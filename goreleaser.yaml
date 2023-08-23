@@ -1,0 +1,30 @@
+project_name: "dispel-multi"
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - main: ./
+    id: dispel-multi
+    binary: dispel-multi
+    env:
+      - CGO_ENABLED=0
+    goos: [ "linux", "windows", "darwin" ]
+    goarch: [ "amd64", "arm64" ]
+    ignore:
+      - { goos: darwin, goarch: amd64 }
+      - { goos: linux, goarch: arm64 }
+      - { goos: windows, goarch: arm64 }
+
+archives:
+  - format_overrides:
+      - goos: windows
+        format: zip
+    rlcp: true
+
+checksum:
+  name_template: 'checksums.txt'
+
+snapshot:
+  name_template: "{{ incpatch .Version }}-next"
