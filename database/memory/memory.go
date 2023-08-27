@@ -284,12 +284,12 @@ func NewMemory() *Memory {
 					{
 						ClassType: model.ClassTypeMage,
 						Name:      "Some Mage",
-						Unknown:   [4]byte{0, 0, 0, 0},
+						IPAddress: [4]byte{0, 0, 0, 0},
 					},
 					{
 						ClassType: model.ClassTypeArcher,
 						Name:      "SkeletonArcher",
-						Unknown:   [4]byte{0, 0, 0, 0},
+						IPAddress: [4]byte{0, 0, 0, 0},
 					},
 				},
 			},

@@ -42,14 +42,14 @@ func (r *GameRoom) Details() []byte {
 
 type LobbyPlayer struct {
 	ClassType ClassType
-	Unknown   [4]byte
+	IPAddress [4]byte
 	Name      string
 }
 
 func (p *LobbyPlayer) ToBytes() []byte {
 	buf := make([]byte, 4+4+len(p.Name)+1)
-	buf[0] = byte(p.ClassType)   // Class type (4 bytes)
-	copy(buf[4:8], p.Unknown[:]) // Unknown (4 bytes)
-	copy(buf[8:], p.Name)        // Character name (null terminated string)
+	buf[0] = byte(p.ClassType)     // Class type (4 bytes)
+	copy(buf[4:8], p.IPAddress[:]) // IP Address (4 bytes)
+	copy(buf[8:], p.Name)          // Character name (null terminated string)
 	return buf
 }
