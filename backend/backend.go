@@ -6,6 +6,7 @@ import (
 
 	"github.com/dispel-re/dispel-multi/database/memory"
 	"github.com/dispel-re/dispel-multi/model"
+	"github.com/google/uuid"
 )
 
 type Backend struct {
@@ -15,7 +16,10 @@ type Backend struct {
 }
 
 func NewBackend(db *memory.Memory) *Backend {
-	return nil
+	return &Backend{
+		DB:       db,
+		Sessions: make(map[string]*model.Session),
+	}
 }
 
 func (b *Backend) Shutdown(ctx context.Context) {
@@ -31,20 +35,23 @@ func (b *Backend) Shutdown(ctx context.Context) {
 }
 
 func (b *Backend) NewSession(conn net.Conn) *model.Session {
-	session := &model.Session{Conn: conn}
-	b.Sessions["id"] = session
+	id := uuid.New().String()
+	session := &model.Session{Conn: conn, ID: id}
+	b.Sessions[id] = session
 	return session
 }
 
 func (b *Backend) CloseSession(session *model.Session) error {
 	// TODO: wrap all errors
-	_, ok := b.Sessions["id"]
+	_, ok := b.Sessions[session.ID]
 	if ok {
-		delete(b.Sessions, "id")
+		delete(b.Sessions, session.ID)
 	}
 
 	if session.Conn != nil {
-		session.Conn.Close()
+		_ = session.Conn.Close()
 	}
+
+	session = nil
 	return nil
 }

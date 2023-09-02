@@ -5,6 +5,7 @@ import (
 )
 
 type Session struct {
+	ID        string
 	User      *User
 	Character *Character
 	Conn      net.Conn
