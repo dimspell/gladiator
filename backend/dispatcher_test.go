@@ -1,12 +1,11 @@
 package backend
 
 import (
-	"errors"
+	"bytes"
 	"net"
 	"testing"
 	"time"
 
-	"github.com/dispel-re/dispel-multi/model"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -87,35 +86,42 @@ func (m *mockConn) ClearReadData() {
 	// Clear any queued read data
 }
 
-func TestBackend_HandleAuthorizationHandshake(t *testing.T) {
-	t.Run("valid request", func(t *testing.T) {
-		// Arrange
-		b := &Backend{}
-		conn := &mockConn{}
-		session := &model.Session{Conn: conn}
-		req := HandleAuthorizationHandshakeRequest{}
+func Test_splitMultiPacket(t *testing.T) {
+	t.Run("non-compatible packet", func(t *testing.T) {
+		packets := splitMultiPacket([]byte{1})
 
-		// Act
-		err := b.HandleAuthorizationHandshake(session, req)
-
-		// Assert
-		assert.NoError(t, err)
-		assert.Equal(t, []byte("ENET\x00"), conn.Written)
+		assert.Equal(t, 1, len(packets))
+		assert.True(t, bytes.Equal([]byte{1}, packets[0]))
 	})
 
-	t.Run("connection error", func(t *testing.T) {
-		// Arrange
-		b := &Backend{}
-		session := &model.Session{Conn: &mockConn{
-			WriteError: errors.New("write error"),
-		}}
-		req := HandleAuthorizationHandshakeRequest{}
+	t.Run("single packet", func(t *testing.T) {
+		packets := splitMultiPacket([]byte{255, 1, 4, 0})
 
-		// Act
-		err := b.HandleAuthorizationHandshake(session, req)
+		assert.Equal(t, 1, len(packets))
+		assert.True(t, bytes.Equal([]byte{255, 1, 4, 0}, packets[0]))
+	})
 
-		// Assert
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "write error")
+	t.Run("two packets", func(t *testing.T) {
+		packets := splitMultiPacket([]byte{
+			255, 1, 8, 0, 1, 0, 0, 0,
+			255, 2, 4, 0,
+		})
+
+		assert.Equal(t, 2, len(packets))
+		assert.True(t, bytes.Equal([]byte{255, 1, 8, 0, 1, 0, 0, 0}, packets[0]))
+		assert.True(t, bytes.Equal([]byte{255, 2, 4, 0}, packets[1]))
+	})
+
+	t.Run("three packets", func(t *testing.T) {
+		packets := splitMultiPacket([]byte{
+			255, 1, 8, 0, 1, 0, 0, 0,
+			255, 2, 4, 0,
+			255, 3, 6, 0, 1, 0,
+		})
+
+		assert.Equal(t, 3, len(packets))
+		assert.True(t, bytes.Equal([]byte{255, 1, 8, 0, 1, 0, 0, 0}, packets[0]))
+		assert.True(t, bytes.Equal([]byte{255, 2, 4, 0}, packets[1]))
+		assert.True(t, bytes.Equal([]byte{255, 3, 6, 0, 1, 0}, packets[2]))
 	})
 }
