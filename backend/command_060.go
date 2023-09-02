@@ -1,7 +1,9 @@
 package backend
 
 import (
+	"bytes"
 	"encoding/binary"
+	"fmt"
 
 	"github.com/dispel-re/dispel-multi/model"
 )
@@ -22,6 +24,13 @@ func (b *Backend) HandleGetCharacters(session *model.Session, req GetCharactersR
 
 type GetCharactersRequest []byte
 
-func (r GetCharactersRequest) Username() string {
-	return string(r[:len(r)-1])
+func (r GetCharactersRequest) Parse() (username string, err error) {
+	if bytes.Count(r, []byte{0}) != 1 {
+		return username, fmt.Errorf("packet-44: malformed payload: %v", r)
+	}
+
+	split := bytes.SplitN(r, []byte{0}, 2)
+	username = string(split[0])
+
+	return username, err
 }

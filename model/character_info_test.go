@@ -8,6 +8,7 @@ import (
 )
 
 func TestNewCharacterInfo(t *testing.T) {
+	// Arrange
 	packet := []byte{
 		255, 92, // Packet header
 		65, 0, // Packet length
@@ -46,7 +47,10 @@ func TestNewCharacterInfo(t *testing.T) {
 		99, 104, 97, 114, 97, 99, 116, 101, 114, 0, // Character name
 	}
 
+	// Act
 	info := NewCharacterInfo(packet[4:])
+
+	// Assert
 	assert.Equal(t, uint16(20), info.Strength)
 	assert.Equal(t, uint16(15), info.Agility)
 	assert.Equal(t, uint16(11), info.Wisdom)

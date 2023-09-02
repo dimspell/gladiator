@@ -7,7 +7,8 @@ import (
 )
 
 func (b *Backend) HandleSelectChannel(session *model.Session, req SelectChannelRequest) error {
-	if req.ChannelName() == "DISPEL" {
+	channelName, _ := req.Parse()
+	if channelName == "DISPEL" {
 		// b.Send(session.Conn, ReceiveMessage, NewMessage())
 	}
 
@@ -16,7 +17,7 @@ func (b *Backend) HandleSelectChannel(session *model.Session, req SelectChannelR
 
 type SelectChannelRequest []byte
 
-func (r SelectChannelRequest) ChannelName() string {
+func (r SelectChannelRequest) Parse() (string, error) {
 	split := bytes.Split(r, []byte{0})
-	return string(split[0])
+	return string(split[0]), nil
 }

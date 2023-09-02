@@ -2,12 +2,16 @@ package backend
 
 import (
 	"bytes"
+	"fmt"
 
 	"github.com/dispel-re/dispel-multi/model"
 )
 
 func (b *Backend) HandleDeleteCharacter(session *model.Session, req DeleteCharacterRequest) error {
-	_, characterName := req.UsernameAndCharacterName()
+	_, characterName, err := req.Parse()
+	if err != nil {
+		return err
+	}
 
 	var characters []model.Character
 	for _, ch := range session.User.Characters {
@@ -25,13 +29,13 @@ func (b *Backend) HandleDeleteCharacter(session *model.Session, req DeleteCharac
 
 type DeleteCharacterRequest []byte
 
-func (r DeleteCharacterRequest) UsernameAndCharacterName() (username string, characterName string) {
+func (r DeleteCharacterRequest) Parse() (username string, characterName string, err error) {
 	if bytes.Count(r, []byte{0}) < 2 {
-		return "", ""
+		return "", "", fmt.Errorf("packet-61: malformed packet, not enough null-terminators")
 	}
 
 	split := bytes.SplitN(r, []byte{0}, 3)
 	username = string(split[0])
 	characterName = string(split[1])
-	return username, characterName
+	return username, characterName, nil
 }

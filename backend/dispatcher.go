@@ -150,22 +150,99 @@ func (b *Backend) handleCommands(session *model.Session) error {
 
 		switch pt {
 		case CreateNewAccount:
+			if err := b.HandleCreateNewAccount(session, packet[4:]); err != nil {
+				return err
+			}
 			break
 		case ClientAuthentication:
+			if err := b.HandleClientAuthentication(session, packet[4:]); err != nil {
+				return err
+			}
 			break
 		case ListChannels:
+			if err := b.HandleListChannels(session, packet[4:]); err != nil {
+				return err
+			}
 			break
 		case SelectedChannel:
+			if err := b.HandleSelectChannel(session, packet[4:]); err != nil {
+				return err
+			}
+			break
+		case SendLobbyMessage:
+			if err := b.HandleSendLobbyMessage(session, packet[4:]); err != nil {
+				return err
+			}
 			break
 		case CreateGame:
+			if err := b.HandleCreateGame(session, packet[4:]); err != nil {
+				return err
+			}
 			break
 		case ListGames:
+			if err := b.HandleListGames(session, packet[4:]); err != nil {
+				return err
+			}
 			break
 		case SelectGame:
+			if err := b.HandleSelectGame(session, packet[4:]); err != nil {
+				return err
+			}
 			break
 		case JoinGame:
+			if err := b.HandleJoinGame(session, packet[4:]); err != nil {
+				return err
+			}
 			break
 		case ShowRanking:
+			if err := b.HandleShowRanking(session, packet[4:]); err != nil {
+				return err
+			}
+			break
+		case UpdateCharacterInventory:
+			if err := b.HandleUpdateCharacterInventory(session, packet[4:]); err != nil {
+				return err
+			}
+			break
+		case GetCharacters:
+			if err := b.HandleGetCharacters(session, packet[4:]); err != nil {
+				return err
+			}
+			break
+		case DeleteCharacter:
+			if err := b.HandleDeleteCharacter(session, packet[4:]); err != nil {
+				return err
+			}
+			break
+		case GetCharacterInventory:
+			if err := b.HandleGetCharacterInventory(session, packet[4:]); err != nil {
+				return err
+			}
+			break
+		case GetCharacterSpells:
+			if err := b.HandleGetCharacterSpells(session, packet[4:]); err != nil {
+				return err
+			}
+			break
+		case UpdateCharacterSpells:
+			if err := b.HandleUpdateCharacterSpells(session, packet[4:]); err != nil {
+				return err
+			}
+			break
+		case SelectCharacter:
+			if err := b.HandleSelectCharacter(session, packet[4:]); err != nil {
+				return err
+			}
+			break
+		case CreateCharacter:
+			if err := b.HandleCreateCharacter(session, packet[4:]); err != nil {
+				return err
+			}
+			break
+		case UpdateCharacterStats:
+			if err := b.HandleUpdateCharacterStats(session, packet[4:]); err != nil {
+				return err
+			}
 			break
 		}
 	}
@@ -177,7 +254,7 @@ func splitMultiPacket(buf []byte) [][]byte {
 		return [][]byte{buf}
 	}
 
-	packets := [][]byte{}
+	var packets [][]byte
 	var offset int
 	for {
 		if (offset + 4) > len(buf) {
@@ -192,6 +269,9 @@ func splitMultiPacket(buf []byte) [][]byte {
 }
 
 func (b *Backend) Send(conn net.Conn, packetType PacketType, payload []byte) error {
+	if conn == nil {
+		return fmt.Errorf("backend: invalid client connection")
+	}
 	_, err := conn.Write(b.EncodePacket(packetType, payload))
 	return err
 }

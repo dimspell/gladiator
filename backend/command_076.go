@@ -2,12 +2,16 @@ package backend
 
 import (
 	"bytes"
+	"fmt"
 
 	"github.com/dispel-re/dispel-multi/model"
 )
 
 func (b *Backend) HandleSelectCharacter(session *model.Session, req SelectCharacterRequest) error {
-	_, characterName := req.UserAndCharacterName()
+	_, characterName, err := req.Parse()
+	if err != nil {
+		return err
+	}
 
 	for _, c := range session.User.Characters {
 		if c.CharacterName == characterName {
@@ -33,9 +37,12 @@ func (b *Backend) HandleSelectCharacter(session *model.Session, req SelectCharac
 
 type SelectCharacterRequest []byte
 
-func (r SelectCharacterRequest) UserAndCharacterName() (username string, characterName string) {
+func (r SelectCharacterRequest) Parse() (user string, character string, err error) {
 	split := bytes.SplitN(r, []byte{0}, 3)
-	username = string(split[0])
-	characterName = string(split[1])
-	return username, characterName
+	if len(split) != 3 {
+		return user, character, fmt.Errorf("packet-76: no enough arguments, malformed request payload: %v", r)
+	}
+	user = string(split[0])
+	character = string(split[1])
+	return user, character, nil
 }

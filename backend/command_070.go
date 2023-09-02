@@ -37,17 +37,14 @@ func NewRankingRequest(classType model.ClassType, resultsOffset uint32, userName
 	return buf
 }
 
-func (r RankingRequest) ClassType() model.ClassType {
-	return model.ClassType(r[0])
-}
+func (r RankingRequest) Parse() (classType model.ClassType, offset uint32, user string, character string, err error) {
+	classType = model.ClassType(r[0])
 
-func (r RankingRequest) Offset() uint32 {
-	return binary.LittleEndian.Uint32(r[4:8])
-}
+	offset = binary.LittleEndian.Uint32(r[4:8])
 
-func (r RankingRequest) UserAndCharacterName() (user string, character string) {
 	split := bytes.Split(r[8:], []byte{0})
 	user = string(split[0])
 	character = string(split[1])
-	return user, character
+
+	return classType, offset, user, character, nil
 }

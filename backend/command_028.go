@@ -9,9 +9,11 @@ import (
 
 // HandleCreateGame handles 0x1cff (255-28) command
 func (b *Backend) HandleCreateGame(session *model.Session, req CreateGameRequest) error {
+	state, _, _, _, _ := req.Parse()
+
 	resp := make([]byte, 4)
 
-	switch req.State() {
+	switch state {
 	case uint32(0):
 		binary.LittleEndian.PutUint32(resp[0:4], 1)
 		// b.CreateGameRoom()
@@ -26,17 +28,13 @@ func (b *Backend) HandleCreateGame(session *model.Session, req CreateGameRequest
 
 type CreateGameRequest []byte
 
-func (c CreateGameRequest) State() uint32 {
-	return binary.LittleEndian.Uint32(c[0:4])
-}
+func (r CreateGameRequest) Parse() (state uint32, mapId uint32, roomName string, password string, err error) {
+	state = binary.LittleEndian.Uint32(r[0:4])
+	mapId = binary.LittleEndian.Uint32(r[4:8])
 
-func (c CreateGameRequest) MapID() uint32 {
-	return binary.LittleEndian.Uint32(c[4:8])
-}
-
-func (c CreateGameRequest) NameAndPassword() (roomName string, password string) {
-	split := bytes.Split(c[8:], []byte{0})
+	split := bytes.Split(r[8:], []byte{0})
 	roomName = string(split[0])
 	password = string(split[1])
-	return roomName, password
+
+	return
 }

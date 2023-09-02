@@ -7,8 +7,10 @@ import (
 )
 
 func (b *Backend) HandleCreateCharacter(session *model.Session, req CreateCharacterRequest) error {
-	info := req.CharacterInfo()
-	_, character := req.UserAndCharacterName()
+	info, _, character, err := req.Parse()
+	if err != nil {
+		return err
+	}
 
 	newCharacter := model.Character{
 		CharacterName: character,
@@ -22,15 +24,15 @@ func (b *Backend) HandleCreateCharacter(session *model.Session, req CreateCharac
 	return b.Send(session.Conn, CreateCharacter, []byte{1, 0, 0, 0})
 }
 
+// TODO: check if there is any additional not recognised byte at the end
 type CreateCharacterRequest []byte
 
-func (r CreateCharacterRequest) CharacterInfo() model.CharacterInfo {
-	return model.NewCharacterInfo(r[:56])
-}
+func (r CreateCharacterRequest) Parse() (info model.CharacterInfo, user string, character string, err error) {
+	info = model.NewCharacterInfo(r[:56])
 
-func (r CreateCharacterRequest) UserAndCharacterName() (username string, characterName string) {
-	split := bytes.SplitN(r, []byte{0}, 3)
-	username = string(split[0])
-	characterName = string(split[1])
-	return username, characterName
+	split := bytes.SplitN(r[56:], []byte{0}, 3)
+	user = string(split[0])
+	character = string(split[1])
+
+	return info, user, character, err
 }

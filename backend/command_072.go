@@ -1,6 +1,11 @@
 package backend
 
-import "github.com/dispel-re/dispel-multi/model"
+import (
+	"bytes"
+	"fmt"
+
+	"github.com/dispel-re/dispel-multi/model"
+)
 
 func (b *Backend) HandleGetCharacterSpells(session *model.Session, req GetCharacterSpellsRequest) error {
 	// spells := make([]byte, 41)
@@ -15,7 +20,20 @@ func (b *Backend) HandleGetCharacterSpells(session *model.Session, req GetCharac
 	// _, _ = conn.Write(resp)
 	// _, err := conn.Write(resp)
 
+	// GetCharacterSpells
+
 	return nil
 }
 
 type GetCharacterSpellsRequest []byte
+
+func (r GetCharacterSpellsRequest) Parse() (username string, characterName string, err error) {
+	if bytes.Count(r, []byte{0}) < 2 {
+		return "", "", fmt.Errorf("packet-72: malformed packet, not enough null-terminators")
+	}
+
+	split := bytes.SplitN(r, []byte{0}, 3)
+	username = string(split[0])
+	characterName = string(split[1])
+	return username, characterName, nil
+}

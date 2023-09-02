@@ -1,6 +1,11 @@
 package backend
 
-import "github.com/dispel-re/dispel-multi/model"
+import (
+	"bytes"
+	"fmt"
+
+	"github.com/dispel-re/dispel-multi/model"
+)
 
 func (b *Backend) HandleGetCharacterInventory(session *model.Session, req GetCharacterInventoryRequest) error {
 	resp := make([]byte, 207)
@@ -21,3 +26,16 @@ func (b *Backend) HandleGetCharacterInventory(session *model.Session, req GetCha
 }
 
 type GetCharacterInventoryRequest []byte
+
+func (r GetCharacterInventoryRequest) Parse() (username string, characterName string, unknown []byte, err error) {
+	if bytes.Count(r, []byte{0}) != 3 {
+		return username, characterName, unknown, fmt.Errorf("packet-61: malformed packet, not enough null-terminators")
+	}
+
+	split := bytes.SplitN(r, []byte{0}, 3)
+	username = string(split[0])
+	characterName = string(split[1])
+	unknown = split[2]
+
+	return username, characterName, unknown, nil
+}

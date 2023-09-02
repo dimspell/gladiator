@@ -16,8 +16,9 @@ func TestDeleteCharacterRequest_UsernameAndCharacterName(t *testing.T) {
 			0, // Unknown (slot?)
 		}
 		req := DeleteCharacterRequest(packet[4:])
-		user, character := req.UsernameAndCharacterName()
+		user, character, err := req.Parse()
 
+		assert.NoError(t, err)
 		assert.Equal(t, "user", user)
 		assert.Equal(t, "character", character)
 	})
@@ -28,9 +29,10 @@ func TestDeleteCharacterRequest_UsernameAndCharacterName(t *testing.T) {
 		req := DeleteCharacterRequest(data)
 
 		// Act
-		username, characterName := req.UsernameAndCharacterName()
+		username, characterName, err := req.Parse()
 
 		// Assert
+		assert.NoError(t, err)
 		assert.Equal(t, "user", username)
 		assert.Equal(t, "character", characterName)
 	})
@@ -41,9 +43,10 @@ func TestDeleteCharacterRequest_UsernameAndCharacterName(t *testing.T) {
 		req := DeleteCharacterRequest(data)
 
 		// Act
-		username, characterName := req.UsernameAndCharacterName()
+		username, characterName, err := req.Parse()
 
 		// Assert
+		assert.Error(t, err)
 		assert.Empty(t, username)
 		assert.Empty(t, characterName)
 	})
@@ -54,9 +57,10 @@ func TestDeleteCharacterRequest_UsernameAndCharacterName(t *testing.T) {
 		req := DeleteCharacterRequest(data)
 
 		// Act
-		username, characterName := req.UsernameAndCharacterName()
+		username, characterName, err := req.Parse()
 
 		// Assert
+		assert.Error(t, err)
 		assert.Empty(t, username)
 		assert.Empty(t, characterName)
 	})
