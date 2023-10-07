@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/dispel-re/dispel-multi/backend"
-	"github.com/dispel-re/dispel-multi/database/memory"
+	"github.com/dispel-re/dispel-multi/internal/database/memory"
 	"github.com/go-chi/chi/v5"
 )
 
