@@ -44,7 +44,7 @@ type AuthorizationHandshakeRequestData struct {
 
 // Parse extract data from the command packet.
 func (r AuthorizationHandshakeRequest) Parse() (data AuthorizationHandshakeRequestData, err error) {
-	if len(r) >= 12 {
+	if len(r) < 12 {
 		return data, fmt.Errorf("malformed packet")
 	}
 
