@@ -3,7 +3,7 @@ package action
 import (
 	"github.com/dispel-re/dispel-multi/backend"
 	"github.com/dispel-re/dispel-multi/console"
-	"github.com/dispel-re/dispel-multi/database/memory"
+	"github.com/dispel-re/dispel-multi/internal/database/memory"
 	"github.com/urfave/cli/v3"
 )
 

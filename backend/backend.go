@@ -4,7 +4,7 @@ import (
 	"context"
 	"net"
 
-	"github.com/dispel-re/dispel-multi/database/memory"
+	"github.com/dispel-re/dispel-multi/internal/database/memory"
 	"github.com/dispel-re/dispel-multi/model"
 	"github.com/google/uuid"
 )
@@ -30,7 +30,7 @@ func (b *Backend) Shutdown(ctx context.Context) {
 
 	// TODO: Send a system message "(system) The server is going to close in less than 30 seconds"
 	// TODO: Send a packet to trigger stats saving
-	// TODO: Send a system message "(system): Your stats were saving, your game client might close in next 10 seconds"
+	// TODO: Send a system message "(system): Your stats were saving, your game client might close in the next 10 seconds"
 	// TODO: Send a packet to close the connection (malformed 255-21?)
 }
 
