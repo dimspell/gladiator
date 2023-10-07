@@ -50,10 +50,10 @@ func TestAuthorizationHandshakeRequest(t *testing.T) {
 
 	// Act
 	req := AuthorizationHandshakeRequest(packet[4:])
-	authKey, unknown, err := req.Parse()
+	data, err := req.Parse()
 
 	// Assert
 	assert.NoError(t, err)
-	assert.Equal(t, "68XIPSID", authKey)
-	assert.Equal(t, uint32(3), unknown)
+	assert.Equal(t, "68XIPSID", data.AuthKey)
+	assert.Equal(t, uint32(3), data.Unknown)
 }
