@@ -9,14 +9,19 @@ import (
 
 func TestRankingRequest(t *testing.T) {
 	t.Run("NewRankingRequest", func(t *testing.T) {
-		req := NewRankingRequest(model.ClassTypeKnight, 1000, "user", "character")
-		classType, offset, user, character, err := req.Parse()
+		req := NewRankingRequest(RankingRequestData{
+			ClassType:     model.ClassTypeKnight,
+			Offset:        1000,
+			Username:      "user",
+			CharacterName: "character",
+		})
+		data, err := req.Parse()
 
 		assert.NoError(t, err)
-		assert.Equal(t, model.ClassTypeKnight, classType)
-		assert.Equal(t, uint32(1000), offset)
-		assert.Equal(t, "user", user)
-		assert.Equal(t, "character", character)
+		assert.Equal(t, model.ClassTypeKnight, data.ClassType)
+		assert.Equal(t, uint32(1000), data.Offset)
+		assert.Equal(t, "user", data.Username)
+		assert.Equal(t, "character", data.CharacterName)
 	})
 
 	t.Run("First page for warrior", func(t *testing.T) {
@@ -29,13 +34,13 @@ func TestRankingRequest(t *testing.T) {
 			99, 104, 97, 114, 97, 99, 116, 101, 114, 0, // Character name
 		}
 		req := RankingRequest(packet[4:])
-		classType, offset, user, character, err := req.Parse()
+		data, err := req.Parse()
 
 		assert.NoError(t, err)
-		assert.Equal(t, model.ClassTypeWarrior, classType)
-		assert.Equal(t, uint32(0), offset)
-		assert.Equal(t, "user", user)
-		assert.Equal(t, "character", character)
+		assert.Equal(t, model.ClassTypeWarrior, data.ClassType)
+		assert.Equal(t, uint32(0), data.Offset)
+		assert.Equal(t, "user", data.Username)
+		assert.Equal(t, "character", data.CharacterName)
 	})
 
 	t.Run("Second page for mage", func(t *testing.T) {
@@ -48,12 +53,12 @@ func TestRankingRequest(t *testing.T) {
 			99, 104, 97, 114, 97, 99, 116, 101, 114, 0, // Character name
 		}
 		req := RankingRequest(packet[4:])
-		classType, offset, user, character, err := req.Parse()
+		data, err := req.Parse()
 
 		assert.NoError(t, err)
-		assert.Equal(t, model.ClassTypeMage, classType)
-		assert.Equal(t, uint32(10), offset)
-		assert.Equal(t, "user", user)
-		assert.Equal(t, "character", character)
+		assert.Equal(t, model.ClassTypeMage, data.ClassType)
+		assert.Equal(t, uint32(10), data.Offset)
+		assert.Equal(t, "user", data.Username)
+		assert.Equal(t, "character", data.CharacterName)
 	})
 }

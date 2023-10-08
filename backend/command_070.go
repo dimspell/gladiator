@@ -15,36 +15,42 @@ func (b *Backend) HandleShowRanking(session *model.Session, req RankingRequest) 
 
 type RankingRequest []byte
 
-func NewRankingRequest(classType model.ClassType, resultsOffset uint32, userName string, characterName string) RankingRequest {
-	userNameLength := len(userName)
-	characterNameLength := len(characterName)
+type RankingRequestData struct {
+	ClassType     model.ClassType
+	Offset        uint32
+	Username      string
+	CharacterName string
+}
+
+func NewRankingRequest(data RankingRequestData) RankingRequest {
+	userNameLength := len(data.Username)
+	characterNameLength := len(data.CharacterName)
 
 	buf := make([]byte, 4+4+userNameLength+1+characterNameLength+1)
 
 	// 0:4 Class type
-	buf[0] = byte(classType)
+	buf[0] = byte(data.ClassType)
 
 	// 4:8 Offset used in pagination
-	binary.LittleEndian.PutUint32(buf[4:8], resultsOffset)
+	binary.LittleEndian.PutUint32(buf[4:8], data.Offset)
 
 	// Username (null-terminated string)
-	copy(buf[8:], userName)
+	copy(buf[8:], data.Username)
 	buf[8+userNameLength] = 0
 
 	// Character name (null-terminated string)
-	copy(buf[8+userNameLength+1:], characterName)
+	copy(buf[8+userNameLength+1:], data.CharacterName)
 
 	return buf
 }
 
-func (r RankingRequest) Parse() (classType model.ClassType, offset uint32, user string, character string, err error) {
-	classType = model.ClassType(r[0])
-
-	offset = binary.LittleEndian.Uint32(r[4:8])
+func (r RankingRequest) Parse() (data RankingRequestData, err error) {
+	data.ClassType = model.ClassType(r[0])
+	data.Offset = binary.LittleEndian.Uint32(r[4:8])
 
 	split := bytes.Split(r[8:], []byte{0})
-	user = string(split[0])
-	character = string(split[1])
+	data.Username = string(split[0])
+	data.CharacterName = string(split[1])
 
-	return classType, offset, user, character, nil
+	return data, nil
 }

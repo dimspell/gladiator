@@ -18,11 +18,11 @@ func TestClientAuthenticationRequest(t *testing.T) {
 
 	// Act
 	req := ClientAuthenticationRequest(packet[4:])
-	unknown, username, password, err := req.Parse()
+	data, err := req.Parse()
 
 	// Assert
 	assert.NoError(t, err)
-	assert.Equal(t, uint32(2), unknown)
-	assert.Equal(t, "pass", password)
-	assert.Equal(t, "login", username)
+	assert.Equal(t, uint32(2), data.Unknown)
+	assert.Equal(t, "pass", data.Password)
+	assert.Equal(t, "login", data.Username)
 }

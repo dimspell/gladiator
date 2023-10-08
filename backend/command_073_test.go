@@ -18,65 +18,65 @@ func Test_UpdateCharacterSpellsRequest(t *testing.T) {
 
 	// Act
 	req := UpdateCharacterSpellsRequest(packet[4:])
-	username, characterName, spells, err := req.Parse()
+	data, err := req.Parse()
 
 	// Assert
 	assert.NoError(t, err)
-	assert.Equal(t, "user", username)
-	assert.Equal(t, "character", characterName)
+	assert.Equal(t, "user", data.Username)
+	assert.Equal(t, "character", data.CharacterName)
 	assert.Equal(t,
 		[]byte{2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0},
-		spells,
+		data.Spells,
 	)
 }
 
 func TestUpdateCharacterSpellsRequest_Parse(t *testing.T) {
 	t.Run("valid payload", func(t *testing.T) {
 		// Arrange
-		data := append(
+		input := append(
 			[]byte("user\x00character\x00"),
 			[]byte{2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0}...,
 		)
 
 		// Act
-		req := UpdateCharacterSpellsRequest(data)
-		username, characterName, spells, err := req.Parse()
+		req := UpdateCharacterSpellsRequest(input)
+		data, err := req.Parse()
 
 		// Assert
 		assert.NoError(t, err)
-		assert.Equal(t, "user", username)
-		assert.Equal(t, "character", characterName)
-		assert.Equal(t, []byte{2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0}, spells)
+		assert.Equal(t, "user", data.Username)
+		assert.Equal(t, "character", data.CharacterName)
+		assert.Equal(t, []byte{2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0}, data.Spells)
 	})
 
 	t.Run("invalid spells length", func(t *testing.T) {
 		// Arrange
-		data := []byte("user\x00character\x00badspells")
+		input := []byte("user\x00character\x00badspells")
 
 		// Act
-		req := UpdateCharacterSpellsRequest(data)
-		username, characterName, spells, err := req.Parse()
+		req := UpdateCharacterSpellsRequest(input)
+		data, err := req.Parse()
 
 		// Assert
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid length")
-		assert.Empty(t, username)
-		assert.Empty(t, characterName)
-		assert.Empty(t, spells)
+		assert.Empty(t, data.Username)
+		assert.Empty(t, data.CharacterName)
+		assert.Empty(t, data.Spells)
 	})
 
 	t.Run("missing null byte", func(t *testing.T) {
 		// Arrange
-		data := []byte("usercharacter\x00spells")
+		input := []byte("usercharacter\x00spells")
 
 		// Act
-		req := UpdateCharacterSpellsRequest(data)
-		username, characterName, spells, err := req.Parse()
+		req := UpdateCharacterSpellsRequest(input)
+		data, err := req.Parse()
 
 		// Assert
 		assert.Error(t, err)
-		assert.Empty(t, username)
-		assert.Empty(t, characterName)
-		assert.Empty(t, spells)
+		assert.Empty(t, data.Username)
+		assert.Empty(t, data.CharacterName)
+		assert.Empty(t, data.Spells)
 	})
 }

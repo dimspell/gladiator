@@ -18,13 +18,20 @@ func (b *Backend) HandleCreateNewAccount(session *model.Session, req CreateNewAc
 
 type CreateNewAccountRequest []byte
 
-func (r CreateNewAccountRequest) Parse() (cdKey uint32, username string, password string, unknown []byte, err error) {
-	cdKey = binary.LittleEndian.Uint32(r[0:4])
+type CreateNewAccountRequestData struct {
+	CDKey    uint32
+	Username string
+	Password string
+	Unknown  []byte
+}
+
+func (r CreateNewAccountRequest) Parse() (data CreateNewAccountRequestData, err error) {
+	data.CDKey = binary.LittleEndian.Uint32(r[0:4])
 	split := bytes.SplitN(r[4:], []byte{0}, 3)
-	password = string(split[0])
-	username = string(split[1])
-	unknown = split[2]
-	return cdKey, username, password, unknown, err
+	data.Password = string(split[0])
+	data.Username = string(split[1])
+	data.Unknown = split[2]
+	return data, err
 }
 
 type CreateNewAccountResponse [4]byte

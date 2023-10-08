@@ -2,20 +2,22 @@ package backend
 
 import (
 	"bytes"
+	"encoding/base64"
+	"fmt"
 
 	"github.com/dispel-re/dispel-multi/model"
 )
 
 func (b *Backend) HandleCreateCharacter(session *model.Session, req CreateCharacterRequest) error {
-	info, _, character, err := req.Parse()
+	data, err := req.Parse()
 	if err != nil {
 		return err
 	}
 
 	newCharacter := model.Character{
-		CharacterName: character,
+		CharacterName: data.CharacterName,
 		Slot:          0,
-		Info:          info,
+		Info:          data.CharacterInfo,
 		Inventory:     model.CharacterInventory{},
 		Spells:        nil,
 	}
@@ -27,12 +29,24 @@ func (b *Backend) HandleCreateCharacter(session *model.Session, req CreateCharac
 // TODO: check if there is any additional not recognised byte at the end
 type CreateCharacterRequest []byte
 
-func (r CreateCharacterRequest) Parse() (info model.CharacterInfo, user string, character string, err error) {
-	info = model.NewCharacterInfo(r[:56])
+type CreateCharacterRequestData struct {
+	CharacterInfo model.CharacterInfo
+	Username      string
+	CharacterName string
+}
 
+func (r CreateCharacterRequest) Parse() (data CreateCharacterRequestData, err error) {
+	if len(r) < 56 {
+		return data, fmt.Errorf("packet-92: packet is too short: %s", base64.StdEncoding.EncodeToString(r))
+	}
 	split := bytes.SplitN(r[56:], []byte{0}, 3)
-	user = string(split[0])
-	character = string(split[1])
+	if len(split) != 3 {
+		return data, fmt.Errorf("packet-92: no enough arguments, malformed request payload: %s", base64.StdEncoding.EncodeToString(r))
+	}
 
-	return info, user, character, err
+	data.CharacterInfo = model.NewCharacterInfo(r[:56])
+	data.Username = string(split[0])
+	data.CharacterName = string(split[1])
+
+	return data, err
 }

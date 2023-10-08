@@ -17,7 +17,7 @@ type RankingPosition struct {
 }
 
 func (ranking *Ranking) ToBytes() []byte {
-	buf := []byte{}
+	var buf = []byte{}
 
 	buf = binary.LittleEndian.AppendUint32(buf, uint32(len(ranking.Players)))
 

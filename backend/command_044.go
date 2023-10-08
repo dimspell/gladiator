@@ -19,19 +19,25 @@ func (b *Backend) HandleUpdateCharacterInventory(session *model.Session, req Upd
 
 type UpdateCharacterInventoryRequest []byte
 
-func (r UpdateCharacterInventoryRequest) Parse() (username string, character string, inventory []byte, err error) {
+type UpdateCharacterInventoryRequestData struct {
+	Username      string
+	CharacterName string
+	Inventory     []byte
+}
+
+func (r UpdateCharacterInventoryRequest) Parse() (data UpdateCharacterInventoryRequestData, err error) {
 	if bytes.Count(r, []byte{0}) != 3 {
-		return username, character, inventory, fmt.Errorf("packet-44: malformed payload: %v", r)
+		return data, fmt.Errorf("packet-44: malformed payload: %v", r)
 	}
 
 	split := bytes.SplitN(r, []byte{0}, 4)
 	if len(split[2]) != 207 {
-		return username, character, inventory, fmt.Errorf("packet-44: invalid length of inventory array")
+		return data, fmt.Errorf("packet-44: invalid length of inventory array")
 	}
 
-	username = string(split[0])
-	character = string(split[1])
-	inventory = split[2]
+	data.Username = string(split[0])
+	data.CharacterName = string(split[1])
+	data.Inventory = split[2]
 
-	return username, character, inventory, err
+	return data, err
 }

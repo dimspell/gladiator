@@ -42,17 +42,17 @@ func TestCreateCharacterRequest(t *testing.T) {
 		1, 0, // Polearms
 		1, 0, // Wizardry
 		0, 0, 0, 0, 0, 0, // Unknown
-		117, 115, 101, 114, 0, // User name
+		117, 115, 101, 114, 0, // Username
 		99, 104, 97, 114, 97, 99, 116, 101, 114, 0, // Character name
 	}
 
 	// Act
 	req := CreateCharacterRequest(packet[4:])
-	info, userName, characterName, err := req.Parse()
+	data, err := req.Parse()
 
 	// Assert
 	assert.NoError(t, err)
-	assert.Equal(t, packet[4:60], info.ToBytes())
-	assert.Equal(t, "user", userName)
-	assert.Equal(t, "character", characterName)
+	assert.Equal(t, packet[4:60], data.CharacterInfo.ToBytes())
+	assert.Equal(t, "user", data.Username)
+	assert.Equal(t, "character", data.CharacterName)
 }

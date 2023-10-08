@@ -17,10 +17,10 @@ func TestClientHostAndUsernameRequest(t *testing.T) {
 
 	// Act
 	req := ClientHostAndUsernameRequest(packet[4:])
-	hostname, hostUser, err := req.Parse()
+	data, err := req.Parse()
 
 	// Assert
 	assert.NoError(t, err)
-	assert.Equal(t, "DESKTOP-1337ISH", hostname)
-	assert.Equal(t, "User", hostUser)
+	assert.Equal(t, "DESKTOP-1337ISH", data.ComputerHostname)
+	assert.Equal(t, "User", data.ComputerUsername)
 }

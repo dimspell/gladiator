@@ -17,10 +17,10 @@ func TestSelectCharacterRequest(t *testing.T) {
 
 	// Act
 	req := SelectCharacterRequest(packet[4:])
-	username, characterName, err := req.Parse()
+	data, err := req.Parse()
 
 	// Assert
 	assert.NoError(t, err)
-	assert.Equal(t, "user", username)
-	assert.Equal(t, "character", characterName)
+	assert.Equal(t, "user", data.Username)
+	assert.Equal(t, "character", data.CharacterName)
 }

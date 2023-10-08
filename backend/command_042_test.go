@@ -20,12 +20,12 @@ func TestCreateNewAccountRequest(t *testing.T) {
 
 	// Act
 	req := CreateNewAccountRequest(packet[4:])
-	cdKey, username, password, unknown, err := req.Parse()
+	data, err := req.Parse()
 
 	// Assert
 	assert.NoError(t, err)
-	assert.Equal(t, uint32(20001), cdKey)
-	assert.Equal(t, "password", password)
-	assert.Equal(t, "user", username)
-	assert.True(t, bytes.Equal([]byte{0, 0, 49, 207, 69, 0}, unknown))
+	assert.Equal(t, uint32(20001), data.CDKey)
+	assert.Equal(t, "password", data.Password)
+	assert.Equal(t, "user", data.Username)
+	assert.True(t, bytes.Equal([]byte{0, 0, 49, 207, 69, 0}, data.Unknown))
 }

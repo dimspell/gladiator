@@ -18,11 +18,11 @@ func TestGetCharacterInventoryRequest(t *testing.T) {
 	req := GetCharacterInventoryRequest(packet[4:])
 
 	// Act
-	user, character, unknown, err := req.Parse()
+	data, err := req.Parse()
 
 	// Assert
 	assert.NoError(t, err)
-	assert.Equal(t, "user", user)
-	assert.Equal(t, "character", character)
-	assert.Equal(t, []byte{0}, unknown)
+	assert.Equal(t, "user", data.Username)
+	assert.Equal(t, "character", data.CharacterName)
+	assert.Equal(t, []byte{0}, data.Unknown)
 }

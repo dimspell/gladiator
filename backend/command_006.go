@@ -10,15 +10,16 @@ import (
 // HandleAuthorizationHandshake handles 0x6ff (255-6) command.
 //
 // This command is called from the game client during initial handshake, after
-// player clicked on the "Play" button and game server handled 255-30 command.
+// player clicked on the "Play" button and the game server previously responded
+// on command 255-30.
 //
 // It expects to receive an authorization key "68XIPSID" (note: not a null
 // terminated string) from the game client. If the key matches, then the game
 // server is going to respond with "ENET" (also a null-terminated string).
 //
 // When the game client will receive the response on the 255-6 command, it is
-// going to display login screen, asking user to create a new account or sign in
-// using already existing credentials.
+// going to display a login screen, asking user to create a new account or sign
+// in using with already existing credentials.
 func (b *Backend) HandleAuthorizationHandshake(session *model.Session, req AuthorizationHandshakeRequest) error {
 	data, err := req.Parse()
 	if err != nil {

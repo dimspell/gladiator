@@ -17,10 +17,10 @@ func TestGetCharacterSpells(t *testing.T) {
 
 	// Act
 	req := GetCharacterSpellsRequest(packet[4:])
-	user, character, err := req.Parse()
+	data, err := req.Parse()
 
 	// Assert
 	assert.NoError(t, err)
-	assert.Equal(t, "user", user)
-	assert.Equal(t, "character", character)
+	assert.Equal(t, "user", data.Username)
+	assert.Equal(t, "character", data.CharacterName)
 }

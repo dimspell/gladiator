@@ -19,12 +19,12 @@ func TestCreateGameRequest(t *testing.T) {
 
 	// Act
 	req := CreateGameRequest(packet[4:])
-	state, mapId, roomName, password, err := req.Parse()
+	data, err := req.Parse()
 
 	// Assert
 	assert.NoError(t, err)
-	assert.Equal(t, uint32(1), state)
-	assert.Equal(t, uint32(3), mapId)
-	assert.Equal(t, "room", roomName)
-	assert.Equal(t, "", password)
+	assert.Equal(t, uint32(1), data.State)
+	assert.Equal(t, uint32(3), data.MapID)
+	assert.Equal(t, "room", data.RoomName)
+	assert.Equal(t, "", data.Password)
 }

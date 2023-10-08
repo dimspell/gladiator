@@ -18,12 +18,18 @@ func (b *Backend) HandleClientAuthentication(session *model.Session, req ClientA
 
 type ClientAuthenticationRequest []byte
 
-func (r ClientAuthenticationRequest) Parse() (unknown uint32, username string, password string, err error) {
-	unknown = binary.LittleEndian.Uint32(r[0:4])
+type ClientAuthenticationRequestData struct {
+	Unknown  uint32
+	Username string
+	Password string
+}
+
+func (r ClientAuthenticationRequest) Parse() (data ClientAuthenticationRequestData, err error) {
+	data.Unknown = binary.LittleEndian.Uint32(r[0:4])
 
 	split := bytes.SplitN(r[4:], []byte{0}, 3)
-	password = string(split[0])
-	username = string(split[1])
+	data.Password = string(split[0])
+	data.Username = string(split[1])
 
-	return unknown, username, password, nil
+	return data, nil
 }

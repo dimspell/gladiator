@@ -16,52 +16,52 @@ func TestDeleteCharacterRequest_UsernameAndCharacterName(t *testing.T) {
 			0, // Unknown (slot?)
 		}
 		req := DeleteCharacterRequest(packet[4:])
-		user, character, err := req.Parse()
+		data, err := req.Parse()
 
 		assert.NoError(t, err)
-		assert.Equal(t, "user", user)
-		assert.Equal(t, "character", character)
+		assert.Equal(t, "user", data.Username)
+		assert.Equal(t, "character", data.CharacterName)
 	})
 
 	t.Run("valid names", func(t *testing.T) {
 		// Arrange
-		data := []byte("user\x00character\x00\x00")
-		req := DeleteCharacterRequest(data)
+		input := []byte("user\x00character\x00\x00")
+		req := DeleteCharacterRequest(input)
 
 		// Act
-		username, characterName, err := req.Parse()
+		data, err := req.Parse()
 
 		// Assert
 		assert.NoError(t, err)
-		assert.Equal(t, "user", username)
-		assert.Equal(t, "character", characterName)
+		assert.Equal(t, "user", data.Username)
+		assert.Equal(t, "character", data.CharacterName)
 	})
 
 	t.Run("missing null byte", func(t *testing.T) {
 		// Arrange
-		data := []byte("usercharacter\x00")
-		req := DeleteCharacterRequest(data)
+		input := []byte("usercharacter\x00")
+		req := DeleteCharacterRequest(input)
 
 		// Act
-		username, characterName, err := req.Parse()
+		data, err := req.Parse()
 
 		// Assert
 		assert.Error(t, err)
-		assert.Empty(t, username)
-		assert.Empty(t, characterName)
+		assert.Empty(t, data.Username)
+		assert.Empty(t, data.CharacterName)
 	})
 
 	t.Run("empty data", func(t *testing.T) {
 		// Arrange
-		data := []byte{}
-		req := DeleteCharacterRequest(data)
+		input := []byte{}
+		req := DeleteCharacterRequest(input)
 
 		// Act
-		username, characterName, err := req.Parse()
+		data, err := req.Parse()
 
 		// Assert
 		assert.Error(t, err)
-		assert.Empty(t, username)
-		assert.Empty(t, characterName)
+		assert.Empty(t, data.Username)
+		assert.Empty(t, data.CharacterName)
 	})
 }

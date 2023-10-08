@@ -27,13 +27,18 @@ func (b *Backend) HandleGetCharacterSpells(session *model.Session, req GetCharac
 
 type GetCharacterSpellsRequest []byte
 
-func (r GetCharacterSpellsRequest) Parse() (username string, characterName string, err error) {
-	if bytes.Count(r, []byte{0}) < 2 {
-		return "", "", fmt.Errorf("packet-72: malformed packet, not enough null-terminators")
-	}
+type GetCharacterSpellsRequestData struct {
+	Username      string
+	CharacterName string
+}
 
+func (r GetCharacterSpellsRequest) Parse() (data GetCharacterSpellsRequestData, err error) {
+	if bytes.Count(r, []byte{0}) < 2 {
+		return data, fmt.Errorf("packet-72: malformed packet, not enough null-terminators")
+	}
 	split := bytes.SplitN(r, []byte{0}, 3)
-	username = string(split[0])
-	characterName = string(split[1])
-	return username, characterName, nil
+	data.Username = string(split[0])
+	data.CharacterName = string(split[1])
+
+	return data, nil
 }

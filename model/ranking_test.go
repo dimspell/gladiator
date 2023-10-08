@@ -37,18 +37,18 @@ func TestRanking(t *testing.T) {
 
 			1, 0, 0, 0, // Ranking position = 1
 			200, 0, 0, 0, // Points = 200
-			85, 115, 101, 114, 49, 0, // User name = User1
-			87, 97, 114, 114, 105, 111, 114, 0, // Character name =Warrior
+			85, 115, 101, 114, 49, 0, // Username = "User1"
+			87, 97, 114, 114, 105, 111, 114, 0, // Character name = "Warrior"
 
 			2, 0, 0, 0, // Ranking position = 2
 			150, 0, 0, 0, // Points = 150
-			67, 117, 114, 114, 101, 110, 116, 0, // User name = Current
-			77, 97, 103, 101, 0, // Character name = Mage
+			67, 117, 114, 114, 101, 110, 116, 0, // Username = "Current"
+			77, 97, 103, 101, 0, // Character name = "Mage"
 
 			2, 0, 0, 0, // Ranking position = 2
 			150, 0, 0, 0, // Points = 150
-			67, 117, 114, 114, 101, 110, 116, 0, // User name = Current
-			77, 97, 103, 101, 0, // Character name = Mage
+			67, 117, 114, 114, 101, 110, 116, 0, // Username = "Current"
+			77, 97, 103, 101, 0, // Character name = "Mage"
 		},
 		ranking.ToBytes(),
 	))

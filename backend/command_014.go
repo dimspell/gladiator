@@ -21,7 +21,7 @@ func (b *Backend) HandleSendLobbyMessage(session *model.Session, req SendLobbyMe
 
 type SendLobbyMessageRequest []byte
 
-func (c SendLobbyMessageRequest) Parse() (string, error) {
+func (c SendLobbyMessageRequest) Parse() (message string, err error) {
 	split := bytes.SplitN(c, []byte{0}, 2)
 	if len(split) != 2 {
 		return "", fmt.Errorf("packet-14: malformed packet, missing null terminator")

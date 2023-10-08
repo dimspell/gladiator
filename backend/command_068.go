@@ -27,15 +27,21 @@ func (b *Backend) HandleGetCharacterInventory(session *model.Session, req GetCha
 
 type GetCharacterInventoryRequest []byte
 
-func (r GetCharacterInventoryRequest) Parse() (username string, characterName string, unknown []byte, err error) {
+type GetCharacterInventoryRequestData struct {
+	Username      string
+	CharacterName string
+	Unknown       []byte
+}
+
+func (r GetCharacterInventoryRequest) Parse() (data GetCharacterInventoryRequestData, err error) {
 	if bytes.Count(r, []byte{0}) != 3 {
-		return username, characterName, unknown, fmt.Errorf("packet-61: malformed packet, not enough null-terminators")
+		return data, fmt.Errorf("packet-61: malformed packet, not enough null-terminators")
 	}
-
 	split := bytes.SplitN(r, []byte{0}, 3)
-	username = string(split[0])
-	characterName = string(split[1])
-	unknown = split[2]
 
-	return username, characterName, unknown, nil
+	data.Username = string(split[0])
+	data.CharacterName = string(split[1])
+	data.Unknown = split[2]
+
+	return data, nil
 }

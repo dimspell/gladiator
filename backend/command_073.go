@@ -2,13 +2,14 @@ package backend
 
 import (
 	"bytes"
+	"encoding/base64"
 	"fmt"
 
 	"github.com/dispel-re/dispel-multi/model"
 )
 
 func (b *Backend) HandleUpdateCharacterSpells(session *model.Session, req UpdateCharacterSpellsRequest) error {
-	_, _, _, err := req.Parse()
+	_, err := req.Parse()
 	if err != nil {
 		return err
 	}
@@ -18,16 +19,23 @@ func (b *Backend) HandleUpdateCharacterSpells(session *model.Session, req Update
 
 type UpdateCharacterSpellsRequest []byte
 
-func (r UpdateCharacterSpellsRequest) Parse() (user string, character string, spells []byte, err error) {
+type UpdateCharacterSpellsRequestData struct {
+	Username      string
+	CharacterName string
+	Spells        []byte
+}
+
+func (r UpdateCharacterSpellsRequest) Parse() (data UpdateCharacterSpellsRequestData, err error) {
 	split := bytes.SplitN(r, []byte{0}, 3)
 	if len(split) != 3 {
-		return user, character, spells, fmt.Errorf("packet-73: no enough arguments, malformed request payload: %v", r)
+		return data, fmt.Errorf("packet-73: no enough arguments, malformed request payload: %s", base64.StdEncoding.EncodeToString(r))
 	}
 	if len(split[2]) != 43 {
-		return user, character, spells, fmt.Errorf("packet-73: the spells array has invalid length: %v", r)
+		return data, fmt.Errorf("packet-73: the spells array has invalid length: %s", base64.StdEncoding.EncodeToString(r))
 	}
-	user = string(split[0])
-	character = string(split[1])
-	spells = split[2]
-	return user, character, spells, nil
+
+	data.Username = string(split[0])
+	data.CharacterName = string(split[1])
+	data.Spells = split[2]
+	return data, nil
 }

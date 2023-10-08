@@ -49,12 +49,12 @@ func TestUpdateCharacterStatsRequest(t *testing.T) {
 
 	// Act
 	req := UpdateCharacterStatsRequest(packet[4:])
-	info, userName, characterName, unknown, err := req.Parse()
+	data, err := req.Parse()
 
 	// Assert
 	assert.NoError(t, err)
-	assert.Equal(t, packet[4:60], info.ToBytes())
-	assert.Equal(t, "user", userName)
-	assert.Equal(t, "character", characterName)
-	assert.Equal(t, []byte{0}, unknown)
+	assert.Equal(t, packet[4:60], data.CharacterInfo.ToBytes())
+	assert.Equal(t, "user", data.User)
+	assert.Equal(t, "character", data.Character)
+	assert.Equal(t, []byte{0}, data.Unknown)
 }
