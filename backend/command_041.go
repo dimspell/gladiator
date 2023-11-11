@@ -2,22 +2,48 @@ package backend
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
+	"log/slog"
 
 	"github.com/dispel-re/dispel-multi/model"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func (b *Backend) HandleClientAuthentication(session *model.Session, req ClientAuthenticationRequest) error {
-	resp := make([]byte, 4)
-	ok := true
-	if ok {
-		resp[0] = 1
+	data, err := req.Parse()
+	if err != nil {
+		return err
 	}
 
-	user := b.DB.Players()[0]
-	session.User = &user
+	user, err := b.DB.GetUser(context.TODO(), data.Username)
+	if err != nil {
+		slog.Debug("packet-41: could not find a user", "username", data.Username)
+		return b.Send(session.Conn, ClientAuthentication, []byte{0, 0, 0, 0})
+	}
 
-	return b.Send(session.Conn, ClientAuthentication, resp)
+	if !checkPasswordHash(data.Password, user.Password) {
+		slog.Debug("packet-41: incorrect password")
+		return b.Send(session.Conn, ClientAuthentication, []byte{0, 0, 0, 0})
+	}
+
+	// Assign user into session
+	session.User = &model.User{
+		UserID:   user.ID,
+		UserName: user.Username,
+	}
+
+	return b.Send(session.Conn, ClientAuthentication, []byte{1, 0, 0, 0})
+}
+
+func hashPassword(password string) (string, error) {
+	bytes, err := bcrypt.GenerateFromPassword([]byte(password), 14)
+	return string(bytes), err
+}
+
+func checkPasswordHash(password, hash string) bool {
+	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+	return err == nil
 }
 
 type ClientAuthenticationRequest []byte

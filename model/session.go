@@ -5,10 +5,11 @@ import (
 )
 
 type Session struct {
-	ID        string
-	User      *User
-	Character *Character
-	Conn      net.Conn
+	ID         string
+	User       *User
+	Character  *Character
+	Conn       net.Conn
+	GameRoomID int64
 }
 
 func (s *Session) LoggedIn() bool {
@@ -16,6 +17,7 @@ func (s *Session) LoggedIn() bool {
 }
 
 type User struct {
+	UserID     int64
 	UserName   string
 	Characters []Character
 }

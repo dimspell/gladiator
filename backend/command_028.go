@@ -2,8 +2,12 @@ package backend
 
 import (
 	"bytes"
+	"context"
+	"database/sql"
 	"encoding/binary"
+	"net"
 
+	"github.com/dispel-re/dispel-multi/internal/database/sqlite"
 	"github.com/dispel-re/dispel-multi/model"
 )
 
@@ -18,8 +22,18 @@ func (b *Backend) HandleCreateGame(session *model.Session, req CreateGameRequest
 
 	switch data.State {
 	case uint32(0):
+		tcpAddr := session.Conn.RemoteAddr().(*net.TCPAddr)
+		room, err := b.DB.CreateGameRoom(context.TODO(), sqlite.CreateGameRoomParams{
+			Name:          data.RoomName,
+			Password:      sql.NullString{String: data.Password, Valid: len(data.Password) > 0},
+			HostIpAddress: tcpAddr.IP.String(),
+		})
+		if err != nil {
+			return nil
+		}
+		session.GameRoomID = room.ID
+
 		binary.LittleEndian.PutUint32(resp[0:4], 1)
-		// b.CreateGameRoom()
 		break
 	case uint32(1):
 		binary.LittleEndian.PutUint32(resp[0:4], 2)

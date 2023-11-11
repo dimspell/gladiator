@@ -2,18 +2,41 @@ package backend
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
+	"log/slog"
 
+	"github.com/dispel-re/dispel-multi/internal/database/sqlite"
 	"github.com/dispel-re/dispel-multi/model"
 )
 
 func (b *Backend) HandleCreateNewAccount(session *model.Session, req CreateNewAccountRequest) error {
-	resp := make([]byte, 4)
-	ok := true
-	if ok {
-		resp[0] = 1
+	data, err := req.Parse()
+	if err != nil {
+		return err
 	}
-	return b.Send(session.Conn, CreateNewAccount, resp)
+
+	password, err := hashPassword(data.Password)
+	if err != nil {
+		slog.Warn("packet-42: could not hash the password", "err", err)
+		return b.Send(session.Conn, CreateNewAccount, []byte{0, 0, 0, 0})
+	}
+
+	user, err := b.DB.CreateUser(context.TODO(), sqlite.CreateUserParams{
+		Username: data.Username,
+		Password: password,
+	})
+	if err != nil {
+		slog.Warn("packet-42: could not save new user into database", "err", err)
+		return b.Send(session.Conn, CreateNewAccount, []byte{0, 0, 0, 0})
+	}
+
+	session.User = &model.User{
+		UserID:   user.ID,
+		UserName: user.Username,
+	}
+
+	return b.Send(session.Conn, CreateNewAccount, []byte{1, 0, 0, 0})
 }
 
 type CreateNewAccountRequest []byte

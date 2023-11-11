@@ -3,13 +3,13 @@ package action
 import (
 	"github.com/dispel-re/dispel-multi/backend"
 	"github.com/dispel-re/dispel-multi/console"
-	"github.com/dispel-re/dispel-multi/internal/database/memory"
+	"github.com/dispel-re/dispel-multi/internal/database/sqlite"
 	"github.com/urfave/cli/v3"
 )
 
 const (
-	defaultConsoleAddr = "0.0.0.0:2137"
-	defaultBackendAddr = "0.0.0.0:6112"
+	defaultConsoleAddr = "127.0.0.1:2137"
+	defaultBackendAddr = "127.0.0.1:6112"
 )
 
 func ServeCommand() *cli.Command {
@@ -45,7 +45,11 @@ func ServeCommand() *cli.Command {
 		backendAddr := c.String("backend-addr")
 
 		// TODO: Use database-type flag and choose the database
-		db := memory.NewMemory()
+		// db := memory.NewMemory()
+		db, err := sqlite.NewLocal("database.sqlite")
+		if err != nil {
+			return err
+		}
 		bd := backend.NewBackend(db)
 		con := console.NewConsole(db, bd)
 
