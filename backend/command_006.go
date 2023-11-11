@@ -25,7 +25,6 @@ func (b *Backend) HandleAuthorizationHandshake(session *model.Session, req Autho
 	if err != nil {
 		return err
 	}
-	fmt.Println(data)
 	if data.AuthKey != "68XIPSID" {
 		return b.Send(session.Conn, AuthorizationHandshake, []byte{0, 0, 0, 0})
 	}
@@ -39,9 +38,8 @@ type AuthorizationHandshakeRequestData struct {
 	// Authorization key. Normally it should be equal to "68XIPSID".
 	AuthKey string
 
-	// TODO: Recognise what kind of integer does it store.
-	// Note: At 12:14 it was equal to "3".
-	Unknown uint32
+	// TODO: Recognise what kind of integer does it store. It seems to be always equal to 3.
+	UnknownCounter uint32
 }
 
 // Parse extract data from the command packet.
@@ -51,6 +49,6 @@ func (r AuthorizationHandshakeRequest) Parse() (data AuthorizationHandshakeReque
 	}
 
 	data.AuthKey = string(r[:8])
-	data.Unknown = binary.LittleEndian.Uint32(r[8:12])
+	data.UnknownCounter = binary.LittleEndian.Uint32(r[8:12])
 	return data, err
 }
