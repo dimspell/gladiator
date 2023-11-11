@@ -45,7 +45,7 @@ func ServeCommand() *cli.Command {
 		backendAddr := c.String("backend-addr")
 
 		// TODO: Use database-type flag and choose the database
-		db := &memory.Memory{}
+		db := memory.NewMemory()
 		bd := backend.NewBackend(db)
 		con := console.NewConsole(db, bd)
 

@@ -9,6 +9,10 @@ import (
 )
 
 func (b *Backend) HandleGetCharacters(session *model.Session, req GetCharactersRequest) error {
+	if session.User == nil {
+		return fmt.Errorf("packet-44: user is not logged in")
+	}
+
 	if len(session.User.Characters) == 0 {
 		return b.Send(session.Conn, GetCharacters, []byte{0, 0, 0, 0})
 	}

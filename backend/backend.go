@@ -2,6 +2,7 @@ package backend
 
 import (
 	"context"
+	"log/slog"
 	"net"
 
 	"github.com/dispel-re/dispel-multi/internal/database/memory"
@@ -36,12 +37,16 @@ func (b *Backend) Shutdown(ctx context.Context) {
 
 func (b *Backend) NewSession(conn net.Conn) *model.Session {
 	id := uuid.New().String()
+	slog.Debug("New session", "session", id)
+
 	session := &model.Session{Conn: conn, ID: id}
 	b.Sessions[id] = session
 	return session
 }
 
 func (b *Backend) CloseSession(session *model.Session) error {
+	slog.Debug("Session closed", "session", session.ID)
+
 	// TODO: wrap all errors
 	_, ok := b.Sessions[session.ID]
 	if ok {

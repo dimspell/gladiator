@@ -9,6 +9,10 @@ import (
 )
 
 func (b *Backend) HandleCreateCharacter(session *model.Session, req CreateCharacterRequest) error {
+	if session.User == nil {
+		return fmt.Errorf("packet-92: user is not logged in")
+	}
+
 	data, err := req.Parse()
 	if err != nil {
 		return err

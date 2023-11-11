@@ -13,6 +13,10 @@ func (b *Backend) HandleClientAuthentication(session *model.Session, req ClientA
 	if ok {
 		resp[0] = 1
 	}
+
+	user := b.DB.Players()[0]
+	session.User = &user
+
 	return b.Send(session.Conn, ClientAuthentication, resp)
 }
 

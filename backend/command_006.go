@@ -25,6 +25,7 @@ func (b *Backend) HandleAuthorizationHandshake(session *model.Session, req Autho
 	if err != nil {
 		return err
 	}
+	fmt.Println(data)
 	if data.AuthKey != "68XIPSID" {
 		return b.Send(session.Conn, AuthorizationHandshake, []byte{0, 0, 0, 0})
 	}
@@ -39,7 +40,7 @@ type AuthorizationHandshakeRequestData struct {
 	AuthKey string
 
 	// TODO: Recognise what kind of integer does it store.
-	//  Q: Is it a number of connection attempts?
+	// Note: At 12:14 it was equal to "3".
 	Unknown uint32
 }
 
