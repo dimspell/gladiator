@@ -24,8 +24,8 @@ func New(db DBTX) *Queries {
 func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	q := Queries{db: db}
 	var err error
-	if q.createAuthorStmt, err = db.PrepareContext(ctx, createAuthor); err != nil {
-		return nil, fmt.Errorf("error preparing query CreateAuthor: %w", err)
+	if q.createCharacterStmt, err = db.PrepareContext(ctx, createCharacter); err != nil {
+		return nil, fmt.Errorf("error preparing query CreateCharacter: %w", err)
 	}
 	if q.createGameRoomStmt, err = db.PrepareContext(ctx, createGameRoom); err != nil {
 		return nil, fmt.Errorf("error preparing query CreateGameRoom: %w", err)
@@ -33,17 +33,17 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.createUserStmt, err = db.PrepareContext(ctx, createUser); err != nil {
 		return nil, fmt.Errorf("error preparing query CreateUser: %w", err)
 	}
-	if q.deleteAuthorStmt, err = db.PrepareContext(ctx, deleteAuthor); err != nil {
-		return nil, fmt.Errorf("error preparing query DeleteAuthor: %w", err)
+	if q.deleteCharacterStmt, err = db.PrepareContext(ctx, deleteCharacter); err != nil {
+		return nil, fmt.Errorf("error preparing query DeleteCharacter: %w", err)
 	}
-	if q.getAuthorStmt, err = db.PrepareContext(ctx, getAuthor); err != nil {
-		return nil, fmt.Errorf("error preparing query GetAuthor: %w", err)
+	if q.findCharacterStmt, err = db.PrepareContext(ctx, findCharacter); err != nil {
+		return nil, fmt.Errorf("error preparing query FindCharacter: %w", err)
+	}
+	if q.getGameRoomStmt, err = db.PrepareContext(ctx, getGameRoom); err != nil {
+		return nil, fmt.Errorf("error preparing query GetGameRoom: %w", err)
 	}
 	if q.getUserStmt, err = db.PrepareContext(ctx, getUser); err != nil {
 		return nil, fmt.Errorf("error preparing query GetUser: %w", err)
-	}
-	if q.listAuthorsStmt, err = db.PrepareContext(ctx, listAuthors); err != nil {
-		return nil, fmt.Errorf("error preparing query ListAuthors: %w", err)
 	}
 	if q.listCharactersStmt, err = db.PrepareContext(ctx, listCharacters); err != nil {
 		return nil, fmt.Errorf("error preparing query ListCharacters: %w", err)
@@ -51,17 +51,23 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.listGameRoomsStmt, err = db.PrepareContext(ctx, listGameRooms); err != nil {
 		return nil, fmt.Errorf("error preparing query ListGameRooms: %w", err)
 	}
-	if q.updateAuthorStmt, err = db.PrepareContext(ctx, updateAuthor); err != nil {
-		return nil, fmt.Errorf("error preparing query UpdateAuthor: %w", err)
+	if q.updateCharacterInventoryStmt, err = db.PrepareContext(ctx, updateCharacterInventory); err != nil {
+		return nil, fmt.Errorf("error preparing query UpdateCharacterInventory: %w", err)
+	}
+	if q.updateCharacterSpellsStmt, err = db.PrepareContext(ctx, updateCharacterSpells); err != nil {
+		return nil, fmt.Errorf("error preparing query UpdateCharacterSpells: %w", err)
+	}
+	if q.updateCharacterStatsStmt, err = db.PrepareContext(ctx, updateCharacterStats); err != nil {
+		return nil, fmt.Errorf("error preparing query UpdateCharacterStats: %w", err)
 	}
 	return &q, nil
 }
 
 func (q *Queries) Close() error {
 	var err error
-	if q.createAuthorStmt != nil {
-		if cerr := q.createAuthorStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing createAuthorStmt: %w", cerr)
+	if q.createCharacterStmt != nil {
+		if cerr := q.createCharacterStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing createCharacterStmt: %w", cerr)
 		}
 	}
 	if q.createGameRoomStmt != nil {
@@ -74,24 +80,24 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing createUserStmt: %w", cerr)
 		}
 	}
-	if q.deleteAuthorStmt != nil {
-		if cerr := q.deleteAuthorStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing deleteAuthorStmt: %w", cerr)
+	if q.deleteCharacterStmt != nil {
+		if cerr := q.deleteCharacterStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing deleteCharacterStmt: %w", cerr)
 		}
 	}
-	if q.getAuthorStmt != nil {
-		if cerr := q.getAuthorStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing getAuthorStmt: %w", cerr)
+	if q.findCharacterStmt != nil {
+		if cerr := q.findCharacterStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing findCharacterStmt: %w", cerr)
+		}
+	}
+	if q.getGameRoomStmt != nil {
+		if cerr := q.getGameRoomStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getGameRoomStmt: %w", cerr)
 		}
 	}
 	if q.getUserStmt != nil {
 		if cerr := q.getUserStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing getUserStmt: %w", cerr)
-		}
-	}
-	if q.listAuthorsStmt != nil {
-		if cerr := q.listAuthorsStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing listAuthorsStmt: %w", cerr)
 		}
 	}
 	if q.listCharactersStmt != nil {
@@ -104,9 +110,19 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing listGameRoomsStmt: %w", cerr)
 		}
 	}
-	if q.updateAuthorStmt != nil {
-		if cerr := q.updateAuthorStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing updateAuthorStmt: %w", cerr)
+	if q.updateCharacterInventoryStmt != nil {
+		if cerr := q.updateCharacterInventoryStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing updateCharacterInventoryStmt: %w", cerr)
+		}
+	}
+	if q.updateCharacterSpellsStmt != nil {
+		if cerr := q.updateCharacterSpellsStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing updateCharacterSpellsStmt: %w", cerr)
+		}
+	}
+	if q.updateCharacterStatsStmt != nil {
+		if cerr := q.updateCharacterStatsStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing updateCharacterStatsStmt: %w", cerr)
 		}
 	}
 	return err
@@ -146,33 +162,37 @@ func (q *Queries) queryRow(ctx context.Context, stmt *sql.Stmt, query string, ar
 }
 
 type Queries struct {
-	db                 DBTX
-	tx                 *sql.Tx
-	createAuthorStmt   *sql.Stmt
-	createGameRoomStmt *sql.Stmt
-	createUserStmt     *sql.Stmt
-	deleteAuthorStmt   *sql.Stmt
-	getAuthorStmt      *sql.Stmt
-	getUserStmt        *sql.Stmt
-	listAuthorsStmt    *sql.Stmt
-	listCharactersStmt *sql.Stmt
-	listGameRoomsStmt  *sql.Stmt
-	updateAuthorStmt   *sql.Stmt
+	db                           DBTX
+	tx                           *sql.Tx
+	createCharacterStmt          *sql.Stmt
+	createGameRoomStmt           *sql.Stmt
+	createUserStmt               *sql.Stmt
+	deleteCharacterStmt          *sql.Stmt
+	findCharacterStmt            *sql.Stmt
+	getGameRoomStmt              *sql.Stmt
+	getUserStmt                  *sql.Stmt
+	listCharactersStmt           *sql.Stmt
+	listGameRoomsStmt            *sql.Stmt
+	updateCharacterInventoryStmt *sql.Stmt
+	updateCharacterSpellsStmt    *sql.Stmt
+	updateCharacterStatsStmt     *sql.Stmt
 }
 
 func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 	return &Queries{
-		db:                 tx,
-		tx:                 tx,
-		createAuthorStmt:   q.createAuthorStmt,
-		createGameRoomStmt: q.createGameRoomStmt,
-		createUserStmt:     q.createUserStmt,
-		deleteAuthorStmt:   q.deleteAuthorStmt,
-		getAuthorStmt:      q.getAuthorStmt,
-		getUserStmt:        q.getUserStmt,
-		listAuthorsStmt:    q.listAuthorsStmt,
-		listCharactersStmt: q.listCharactersStmt,
-		listGameRoomsStmt:  q.listGameRoomsStmt,
-		updateAuthorStmt:   q.updateAuthorStmt,
+		db:                           tx,
+		tx:                           tx,
+		createCharacterStmt:          q.createCharacterStmt,
+		createGameRoomStmt:           q.createGameRoomStmt,
+		createUserStmt:               q.createUserStmt,
+		deleteCharacterStmt:          q.deleteCharacterStmt,
+		findCharacterStmt:            q.findCharacterStmt,
+		getGameRoomStmt:              q.getGameRoomStmt,
+		getUserStmt:                  q.getUserStmt,
+		listCharactersStmt:           q.listCharactersStmt,
+		listGameRoomsStmt:            q.listGameRoomsStmt,
+		updateCharacterInventoryStmt: q.updateCharacterInventoryStmt,
+		updateCharacterSpellsStmt:    q.updateCharacterSpellsStmt,
+		updateCharacterStatsStmt:     q.updateCharacterStatsStmt,
 	}
 }

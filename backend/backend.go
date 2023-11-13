@@ -16,6 +16,8 @@ type Backend struct {
 	Sessions map[string]*model.Session
 }
 
+var Channels = []string{"DISPEL"}
+
 // func NewBackend(db *memory.Memory) *Backend {
 func NewBackend(db *sqlite.Queries) *Backend {
 	return &Backend{

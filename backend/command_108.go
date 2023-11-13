@@ -2,9 +2,12 @@ package backend
 
 import (
 	"bytes"
+	"context"
+	"database/sql"
 	"encoding/base64"
 	"fmt"
 
+	"github.com/dispel-re/dispel-multi/internal/database/sqlite"
 	"github.com/dispel-re/dispel-multi/model"
 )
 
@@ -13,7 +16,55 @@ import (
 // It can be received by the game server in multiple scenarios:
 //   - .
 func (b *Backend) HandleUpdateCharacterStats(session *model.Session, req UpdateCharacterStatsRequest) error {
-	// _ = CharacterFromBytes(buf)
+	if session.UserID == 0 {
+		return fmt.Errorf("packet-108: user is not logged in")
+	}
+	if session.CharacterID == 0 {
+		return fmt.Errorf("packet-108: user has not selected character")
+	}
+
+	data, err := req.Parse()
+	if err != nil {
+		return err
+	}
+
+	if err := b.DB.UpdateCharacterStats(context.TODO(), sqlite.UpdateCharacterStatsParams{
+		Strength:             int64(data.CharacterInfo.Strength),
+		Agility:              int64(data.CharacterInfo.Agility),
+		Wisdom:               int64(data.CharacterInfo.Wisdom),
+		Constitution:         int64(data.CharacterInfo.Constitution),
+		HealthPoints:         int64(data.CharacterInfo.HealthPoints),
+		MagicPoints:          int64(data.CharacterInfo.MagicPoints),
+		ExperiencePoints:     int64(data.CharacterInfo.ExperiencePoints),
+		Money:                int64(data.CharacterInfo.Money),
+		ScorePoints:          int64(data.CharacterInfo.ScorePoints),
+		ClassType:            int64(data.CharacterInfo.ClassType),
+		SkinCarnation:        int64(data.CharacterInfo.SkinCarnation),
+		HairStyle:            int64(data.CharacterInfo.HairStyle),
+		LightArmourLegs:      int64(data.CharacterInfo.LightArmourLegs),
+		LightArmourTorso:     int64(data.CharacterInfo.LightArmourTorso),
+		LightArmourHands:     int64(data.CharacterInfo.LightArmourHands),
+		LightArmourBoots:     int64(data.CharacterInfo.LightArmourBoots),
+		FullArmour:           int64(data.CharacterInfo.FullArmour),
+		ArmourEmblem:         int64(data.CharacterInfo.ArmourEmblem),
+		Helmet:               int64(data.CharacterInfo.Helmet),
+		SecondaryWeapon:      int64(data.CharacterInfo.SecondaryWeapon),
+		PrimaryWeapon:        int64(data.CharacterInfo.PrimaryWeapon),
+		Shield:               int64(data.CharacterInfo.Shield),
+		UnknownEquipmentSlot: int64(data.CharacterInfo.UnknownEquipmentSlot),
+		Gender:               int64(data.CharacterInfo.Gender),
+		Level:                int64(data.CharacterInfo.Level),
+		EdgedWeapons:         int64(data.CharacterInfo.EdgedWeapons),
+		BluntedWeapons:       int64(data.CharacterInfo.BluntedWeapons),
+		Archery:              int64(data.CharacterInfo.Archery),
+		Polearms:             int64(data.CharacterInfo.Polearms),
+		Wizardry:             int64(data.CharacterInfo.Wizardry),
+		Unknown:              sql.NullString{Valid: true, String: base64.StdEncoding.EncodeToString(data.CharacterInfo.Unknown)},
+		ID:                   session.CharacterID,
+	}); err != nil {
+		return err
+	}
+
 	return b.Send(session.Conn, UpdateCharacterStats, []byte{})
 }
 

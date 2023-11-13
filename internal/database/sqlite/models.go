@@ -44,8 +44,8 @@ type Character struct {
 	Polearms             int64
 	Wizardry             int64
 	Unknown              sql.NullString
-	InventoryBase64      sql.NullString
-	SpellsBase64         sql.NullString
+	Inventory            sql.NullString
+	Spells               sql.NullString
 }
 
 type GameRoom struct {

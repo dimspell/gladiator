@@ -2,8 +2,10 @@ package backend
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 
+	"github.com/dispel-re/dispel-multi/internal/database/sqlite"
 	"github.com/dispel-re/dispel-multi/model"
 )
 
@@ -13,13 +15,12 @@ func (b *Backend) HandleDeleteCharacter(session *model.Session, req DeleteCharac
 		return err
 	}
 
-	var characters []model.Character
-	for _, ch := range session.User.Characters {
-		if ch.CharacterName != data.CharacterName {
-			characters = append(characters, ch)
-		}
+	if err := b.DB.DeleteCharacter(context.TODO(), sqlite.DeleteCharacterParams{
+		CharacterName: data.CharacterName,
+		UserID:        session.UserID,
+	}); err != nil {
+		return err
 	}
-	session.User.Characters = characters
 
 	response := make([]byte, len(data.CharacterName)+1)
 	copy(response, data.CharacterName)

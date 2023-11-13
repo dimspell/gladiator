@@ -2,16 +2,29 @@ package backend
 
 import (
 	"bytes"
+	"context"
+	"database/sql"
 	"encoding/base64"
 	"fmt"
 
+	"github.com/dispel-re/dispel-multi/internal/database/sqlite"
 	"github.com/dispel-re/dispel-multi/model"
 )
 
 func (b *Backend) HandleUpdateCharacterSpells(session *model.Session, req UpdateCharacterSpellsRequest) error {
-	_, err := req.Parse()
+	data, err := req.Parse()
 	if err != nil {
 		return err
+	}
+
+	if err := b.DB.UpdateCharacterSpells(context.TODO(), sqlite.UpdateCharacterSpellsParams{
+		Spells: sql.NullString{
+			String: base64.StdEncoding.EncodeToString(data.Spells),
+			Valid:  len(data.Spells) > 0,
+		},
+		ID: session.Character.CharacterID,
+	}); err != nil {
+		return fmt.Errorf("packet-73: could not update character spells: %s", err)
 	}
 
 	return b.Send(session.Conn, UpdateCharacterSpells, []byte{1, 0, 0, 0})

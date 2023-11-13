@@ -2,15 +2,22 @@ package backend
 
 import (
 	"bytes"
+	"context"
+	"database/sql"
 	"encoding/base64"
 	"fmt"
+	"log/slog"
 
+	"github.com/dispel-re/dispel-multi/internal/database/sqlite"
 	"github.com/dispel-re/dispel-multi/model"
 )
 
 func (b *Backend) HandleCreateCharacter(session *model.Session, req CreateCharacterRequest) error {
-	if session.User == nil {
+	if session.UserID == 0 {
 		return fmt.Errorf("packet-92: user is not logged in")
+	}
+	if session.CharacterID != 0 {
+		return fmt.Errorf("packet-92: character already selected")
 	}
 
 	data, err := req.Parse()
@@ -18,19 +25,58 @@ func (b *Backend) HandleCreateCharacter(session *model.Session, req CreateCharac
 		return err
 	}
 
-	newCharacter := model.Character{
+	newCharacter, err := b.DB.CreateCharacter(context.TODO(), sqlite.CreateCharacterParams{
+		Strength:             int64(data.CharacterInfo.Strength),
+		Agility:              int64(data.CharacterInfo.Agility),
+		Wisdom:               int64(data.CharacterInfo.Wisdom),
+		Constitution:         int64(data.CharacterInfo.Constitution),
+		HealthPoints:         int64(data.CharacterInfo.HealthPoints),
+		MagicPoints:          int64(data.CharacterInfo.MagicPoints),
+		ExperiencePoints:     int64(data.CharacterInfo.ExperiencePoints),
+		Money:                int64(data.CharacterInfo.Money),
+		ScorePoints:          int64(data.CharacterInfo.ScorePoints),
+		ClassType:            int64(data.CharacterInfo.ClassType),
+		SkinCarnation:        int64(data.CharacterInfo.SkinCarnation),
+		HairStyle:            int64(data.CharacterInfo.HairStyle),
+		LightArmourLegs:      int64(data.CharacterInfo.LightArmourLegs),
+		LightArmourTorso:     int64(data.CharacterInfo.LightArmourTorso),
+		LightArmourHands:     int64(data.CharacterInfo.LightArmourHands),
+		LightArmourBoots:     int64(data.CharacterInfo.LightArmourBoots),
+		FullArmour:           int64(data.CharacterInfo.FullArmour),
+		ArmourEmblem:         int64(data.CharacterInfo.ArmourEmblem),
+		Helmet:               int64(data.CharacterInfo.Helmet),
+		SecondaryWeapon:      int64(data.CharacterInfo.SecondaryWeapon),
+		PrimaryWeapon:        int64(data.CharacterInfo.PrimaryWeapon),
+		Shield:               int64(data.CharacterInfo.Shield),
+		UnknownEquipmentSlot: int64(data.CharacterInfo.UnknownEquipmentSlot),
+		Gender:               int64(data.CharacterInfo.Gender),
+		Level:                int64(data.CharacterInfo.Level),
+		EdgedWeapons:         int64(data.CharacterInfo.EdgedWeapons),
+		BluntedWeapons:       int64(data.CharacterInfo.BluntedWeapons),
+		Archery:              int64(data.CharacterInfo.Archery),
+		Polearms:             int64(data.CharacterInfo.Polearms),
+		Wizardry:             int64(data.CharacterInfo.Wizardry),
+		Unknown: sql.NullString{
+			String: base64.StdEncoding.EncodeToString(data.CharacterInfo.Unknown),
+			Valid:  true,
+		},
 		CharacterName: data.CharacterName,
-		Slot:          0,
-		Info:          data.CharacterInfo,
-		Inventory:     model.CharacterInventory{},
-		Spells:        nil,
+		UserID:        session.UserID,
+		SortOrder:     0,
+	})
+	if err != nil {
+		slog.Error("Could not create a character", "err", err)
+		return b.Send(session.Conn, CreateCharacter, []byte{0, 0, 0, 0})
 	}
-	session.User.Characters = append(session.User.Characters, newCharacter)
+
+	// TODO: Check if it superfluous
+	session.CharacterID = newCharacter.ID
+	session.CharacterName = newCharacter.CharacterName
 
 	return b.Send(session.Conn, CreateCharacter, []byte{1, 0, 0, 0})
 }
 
-// TODO: check if there is any additional not recognised byte at the end
+// TODO: check if there is any additional not recognised byte at the end like slot number
 type CreateCharacterRequest []byte
 
 type CreateCharacterRequestData struct {

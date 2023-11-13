@@ -44,9 +44,8 @@ CREATE TABLE characters
     wizardry               INTEGER NOT NULL,
     unknown                TEXT,
 
-    inventory_base64       TEXT,
-
-    spells_base64          TEXT
+    inventory              TEXT,
+    spells                 TEXT
 );
 
 CREATE TABLE game_rooms

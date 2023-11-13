@@ -5,27 +5,11 @@ import (
 )
 
 type Session struct {
-	ID         string
-	User       *User
-	Character  *Character
-	Conn       net.Conn
-	GameRoomID int64
-}
+	ID   string
+	Conn net.Conn
 
-func (s *Session) LoggedIn() bool {
-	return s.Character != nil
-}
-
-type User struct {
-	UserID     int64
-	UserName   string
-	Characters []Character
-}
-
-type Character struct {
+	UserID        int64
+	CharacterID   int64
 	CharacterName string
-	Slot          int
-	Info          CharacterInfo
-	Inventory     CharacterInventory
-	Spells        []byte
+	GameRoomID    int64
 }

@@ -2,6 +2,7 @@ package backend
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"fmt"
 
@@ -9,17 +10,25 @@ import (
 )
 
 func (b *Backend) HandleGetCharacters(session *model.Session, req GetCharactersRequest) error {
-	if session.User == nil {
+	if session.UserID == 0 {
 		return fmt.Errorf("packet-44: user is not logged in")
 	}
+	if session.CharacterID != 0 {
+		return fmt.Errorf("packet-44: character is already selected")
+	}
 
-	if len(session.User.Characters) == 0 {
+	characters, err := b.DB.ListCharacters(context.TODO(), session.UserID)
+	if err != nil {
+		return err
+	}
+
+	if len(characters) == 0 {
 		return b.Send(session.Conn, GetCharacters, []byte{0, 0, 0, 0})
 	}
 
 	response := []byte{1, 0, 0, 0}
-	response = binary.LittleEndian.AppendUint32(response, uint32(len(session.User.Characters)))
-	for _, character := range session.User.Characters {
+	response = binary.LittleEndian.AppendUint32(response, uint32(len(characters)))
+	for _, character := range characters {
 		response = append(response, character.CharacterName...)
 		response = append(response, 0)
 	}

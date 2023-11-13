@@ -10,26 +10,166 @@ import (
 	"database/sql"
 )
 
-const createAuthor = `-- name: CreateAuthor :one
-INSERT INTO users (username, password)
-VALUES (?, ?) RETURNING id, username, password
+const createCharacter = `-- name: CreateCharacter :one
+INSERT INTO characters (strength,
+                        agility,
+                        wisdom,
+                        constitution,
+                        health_points,
+                        magic_points,
+                        experience_points,
+                        money,
+                        score_points,
+                        class_type,
+                        skin_carnation,
+                        hair_style,
+                        light_armour_legs,
+                        light_armour_torso,
+                        light_armour_hands,
+                        light_armour_boots,
+                        full_armour,
+                        armour_emblem,
+                        helmet,
+                        secondary_weapon,
+                        primary_weapon,
+                        shield,
+                        unknown_equipment_slot,
+                        gender,
+                        level,
+                        edged_weapons,
+                        blunted_weapons,
+                        archery,
+                        polearms,
+                        wizardry,
+                        unknown,
+                        character_name,
+                        user_id,
+                        sort_order)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+RETURNING id, user_id, character_name, sort_order, strength, agility, wisdom, constitution, health_points, magic_points, experience_points, money, score_points, class_type, skin_carnation, hair_style, light_armour_legs, light_armour_torso, light_armour_hands, light_armour_boots, full_armour, armour_emblem, helmet, secondary_weapon, primary_weapon, shield, unknown_equipment_slot, gender, level, edged_weapons, blunted_weapons, archery, polearms, wizardry, unknown, inventory, spells
 `
 
-type CreateAuthorParams struct {
-	Username string
-	Password string
+type CreateCharacterParams struct {
+	Strength             int64
+	Agility              int64
+	Wisdom               int64
+	Constitution         int64
+	HealthPoints         int64
+	MagicPoints          int64
+	ExperiencePoints     int64
+	Money                int64
+	ScorePoints          int64
+	ClassType            int64
+	SkinCarnation        int64
+	HairStyle            int64
+	LightArmourLegs      int64
+	LightArmourTorso     int64
+	LightArmourHands     int64
+	LightArmourBoots     int64
+	FullArmour           int64
+	ArmourEmblem         int64
+	Helmet               int64
+	SecondaryWeapon      int64
+	PrimaryWeapon        int64
+	Shield               int64
+	UnknownEquipmentSlot int64
+	Gender               int64
+	Level                int64
+	EdgedWeapons         int64
+	BluntedWeapons       int64
+	Archery              int64
+	Polearms             int64
+	Wizardry             int64
+	Unknown              sql.NullString
+	CharacterName        string
+	UserID               int64
+	SortOrder            int64
 }
 
-func (q *Queries) CreateAuthor(ctx context.Context, arg CreateAuthorParams) (User, error) {
-	row := q.queryRow(ctx, q.createAuthorStmt, createAuthor, arg.Username, arg.Password)
-	var i User
-	err := row.Scan(&i.ID, &i.Username, &i.Password)
+func (q *Queries) CreateCharacter(ctx context.Context, arg CreateCharacterParams) (Character, error) {
+	row := q.queryRow(ctx, q.createCharacterStmt, createCharacter,
+		arg.Strength,
+		arg.Agility,
+		arg.Wisdom,
+		arg.Constitution,
+		arg.HealthPoints,
+		arg.MagicPoints,
+		arg.ExperiencePoints,
+		arg.Money,
+		arg.ScorePoints,
+		arg.ClassType,
+		arg.SkinCarnation,
+		arg.HairStyle,
+		arg.LightArmourLegs,
+		arg.LightArmourTorso,
+		arg.LightArmourHands,
+		arg.LightArmourBoots,
+		arg.FullArmour,
+		arg.ArmourEmblem,
+		arg.Helmet,
+		arg.SecondaryWeapon,
+		arg.PrimaryWeapon,
+		arg.Shield,
+		arg.UnknownEquipmentSlot,
+		arg.Gender,
+		arg.Level,
+		arg.EdgedWeapons,
+		arg.BluntedWeapons,
+		arg.Archery,
+		arg.Polearms,
+		arg.Wizardry,
+		arg.Unknown,
+		arg.CharacterName,
+		arg.UserID,
+		arg.SortOrder,
+	)
+	var i Character
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.CharacterName,
+		&i.SortOrder,
+		&i.Strength,
+		&i.Agility,
+		&i.Wisdom,
+		&i.Constitution,
+		&i.HealthPoints,
+		&i.MagicPoints,
+		&i.ExperiencePoints,
+		&i.Money,
+		&i.ScorePoints,
+		&i.ClassType,
+		&i.SkinCarnation,
+		&i.HairStyle,
+		&i.LightArmourLegs,
+		&i.LightArmourTorso,
+		&i.LightArmourHands,
+		&i.LightArmourBoots,
+		&i.FullArmour,
+		&i.ArmourEmblem,
+		&i.Helmet,
+		&i.SecondaryWeapon,
+		&i.PrimaryWeapon,
+		&i.Shield,
+		&i.UnknownEquipmentSlot,
+		&i.Gender,
+		&i.Level,
+		&i.EdgedWeapons,
+		&i.BluntedWeapons,
+		&i.Archery,
+		&i.Polearms,
+		&i.Wizardry,
+		&i.Unknown,
+		&i.Inventory,
+		&i.Spells,
+	)
 	return i, err
 }
 
 const createGameRoom = `-- name: CreateGameRoom :one
 INSERT INTO game_rooms (name, password, host_ip_address)
-VALUES (?, ?, ?) RETURNING id, name, password, host_ip_address
+VALUES (?, ?, ?)
+RETURNING id, name, password, host_ip_address
 `
 
 type CreateGameRoomParams struct {
@@ -52,7 +192,8 @@ func (q *Queries) CreateGameRoom(ctx context.Context, arg CreateGameRoomParams) 
 
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (username, password)
-VALUES (?, ?) RETURNING id, username, password
+VALUES (?, ?)
+RETURNING id, username, password
 `
 
 type CreateUserParams struct {
@@ -67,36 +208,135 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 	return i, err
 }
 
-const deleteAuthor = `-- name: DeleteAuthor :exec
+const deleteCharacter = `-- name: DeleteCharacter :exec
 DELETE
-FROM users
-WHERE id = ?
+FROM characters
+WHERE character_name = ?
+  AND user_id = ?
 `
 
-func (q *Queries) DeleteAuthor(ctx context.Context, id int64) error {
-	_, err := q.exec(ctx, q.deleteAuthorStmt, deleteAuthor, id)
+type DeleteCharacterParams struct {
+	CharacterName string
+	UserID        int64
+}
+
+func (q *Queries) DeleteCharacter(ctx context.Context, arg DeleteCharacterParams) error {
+	_, err := q.exec(ctx, q.deleteCharacterStmt, deleteCharacter, arg.CharacterName, arg.UserID)
 	return err
 }
 
-const getAuthor = `-- name: GetAuthor :one
-SELECT id, username, password
-FROM users
-WHERE id = ? LIMIT 1
+const findCharacter = `-- name: FindCharacter :one
+SELECT id, user_id, character_name, sort_order, strength, agility, wisdom, constitution, health_points, magic_points, experience_points, money, score_points, class_type, skin_carnation, hair_style, light_armour_legs, light_armour_torso, light_armour_hands, light_armour_boots, full_armour, armour_emblem, helmet, secondary_weapon, primary_weapon, shield, unknown_equipment_slot, gender, level, edged_weapons, blunted_weapons, archery, polearms, wizardry, unknown, inventory, spells
+FROM characters
+WHERE user_id = ?
+  AND character_name = ?
 `
 
-func (q *Queries) GetAuthor(ctx context.Context, id int64) (User, error) {
-	row := q.queryRow(ctx, q.getAuthorStmt, getAuthor, id)
-	var i User
-	err := row.Scan(&i.ID, &i.Username, &i.Password)
+type FindCharacterParams struct {
+	UserID        int64
+	CharacterName string
+}
+
+func (q *Queries) FindCharacter(ctx context.Context, arg FindCharacterParams) (Character, error) {
+	row := q.queryRow(ctx, q.findCharacterStmt, findCharacter, arg.UserID, arg.CharacterName)
+	var i Character
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.CharacterName,
+		&i.SortOrder,
+		&i.Strength,
+		&i.Agility,
+		&i.Wisdom,
+		&i.Constitution,
+		&i.HealthPoints,
+		&i.MagicPoints,
+		&i.ExperiencePoints,
+		&i.Money,
+		&i.ScorePoints,
+		&i.ClassType,
+		&i.SkinCarnation,
+		&i.HairStyle,
+		&i.LightArmourLegs,
+		&i.LightArmourTorso,
+		&i.LightArmourHands,
+		&i.LightArmourBoots,
+		&i.FullArmour,
+		&i.ArmourEmblem,
+		&i.Helmet,
+		&i.SecondaryWeapon,
+		&i.PrimaryWeapon,
+		&i.Shield,
+		&i.UnknownEquipmentSlot,
+		&i.Gender,
+		&i.Level,
+		&i.EdgedWeapons,
+		&i.BluntedWeapons,
+		&i.Archery,
+		&i.Polearms,
+		&i.Wizardry,
+		&i.Unknown,
+		&i.Inventory,
+		&i.Spells,
+	)
+	return i, err
+}
+
+const getGameRoom = `-- name: GetGameRoom :one
+SELECT id, name, password, host_ip_address
+FROM game_rooms
+WHERE name = ?
+LIMIT 1
+`
+
+func (q *Queries) GetGameRoom(ctx context.Context, name string) (GameRoom, error) {
+	row := q.queryRow(ctx, q.getGameRoomStmt, getGameRoom, name)
+	var i GameRoom
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Password,
+		&i.HostIpAddress,
+	)
 	return i, err
 }
 
 const getUser = `-- name: GetUser :one
+
 SELECT id, username, password
 FROM users
-WHERE username = ? LIMIT 1
+WHERE username = ?
+LIMIT 1
 `
 
+// -- name: GetAuthor :one
+// SELECT *
+// FROM users
+// WHERE id = ?
+// LIMIT 1;
+//
+// -- name: ListAuthors :many
+// SELECT *
+// FROM users
+// ORDER BY username;
+//
+// -- name: CreateAuthor :one
+// INSERT INTO users (username, password)
+// VALUES (?, ?)
+// RETURNING *;
+//
+// -- name: UpdateAuthor :exec
+// UPDATE users
+// set username = ?,
+//
+//	password = ?
+//
+// WHERE id = ?;
+//
+// -- name: DeleteAuthor :exec
+// DELETE
+// FROM users
+// WHERE id = ?;
 func (q *Queries) GetUser(ctx context.Context, username string) (User, error) {
 	row := q.queryRow(ctx, q.getUserStmt, getUser, username)
 	var i User
@@ -104,37 +344,8 @@ func (q *Queries) GetUser(ctx context.Context, username string) (User, error) {
 	return i, err
 }
 
-const listAuthors = `-- name: ListAuthors :many
-SELECT id, username, password
-FROM users
-ORDER BY username
-`
-
-func (q *Queries) ListAuthors(ctx context.Context) ([]User, error) {
-	rows, err := q.query(ctx, q.listAuthorsStmt, listAuthors)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []User
-	for rows.Next() {
-		var i User
-		if err := rows.Scan(&i.ID, &i.Username, &i.Password); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const listCharacters = `-- name: ListCharacters :many
-SELECT id, user_id, character_name, sort_order, strength, agility, wisdom, constitution, health_points, magic_points, experience_points, money, score_points, class_type, skin_carnation, hair_style, light_armour_legs, light_armour_torso, light_armour_hands, light_armour_boots, full_armour, armour_emblem, helmet, secondary_weapon, primary_weapon, shield, unknown_equipment_slot, gender, level, edged_weapons, blunted_weapons, archery, polearms, wizardry, unknown, inventory_base64, spells_base64
+SELECT id, user_id, character_name, sort_order, strength, agility, wisdom, constitution, health_points, magic_points, experience_points, money, score_points, class_type, skin_carnation, hair_style, light_armour_legs, light_armour_torso, light_armour_hands, light_armour_boots, full_armour, armour_emblem, helmet, secondary_weapon, primary_weapon, shield, unknown_equipment_slot, gender, level, edged_weapons, blunted_weapons, archery, polearms, wizardry, unknown, inventory, spells
 FROM characters
 WHERE user_id = ?
 ORDER BY slot_order
@@ -185,8 +396,8 @@ func (q *Queries) ListCharacters(ctx context.Context, userID int64) ([]Character
 			&i.Polearms,
 			&i.Wizardry,
 			&i.Unknown,
-			&i.InventoryBase64,
-			&i.SpellsBase64,
+			&i.Inventory,
+			&i.Spells,
 		); err != nil {
 			return nil, err
 		}
@@ -234,20 +445,143 @@ func (q *Queries) ListGameRooms(ctx context.Context) ([]GameRoom, error) {
 	return items, nil
 }
 
-const updateAuthor = `-- name: UpdateAuthor :exec
-UPDATE users
-set username = ?,
-    password  = ?
+const updateCharacterInventory = `-- name: UpdateCharacterInventory :exec
+UPDATE characters
+SET inventory = ?
 WHERE id = ?
 `
 
-type UpdateAuthorParams struct {
-	Username string
-	Password string
-	ID       int64
+type UpdateCharacterInventoryParams struct {
+	Inventory sql.NullString
+	ID        int64
 }
 
-func (q *Queries) UpdateAuthor(ctx context.Context, arg UpdateAuthorParams) error {
-	_, err := q.exec(ctx, q.updateAuthorStmt, updateAuthor, arg.Username, arg.Password, arg.ID)
+func (q *Queries) UpdateCharacterInventory(ctx context.Context, arg UpdateCharacterInventoryParams) error {
+	_, err := q.exec(ctx, q.updateCharacterInventoryStmt, updateCharacterInventory, arg.Inventory, arg.ID)
+	return err
+}
+
+const updateCharacterSpells = `-- name: UpdateCharacterSpells :exec
+UPDATE characters
+SET spells = ?
+WHERE id = ?
+`
+
+type UpdateCharacterSpellsParams struct {
+	Spells sql.NullString
+	ID     int64
+}
+
+func (q *Queries) UpdateCharacterSpells(ctx context.Context, arg UpdateCharacterSpellsParams) error {
+	_, err := q.exec(ctx, q.updateCharacterSpellsStmt, updateCharacterSpells, arg.Spells, arg.ID)
+	return err
+}
+
+const updateCharacterStats = `-- name: UpdateCharacterStats :exec
+UPDATE characters
+SET strength               = ?,
+    agility                = ?,
+    wisdom                 = ?,
+    constitution           = ?,
+    health_points          = ?,
+    magic_points           = ?,
+    experience_points      = ?,
+    money                  = ?,
+    score_points           = ?,
+    class_type             = ?,
+    skin_carnation         = ?,
+    hair_style             = ?,
+    light_armour_legs      = ?,
+    light_armour_torso     = ?,
+    light_armour_hands     = ?,
+    light_armour_boots     = ?,
+    full_armour            = ?,
+    armour_emblem          = ?,
+    helmet                 = ?,
+    secondary_weapon       = ?,
+    primary_weapon         = ?,
+    shield                 = ?,
+    unknown_equipment_slot = ?,
+    gender                 = ?,
+    level                  = ?,
+    edged_weapons          = ?,
+    blunted_weapons        = ?,
+    archery                = ?,
+    polearms               = ?,
+    wizardry               = ?,
+    unknown                = ?
+WHERE id = ?
+`
+
+type UpdateCharacterStatsParams struct {
+	Strength             int64
+	Agility              int64
+	Wisdom               int64
+	Constitution         int64
+	HealthPoints         int64
+	MagicPoints          int64
+	ExperiencePoints     int64
+	Money                int64
+	ScorePoints          int64
+	ClassType            int64
+	SkinCarnation        int64
+	HairStyle            int64
+	LightArmourLegs      int64
+	LightArmourTorso     int64
+	LightArmourHands     int64
+	LightArmourBoots     int64
+	FullArmour           int64
+	ArmourEmblem         int64
+	Helmet               int64
+	SecondaryWeapon      int64
+	PrimaryWeapon        int64
+	Shield               int64
+	UnknownEquipmentSlot int64
+	Gender               int64
+	Level                int64
+	EdgedWeapons         int64
+	BluntedWeapons       int64
+	Archery              int64
+	Polearms             int64
+	Wizardry             int64
+	Unknown              sql.NullString
+	ID                   int64
+}
+
+func (q *Queries) UpdateCharacterStats(ctx context.Context, arg UpdateCharacterStatsParams) error {
+	_, err := q.exec(ctx, q.updateCharacterStatsStmt, updateCharacterStats,
+		arg.Strength,
+		arg.Agility,
+		arg.Wisdom,
+		arg.Constitution,
+		arg.HealthPoints,
+		arg.MagicPoints,
+		arg.ExperiencePoints,
+		arg.Money,
+		arg.ScorePoints,
+		arg.ClassType,
+		arg.SkinCarnation,
+		arg.HairStyle,
+		arg.LightArmourLegs,
+		arg.LightArmourTorso,
+		arg.LightArmourHands,
+		arg.LightArmourBoots,
+		arg.FullArmour,
+		arg.ArmourEmblem,
+		arg.Helmet,
+		arg.SecondaryWeapon,
+		arg.PrimaryWeapon,
+		arg.Shield,
+		arg.UnknownEquipmentSlot,
+		arg.Gender,
+		arg.Level,
+		arg.EdgedWeapons,
+		arg.BluntedWeapons,
+		arg.Archery,
+		arg.Polearms,
+		arg.Wizardry,
+		arg.Unknown,
+		arg.ID,
+	)
 	return err
 }

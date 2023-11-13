@@ -31,10 +31,8 @@ func (b *Backend) HandleCreateNewAccount(session *model.Session, req CreateNewAc
 		return b.Send(session.Conn, CreateNewAccount, []byte{0, 0, 0, 0})
 	}
 
-	session.User = &model.User{
-		UserID:   user.ID,
-		UserName: user.Username,
-	}
+	// TODO: Check if it is needed
+	session.UserID = user.ID
 
 	return b.Send(session.Conn, CreateNewAccount, []byte{1, 0, 0, 0})
 }

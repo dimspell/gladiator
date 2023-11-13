@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"fmt"
 	"log/slog"
 
 	"github.com/dispel-re/dispel-multi/model"
@@ -11,6 +12,10 @@ import (
 )
 
 func (b *Backend) HandleClientAuthentication(session *model.Session, req ClientAuthenticationRequest) error {
+	if session.UserID != 0 {
+		return fmt.Errorf("packet-41: user has been already logged in")
+	}
+
 	data, err := req.Parse()
 	if err != nil {
 		return err
@@ -28,14 +33,12 @@ func (b *Backend) HandleClientAuthentication(session *model.Session, req ClientA
 	}
 
 	// Assign user into session
-	session.User = &model.User{
-		UserID:   user.ID,
-		UserName: user.Username,
-	}
+	session.UserID = user.ID
 
 	return b.Send(session.Conn, ClientAuthentication, []byte{1, 0, 0, 0})
 }
 
+// TODO: User salt and pepper
 func hashPassword(password string) (string, error) {
 	bytes, err := bcrypt.GenerateFromPassword([]byte(password), 14)
 	return string(bytes), err
