@@ -5,19 +5,19 @@ import (
 	"log/slog"
 	"net"
 
-	"github.com/dispel-re/dispel-multi/internal/database/sqlite"
+	"github.com/dispel-re/dispel-multi/internal/database"
 	"github.com/dispel-re/dispel-multi/model"
 	"github.com/google/uuid"
 )
 
 type Backend struct {
-	DB *sqlite.Queries
+	DB *database.Queries
 
 	Sessions map[string]*model.Session
 }
 
 // func NewBackend(db *memory.Memory) *Backend {
-func NewBackend(db *sqlite.Queries) *Backend {
+func NewBackend(db *database.Queries) *Backend {
 	return &Backend{
 		DB:       db,
 		Sessions: make(map[string]*model.Session),

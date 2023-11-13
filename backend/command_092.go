@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/dispel-re/dispel-multi/internal/database/sqlite"
+	"github.com/dispel-re/dispel-multi/internal/database"
 	"github.com/dispel-re/dispel-multi/model"
 )
 
@@ -25,7 +25,7 @@ func (b *Backend) HandleCreateCharacter(session *model.Session, req CreateCharac
 		return err
 	}
 
-	newCharacter, err := b.DB.CreateCharacter(context.TODO(), sqlite.CreateCharacterParams{
+	newCharacter, err := b.DB.CreateCharacter(context.TODO(), database.CreateCharacterParams{
 		Strength:             int64(data.CharacterInfo.Strength),
 		Agility:              int64(data.CharacterInfo.Agility),
 		Wisdom:               int64(data.CharacterInfo.Wisdom),

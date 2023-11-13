@@ -6,7 +6,7 @@ import (
 	"encoding/binary"
 	"log/slog"
 
-	"github.com/dispel-re/dispel-multi/internal/database/sqlite"
+	"github.com/dispel-re/dispel-multi/internal/database"
 	"github.com/dispel-re/dispel-multi/model"
 )
 
@@ -22,7 +22,7 @@ func (b *Backend) HandleCreateNewAccount(session *model.Session, req CreateNewAc
 		return b.Send(session.Conn, CreateNewAccount, []byte{0, 0, 0, 0})
 	}
 
-	user, err := b.DB.CreateUser(context.TODO(), sqlite.CreateUserParams{
+	user, err := b.DB.CreateUser(context.TODO(), database.CreateUserParams{
 		Username: data.Username,
 		Password: password,
 	})

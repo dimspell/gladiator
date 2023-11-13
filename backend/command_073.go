@@ -7,7 +7,7 @@ import (
 	"encoding/base64"
 	"fmt"
 
-	"github.com/dispel-re/dispel-multi/internal/database/sqlite"
+	"github.com/dispel-re/dispel-multi/internal/database"
 	"github.com/dispel-re/dispel-multi/model"
 )
 
@@ -17,7 +17,7 @@ func (b *Backend) HandleUpdateCharacterSpells(session *model.Session, req Update
 		return err
 	}
 
-	if err := b.DB.UpdateCharacterSpells(context.TODO(), sqlite.UpdateCharacterSpellsParams{
+	if err := b.DB.UpdateCharacterSpells(context.TODO(), database.UpdateCharacterSpellsParams{
 		Spells: sql.NullString{
 			String: base64.StdEncoding.EncodeToString(data.Spells),
 			Valid:  len(data.Spells) > 0,

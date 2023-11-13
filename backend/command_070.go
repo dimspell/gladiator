@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/binary"
 
-	"github.com/dispel-re/dispel-multi/internal/database/sqlite"
+	"github.com/dispel-re/dispel-multi/internal/database"
 	"github.com/dispel-re/dispel-multi/model"
 )
 
@@ -16,14 +16,14 @@ func (b *Backend) HandleShowRanking(session *model.Session, req RankingRequest) 
 		return err
 	}
 
-	positions, err := b.DB.SelectRanking(context.TODO(), sqlite.SelectRankingParams{
+	positions, err := b.DB.SelectRanking(context.TODO(), database.SelectRankingParams{
 		ClassType: int64(data.ClassType),
 		Offset:    int64(data.Offset),
 	})
 	if err != nil {
 		return err
 	}
-	currentPlayer, err := b.DB.GetCurrentUser(context.TODO(), sqlite.GetCurrentUserParams{
+	currentPlayer, err := b.DB.GetCurrentUser(context.TODO(), database.GetCurrentUserParams{
 		Username:      data.Username,
 		CharacterName: data.CharacterName,
 	})

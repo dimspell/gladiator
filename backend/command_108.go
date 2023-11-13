@@ -7,7 +7,7 @@ import (
 	"encoding/base64"
 	"fmt"
 
-	"github.com/dispel-re/dispel-multi/internal/database/sqlite"
+	"github.com/dispel-re/dispel-multi/internal/database"
 	"github.com/dispel-re/dispel-multi/model"
 )
 
@@ -28,7 +28,7 @@ func (b *Backend) HandleUpdateCharacterStats(session *model.Session, req UpdateC
 		return err
 	}
 
-	if err := b.DB.UpdateCharacterStats(context.TODO(), sqlite.UpdateCharacterStatsParams{
+	if err := b.DB.UpdateCharacterStats(context.TODO(), database.UpdateCharacterStatsParams{
 		Strength:             int64(data.CharacterInfo.Strength),
 		Agility:              int64(data.CharacterInfo.Agility),
 		Wisdom:               int64(data.CharacterInfo.Wisdom),

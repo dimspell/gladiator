@@ -5,7 +5,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/dispel-re/dispel-multi/internal/database/sqlite"
+	"github.com/dispel-re/dispel-multi/internal/database"
 	"github.com/dispel-re/dispel-multi/model"
 )
 
@@ -15,7 +15,7 @@ func (b *Backend) HandleDeleteCharacter(session *model.Session, req DeleteCharac
 		return err
 	}
 
-	if err := b.DB.DeleteCharacter(context.TODO(), sqlite.DeleteCharacterParams{
+	if err := b.DB.DeleteCharacter(context.TODO(), database.DeleteCharacterParams{
 		CharacterName: data.CharacterName,
 		UserID:        session.UserID,
 	}); err != nil {

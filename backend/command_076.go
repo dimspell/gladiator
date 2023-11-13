@@ -8,7 +8,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/dispel-re/dispel-multi/internal/database/sqlite"
+	"github.com/dispel-re/dispel-multi/internal/database"
 	"github.com/dispel-re/dispel-multi/model"
 )
 
@@ -22,7 +22,7 @@ func (b *Backend) HandleSelectCharacter(session *model.Session, req SelectCharac
 		return err
 	}
 
-	character, err := b.DB.FindCharacter(context.TODO(), sqlite.FindCharacterParams{
+	character, err := b.DB.FindCharacter(context.TODO(), database.FindCharacterParams{
 		UserID:        session.UserID,
 		CharacterName: data.CharacterName,
 	})

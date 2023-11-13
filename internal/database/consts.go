@@ -1,3 +1,3 @@
-package sqlite
+package database
 
 var Channels = []string{"DISPEL"}

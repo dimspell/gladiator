@@ -9,16 +9,16 @@ import (
 	"time"
 
 	"github.com/dispel-re/dispel-multi/backend"
-	"github.com/dispel-re/dispel-multi/internal/database/sqlite"
+	"github.com/dispel-re/dispel-multi/internal/database"
 	"github.com/go-chi/chi/v5"
 )
 
 type Console struct {
-	DB      *sqlite.Queries
+	DB      *database.Queries
 	Backend *backend.Backend
 }
 
-func NewConsole(db *sqlite.Queries, b *backend.Backend) *Console {
+func NewConsole(db *database.Queries, b *backend.Backend) *Console {
 	return &Console{
 		DB:      db,
 		Backend: b,

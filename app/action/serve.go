@@ -3,7 +3,7 @@ package action
 import (
 	"github.com/dispel-re/dispel-multi/backend"
 	"github.com/dispel-re/dispel-multi/console"
-	"github.com/dispel-re/dispel-multi/internal/database/sqlite"
+	"github.com/dispel-re/dispel-multi/internal/database"
 	"github.com/urfave/cli/v3"
 )
 
@@ -46,7 +46,7 @@ func ServeCommand() *cli.Command {
 
 		// TODO: Use database-type flag and choose the database
 		// db := memory.NewMemory()
-		db, err := sqlite.NewLocal("database.sqlite")
+		db, err := database.NewLocal("database.sqlite")
 		if err != nil {
 			return err
 		}

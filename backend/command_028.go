@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/dispel-re/dispel-multi/internal/database/sqlite"
+	"github.com/dispel-re/dispel-multi/internal/database"
 	"github.com/dispel-re/dispel-multi/model"
 )
 
@@ -31,7 +31,7 @@ func (b *Backend) HandleCreateGame(session *model.Session, req CreateGameRequest
 	switch data.State {
 	case uint32(0):
 		tcpAddr := session.Conn.RemoteAddr().(*net.TCPAddr)
-		room, err := b.DB.CreateGameRoom(context.TODO(), sqlite.CreateGameRoomParams{
+		room, err := b.DB.CreateGameRoom(context.TODO(), database.CreateGameRoomParams{
 			Name:          data.RoomName,
 			Password:      sql.NullString{String: data.Password, Valid: len(data.Password) > 0},
 			HostIpAddress: tcpAddr.IP.String(),
