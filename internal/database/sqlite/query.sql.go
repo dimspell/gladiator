@@ -282,6 +282,43 @@ func (q *Queries) FindCharacter(ctx context.Context, arg FindCharacterParams) (C
 	return i, err
 }
 
+const getCurrentUser = `-- name: GetCurrentUser :one
+SELECT position, cte.score_points, cte.username, cte.character_name
+FROM (SELECT ROW_NUMBER() over (ORDER BY score_points) as position,
+             score_points,
+             username,
+             character_name
+      FROM characters
+               JOIN users ON characters.user_id = users.id) as cte
+WHERE username = ?
+  AND character_name = ?
+LIMIT 1
+`
+
+type GetCurrentUserParams struct {
+	Username      string
+	CharacterName string
+}
+
+type GetCurrentUserRow struct {
+	Position      interface{}
+	ScorePoints   int64
+	Username      string
+	CharacterName string
+}
+
+func (q *Queries) GetCurrentUser(ctx context.Context, arg GetCurrentUserParams) (GetCurrentUserRow, error) {
+	row := q.queryRow(ctx, q.getCurrentUserStmt, getCurrentUser, arg.Username, arg.CharacterName)
+	var i GetCurrentUserRow
+	err := row.Scan(
+		&i.Position,
+		&i.ScorePoints,
+		&i.Username,
+		&i.CharacterName,
+	)
+	return i, err
+}
+
 const getGameRoom = `-- name: GetGameRoom :one
 SELECT id, name, password, host_ip_address
 FROM game_rooms
@@ -431,6 +468,58 @@ func (q *Queries) ListGameRooms(ctx context.Context) ([]GameRoom, error) {
 			&i.Name,
 			&i.Password,
 			&i.HostIpAddress,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const selectRanking = `-- name: SelectRanking :many
+SELECT ROW_NUMBER() over (ORDER BY score_points) as position,
+       score_points,
+       username,
+       character_name
+FROM characters
+         JOIN users ON characters.user_id = users.id
+WHERE class_type = ?
+ORDER BY score_points
+LIMIT 10 OFFSET ?
+`
+
+type SelectRankingParams struct {
+	ClassType int64
+	Offset    int64
+}
+
+type SelectRankingRow struct {
+	Position      interface{}
+	ScorePoints   int64
+	Username      string
+	CharacterName string
+}
+
+func (q *Queries) SelectRanking(ctx context.Context, arg SelectRankingParams) ([]SelectRankingRow, error) {
+	rows, err := q.query(ctx, q.selectRankingStmt, selectRanking, arg.ClassType, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SelectRankingRow
+	for rows.Next() {
+		var i SelectRankingRow
+		if err := rows.Scan(
+			&i.Position,
+			&i.ScorePoints,
+			&i.Username,
+			&i.CharacterName,
 		); err != nil {
 			return nil, err
 		}

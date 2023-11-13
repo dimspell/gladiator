@@ -22,7 +22,7 @@ func (b *Backend) HandleUpdateCharacterSpells(session *model.Session, req Update
 			String: base64.StdEncoding.EncodeToString(data.Spells),
 			Valid:  len(data.Spells) > 0,
 		},
-		ID: session.Character.CharacterID,
+		ID: session.CharacterID,
 	}); err != nil {
 		return fmt.Errorf("packet-73: could not update character spells: %s", err)
 	}

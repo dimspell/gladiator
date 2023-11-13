@@ -2,14 +2,55 @@ package backend
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 
+	"github.com/dispel-re/dispel-multi/internal/database/sqlite"
 	"github.com/dispel-re/dispel-multi/model"
 )
 
 // HandleShowRanking handles 0x46ff (255-70) command
 func (b *Backend) HandleShowRanking(session *model.Session, req RankingRequest) error {
-	ranking := b.DB.Ranking()
+	data, err := req.Parse()
+	if err != nil {
+		return err
+	}
+
+	positions, err := b.DB.SelectRanking(context.TODO(), sqlite.SelectRankingParams{
+		ClassType: int64(data.ClassType),
+		Offset:    int64(data.Offset),
+	})
+	if err != nil {
+		return err
+	}
+	currentPlayer, err := b.DB.GetCurrentUser(context.TODO(), sqlite.GetCurrentUserParams{
+		Username:      data.Username,
+		CharacterName: data.CharacterName,
+	})
+	if err != nil {
+		return err
+	}
+
+	rankingPositions := make([]model.RankingPosition, len(positions))
+	for i, position := range positions {
+		rankingPositions[i] = model.RankingPosition{
+			Rank:          position.Position.(uint32),
+			Points:        uint32(position.ScorePoints),
+			Username:      position.Username,
+			CharacterName: position.CharacterName,
+		}
+	}
+
+	ranking := model.Ranking{
+		Players: rankingPositions,
+		CurrentPlayer: model.RankingPosition{
+			Rank:          currentPlayer.Position.(uint32),
+			Points:        uint32(currentPlayer.ScorePoints),
+			Username:      currentPlayer.Username,
+			CharacterName: currentPlayer.CharacterName,
+		},
+	}
+
 	return b.Send(session.Conn, ShowRanking, ranking.ToBytes())
 }
 

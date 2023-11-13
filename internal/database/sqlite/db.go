@@ -39,6 +39,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.findCharacterStmt, err = db.PrepareContext(ctx, findCharacter); err != nil {
 		return nil, fmt.Errorf("error preparing query FindCharacter: %w", err)
 	}
+	if q.getCurrentUserStmt, err = db.PrepareContext(ctx, getCurrentUser); err != nil {
+		return nil, fmt.Errorf("error preparing query GetCurrentUser: %w", err)
+	}
 	if q.getGameRoomStmt, err = db.PrepareContext(ctx, getGameRoom); err != nil {
 		return nil, fmt.Errorf("error preparing query GetGameRoom: %w", err)
 	}
@@ -50,6 +53,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	}
 	if q.listGameRoomsStmt, err = db.PrepareContext(ctx, listGameRooms); err != nil {
 		return nil, fmt.Errorf("error preparing query ListGameRooms: %w", err)
+	}
+	if q.selectRankingStmt, err = db.PrepareContext(ctx, selectRanking); err != nil {
+		return nil, fmt.Errorf("error preparing query SelectRanking: %w", err)
 	}
 	if q.updateCharacterInventoryStmt, err = db.PrepareContext(ctx, updateCharacterInventory); err != nil {
 		return nil, fmt.Errorf("error preparing query UpdateCharacterInventory: %w", err)
@@ -90,6 +96,11 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing findCharacterStmt: %w", cerr)
 		}
 	}
+	if q.getCurrentUserStmt != nil {
+		if cerr := q.getCurrentUserStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getCurrentUserStmt: %w", cerr)
+		}
+	}
 	if q.getGameRoomStmt != nil {
 		if cerr := q.getGameRoomStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing getGameRoomStmt: %w", cerr)
@@ -108,6 +119,11 @@ func (q *Queries) Close() error {
 	if q.listGameRoomsStmt != nil {
 		if cerr := q.listGameRoomsStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing listGameRoomsStmt: %w", cerr)
+		}
+	}
+	if q.selectRankingStmt != nil {
+		if cerr := q.selectRankingStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing selectRankingStmt: %w", cerr)
 		}
 	}
 	if q.updateCharacterInventoryStmt != nil {
@@ -169,10 +185,12 @@ type Queries struct {
 	createUserStmt               *sql.Stmt
 	deleteCharacterStmt          *sql.Stmt
 	findCharacterStmt            *sql.Stmt
+	getCurrentUserStmt           *sql.Stmt
 	getGameRoomStmt              *sql.Stmt
 	getUserStmt                  *sql.Stmt
 	listCharactersStmt           *sql.Stmt
 	listGameRoomsStmt            *sql.Stmt
+	selectRankingStmt            *sql.Stmt
 	updateCharacterInventoryStmt *sql.Stmt
 	updateCharacterSpellsStmt    *sql.Stmt
 	updateCharacterStatsStmt     *sql.Stmt
@@ -187,10 +205,12 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		createUserStmt:               q.createUserStmt,
 		deleteCharacterStmt:          q.deleteCharacterStmt,
 		findCharacterStmt:            q.findCharacterStmt,
+		getCurrentUserStmt:           q.getCurrentUserStmt,
 		getGameRoomStmt:              q.getGameRoomStmt,
 		getUserStmt:                  q.getUserStmt,
 		listCharactersStmt:           q.listCharactersStmt,
 		listGameRoomsStmt:            q.listGameRoomsStmt,
+		selectRankingStmt:            q.selectRankingStmt,
 		updateCharacterInventoryStmt: q.updateCharacterInventoryStmt,
 		updateCharacterSpellsStmt:    q.updateCharacterSpellsStmt,
 		updateCharacterStatsStmt:     q.updateCharacterStatsStmt,

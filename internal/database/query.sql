@@ -36,15 +36,6 @@ INSERT INTO users (username, password)
 VALUES (?, ?)
 RETURNING *;
 
--- name: CreateGameRoom :one
-INSERT INTO game_rooms (name, password, host_ip_address)
-VALUES (?, ?, ?)
-RETURNING *;
-
--- name: ListGameRooms :many
-SELECT *
-FROM game_rooms;
-
 -- name: ListCharacters :many
 SELECT *
 FROM characters
@@ -146,8 +137,40 @@ FROM characters
 WHERE character_name = ?
   AND user_id = ?;
 
+-- name: SelectRanking :many
+SELECT ROW_NUMBER() over (ORDER BY score_points) as position,
+       score_points,
+       username,
+       character_name
+FROM characters
+         JOIN users ON characters.user_id = users.id
+WHERE class_type = ?
+ORDER BY score_points
+LIMIT 10 OFFSET ?;
+
+-- name: GetCurrentUser :one
+SELECT position, cte.score_points, cte.username, cte.character_name
+FROM (SELECT ROW_NUMBER() over (ORDER BY score_points) as position,
+             score_points,
+             username,
+             character_name
+      FROM characters
+               JOIN users ON characters.user_id = users.id) as cte
+WHERE username = ?
+  AND character_name = ?
+LIMIT 1;
+
+-- name: ListGameRooms :many
+SELECT *
+FROM game_rooms;
+
 -- name: GetGameRoom :one
 SELECT *
 FROM game_rooms
 WHERE name = ?
 LIMIT 1;
+
+-- name: CreateGameRoom :one
+INSERT INTO game_rooms (name, password, host_ip_address)
+VALUES (?, ?, ?)
+RETURNING *;

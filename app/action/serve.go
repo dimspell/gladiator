@@ -50,8 +50,13 @@ func ServeCommand() *cli.Command {
 		if err != nil {
 			return err
 		}
-		bd := backend.NewBackend(db)
-		con := console.NewConsole(db, bd)
+		queries, err := db.Queries()
+		if err != nil {
+			return err
+		}
+
+		bd := backend.NewBackend(queries)
+		con := console.NewConsole(queries, bd)
 
 		return con.Serve(c.Context, consoleAddr, backendAddr)
 	}

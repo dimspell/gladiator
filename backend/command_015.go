@@ -6,22 +6,22 @@ import (
 	"github.com/dispel-re/dispel-multi/model"
 )
 
-func AppendCharacterToLobby(character model.Character, idx uint32) []byte {
-	buf := make([]byte, 4+4+4+len(character.CharacterName)+1)
+func AppendCharacterToLobby(characterName string, classType model.ClassType, idx uint32) []byte {
+	buf := make([]byte, 4+4+4+len(characterName)+1)
 
 	buf[0] = 2                                    // Message type
-	buf[4] = byte(character.Info.ClassType)       // Class of character
+	buf[4] = byte(classType)                      // Class of character
 	binary.LittleEndian.PutUint32(buf[8:12], idx) // Unknown 28?
-	copy(buf[12:], character.CharacterName)       // Character name
+	copy(buf[12:], characterName)                 // Character name
 
 	return buf
 }
 
-func RemoveCharacterFromLobby(character model.Character) []byte {
-	buf := make([]byte, 4+4+4+len(character.CharacterName)+1)
+func RemoveCharacterFromLobby(characterName string) []byte {
+	buf := make([]byte, 4+4+4+len(characterName)+1)
 
-	buf[0] = 3                              // Message type
-	copy(buf[12:], character.CharacterName) // Character name
+	buf[0] = 3                    // Message type
+	copy(buf[12:], characterName) // Character name
 
 	return buf
 }
