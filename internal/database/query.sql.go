@@ -347,41 +347,12 @@ func (q *Queries) GetGameRoom(ctx context.Context, name string) (GameRoom, error
 }
 
 const getUser = `-- name: GetUser :one
-
 SELECT id, username, password
 FROM users
 WHERE username = ?
 LIMIT 1
 `
 
-// -- name: GetAuthor :one
-// SELECT *
-// FROM users
-// WHERE id = ?
-// LIMIT 1;
-//
-// -- name: ListAuthors :many
-// SELECT *
-// FROM users
-// ORDER BY username;
-//
-// -- name: CreateAuthor :one
-// INSERT INTO users (username, password)
-// VALUES (?, ?)
-// RETURNING *;
-//
-// -- name: UpdateAuthor :exec
-// UPDATE users
-// set username = ?,
-//
-//	password = ?
-//
-// WHERE id = ?;
-//
-// -- name: DeleteAuthor :exec
-// DELETE
-// FROM users
-// WHERE id = ?;
 func (q *Queries) GetUser(ctx context.Context, username string) (User, error) {
 	row := q.queryRow(ctx, q.getUserStmt, getUser, username)
 	var i User
