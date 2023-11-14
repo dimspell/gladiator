@@ -34,7 +34,7 @@ func (b *Backend) HandleShowRanking(session *model.Session, req RankingRequest) 
 	rankingPositions := make([]model.RankingPosition, len(positions))
 	for i, position := range positions {
 		rankingPositions[i] = model.RankingPosition{
-			Rank:          position.Position.(uint32),
+			Rank:          uint32(position.Position.(int64)),
 			Points:        uint32(position.ScorePoints),
 			Username:      position.Username,
 			CharacterName: position.CharacterName,
@@ -44,7 +44,7 @@ func (b *Backend) HandleShowRanking(session *model.Session, req RankingRequest) 
 	ranking := model.Ranking{
 		Players: rankingPositions,
 		CurrentPlayer: model.RankingPosition{
-			Rank:          currentPlayer.Position.(uint32),
+			Rank:          uint32(currentPlayer.Position.(int64)),
 			Points:        uint32(currentPlayer.ScorePoints),
 			Username:      currentPlayer.Username,
 			CharacterName: currentPlayer.CharacterName,

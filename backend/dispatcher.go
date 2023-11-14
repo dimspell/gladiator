@@ -1,6 +1,7 @@
 package backend
 
 import (
+	"encoding/base64"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -148,7 +149,9 @@ func (b *Backend) handleCommands(session *model.Session) error {
 
 	for _, packet := range packets {
 		pt := PacketType(packet[1])
-		slog.Debug("Handle packet", slog.Int("packetType", int(pt)), slog.String("packet", string(packet)))
+		slog.Debug("Handle packet",
+			slog.Int("packetType", int(pt)),
+			slog.String("packet", base64.StdEncoding.EncodeToString(packet)))
 
 		switch pt {
 		case CreateNewAccount:
@@ -260,7 +263,7 @@ func (b *Backend) Send(conn net.Conn, packetType PacketType, payload []byte) err
 	data := b.EncodePacket(packetType, payload)
 	slog.Debug("Sent packet",
 		slog.Int("packetType", int(packetType)),
-		slog.Any("data", data),
+		slog.Any("data", base64.StdEncoding.EncodeToString(data)),
 	)
 
 	_, err := conn.Write(data)
