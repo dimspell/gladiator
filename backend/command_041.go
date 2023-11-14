@@ -34,6 +34,7 @@ func (b *Backend) HandleClientAuthentication(session *model.Session, req ClientA
 
 	// Assign user into session
 	session.UserID = user.ID
+	session.Username = user.Username
 
 	return b.Send(session.Conn, ClientAuthentication, []byte{1, 0, 0, 0})
 }

@@ -15,7 +15,7 @@ func (b *Backend) HandleSendLobbyMessage(session *model.Session, req SendLobbyMe
 	if len(message) == 0 {
 		return nil
 	}
-	resp := NewLobbyMessage(session.CharacterName, message)
+	resp := NewLobbyMessage(session.Username, message)
 	return b.Send(session.Conn, ReceiveMessage, resp)
 }
 

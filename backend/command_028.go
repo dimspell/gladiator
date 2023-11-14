@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/binary"
 	"fmt"
+	"log/slog"
 	"net"
 
 	"github.com/dispel-re/dispel-multi/internal/database"
@@ -28,7 +29,7 @@ func (b *Backend) HandleCreateGame(session *model.Session, req CreateGameRequest
 	switch data.State {
 	case uint32(0):
 		tcpAddr := session.Conn.RemoteAddr().(*net.TCPAddr)
-		room, err := b.DB.CreateGameRoom(context.TODO(), database.CreateGameRoomParams{
+		newGameRoom, err := b.DB.CreateGameRoom(context.TODO(), database.CreateGameRoomParams{
 			Name:          data.RoomName,
 			Password:      sql.NullString{String: data.Password, Valid: len(data.Password) > 0},
 			HostIpAddress: tcpAddr.IP.String(),
@@ -36,7 +37,7 @@ func (b *Backend) HandleCreateGame(session *model.Session, req CreateGameRequest
 		if err != nil {
 			return nil
 		}
-		session.GameRoomID = room.ID
+		slog.Info("packet-28: created game room", "id", newGameRoom.ID, "name", newGameRoom.Name)
 
 		binary.LittleEndian.PutUint32(resp[0:4], 1)
 		break

@@ -57,7 +57,8 @@ func (b *Backend) HandleUpdateCharacterStats(session *model.Session, req UpdateC
 		Polearms:             int64(data.CharacterInfo.Polearms),
 		Wizardry:             int64(data.CharacterInfo.Wizardry),
 		Unknown:              sql.NullString{Valid: true, String: base64.StdEncoding.EncodeToString(data.CharacterInfo.Unknown)},
-		ID:                   session.CharacterID,
+		CharacterName:        data.Character,
+		UserID:               session.UserID,
 	}); err != nil {
 		return err
 	}

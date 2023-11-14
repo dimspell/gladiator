@@ -45,8 +45,8 @@ ORDER BY sort_order;
 -- name: FindCharacter :one
 SELECT *
 FROM characters
-WHERE user_id = ?
-  AND character_name = ?;
+WHERE character_name = ?
+  AND user_id = ?;
 
 -- name: CreateCharacter :one
 INSERT INTO characters (strength,
@@ -119,17 +119,20 @@ SET strength               = ?,
     polearms               = ?,
     wizardry               = ?,
     unknown                = ?
-WHERE id = ?;
+WHERE character_name = ?
+  AND user_id = ?;
 
 -- name: UpdateCharacterSpells :exec
 UPDATE characters
 SET spells = ?
-WHERE id = ?;
+WHERE character_name = ?
+  AND user_id = ?;
 
 -- name: UpdateCharacterInventory :exec
 UPDATE characters
 SET inventory = ?
-WHERE id = ?;
+WHERE character_name = ?
+  AND user_id = ?;
 
 -- name: DeleteCharacter :exec
 DELETE
