@@ -3,25 +3,23 @@ package database
 import (
 	"context"
 	"database/sql"
+	"embed"
+	_ "embed"
 	"fmt"
 
-	_ "embed"
+	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database/sqlite"
+	"github.com/golang-migrate/migrate/v4/source/iofs"
 
 	_ "github.com/mattn/go-sqlite3"
 )
 
+//go:embed migrations/*.sql
+var migrations embed.FS
+
 type SQLite struct {
 	Conn *sql.DB
 }
-
-//go:embed migration_001.sql
-var migration1 string
-
-//go:embed migration_002.sql
-var migration2 string
-
-//go:embed migration_003.sql
-var migration3 string
 
 func NewMemory() (*SQLite, error) {
 	conn, err := sql.Open("sqlite3", ":memory:")
@@ -31,15 +29,7 @@ func NewMemory() (*SQLite, error) {
 	if err := conn.Ping(); err != nil {
 		return nil, err
 	}
-
-	// 008-JP1-
-	if _, err := conn.Exec(migration1); err != nil {
-		return nil, err
-	}
-	if _, err := conn.Exec(migration2); err != nil {
-		return nil, err
-	}
-	if _, err := conn.Exec(migration3); err != nil {
+	if err := Migrate(conn); err != nil {
 		return nil, err
 	}
 
@@ -56,8 +46,42 @@ func NewLocal(pathToDatabase string) (*SQLite, error) {
 	if err := conn.Ping(); err != nil {
 		return nil, err
 	}
+	if err := Migrate(conn); err != nil {
+		return nil, err
+	}
 
 	return &SQLite{Conn: conn}, nil
+}
+
+func Migrate(conn *sql.DB) error {
+	// Prepare resources
+	migrationSource, err := iofs.New(migrations, "migrations")
+	if err != nil {
+		return err
+	}
+	driver, err := sqlite.WithInstance(conn, &sqlite.Config{})
+	if err != nil {
+		return err
+	}
+	m, err := migrate.NewWithInstance("iofs", migrationSource, "sqlite", driver)
+	if err != nil {
+		return err
+	}
+
+	// Migrate
+	if err := m.Up(); err != nil {
+		return err
+	}
+
+	// Free resources
+	err1, err2 := m.Close()
+	if err1 != nil {
+		return err1
+	}
+	if err2 != nil {
+		return err2
+	}
+	return nil
 }
 
 func (db *SQLite) Queries() (*Queries, error) {
