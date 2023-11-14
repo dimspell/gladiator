@@ -18,7 +18,6 @@ func (b *Backend) HandleCreateGame(session *model.Session, req CreateGameRequest
 	if session.UserID == 0 {
 		return fmt.Errorf("packet-28: user is not logged in")
 	}
-
 	data, err := req.Parse()
 	if err != nil {
 		return err
@@ -33,9 +32,10 @@ func (b *Backend) HandleCreateGame(session *model.Session, req CreateGameRequest
 			Name:          data.RoomName,
 			Password:      sql.NullString{String: data.Password, Valid: len(data.Password) > 0},
 			HostIpAddress: tcpAddr.IP.String(),
+			MapID:         int64(data.MapID),
 		})
 		if err != nil {
-			return nil
+			return err
 		}
 		slog.Info("packet-28: created game room", "id", newGameRoom.ID, "name", newGameRoom.Name)
 

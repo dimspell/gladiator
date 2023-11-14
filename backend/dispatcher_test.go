@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dispel-re/dispel-multi/internal/database"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -14,10 +15,14 @@ type mockConn struct {
 	Written    []byte
 	WriteError error
 	CloseError error
+
+	LocalAddress  net.Addr
+	RemoteAddress net.Addr
 }
 
 func (m *mockConn) Write(b []byte) (n int, err error) {
 	// Return injected error
+	m.Written = append(m.Written, b...)
 	return 0, m.WriteError
 }
 
@@ -32,13 +37,11 @@ func (m *mockConn) Close() error {
 }
 
 func (m *mockConn) LocalAddr() net.Addr {
-	// Return mock local address
-	return nil
+	return m.LocalAddress
 }
 
 func (m *mockConn) RemoteAddr() net.Addr {
-	// Return mock remote address
-	return nil
+	return m.RemoteAddress
 }
 
 func (m *mockConn) SetDeadline(t time.Time) error {
@@ -84,6 +87,18 @@ func (m *mockConn) AllDataRead() bool {
 
 func (m *mockConn) ClearReadData() {
 	// Clear any queued read data
+}
+
+func testDB(t *testing.T) *database.Queries {
+	db, err := database.NewMemory()
+	if err != nil {
+		t.Fatal(err)
+	}
+	queries, err := db.Queries()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return queries
 }
 
 func Test_splitMultiPacket(t *testing.T) {

@@ -2,17 +2,34 @@ package backend
 
 import (
 	"bytes"
+	"context"
+	"database/sql"
+	"encoding/base64"
 	"fmt"
 
+	"github.com/dispel-re/dispel-multi/internal/database"
 	"github.com/dispel-re/dispel-multi/model"
 )
 
 func (b *Backend) HandleUpdateCharacterInventory(session *model.Session, req UpdateCharacterInventoryRequest) error {
-	// rd := bufio.NewReader(bytes.NewReader(buf[4:]))
-	// _, _ = rd.ReadBytes(0)         // username
-	// _, _ = rd.ReadBytes(0)         // character
-	// backpack, _ := rd.ReadBytes(0) // inventory
-	// printBackpack(backpack)
+	if session.UserID == 0 {
+		return fmt.Errorf("packet-44: user is not logged in")
+	}
+	data, err := req.Parse()
+	if err != nil {
+		return err
+	}
+
+	if err := b.DB.UpdateCharacterInventory(context.TODO(), database.UpdateCharacterInventoryParams{
+		Inventory: sql.NullString{
+			Valid:  true,
+			String: base64.StdEncoding.EncodeToString(data.Inventory),
+		},
+		CharacterName: data.CharacterName,
+		UserID:        session.UserID,
+	}); err != nil {
+		return err
+	}
 
 	return b.Send(session.Conn, UpdateCharacterInventory, []byte{1, 0, 0, 0})
 }

@@ -174,6 +174,6 @@ WHERE name = ?
 LIMIT 1;
 
 -- name: CreateGameRoom :one
-INSERT INTO game_rooms (name, password, host_ip_address)
-VALUES (?, ?, ?)
+INSERT INTO game_rooms (name, password, host_ip_address, map_id)
+VALUES (?, ?, ?, ?)
 RETURNING *;

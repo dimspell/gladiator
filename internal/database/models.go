@@ -53,6 +53,7 @@ type GameRoom struct {
 	Name          string
 	Password      sql.NullString
 	HostIpAddress string
+	MapID         int64
 }
 
 type User struct {

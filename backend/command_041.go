@@ -39,7 +39,7 @@ func (b *Backend) HandleClientAuthentication(session *model.Session, req ClientA
 	return b.Send(session.Conn, ClientAuthentication, []byte{1, 0, 0, 0})
 }
 
-// TODO: User salt and pepper
+// TODO: Use salt and pepper
 func hashPassword(password string) (string, error) {
 	bytes, err := bcrypt.GenerateFromPassword([]byte(password), 14)
 	return string(bytes), err
