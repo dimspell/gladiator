@@ -32,7 +32,7 @@ func (b *Backend) HandleGetCharacterSpells(session *model.Session, req GetCharac
 	if len(spells) != 43 {
 		return fmt.Errorf("packet-72: spells array should be 43-chars long")
 	}
-	for i := 0; i < len(spells); i++ {
+	for i := 0; i < 41; i++ {
 		if spells[i] == 0 {
 			spells[i] = 1
 		}

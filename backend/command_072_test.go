@@ -46,8 +46,8 @@ func TestBackend_HandleGetCharacterSpells(t *testing.T) {
 		SortOrder:     1,
 	})
 
-	spells := make([]byte, 41)
-	for i := 0; i < len(spells); i++ {
+	spells := make([]byte, 43)
+	for i := 0; i < 41; i++ {
 		spells[i] = 1
 	}
 	spells[0] = 2
@@ -67,6 +67,6 @@ func TestBackend_HandleGetCharacterSpells(t *testing.T) {
 
 	assert.NoError(t, b.HandleGetCharacterSpells(session, GetCharacterSpellsRequest("tester\x00characterName\x00")))
 	assert.Equal(t, []byte{255, 72, 47, 0}, conn.Written[0:4]) // Header
-	assert.Equal(t, spells, conn.Written[4:45])                // Spells
+	assert.Equal(t, spells, conn.Written[4:47])                // Spells
 	assert.Len(t, conn.Written, 47)
 }

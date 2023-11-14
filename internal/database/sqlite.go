@@ -72,15 +72,6 @@ func Migrate(conn *sql.DB) error {
 	if err := m.Up(); err != nil {
 		return err
 	}
-
-	// Free resources
-	err1, err2 := m.Close()
-	if err1 != nil {
-		return err1
-	}
-	if err2 != nil {
-		return err2
-	}
 	return nil
 }
 
