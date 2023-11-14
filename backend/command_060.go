@@ -11,10 +11,7 @@ import (
 
 func (b *Backend) HandleGetCharacters(session *model.Session, req GetCharactersRequest) error {
 	if session.UserID == 0 {
-		return fmt.Errorf("packet-44: user is not logged in")
-	}
-	if session.CharacterID != 0 {
-		return fmt.Errorf("packet-44: character is already selected")
+		return fmt.Errorf("packet-60: user is not logged in")
 	}
 
 	characters, err := b.DB.ListCharacters(context.TODO(), session.UserID)

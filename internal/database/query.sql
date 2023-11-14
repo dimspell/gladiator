@@ -40,7 +40,7 @@ RETURNING *;
 SELECT *
 FROM characters
 WHERE user_id = ?
-ORDER BY slot_order;
+ORDER BY sort_order;
 
 -- name: FindCharacter :one
 SELECT *

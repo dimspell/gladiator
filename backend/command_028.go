@@ -17,9 +17,6 @@ func (b *Backend) HandleCreateGame(session *model.Session, req CreateGameRequest
 	if session.UserID == 0 {
 		return fmt.Errorf("packet-28: user is not logged in")
 	}
-	if session.UserID == 0 {
-		return fmt.Errorf("packet-28: character has not been selected yet")
-	}
 
 	data, err := req.Parse()
 	if err != nil {

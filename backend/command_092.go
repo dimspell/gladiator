@@ -16,9 +16,6 @@ func (b *Backend) HandleCreateCharacter(session *model.Session, req CreateCharac
 	if session.UserID == 0 {
 		return fmt.Errorf("packet-92: user is not logged in")
 	}
-	if session.CharacterID != 0 {
-		return fmt.Errorf("packet-92: character already selected")
-	}
 
 	data, err := req.Parse()
 	if err != nil {
@@ -69,9 +66,7 @@ func (b *Backend) HandleCreateCharacter(session *model.Session, req CreateCharac
 		return b.Send(session.Conn, CreateCharacter, []byte{0, 0, 0, 0})
 	}
 
-	// TODO: Check if it superfluous
-	session.CharacterID = newCharacter.ID
-	session.CharacterName = newCharacter.CharacterName
+	slog.Info("packet-92: new character created", "character", newCharacter.CharacterName, "username", data.Username)
 
 	return b.Send(session.Conn, CreateCharacter, []byte{1, 0, 0, 0})
 }

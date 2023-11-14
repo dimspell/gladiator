@@ -14,9 +14,6 @@ func (b *Backend) HandleListGames(session *model.Session, req ListGamesRequest) 
 	if session.UserID == 0 {
 		return fmt.Errorf("packet-09: user is not logged in")
 	}
-	if session.CharacterID == 0 {
-		return fmt.Errorf("packet-09: character has been not selected yet")
-	}
 
 	gameRooms, err := b.DB.ListGameRooms(context.TODO())
 	if err != nil {

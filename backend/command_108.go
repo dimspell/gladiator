@@ -19,9 +19,6 @@ func (b *Backend) HandleUpdateCharacterStats(session *model.Session, req UpdateC
 	if session.UserID == 0 {
 		return fmt.Errorf("packet-108: user is not logged in")
 	}
-	if session.CharacterID == 0 {
-		return fmt.Errorf("packet-108: user has not selected character")
-	}
 
 	data, err := req.Parse()
 	if err != nil {

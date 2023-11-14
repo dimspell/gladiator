@@ -31,8 +31,7 @@ func (b *Backend) HandleCreateNewAccount(session *model.Session, req CreateNewAc
 		return b.Send(session.Conn, CreateNewAccount, []byte{0, 0, 0, 0})
 	}
 
-	// TODO: Check if it is needed
-	session.UserID = user.ID
+	slog.Info("packet-42: new user created", "user", user.Username)
 
 	return b.Send(session.Conn, CreateNewAccount, []byte{1, 0, 0, 0})
 }

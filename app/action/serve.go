@@ -46,7 +46,8 @@ func ServeCommand() *cli.Command {
 
 		// TODO: Use database-type flag and choose the database
 		// db := memory.NewMemory()
-		db, err := database.NewLocal("database.sqlite")
+		// db, err := database.NewLocal("/c/Users/Piotrek/Projects/dispel-multi/database.sqlite")
+		db, err := database.NewMemory()
 		if err != nil {
 			return err
 		}

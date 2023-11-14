@@ -385,7 +385,7 @@ const listCharacters = `-- name: ListCharacters :many
 SELECT id, user_id, character_name, sort_order, strength, agility, wisdom, constitution, health_points, magic_points, experience_points, money, score_points, class_type, skin_carnation, hair_style, light_armour_legs, light_armour_torso, light_armour_hands, light_armour_boots, full_armour, armour_emblem, helmet, secondary_weapon, primary_weapon, shield, unknown_equipment_slot, gender, level, edged_weapons, blunted_weapons, archery, polearms, wizardry, unknown, inventory, spells
 FROM characters
 WHERE user_id = ?
-ORDER BY slot_order
+ORDER BY sort_order
 `
 
 func (q *Queries) ListCharacters(ctx context.Context, userID int64) ([]Character, error) {
