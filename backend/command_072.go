@@ -2,27 +2,43 @@ package backend
 
 import (
 	"bytes"
+	"context"
+	"encoding/base64"
 	"fmt"
 
+	"github.com/dispel-re/dispel-multi/internal/database"
 	"github.com/dispel-re/dispel-multi/model"
 )
 
 func (b *Backend) HandleGetCharacterSpells(session *model.Session, req GetCharacterSpellsRequest) error {
-	// spells := make([]byte, 41)
-	// for i := 0; i < len(spells); i++ {
-	// 	spells[i] = 2
-	// }
-	// resp := []byte{255, opJoinedUpdateSpells, 0, 0}
-	// resp = append(resp, spells...)
-	// resp = append(resp, 0, 0)
-	// binary.LittleEndian.PutUint16(resp[2:4], uint16(len(resp)))
-	//
-	// _, _ = conn.Write(resp)
-	// _, err := conn.Write(resp)
+	if session.UserID == 0 {
+		return fmt.Errorf("packet-72: user has been already logged in")
+	}
 
-	// GetCharacterSpells
+	data, err := req.Parse()
+	if err != nil {
+		return err
+	}
 
-	return nil
+	character, err := b.DB.FindCharacter(context.TODO(), database.FindCharacterParams{
+		CharacterName: data.CharacterName,
+		UserID:        session.UserID,
+	})
+	if err != nil {
+		return err
+	}
+
+	spells, err := base64.StdEncoding.DecodeString(character.Spells.String)
+	if len(spells) != 43 {
+		return fmt.Errorf("packet-72: spells array should be 43-chars long")
+	}
+	for i := 0; i < len(spells); i++ {
+		if spells[i] == 0 {
+			spells[i] = 1
+		}
+	}
+
+	return b.Send(session.Conn, GetCharacterSpells, spells)
 }
 
 type GetCharacterSpellsRequest []byte

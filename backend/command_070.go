@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"fmt"
 
 	"github.com/dispel-re/dispel-multi/internal/database"
 	"github.com/dispel-re/dispel-multi/model"
@@ -11,6 +12,10 @@ import (
 
 // HandleShowRanking handles 0x46ff (255-70) command
 func (b *Backend) HandleShowRanking(session *model.Session, req RankingRequest) error {
+	if session.UserID != 0 {
+		return fmt.Errorf("packet-70: user has been already logged in")
+	}
+
 	data, err := req.Parse()
 	if err != nil {
 		return err

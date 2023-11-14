@@ -49,7 +49,7 @@ func TestBackend_HandleGetCharacters(t *testing.T) {
 
 	b := &Backend{DB: db}
 	conn := &mockConn{}
-	session := &model.Session{ID: "TEST", Conn: conn, UserID: 1, Username: "JP"}
+	session := &model.Session{ID: "TEST", Conn: conn, UserID: user.ID, Username: "JP"}
 
 	assert.NoError(t, b.HandleGetCharacters(session, GetCharactersRequest("tester\x00")))
 	assert.Equal(t, []byte{255, 60, 34, 0}, conn.Written[0:4])     // Header
