@@ -8,8 +8,8 @@ import (
 
 // HandleJoinGame handles 0x22ff (255-34) command
 func (b *Backend) HandleJoinGame(session *model.Session, req JoinGameRequest) error {
-	if session.UserID != 0 {
-		return fmt.Errorf("packet-34: user has been already logged in")
+	if session.UserID == 0 {
+		return fmt.Errorf("packet-34: user is not logged in")
 	}
 
 	// gameRoom := b.DB.GameRooms()[0]

@@ -149,9 +149,11 @@ func (b *Backend) handleCommands(session *model.Session) error {
 
 	for _, packet := range packets {
 		pt := PacketType(packet[1])
+		fmt.Println(packet)
 		slog.Debug("Handle packet",
 			slog.Int("packetType", int(pt)),
-			slog.String("packet", base64.StdEncoding.EncodeToString(packet)))
+			slog.String("packet", string(packet)),
+			slog.String("packetB64", base64.StdEncoding.EncodeToString(packet)))
 
 		switch pt {
 		case CreateNewAccount:

@@ -8,8 +8,8 @@ import (
 
 // HandleSelectGame handles 0x45ff (255-69) command
 func (b *Backend) HandleSelectGame(session *model.Session, req SelectGameRequest) error {
-	if session.UserID != 0 {
-		return fmt.Errorf("packet-69: user has been already logged in")
+	if session.UserID == 0 {
+		return fmt.Errorf("packet-69: user is not logged in")
 	}
 
 	// gameRoom := b.DB.GameRooms()[0]

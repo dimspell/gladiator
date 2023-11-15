@@ -10,8 +10,8 @@ import (
 )
 
 func (b *Backend) HandleDeleteCharacter(session *model.Session, req DeleteCharacterRequest) error {
-	if session.UserID != 0 {
-		return fmt.Errorf("packet-61: user has been already logged in")
+	if session.UserID == 0 {
+		return fmt.Errorf("packet-61: user is not logged in")
 	}
 
 	data, err := req.Parse()

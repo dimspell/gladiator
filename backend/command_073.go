@@ -12,7 +12,7 @@ import (
 )
 
 func (b *Backend) HandleUpdateCharacterSpells(session *model.Session, req UpdateCharacterSpellsRequest) error {
-	if session.UserID != 0 {
+	if session.UserID == 0 {
 		return fmt.Errorf("packet-73: user has been already logged in")
 	}
 

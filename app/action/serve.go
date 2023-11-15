@@ -1,10 +1,13 @@
 package action
 
 import (
+	"context"
+
 	"github.com/dispel-re/dispel-multi/backend"
 	"github.com/dispel-re/dispel-multi/console"
 	"github.com/dispel-re/dispel-multi/internal/database"
 	"github.com/urfave/cli/v3"
+	"golang.org/x/crypto/bcrypt"
 )
 
 const (
@@ -53,6 +56,14 @@ func ServeCommand() *cli.Command {
 		}
 		queries, err := db.Queries()
 		if err != nil {
+			return err
+		}
+
+		pwd, _ := bcrypt.GenerateFromPassword([]byte("test"), 14)
+		if _, err := queries.CreateUser(context.TODO(), database.CreateUserParams{
+			Username: "test",
+			Password: string(pwd),
+		}); err != nil {
 			return err
 		}
 

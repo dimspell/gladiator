@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"github.com/dispel-re/dispel-multi/internal/database"
 	"github.com/dispel-re/dispel-multi/model"
@@ -109,8 +110,8 @@ func (b *Backend) HandleGetCharacterInventory(session *model.Session, req GetCha
 	// 	resp[2+63+i*3] = item.Unknown
 	// }
 	// resp = append(resp, 0)
-	if session.UserID != 0 {
-		return fmt.Errorf("packet-68: user has been already logged in")
+	if session.UserID == 0 {
+		return fmt.Errorf("packet-68: user is not logged in")
 	}
 
 	data, err := req.Parse()
@@ -129,9 +130,13 @@ func (b *Backend) HandleGetCharacterInventory(session *model.Session, req GetCha
 		return fmt.Errorf("packet-76: no characters found owned by player: %s", err)
 	}
 
-	inventory, err := base64.StdEncoding.DecodeString(character.Spells.String)
+	if !character.Inventory.Valid {
+		return nil
+	}
+	inventory, err := base64.StdEncoding.DecodeString(character.Inventory.String)
 	if len(inventory) != 207 {
-		return fmt.Errorf("packet-68: inventory array should be 207-chars long")
+		slog.Warn("packet-68: inventory array should be 207-chars long", "inventory", character.Inventory.String, "err", err)
+		return nil
 	}
 
 	return b.Send(session.Conn, GetCharacterInventory, inventory)

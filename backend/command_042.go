@@ -10,6 +10,7 @@ import (
 	"github.com/dispel-re/dispel-multi/model"
 )
 
+// 008-JP1-20001
 func (b *Backend) HandleCreateNewAccount(session *model.Session, req CreateNewAccountRequest) error {
 	data, err := req.Parse()
 	if err != nil {

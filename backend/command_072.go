@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"log/slog"
 
 	"github.com/dispel-re/dispel-multi/internal/database"
 	"github.com/dispel-re/dispel-multi/model"
@@ -12,7 +13,7 @@ import (
 
 func (b *Backend) HandleGetCharacterSpells(session *model.Session, req GetCharacterSpellsRequest) error {
 	if session.UserID == 0 {
-		return fmt.Errorf("packet-72: user has been already logged in")
+		return fmt.Errorf("packet-72: user is not logged in")
 	}
 
 	data, err := req.Parse()
@@ -28,9 +29,13 @@ func (b *Backend) HandleGetCharacterSpells(session *model.Session, req GetCharac
 		return err
 	}
 
+	if !character.Spells.Valid {
+		return nil
+	}
 	spells, err := base64.StdEncoding.DecodeString(character.Spells.String)
 	if len(spells) != 43 {
-		return fmt.Errorf("packet-72: spells array should be 43-chars long")
+		slog.Warn("packet-72: spells array should be 43-chars long", "spells", character.Spells.String, "err", err)
+		return nil
 	}
 	for i := 0; i < 41; i++ {
 		if spells[i] == 0 {
