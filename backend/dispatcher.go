@@ -149,7 +149,7 @@ func (b *Backend) handleCommands(session *model.Session) error {
 
 	for _, packet := range packets {
 		pt := PacketType(packet[1])
-		fmt.Println(packet)
+		fmt.Println("Read", packet)
 		slog.Debug("Handle packet",
 			slog.Int("packetType", int(pt)),
 			slog.String("packet", string(packet)),
@@ -263,6 +263,7 @@ func (b *Backend) Send(conn net.Conn, packetType PacketType, payload []byte) err
 	}
 
 	data := b.EncodePacket(packetType, payload)
+	fmt.Println("Sent", data)
 	slog.Debug("Sent packet",
 		slog.Int("packetType", int(packetType)),
 		slog.Any("data", base64.StdEncoding.EncodeToString(data)),

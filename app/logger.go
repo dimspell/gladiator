@@ -6,9 +6,14 @@ import (
 )
 
 func initLogger() {
+	f, err := os.Create("logfile.txt")
+	if err != nil {
+		panic(err)
+	}
+
 	logger := slog.New(
-		slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
-			AddSource: true,
+		slog.NewJSONHandler(f, &slog.HandlerOptions{
+			AddSource: false,
 			Level:     slog.LevelDebug,
 		}),
 	)
