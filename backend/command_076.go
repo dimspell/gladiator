@@ -72,6 +72,8 @@ func (b *Backend) HandleSelectCharacter(session *model.Session, req SelectCharac
 	response[0] = 1
 	copy(response[4:], info.ToBytes())
 
+	session.CharacterID = character.ID
+
 	return b.Send(session.Conn, SelectCharacter, response)
 }
 

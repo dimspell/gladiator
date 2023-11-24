@@ -18,6 +18,10 @@ func (b *Backend) HandleCreateGame(session *model.Session, req CreateGameRequest
 	if session.UserID == 0 {
 		return fmt.Errorf("packet-28: user is not logged in")
 	}
+
+	fmt.Println(req)
+	fmt.Println(string(req))
+
 	data, err := req.Parse()
 	if err != nil {
 		return err
@@ -27,17 +31,25 @@ func (b *Backend) HandleCreateGame(session *model.Session, req CreateGameRequest
 
 	switch data.State {
 	case uint32(0):
-		tcpAddr := session.Conn.RemoteAddr().(*net.TCPAddr)
+		hostIPAddress := session.Conn.RemoteAddr().(*net.TCPAddr).IP.String()
 		newGameRoom, err := b.DB.CreateGameRoom(context.TODO(), database.CreateGameRoomParams{
 			Name:          data.RoomName,
 			Password:      sql.NullString{String: data.Password, Valid: len(data.Password) > 0},
-			HostIpAddress: tcpAddr.IP.String(),
+			HostIpAddress: hostIPAddress,
 			MapID:         int64(data.MapID),
 		})
 		if err != nil {
 			return err
 		}
 		slog.Info("packet-28: created game room", "id", newGameRoom.ID, "name", newGameRoom.Name)
+
+		if err := b.DB.AddPlayerToRoom(context.TODO(), database.AddPlayerToRoomParams{
+			GameRoomID:  newGameRoom.ID,
+			CharacterID: session.CharacterID,
+			IpAddress:   hostIPAddress,
+		}); err != nil {
+			return err
+		}
 
 		binary.LittleEndian.PutUint32(resp[0:4], 1)
 		break

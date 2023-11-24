@@ -26,18 +26,10 @@ func (b *Backend) HandleJoinGame(session *model.Session, req JoinGameRequest) er
 		return err
 	}
 
-	character, err := b.DB.FindCharacter(context.TODO(), database.FindCharacterParams{
-		CharacterName: "TODO",
-		UserID:        session.UserID,
-	})
-	if err != nil {
-		return err
-	}
-
 	tcpAddr := session.Conn.RemoteAddr().(*net.TCPAddr)
 	if err := b.DB.AddPlayerToRoom(context.TODO(), database.AddPlayerToRoomParams{
 		GameRoomID:  room.ID,
-		CharacterID: character.ID,
+		CharacterID: session.CharacterID,
 		IpAddress:   tcpAddr.IP.To4().String(),
 	}); err != nil {
 		return err
@@ -63,7 +55,7 @@ func (b *Backend) HandleJoinGame(session *model.Session, req JoinGameRequest) er
 			Name:      player.CharacterName,
 		}
 		copy(lobbyPlayer.IPAddress[:], net.ParseIP(player.IpAddress).To4())
-		gameRoom.Players = append(gameRoom.Players)
+		gameRoom.Players = append(gameRoom.Players, lobbyPlayer)
 	}
 
 	return b.Send(session.Conn, JoinGame, gameRoom.Details())
@@ -73,15 +65,14 @@ type JoinGameRequest []byte
 
 type JoinGameRequestData struct {
 	RoomName string
+	Password string
 }
 
 func (r JoinGameRequest) Parse() (data JoinGameRequestData, err error) {
-	if bytes.Count(r, []byte{0}) != 1 {
-		return data, fmt.Errorf("packet-34: malformed packet, not enough null-terminators")
-	}
-	split := bytes.SplitN(r, []byte{0}, 2)
+	split := bytes.Split(r, []byte{0})
 
 	data.RoomName = string(split[0])
+	data.Password = string(bytes.TrimSuffix(split[1], []byte{0}))
 
 	return data, nil
 }

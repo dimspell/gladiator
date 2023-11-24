@@ -44,7 +44,7 @@ func (b *Backend) HandleSelectGame(session *model.Session, req SelectGameRequest
 			Name:      player.CharacterName,
 		}
 		copy(lobbyPlayer.IPAddress[:], net.ParseIP(player.IpAddress).To4())
-		gameRoom.Players = append(gameRoom.Players)
+		gameRoom.Players = append(gameRoom.Players, lobbyPlayer)
 	}
 
 	return b.Send(session.Conn, SelectGame, gameRoom.Details())
@@ -57,10 +57,10 @@ type SelectGameRequestData struct {
 }
 
 func (r SelectGameRequest) Parse() (data SelectGameRequestData, err error) {
-	if bytes.Count(r, []byte{0}) != 1 {
-		return data, fmt.Errorf("packet-62: malformed packet, not enough null-terminators")
+	split := bytes.Split(r, []byte{0})
+	if len(split) != 1 {
+		return data, fmt.Errorf("packet-69: malformed packet, not enough null-terminators")
 	}
-	split := bytes.SplitN(r, []byte{0}, 2)
 
 	data.RoomName = string(split[0])
 

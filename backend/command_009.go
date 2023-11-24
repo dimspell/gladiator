@@ -2,6 +2,7 @@ package backend
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
 	"log/slog"
 	"net"
@@ -21,7 +22,9 @@ func (b *Backend) HandleListGames(session *model.Session, req ListGamesRequest) 
 		return nil
 	}
 
-	response := []byte{}
+	var response []byte
+	response = binary.LittleEndian.AppendUint32(response, uint32(len(gameRooms)))
+
 	for _, room := range gameRooms {
 		lobby := model.LobbyRoom{
 			Name:     room.Name,
