@@ -1,7 +1,10 @@
 package backend
 
 import (
+	"bytes"
+	"context"
 	"fmt"
+	"net"
 
 	"github.com/dispel-re/dispel-multi/model"
 )
@@ -12,9 +15,54 @@ func (b *Backend) HandleSelectGame(session *model.Session, req SelectGameRequest
 		return fmt.Errorf("packet-69: user is not logged in")
 	}
 
-	// gameRoom := b.DB.GameRooms()[0]
-	var gameRoom model.GameRoom
+	data, err := req.Parse()
+	if err != nil {
+		return err
+	}
+
+	room, err := b.DB.GetGameRoom(context.TODO(), data.RoomName)
+	if err != nil {
+		return err
+	}
+	gameRoom := model.GameRoom{
+		Lobby: model.LobbyRoom{
+			HostIPAddress: [4]byte{},
+			Name:          room.Name,
+			Password:      room.Password.String,
+		},
+		MapID: uint32(room.MapID),
+	}
+	copy(gameRoom.Lobby.HostIPAddress[:], net.ParseIP(room.HostIpAddress).To4())
+
+	players, err := b.DB.GetGameRoomPlayers(context.TODO(), data.RoomName)
+	if err != nil {
+		return err
+	}
+	for _, player := range players {
+		lobbyPlayer := model.LobbyPlayer{
+			ClassType: model.ClassType(player.ClassType),
+			Name:      player.CharacterName,
+		}
+		copy(lobbyPlayer.IPAddress[:], net.ParseIP(player.IpAddress).To4())
+		gameRoom.Players = append(gameRoom.Players)
+	}
+
 	return b.Send(session.Conn, SelectGame, gameRoom.Details())
 }
 
 type SelectGameRequest []byte
+
+type SelectGameRequestData struct {
+	RoomName string
+}
+
+func (r SelectGameRequest) Parse() (data SelectGameRequestData, err error) {
+	if bytes.Count(r, []byte{0}) != 1 {
+		return data, fmt.Errorf("packet-62: malformed packet, not enough null-terminators")
+	}
+	split := bytes.SplitN(r, []byte{0}, 2)
+
+	data.RoomName = string(split[0])
+
+	return data, nil
+}

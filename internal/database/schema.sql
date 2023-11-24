@@ -57,3 +57,10 @@ CREATE TABLE game_rooms
     map_id          INTEGER NOT NULL
 );
 
+CREATE TABLE game_room_players
+(
+    game_room_id INTEGER NOT NULL,
+    character_id INTEGER NOT NULL,
+    ip_address   TEXT    NOT NULL
+);
+

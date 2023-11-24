@@ -2,7 +2,7 @@ CREATE TABLE game_rooms
 (
     id              INTEGER PRIMARY KEY,
     name            TEXT    NOT NULL,
-    password        TEXT,
+    password        TEXT    NOT NULL,
     host_ip_address TEXT    NOT NULL,
     map_id          INTEGER NOT NULL
 );

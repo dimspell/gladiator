@@ -1,1 +1,1 @@
-DROP TABLE characters;
+DROP TABLE IF EXISTS characters;

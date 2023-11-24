@@ -38,5 +38,7 @@ CREATE TABLE characters
     unknown                TEXT,
 
     inventory              TEXT,
-    spells                 TEXT
+    spells                 TEXT,
+
+    FOREIGN KEY (user_id) REFERENCES users
 );

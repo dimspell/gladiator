@@ -10,6 +10,22 @@ import (
 	"database/sql"
 )
 
+const addPlayerToRoom = `-- name: AddPlayerToRoom :exec
+INSERT INTO game_room_players (game_room_id, character_id, ip_address)
+VALUES (?, ?, ?)
+`
+
+type AddPlayerToRoomParams struct {
+	GameRoomID  int64
+	CharacterID int64
+	IpAddress   string
+}
+
+func (q *Queries) AddPlayerToRoom(ctx context.Context, arg AddPlayerToRoomParams) error {
+	_, err := q.exec(ctx, q.addPlayerToRoomStmt, addPlayerToRoom, arg.GameRoomID, arg.CharacterID, arg.IpAddress)
+	return err
+}
+
 const createCharacter = `-- name: CreateCharacter :one
 INSERT INTO characters (strength,
                         agility,
@@ -327,9 +343,13 @@ func (q *Queries) GetCurrentUser(ctx context.Context, arg GetCurrentUserParams) 
 }
 
 const getGameRoom = `-- name: GetGameRoom :one
-SELECT id, name, password, host_ip_address, map_id
+SELECT id,
+       name,
+       password,
+       host_ip_address,
+       map_id
 FROM game_rooms
-WHERE name = ?
+WHERE game_rooms.name = ?
 LIMIT 1
 `
 
@@ -344,6 +364,45 @@ func (q *Queries) GetGameRoom(ctx context.Context, name string) (GameRoom, error
 		&i.MapID,
 	)
 	return i, err
+}
+
+const getGameRoomPlayers = `-- name: GetGameRoomPlayers :many
+SELECT character_name,
+       class_type,
+       ip_address
+FROM game_rooms
+         JOIN game_room_players ON game_rooms.id = game_room_players.game_room_id
+         JOIN characters ON game_room_players.character_id = characters.id
+WHERE game_rooms.name = ?
+`
+
+type GetGameRoomPlayersRow struct {
+	CharacterName string
+	ClassType     int64
+	IpAddress     string
+}
+
+func (q *Queries) GetGameRoomPlayers(ctx context.Context, name string) ([]GetGameRoomPlayersRow, error) {
+	rows, err := q.query(ctx, q.getGameRoomPlayersStmt, getGameRoomPlayers, name)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetGameRoomPlayersRow
+	for rows.Next() {
+		var i GetGameRoomPlayersRow
+		if err := rows.Scan(&i.CharacterName, &i.ClassType, &i.IpAddress); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getUser = `-- name: GetUser :one

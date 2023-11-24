@@ -141,12 +141,29 @@ SELECT *
 FROM game_rooms;
 
 -- name: GetGameRoom :one
-SELECT *
+SELECT id,
+       name,
+       password,
+       host_ip_address,
+       map_id
 FROM game_rooms
-WHERE name = ?
+WHERE game_rooms.name = ?
 LIMIT 1;
 
 -- name: CreateGameRoom :one
 INSERT INTO game_rooms (name, password, host_ip_address, map_id)
 VALUES (?, ?, ?, ?)
 RETURNING *;
+
+-- name: GetGameRoomPlayers :many
+SELECT character_name,
+       class_type,
+       ip_address
+FROM game_rooms
+         JOIN game_room_players ON game_rooms.id = game_room_players.game_room_id
+         JOIN characters ON game_room_players.character_id = characters.id
+WHERE game_rooms.name = ?;
+
+-- name: AddPlayerToRoom :exec
+INSERT INTO game_room_players (game_room_id, character_id, ip_address)
+VALUES (?, ?, ?);

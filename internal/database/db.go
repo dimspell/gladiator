@@ -24,6 +24,9 @@ func New(db DBTX) *Queries {
 func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	q := Queries{db: db}
 	var err error
+	if q.addPlayerToRoomStmt, err = db.PrepareContext(ctx, addPlayerToRoom); err != nil {
+		return nil, fmt.Errorf("error preparing query AddPlayerToRoom: %w", err)
+	}
 	if q.createCharacterStmt, err = db.PrepareContext(ctx, createCharacter); err != nil {
 		return nil, fmt.Errorf("error preparing query CreateCharacter: %w", err)
 	}
@@ -44,6 +47,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	}
 	if q.getGameRoomStmt, err = db.PrepareContext(ctx, getGameRoom); err != nil {
 		return nil, fmt.Errorf("error preparing query GetGameRoom: %w", err)
+	}
+	if q.getGameRoomPlayersStmt, err = db.PrepareContext(ctx, getGameRoomPlayers); err != nil {
+		return nil, fmt.Errorf("error preparing query GetGameRoomPlayers: %w", err)
 	}
 	if q.getUserStmt, err = db.PrepareContext(ctx, getUser); err != nil {
 		return nil, fmt.Errorf("error preparing query GetUser: %w", err)
@@ -71,6 +77,11 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 
 func (q *Queries) Close() error {
 	var err error
+	if q.addPlayerToRoomStmt != nil {
+		if cerr := q.addPlayerToRoomStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing addPlayerToRoomStmt: %w", cerr)
+		}
+	}
 	if q.createCharacterStmt != nil {
 		if cerr := q.createCharacterStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing createCharacterStmt: %w", cerr)
@@ -104,6 +115,11 @@ func (q *Queries) Close() error {
 	if q.getGameRoomStmt != nil {
 		if cerr := q.getGameRoomStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing getGameRoomStmt: %w", cerr)
+		}
+	}
+	if q.getGameRoomPlayersStmt != nil {
+		if cerr := q.getGameRoomPlayersStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getGameRoomPlayersStmt: %w", cerr)
 		}
 	}
 	if q.getUserStmt != nil {
@@ -180,6 +196,7 @@ func (q *Queries) queryRow(ctx context.Context, stmt *sql.Stmt, query string, ar
 type Queries struct {
 	db                           DBTX
 	tx                           *sql.Tx
+	addPlayerToRoomStmt          *sql.Stmt
 	createCharacterStmt          *sql.Stmt
 	createGameRoomStmt           *sql.Stmt
 	createUserStmt               *sql.Stmt
@@ -187,6 +204,7 @@ type Queries struct {
 	findCharacterStmt            *sql.Stmt
 	getCurrentUserStmt           *sql.Stmt
 	getGameRoomStmt              *sql.Stmt
+	getGameRoomPlayersStmt       *sql.Stmt
 	getUserStmt                  *sql.Stmt
 	listCharactersStmt           *sql.Stmt
 	listGameRoomsStmt            *sql.Stmt
@@ -200,6 +218,7 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 	return &Queries{
 		db:                           tx,
 		tx:                           tx,
+		addPlayerToRoomStmt:          q.addPlayerToRoomStmt,
 		createCharacterStmt:          q.createCharacterStmt,
 		createGameRoomStmt:           q.createGameRoomStmt,
 		createUserStmt:               q.createUserStmt,
@@ -207,6 +226,7 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		findCharacterStmt:            q.findCharacterStmt,
 		getCurrentUserStmt:           q.getCurrentUserStmt,
 		getGameRoomStmt:              q.getGameRoomStmt,
+		getGameRoomPlayersStmt:       q.getGameRoomPlayersStmt,
 		getUserStmt:                  q.getUserStmt,
 		listCharactersStmt:           q.listCharactersStmt,
 		listGameRoomsStmt:            q.listGameRoomsStmt,

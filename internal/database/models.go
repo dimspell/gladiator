@@ -56,6 +56,12 @@ type GameRoom struct {
 	MapID         int64
 }
 
+type GameRoomPlayer struct {
+	GameRoomID  int64
+	CharacterID int64
+	IpAddress   string
+}
+
 type User struct {
 	ID       int64
 	Username string
