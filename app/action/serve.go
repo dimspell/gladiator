@@ -1,15 +1,10 @@
 package action
 
 import (
-	"context"
-	"database/sql"
-
 	"github.com/dispel-re/dispel-multi/backend"
 	"github.com/dispel-re/dispel-multi/console"
 	"github.com/dispel-re/dispel-multi/internal/database"
-	"github.com/dispel-re/dispel-multi/model"
 	"github.com/urfave/cli/v3"
-	"golang.org/x/crypto/bcrypt"
 )
 
 const (
@@ -61,52 +56,7 @@ func ServeCommand() *cli.Command {
 			return err
 		}
 
-		pwd, _ := bcrypt.GenerateFromPassword([]byte("test"), 14)
-		user, err := queries.CreateUser(context.TODO(), database.CreateUserParams{
-			Username: "test",
-			Password: string(pwd),
-		})
-		if err != nil {
-			return err
-		}
-
-		_, err = queries.CreateCharacter(context.TODO(), database.CreateCharacterParams{
-			Strength:             100,
-			Agility:              100,
-			Wisdom:               100,
-			Constitution:         100,
-			HealthPoints:         100,
-			MagicPoints:          100,
-			ExperiencePoints:     9,
-			Money:                300,
-			ScorePoints:          0,
-			ClassType:            int64(model.ClassTypeArcher),
-			SkinCarnation:        int64(model.SkinCarnationMaleBrown),
-			HairStyle:            int64(model.HairStyleMaleLongGray),
-			LightArmourLegs:      100,
-			LightArmourTorso:     100,
-			LightArmourHands:     100,
-			LightArmourBoots:     100,
-			FullArmour:           100,
-			ArmourEmblem:         100,
-			Helmet:               100,
-			SecondaryWeapon:      100,
-			PrimaryWeapon:        100,
-			Shield:               100,
-			UnknownEquipmentSlot: 100,
-			Gender:               int64(model.GenderMale),
-			Level:                1,
-			EdgedWeapons:         1,
-			BluntedWeapons:       1,
-			Archery:              1,
-			Polearms:             1,
-			Wizardry:             1,
-			Unknown:              sql.NullString{Valid: true, String: "\x00\x00\x00\x00\x00\x00"},
-			CharacterName:        "tester",
-			UserID:               user.ID,
-			SortOrder:            0,
-		})
-		if err != nil {
+		if err := database.Seed(queries); err != nil {
 			return err
 		}
 
