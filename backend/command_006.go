@@ -23,7 +23,7 @@ import (
 func (b *Backend) HandleAuthorizationHandshake(session *model.Session, req AuthorizationHandshakeRequest) error {
 	data, err := req.Parse()
 	if err != nil {
-		return err
+		return fmt.Errorf("packet-6: %w", err)
 	}
 	if data.AuthKey != "68XIPSID" {
 		if err := b.Send(session.Conn, AuthorizationHandshake, []byte{0, 0, 0, 0}); err != nil {
@@ -31,7 +31,7 @@ func (b *Backend) HandleAuthorizationHandshake(session *model.Session, req Autho
 		}
 
 		// Returned only for any fake clients
-		return fmt.Errorf("packet-6: wrong auth key: %s", data.AuthKey)
+		return fmt.Errorf("packet-6: wrong auth key: %q", data.AuthKey)
 	}
 
 	return b.Send(session.Conn, AuthorizationHandshake, []byte("ENET\x00"))
