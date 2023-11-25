@@ -32,8 +32,9 @@ func TestBackend_HandleListGames(t *testing.T) {
 		session := &model.Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
 
 		assert.NoError(t, b.HandleListGames(session, ListGamesRequest{}))
-		assert.Len(t, conn.Written, 4)
-		assert.Equal(t, []byte{255, 9, 4, 0}, conn.Written[0:4]) // Header
+		assert.Len(t, conn.Written, 8)
+		assert.Equal(t, []byte{255, 9, 8, 0}, conn.Written[0:4]) // Header
+		assert.Equal(t, []byte{0, 0, 0, 0}, conn.Written[4:8])   // Number of games
 	})
 
 	t.Run("with games", func(t *testing.T) {
@@ -49,10 +50,11 @@ func TestBackend_HandleListGames(t *testing.T) {
 		session := &model.Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
 
 		assert.NoError(t, b.HandleListGames(session, ListGamesRequest{}))
-		assert.Len(t, conn.Written, 24)
-		assert.Equal(t, []byte{255, 9, 24, 0}, conn.Written[0:4])   // Header
-		assert.Equal(t, []byte{127, 0, 0, 1}, conn.Written[4:8])    // Host IP Address
-		assert.Equal(t, []byte("RoomName\x00"), conn.Written[8:17]) // Room name
-		assert.Equal(t, []byte("secret\x00"), conn.Written[17:24])  // Password
+		assert.Len(t, conn.Written, 28)
+		assert.Equal(t, []byte{255, 9, 28, 0}, conn.Written[0:4])    // Header
+		assert.Equal(t, []byte{1, 0, 0, 0}, conn.Written[4:8])       // Number of games
+		assert.Equal(t, []byte{127, 0, 0, 1}, conn.Written[8:12])    // Host IP Address
+		assert.Equal(t, []byte("RoomName\x00"), conn.Written[12:21]) // Room name
+		assert.Equal(t, []byte("secret\x00"), conn.Written[21:28])   // Password
 	})
 }

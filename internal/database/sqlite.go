@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"embed"
 	_ "embed"
+	"errors"
 	"fmt"
 
 	"github.com/golang-migrate/migrate/v4"
@@ -72,7 +73,10 @@ func Migrate(conn *sql.DB) error {
 
 	// Migrate
 	if err := m.Up(); err != nil {
-		return err
+		if errors.Is(err, migrate.ErrNoChange) {
+			return nil
+		}
+		return fmt.Errorf("migration: %w", err)
 	}
 	return nil
 }
