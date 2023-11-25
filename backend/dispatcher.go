@@ -148,6 +148,10 @@ func (b *Backend) handleCommands(session *model.Session) error {
 	packets := splitMultiPacket(buf[:n])
 
 	for _, packet := range packets {
+		if len(packet) < 4 {
+			continue
+		}
+
 		pt := PacketType(packet[1])
 		fmt.Fprintln(os.Stdout, "Read", packet)
 		slog.Debug("Handle packet",
@@ -245,7 +249,7 @@ func splitMultiPacket(buf []byte) [][]byte {
 
 	var packets [][]byte
 	var offset int
-	for {
+	for i := 0; i < 10; i++ {
 		if (offset + 4) > len(buf) {
 			break
 		}
