@@ -58,11 +58,7 @@ type SelectGameRequestData struct {
 
 func (r SelectGameRequest) Parse() (data SelectGameRequestData, err error) {
 	split := bytes.Split(r, []byte{0})
-	if len(split) != 1 {
-		return data, fmt.Errorf("packet-69: malformed packet, not enough null-terminators")
-	}
-
-	data.RoomName = string(split[0])
+	data.RoomName = string(bytes.TrimSuffix(split[0], []byte{0}))
 
 	return data, nil
 }
