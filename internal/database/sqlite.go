@@ -37,7 +37,9 @@ func NewMemory() (*SQLite, error) {
 }
 
 func NewLocal(pathToDatabase string) (*SQLite, error) {
-	uri := fmt.Sprintf("sqlite3://%s?journaled_mode=WAL", pathToDatabase)
+	// uri := fmt.Sprintf("sqlite3://%s?journaled_mode=WAL", pathToDatabase)
+	// uri := fmt.Sprintf("%s?journaled_mode=WAL", pathToDatabase)
+	uri := fmt.Sprintf("%s", pathToDatabase)
 
 	conn, err := sql.Open("sqlite3", uri)
 	if err != nil {

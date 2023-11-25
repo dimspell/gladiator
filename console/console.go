@@ -99,7 +99,7 @@ func (c *Console) Routing() http.Handler {
 		// r.Get("/{channel}/chat", c.GetChannelChat)
 	})
 
-	r.Route("/connections", func(r chi.Router) {
+	r.Route("/sessions", func(r chi.Router) {
 		// r.Get("/", c.ListConnections)
 
 		// r.Get("/{connection}", nil) // Get connection details - user, his inventory, chars..
@@ -118,10 +118,10 @@ func (c *Console) Routing() http.Handler {
 	})
 
 	r.Route("/user", func(r chi.Router) {
-		r.Route("/{user}", func(r chi.Router) {
-			// r.Post("/character", c.AddCharacter)
-			// r.Post("/import-character", c.ImportCharacterFromSav)
-		})
+		r.Get("/{userId}/characters", c.ListCharacters)
+
+		// r.Post("/character", c.AddCharacter)
+		// r.Post("/import-character", c.ImportCharacterFromSav)
 	})
 
 	return r
