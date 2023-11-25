@@ -28,3 +28,10 @@ checksum:
 
 snapshot:
   name_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  skip: true
+
+release:
+  prerelease: auto
+  mode: replace
