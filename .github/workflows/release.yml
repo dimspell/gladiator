@@ -1,8 +1,9 @@
 name: Release
 
 on:
-  workflow_dispatch:
-    inputs: { }
+  push:
+    tags:
+      - '*'
 
 permissions:
   contents: write
