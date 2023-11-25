@@ -1,0 +1,38 @@
+{
+    "terminal.integrated.defaultProfile.windows": "MSYS2",
+    "terminal.integrated.profiles.windows": {
+        "PowerShell": {
+            "source": "PowerShell",
+            "icon": "terminal-powershell"
+        },
+        "Command Prompt": {
+            "path": [
+                "${env:windir}\\Sysnative\\cmd.exe",
+                "${env:windir}\\System32\\cmd.exe"
+            ],
+            "args": [],
+            "icon": "terminal-cmd"
+        },
+        "Git Bash": {
+            "source": "Git Bash"
+        },
+        "MSYS2": {
+            "args": [
+                "-ucrt64",
+                "-full-path",
+                "-here",
+                "-no-start",
+                "-defterm",
+                "-shell",
+                "bash"
+            ],
+            "path": "C:\\msys64\\msys2_shell.cmd",
+            "env": {
+                "GOPATH": "/mingw64",
+                "GOROOT": "/mingw64/lib/go",
+                "GOFLAGS": "-v",
+                "PATH": "${env:PATH};/mingw64/bin"
+            }
+        }
+    }
+}
