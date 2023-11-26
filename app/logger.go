@@ -35,7 +35,7 @@ func initDefaultLogger(ctx *cli.Context) (CleanupFunc, error) {
 
 	logLevel, ok := LogLevels[strings.ToLower(ctx.String("log-level"))]
 	if !ok {
-		logLevel = slog.LevelDebug
+		return deferred, fmt.Errorf("invalid log level: %s", ctx.String("log-level"))
 	}
 
 	var w *os.File = os.Stderr
