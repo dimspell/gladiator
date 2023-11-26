@@ -12,8 +12,6 @@ import (
 const appName = "dispel-multi"
 
 func NewApp(version, commit, buildDate string) {
-	initLogger()
-
 	app := &cli.Command{
 		Name: appName,
 		Version: fmt.Sprintf(
@@ -24,11 +22,58 @@ func NewApp(version, commit, buildDate string) {
 		),
 	}
 
+	// Root flags
+	app.Flags = append(app.Flags,
+		&cli.BoolFlag{
+			Name:  "debug",
+			Usage: "Enable debug mode",
+		},
+		&cli.StringFlag{
+			Name:  "log-level",
+			Value: "debug",
+			Usage: "Log level (debug, info, warn, error)",
+		},
+		&cli.StringFlag{
+			Name:  "log-format",
+			Value: "text",
+			Usage: "Log format (text, json)",
+		},
+		&cli.StringFlag{
+			Name:  "log-file",
+			Usage: "Log file path",
+		},
+		&cli.BoolFlag{
+			Name:  "no-color",
+			Usage: "Disable colors in log output",
+		},
+	)
+
+	// Setup function
+	var closers []CleanupFunc
+	app.Before = func(ctx *cli.Context) error {
+		close, err := initDefaultLogger(ctx)
+		if err != nil {
+			return err
+		}
+		closers = append(closers, close)
+		return nil
+	}
+
+	// Cleanup function
+	app.After = func(ctx *cli.Context) error {
+		for _, close := range closers {
+			close()
+		}
+		return nil
+	}
+
+	// Assign commands
 	app.Commands = append(app.Commands,
 		action.ServeCommand(),
 		action.ConsoleCommand(),
 	)
 
+	// Start the app
 	if err := app.Run(context.Background(), os.Args); err != nil {
 		_, _ = fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
