@@ -9,8 +9,7 @@ import (
 
 // HandleClientHostAndUsername handles 0x1eff (255-30) command
 func (b *Backend) HandleClientHostAndUsername(session *model.Session, req ClientHostAndUsernameRequest) error {
-	// TODO: Are you sure that the response is uint16 not uint32?
-	return b.Send(session.Conn, ClientHostAndUsername, []byte{1, 0})
+	return b.Send(session.Conn, ClientHostAndUsername, []byte{1, 0, 0, 0})
 }
 
 type ClientHostAndUsernameRequest []byte
