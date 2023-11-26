@@ -4,8 +4,10 @@ import (
 	"context"
 	"log/slog"
 	"net"
+	"os"
 
 	"github.com/dispel-re/dispel-multi/internal/database"
+	"github.com/dispel-re/dispel-multi/internal/packetlogger"
 	"github.com/dispel-re/dispel-multi/model"
 	"github.com/google/uuid"
 )
@@ -13,14 +15,16 @@ import (
 type Backend struct {
 	DB *database.Queries
 
-	Sessions map[string]*model.Session
+	Sessions     map[string]*model.Session
+	PacketLogger *slog.Logger
 }
 
 // func NewBackend(db *memory.Memory) *Backend {
 func NewBackend(db *database.Queries) *Backend {
 	return &Backend{
-		DB:       db,
-		Sessions: make(map[string]*model.Session),
+		DB:           db,
+		Sessions:     make(map[string]*model.Session),
+		PacketLogger: slog.New(packetlogger.New(os.Stderr, &packetlogger.Options{Level: slog.LevelDebug})),
 	}
 }
 

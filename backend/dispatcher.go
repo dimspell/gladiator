@@ -153,11 +153,11 @@ func (b *Backend) handleCommands(session *model.Session) error {
 		}
 
 		pt := PacketType(packet[1])
-		fmt.Fprintln(os.Stdout, "Read", packet)
-		slog.Debug("Handle packet",
-			slog.Int("packetType", int(pt)),
-			slog.String("packet", string(packet)),
-			slog.String("packetB64", base64.StdEncoding.EncodeToString(packet)))
+		b.PacketLogger.Debug("Recv",
+			"packetType", pt,
+			"bytes", packet,
+			"base64", base64.StdEncoding.EncodeToString(packet),
+		)
 
 		switch pt {
 		case CreateNewAccount:
@@ -267,10 +267,11 @@ func (b *Backend) Send(conn net.Conn, packetType PacketType, payload []byte) err
 	}
 
 	data := b.EncodePacket(packetType, payload)
-	fmt.Fprintln(os.Stdout, "Sent", data)
-	slog.Debug("Sent packet",
-		slog.Int("packetType", int(packetType)),
-		slog.Any("data", base64.StdEncoding.EncodeToString(data)),
+
+	b.PacketLogger.Debug("Sent",
+		"packetType", packetType,
+		"bytes", data,
+		"base64", base64.StdEncoding.EncodeToString(data),
 	)
 
 	_, err := conn.Write(data)

@@ -31,6 +31,7 @@
                 "GOPATH": "/mingw64",
                 "GOROOT": "/mingw64/lib/go",
                 "GOFLAGS": "-v",
+                "GOTOOLCHAIN": "go1.21.3",
                 "PATH": "${env:PATH};/mingw64/bin"
             }
         }
