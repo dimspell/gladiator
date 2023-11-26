@@ -22,7 +22,7 @@ func (b *Backend) HandleUpdateCharacterStats(session *model.Session, req UpdateC
 
 	data, err := req.Parse()
 	if err != nil {
-		return err
+		return fmt.Errorf("packet-108: could not parse request: %w", err)
 	}
 
 	if err := b.DB.UpdateCharacterStats(context.TODO(), database.UpdateCharacterStatsParams{
@@ -77,11 +77,11 @@ type UpdateCharacterStatsRequestData struct {
 
 func (r UpdateCharacterStatsRequest) Parse() (data UpdateCharacterStatsRequestData, err error) {
 	if len(r) < 56 {
-		return data, fmt.Errorf("packet-108: packet is too short: %s", base64.StdEncoding.EncodeToString(r))
+		return data, fmt.Errorf("packet is too short: %s", base64.StdEncoding.EncodeToString(r))
 	}
 	split := bytes.SplitN(r[56:], []byte{0}, 3)
 	if len(split) != 3 {
-		return data, fmt.Errorf("packet-108: no enough arguments, malformed request payload: %s", base64.StdEncoding.EncodeToString(r))
+		return data, fmt.Errorf("no enough arguments, malformed request payload: %s", base64.StdEncoding.EncodeToString(r))
 	}
 
 	data.CharacterInfo = model.NewCharacterInfo(r[:56])
