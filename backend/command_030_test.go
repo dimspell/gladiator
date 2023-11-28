@@ -37,7 +37,7 @@ func TestBackend_HandleClientHostAndUsername(t *testing.T) {
 		68, 69, 83, 75, 84, 79, 80, 45, 49, 51, 51, 55, 73, 83, 72, 0, // Host name
 		85, 115, 101, 114, 0, // User name
 	}))
-	assert.Equal(t, []byte{255, 30, 6, 0}, conn.Written[0:4]) // Header
-	assert.Equal(t, []byte{1, 0}, conn.Written[4:6])          // Accepted state
-	assert.Len(t, conn.Written, 6)
+	assert.Equal(t, []byte{255, 30, 8, 0}, conn.Written[0:4]) // Header
+	assert.Equal(t, []byte{1, 0, 0, 0}, conn.Written[4:])     // Accepted state
+	assert.Len(t, conn.Written, 8)
 }
