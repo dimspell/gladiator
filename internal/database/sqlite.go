@@ -12,7 +12,7 @@ import (
 	"github.com/golang-migrate/migrate/v4/database/sqlite"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 //go:embed migrations/*.sql
@@ -23,7 +23,7 @@ type SQLite struct {
 }
 
 func NewMemory() (*SQLite, error) {
-	conn, err := sql.Open("sqlite3", ":memory:")
+	conn, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		return nil, err
 	}
@@ -38,11 +38,16 @@ func NewMemory() (*SQLite, error) {
 }
 
 func NewLocal(pathToDatabase string) (*SQLite, error) {
-	// uri := fmt.Sprintf("sqlite3://%s?journaled_mode=WAL", pathToDatabase)
-	// uri := fmt.Sprintf("%s?journaled_mode=WAL", pathToDatabase)
-	uri := fmt.Sprintf("%s", pathToDatabase)
+	pragmas := "_pragma=busy_timeout(10000)&" +
+		"_pragma=journal_mode(WAL)&" +
+		"_pragma=journal_size_limit(200000000)&" +
+		"_pragma=synchronous(NORMAL)&" +
+		"_pragma=foreign_keys(ON)&" +
+		"_pragma=temp_store(MEMORY)&" +
+		"_pragma=cache_size(-16000)"
+	uri := fmt.Sprintf("%s?%s", pathToDatabase, pragmas)
 
-	conn, err := sql.Open("sqlite3", uri)
+	conn, err := sql.Open("sqlite", uri)
 	if err != nil {
 		return nil, err
 	}
@@ -72,6 +77,8 @@ func Migrate(conn *sql.DB) error {
 	}
 
 	// Migrate
+	_ = m.Down()
+
 	if err := m.Up(); err != nil {
 		if errors.Is(err, migrate.ErrNoChange) {
 			return nil

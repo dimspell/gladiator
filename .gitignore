@@ -22,4 +22,4 @@
 go.work
 
 # Databases
-*.sqlite
+*.sqlite*

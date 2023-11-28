@@ -13,7 +13,7 @@ import (
 )
 
 type Backend struct {
-	// DB *database.Queries
+	DB *database.Queries
 
 	Sessions     map[string]*model.Session
 	PacketLogger *slog.Logger
