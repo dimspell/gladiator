@@ -53,18 +53,18 @@ func NewApp(version, commit, buildDate string) {
 	// Setup function
 	var closers []CleanupFunc
 	app.Before = func(ctx *cli.Context) error {
-		close, err := initDefaultLogger(ctx)
+		closer, err := initDefaultLogger(ctx)
 		if err != nil {
 			return err
 		}
-		closers = append(closers, close)
+		closers = append(closers, closer)
 		return nil
 	}
 
 	// Cleanup function
 	app.After = func(ctx *cli.Context) error {
-		for _, close := range closers {
-			close()
+		for _, closer := range closers {
+			closer()
 		}
 		return nil
 	}
@@ -80,9 +80,6 @@ func NewApp(version, commit, buildDate string) {
 
 				byteArray := make([]byte, 20)
 				logger.Debug("Hello, world!", "bytes", byteArray)
-				logger.Info("Hello, world!", "bytes", byteArray)
-				logger.Warn("Hello, world!", "bytes", byteArray)
-				logger.Error("Hello, world!", "bytes", byteArray)
 
 				return nil
 			},
