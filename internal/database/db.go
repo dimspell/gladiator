@@ -51,8 +51,11 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.getGameRoomPlayersStmt, err = db.PrepareContext(ctx, getGameRoomPlayers); err != nil {
 		return nil, fmt.Errorf("error preparing query GetGameRoomPlayers: %w", err)
 	}
-	if q.getUserStmt, err = db.PrepareContext(ctx, getUser); err != nil {
-		return nil, fmt.Errorf("error preparing query GetUser: %w", err)
+	if q.getUserByIDStmt, err = db.PrepareContext(ctx, getUserByID); err != nil {
+		return nil, fmt.Errorf("error preparing query GetUserByID: %w", err)
+	}
+	if q.getUserByNameStmt, err = db.PrepareContext(ctx, getUserByName); err != nil {
+		return nil, fmt.Errorf("error preparing query GetUserByName: %w", err)
 	}
 	if q.listCharactersStmt, err = db.PrepareContext(ctx, listCharacters); err != nil {
 		return nil, fmt.Errorf("error preparing query ListCharacters: %w", err)
@@ -122,9 +125,14 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing getGameRoomPlayersStmt: %w", cerr)
 		}
 	}
-	if q.getUserStmt != nil {
-		if cerr := q.getUserStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing getUserStmt: %w", cerr)
+	if q.getUserByIDStmt != nil {
+		if cerr := q.getUserByIDStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getUserByIDStmt: %w", cerr)
+		}
+	}
+	if q.getUserByNameStmt != nil {
+		if cerr := q.getUserByNameStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getUserByNameStmt: %w", cerr)
 		}
 	}
 	if q.listCharactersStmt != nil {
@@ -205,7 +213,8 @@ type Queries struct {
 	getCurrentUserStmt           *sql.Stmt
 	getGameRoomStmt              *sql.Stmt
 	getGameRoomPlayersStmt       *sql.Stmt
-	getUserStmt                  *sql.Stmt
+	getUserByIDStmt              *sql.Stmt
+	getUserByNameStmt            *sql.Stmt
 	listCharactersStmt           *sql.Stmt
 	listGameRoomsStmt            *sql.Stmt
 	selectRankingStmt            *sql.Stmt
@@ -227,7 +236,8 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		getCurrentUserStmt:           q.getCurrentUserStmt,
 		getGameRoomStmt:              q.getGameRoomStmt,
 		getGameRoomPlayersStmt:       q.getGameRoomPlayersStmt,
-		getUserStmt:                  q.getUserStmt,
+		getUserByIDStmt:              q.getUserByIDStmt,
+		getUserByNameStmt:            q.getUserByNameStmt,
 		listCharactersStmt:           q.listCharactersStmt,
 		listGameRoomsStmt:            q.listGameRoomsStmt,
 		selectRankingStmt:            q.selectRankingStmt,

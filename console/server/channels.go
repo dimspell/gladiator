@@ -1,4 +1,4 @@
-package console
+package server
 
 import (
 	"encoding/json"
@@ -7,7 +7,7 @@ import (
 	"github.com/dispel-re/dispel-multi/internal/database"
 )
 
-func (c *Console) ListChannels(w http.ResponseWriter, r *http.Request) {
+func (c *ConsoleServer) ListChannels(w http.ResponseWriter, r *http.Request) {
 	// Get channels from database
 	channels := database.Channels
 

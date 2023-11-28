@@ -405,15 +405,29 @@ func (q *Queries) GetGameRoomPlayers(ctx context.Context, name string) ([]GetGam
 	return items, nil
 }
 
-const getUser = `-- name: GetUser :one
+const getUserByID = `-- name: GetUserByID :one
+SELECT id, username, password
+FROM users
+WHERE id = ?
+LIMIT 1
+`
+
+func (q *Queries) GetUserByID(ctx context.Context, id int64) (User, error) {
+	row := q.queryRow(ctx, q.getUserByIDStmt, getUserByID, id)
+	var i User
+	err := row.Scan(&i.ID, &i.Username, &i.Password)
+	return i, err
+}
+
+const getUserByName = `-- name: GetUserByName :one
 SELECT id, username, password
 FROM users
 WHERE username = ?
 LIMIT 1
 `
 
-func (q *Queries) GetUser(ctx context.Context, username string) (User, error) {
-	row := q.queryRow(ctx, q.getUserStmt, getUser, username)
+func (q *Queries) GetUserByName(ctx context.Context, username string) (User, error) {
+	row := q.queryRow(ctx, q.getUserByNameStmt, getUserByName, username)
 	var i User
 	err := row.Scan(&i.ID, &i.Username, &i.Password)
 	return i, err

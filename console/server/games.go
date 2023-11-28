@@ -1,4 +1,4 @@
-package console
+package server
 
 import (
 	"context"
@@ -12,7 +12,7 @@ import (
 )
 
 // ListActiveGames lists all game rooms that are currently active.
-func (c *Console) ListActiveGames(w http.ResponseWriter, r *http.Request) {
+func (c *ConsoleServer) ListActiveGames(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
@@ -25,7 +25,7 @@ func (c *Console) ListActiveGames(w http.ResponseWriter, r *http.Request) {
 	render.JSON(w, r, gameRooms)
 }
 
-func (c *Console) CreateGame(w http.ResponseWriter, r *http.Request) {
+func (c *ConsoleServer) CreateGame(w http.ResponseWriter, r *http.Request) {
 	type Input struct {
 		RoomName      string
 		RoomPassword  string

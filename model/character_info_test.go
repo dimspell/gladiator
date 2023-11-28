@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewCharacterInfo(t *testing.T) {
+func TestParseCharacterInfo(t *testing.T) {
 	// Arrange
 	packet := []byte{
 		255, 92, // Packet header
@@ -48,7 +48,7 @@ func TestNewCharacterInfo(t *testing.T) {
 	}
 
 	// Act
-	info := NewCharacterInfo(packet[4:])
+	info := ParseCharacterInfo(packet[4:])
 
 	// Assert
 	assert.Equal(t, uint16(20), info.Strength)

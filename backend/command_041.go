@@ -21,7 +21,7 @@ func (b *Backend) HandleClientAuthentication(session *model.Session, req ClientA
 		return err
 	}
 
-	user, err := b.DB.GetUser(context.TODO(), data.Username)
+	user, err := b.DB.GetUserByName(context.TODO(), data.Username)
 	if err != nil {
 		slog.Debug("packet-41: could not find a user", "username", data.Username)
 		return b.Send(session.Conn, ClientAuthentication, []byte{0, 0, 0, 0})

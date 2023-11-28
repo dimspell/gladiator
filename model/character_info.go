@@ -38,7 +38,7 @@ type CharacterInfo struct {
 	Unknown              []byte // Unknown
 }
 
-func NewCharacterInfo(buf []byte) CharacterInfo {
+func ParseCharacterInfo(buf []byte) CharacterInfo {
 	return CharacterInfo{
 		Strength:             binary.LittleEndian.Uint16(buf[0:2]),
 		Agility:              binary.LittleEndian.Uint16(buf[2:4]),

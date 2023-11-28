@@ -84,7 +84,7 @@ func (r UpdateCharacterStatsRequest) Parse() (data UpdateCharacterStatsRequestDa
 		return data, fmt.Errorf("no enough arguments, malformed request payload: %s", base64.StdEncoding.EncodeToString(r))
 	}
 
-	data.CharacterInfo = model.NewCharacterInfo(r[:56])
+	data.CharacterInfo = model.ParseCharacterInfo(r[:56])
 	data.User = string(split[0])
 	data.Character = string(split[1])
 	data.Unknown = split[2]

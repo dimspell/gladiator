@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"time"
@@ -19,6 +20,20 @@ func New(consoleAddr string) *Client {
 		ConsoleAddr: consoleAddr,
 		HttpClient:  &http.Client{Timeout: 5 * time.Second},
 	}
+}
+
+func unmarshalResponse[T any](body []byte, statusCode int, err error) (T, error) {
+	var t T
+	if err != nil {
+		return t, err
+	}
+	if statusCode > 399 {
+		return t, fmt.Errorf("status code equal to %d", statusCode)
+	}
+	if err := json.Unmarshal(body, &t); err != nil {
+		return t, err
+	}
+	return t, nil
 }
 
 func doRequest(

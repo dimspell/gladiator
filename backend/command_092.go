@@ -89,7 +89,7 @@ func (r CreateCharacterRequest) Parse() (data CreateCharacterRequestData, err er
 		return data, fmt.Errorf("packet-92: no enough arguments, malformed request payload: %s", base64.StdEncoding.EncodeToString(r))
 	}
 
-	data.CharacterInfo = model.NewCharacterInfo(r[:56])
+	data.CharacterInfo = model.ParseCharacterInfo(r[:56])
 	data.Username = string(split[0])
 	data.CharacterName = string(split[1])
 
