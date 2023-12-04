@@ -3,6 +3,7 @@ module github.com/dispel-re/dispel-multi
 go 1.21
 
 require (
+	connectrpc.com/connect v1.12.0
 	github.com/go-chi/chi/v5 v5.0.10
 	github.com/go-chi/render v1.0.3
 	github.com/golang-migrate/migrate/v4 v4.16.2
@@ -14,6 +15,8 @@ require (
 	github.com/stretchr/testify v1.8.4
 	github.com/urfave/cli/v3 v3.0.0-alpha4
 	golang.org/x/crypto v0.15.0
+	golang.org/x/net v0.18.0
+	google.golang.org/protobuf v1.31.0
 	modernc.org/sqlite v1.26.0
 )
 
@@ -45,8 +48,8 @@ require (
 	go.uber.org/atomic v1.11.0 // indirect
 	golang.org/x/mod v0.14.0 // indirect
 	golang.org/x/sys v0.14.0 // indirect
+	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/tools v0.15.0 // indirect
-	google.golang.org/protobuf v1.31.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	lukechampine.com/uint128 v1.3.0 // indirect
 	modernc.org/cc/v3 v3.41.0 // indirect

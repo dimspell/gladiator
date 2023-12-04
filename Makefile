@@ -24,3 +24,11 @@ mig-up:
 mig-force:
 	migrate -path $(mig_dir) -database $(mig_db_url) force $(mig_version)
 
+grpc-test:
+	buf curl \
+		--schema proto \
+		--data '{"pet_type": "PET_TYPE_SNAKE", "name": "Ekans"}' \
+		http://localhost:8080/dispelmulti.v1.PetStoreService/PutPet
+
+gen-grpc:
+	buf generate proto
