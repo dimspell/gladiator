@@ -1,0 +1,116 @@
+syntax = "proto3";
+
+package multi.v1;
+
+message Character {
+  int64 user_id = 1;
+  int64 character_id = 2;
+  int64 character_name = 3;
+  bytes info = 4;
+  bytes inventory = 5;
+  bytes spell = 6;
+}
+
+message CharacterInfo {
+  int64 strength = 1;
+  int64 agility = 2;
+  int64 wisdom = 3;
+  int64 constitution = 4;
+  int64 health_points = 5;
+  int64 magic_points = 6;
+  int64 experience_points = 7;
+  int64 money = 8;
+  int64 score_points = 9;
+  int64 class_type = 10;
+  int64 skin_carnation = 11;
+  int64 hair_style = 12;
+  int64 light_armour_legs = 13;
+  int64 light_armour_torso = 14;
+  int64 light_armour_hands = 15;
+  int64 light_armour_boots = 16;
+  int64 full_armour = 17;
+  int64 armour_emblem = 18;
+  int64 helmet = 19;
+  int64 secondary_weapon = 20;
+  int64 primary_weapon = 21;
+  int64 shield = 22;
+  int64 unknown_equipment_slot = 23;
+  int64 gender = 24;
+  int64 level = 25;
+  int64 edged_weapons = 26;
+  int64 blunted_weapons = 27;
+  int64 archery = 28;
+  int64 polearms = 29;
+  int64 wizardry = 30;
+  bytes kills = 31;
+}
+
+enum Gender {
+  Male = 0;
+  Female = 1;
+}
+
+enum ClassType {
+  Knight = 0;
+  Warrior = 1;
+  Archer = 2;
+  Mage = 3;
+}
+
+enum SkinCarnation {
+  SkinCarnationNone = 0;
+
+  MaleBeige = 102;
+  MalePink = 103;
+  MaleLightBrown = 104;
+  MaleBrown = 105;
+  MaleGray = 106;
+
+  FemaleBeige = 107;
+  FemalePink = 108;
+  FemaleLightBrown = 109;
+  FemaleBrown = 110;
+  FemaleGray = 111;
+}
+
+enum HairStyle {
+  HairStyleNone = 0;
+
+  MaleShortWhite = 112;
+  MaleShortBrown = 113;
+  MaleShortBlack = 114;
+  MaleShortRed = 115;
+  MaleShortGray = 116;
+  MaleMediumWhite = 117;
+  MaleMediumBrown = 118;
+  MaleMediumBlack = 119;
+  MaleMediumRed = 120;
+  MaleMediumGray = 121;
+  MaleLongWhite = 122;
+  MaleLongBrown = 123;
+  MaleLongBlack = 124;
+  MaleLongRed = 125;
+  MaleLongGray = 126;
+  MaleBald = 200;
+
+  FemaleShortWhite = 127;
+  FemaleShortBrown = 128;
+  FemaleShortBlack = 129;
+  FemaleShortRed = 130;
+  FemaleShortGray = 131;
+  FemaleMediumWhite = 132;
+  FemaleMediumBrown = 133;
+  FemaleMediumBlack = 134;
+  FemaleMediumRed = 135;
+  FemaleMediumGray = 136;
+  FemalePonytailWhite = 137;
+  FemalePonytailBrown = 138;
+  FemalePonytailBlack = 139;
+  FemalePonytailRed = 140;
+  FemalePonytailGray = 141;
+  FemaleLongWhite = 142;
+  FemaleLongBrown = 143;
+  FemaleLongBlack = 144;
+  FemaleLongRed = 145;
+  FemaleLongGray = 146;
+}

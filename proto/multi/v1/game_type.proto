@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package multi.v1;
+
+message Game {
+  int64 game_id = 1;
+  string name = 2;
+  string password = 3;
+  string host_ip_address = 4;
+  int64 map_id = 5;
+}

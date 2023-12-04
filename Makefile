@@ -28,7 +28,7 @@ grpc-test:
 	buf curl \
 		--schema proto \
 		--data '{"pet_type": "PET_TYPE_SNAKE", "name": "Ekans"}' \
-		http://localhost:8080/dispelmulti.v1.PetStoreService/PutPet
+		http://localhost:8080/multi.v1.PetStoreService/PutPet
 
 gen-grpc:
 	buf generate proto

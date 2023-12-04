@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package multi.v1;
+
+import "multi/v1/game_type.proto";
+
+message CreateGameRequest {
+  int64 user_id = 1;
+  string game_name = 2;
+  string password = 3;
+  string host_ip_address = 4;
+  int64 map_id = 5;
+}
+
+message CreateGameResponse {
+  Game game = 1;
+}
+
+message GetGameRequest {
+  int64 user_id = 1;
+  string game_name = 2;
+}
+
+message GetGameResponse {
+  Game game = 1;
+}
+
+message ListGamesRequest {
+  int64 user_id = 1;
+}
+
+message ListGamesResponse {
+  repeated Game games = 1;
+}
+
+service GameService {
+  rpc GetGame(GetGameRequest) returns (GetGameResponse) {}
+  rpc ListGames(ListGamesRequest) returns (ListGamesResponse) {}
+
+  rpc CreateGame(CreateGameRequest) returns (CreateGameResponse) {}
+}

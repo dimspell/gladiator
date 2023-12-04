@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package dispelmulti.v1;
+package multi.v1;
 
 // PetType represents the different types of pets in the pet store.
 enum PetType {

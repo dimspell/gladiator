@@ -12,8 +12,8 @@ import (
 	"golang.org/x/net/http2/h2c"
 
 	"connectrpc.com/connect"
-	petv1 "github.com/dispel-re/dispel-multi/gen/dispelmulti/v1"
-	"github.com/dispel-re/dispel-multi/gen/dispelmulti/v1/dispelmultiv1connect"
+	petv1 "github.com/dispel-re/dispel-multi/gen/multi/v1"
+	"github.com/dispel-re/dispel-multi/gen/multi/v1/multiv1connect"
 )
 
 type Console struct {
@@ -55,8 +55,10 @@ func (c *Console) ServeGRPC() error {
 	const address = "localhost:8080"
 
 	mux := http.NewServeMux()
-	path, handler := dispelmultiv1connect.NewPetStoreServiceHandler(&petStoreServiceServer{})
-	mux.Handle(path, handler)
+
+	mux.Handle(multiv1connect.NewPetStoreServiceHandler(&petStoreServiceServer{}))
+	mux.Handle(multiv1connect.NewCharacterServiceHandler(&characterServiceServer{}))
+
 	fmt.Println("... Listening on", address)
 	return http.ListenAndServe(
 		address,
@@ -65,9 +67,13 @@ func (c *Console) ServeGRPC() error {
 	)
 }
 
+type characterServiceServer struct {
+	multiv1connect.UnimplementedCharacterServiceHandler
+}
+
 // petStoreServiceServer implements the PetStoreService API.
 type petStoreServiceServer struct {
-	dispelmultiv1connect.UnimplementedPetStoreServiceHandler
+	multiv1connect.UnimplementedPetStoreServiceHandler
 }
 
 // PutPet adds the pet associated with the given request into the PetStore.
@@ -78,6 +84,7 @@ func (s *petStoreServiceServer) PutPet(
 	name := req.Msg.GetName()
 	petType := req.Msg.GetPetType()
 	log.Printf("Got a request to create a %v named %s", petType, name)
+
 	return connect.NewResponse(&petv1.PutPetResponse{
 		Pet: &petv1.Pet{
 			PetType: petv1.PetType_PET_TYPE_CAT,

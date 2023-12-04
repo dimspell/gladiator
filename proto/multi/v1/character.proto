@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package multi.v1;
+
+import "multi/v1/character_type.proto";
+
+message CreateCharacterRequest {
+  int64 user_id = 1;
+  string character_name = 2;
+  bytes info = 3;
+}
+
+message CreateCharacterResponse {
+  Character character = 1;
+}
+
+message GetCharacterRequest {
+  int64 user_id = 1;
+  string character_name = 2;
+}
+
+message GetCharacterResponse {
+  Character character = 1;
+}
+
+message ListCharactersRequest {
+  int64 user_id = 1;
+}
+
+message ListCharactersResponse {
+  repeated Character characters = 1;
+}
+
+service CharacterService {
+  rpc GetCharacter(GetCharacterRequest) returns (GetCharacterResponse) {}
+  rpc ListCharacters(ListCharactersRequest) returns (ListCharactersResponse) {}
+
+  rpc CreateCharacter(CreateCharacterRequest) returns (CreateCharacterResponse) {}
+}

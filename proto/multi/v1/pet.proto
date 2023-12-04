@@ -1,8 +1,8 @@
 syntax = "proto3";
 
-package dispelmulti.v1;
+package multi.v1;
 
-import "dispelmulti/v1/pet_type.proto";
+import "multi/v1/pet_type.proto";
 
 // Pet represents a pet in the pet store.
 message Pet {

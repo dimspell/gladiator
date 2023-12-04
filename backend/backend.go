@@ -4,8 +4,11 @@ import (
 	"context"
 	"log/slog"
 	"net"
+	"net/http"
 	"os"
+	"time"
 
+	"github.com/dispel-re/dispel-multi/gen/multi/v1/multiv1connect"
 	"github.com/dispel-re/dispel-multi/internal/database"
 	"github.com/dispel-re/dispel-multi/internal/packetlogger"
 	"github.com/dispel-re/dispel-multi/model"
@@ -13,18 +16,36 @@ import (
 )
 
 type Backend struct {
-	DB *database.Queries
-
+	DB           *database.Queries
 	Sessions     map[string]*model.Session
 	PacketLogger *slog.Logger
+
+	CharacterClient multiv1connect.CharacterServiceClient
+	GameClient      multiv1connect.GameServiceClient
 }
 
 // func NewBackend(db *memory.Memory) *Backend {
-func NewBackend(db *database.Queries) *Backend {
+func NewBackend(db *database.Queries, consoleAddr string) *Backend {
+	httpClient := &http.Client{
+		Timeout: 5 * time.Second,
+		Transport: &http.Transport{
+			Proxy:                 http.DefaultTransport.(*http.Transport).Proxy,
+			DialContext:           http.DefaultTransport.(*http.Transport).DialContext,
+			ForceAttemptHTTP2:     true,
+			MaxIdleConns:          100,
+			IdleConnTimeout:       90 * time.Second,
+			TLSHandshakeTimeout:   10 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+		},
+	}
+
 	return &Backend{
 		DB:           db,
 		Sessions:     make(map[string]*model.Session),
 		PacketLogger: slog.New(packetlogger.New(os.Stderr, &packetlogger.Options{Level: slog.LevelDebug})),
+
+		CharacterClient: multiv1connect.NewCharacterServiceClient(httpClient, consoleAddr),
+		GameClient:      multiv1connect.NewGameServiceClient(httpClient, consoleAddr),
 	}
 }
 
