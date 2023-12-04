@@ -4,12 +4,12 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"log/slog"
 
-	"github.com/dispel-re/dispel-multi/internal/database"
+	"connectrpc.com/connect"
+	multiv1 "github.com/dispel-re/dispel-multi/gen/multi/v1"
 	"github.com/dispel-re/dispel-multi/model"
 )
 
@@ -119,23 +119,22 @@ func (b *Backend) HandleGetCharacterInventory(session *model.Session, req GetCha
 		return err
 	}
 
-	character, err := b.DB.FindCharacter(context.TODO(), database.FindCharacterParams{
-		UserID:        session.UserID,
-		CharacterName: data.CharacterName,
-	})
+	resp, err := b.CharacterClient.GetCharacter(context.TODO(),
+		connect.NewRequest(&multiv1.GetCharacterRequest{
+			UserId:        session.UserID,
+			CharacterName: data.CharacterName,
+		}))
+
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return b.Send(session.Conn, SelectCharacter, []byte{0, 0, 0, 0})
 		}
-		return fmt.Errorf("packet-76: no characters found owned by player: %s", err)
+		return fmt.Errorf("packet-68: no characters found owned by player: %s", err)
 	}
 
-	if !character.Inventory.Valid {
-		return nil
-	}
-	inventory, err := base64.StdEncoding.DecodeString(character.Inventory.String)
+	inventory := resp.Msg.GetCharacter().GetInventory()
 	if len(inventory) != 207 {
-		slog.Warn("packet-68: inventory array should be 207-chars long", "inventory", character.Inventory.String, "err", err)
+		slog.Warn("packet-68: inventory array should be 207-chars long", "inventory", inventory, "err", err)
 		return nil
 	}
 

@@ -5,7 +5,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/dispel-re/dispel-multi/internal/database"
+	"connectrpc.com/connect"
+	multiv1 "github.com/dispel-re/dispel-multi/gen/multi/v1"
 	"github.com/dispel-re/dispel-multi/model"
 )
 
@@ -19,10 +20,12 @@ func (b *Backend) HandleDeleteCharacter(session *model.Session, req DeleteCharac
 		return err
 	}
 
-	if err := b.DB.DeleteCharacter(context.TODO(), database.DeleteCharacterParams{
-		CharacterName: data.CharacterName,
-		UserID:        session.UserID,
-	}); err != nil {
+	if _, err := b.CharacterClient.DeleteCharacter(context.TODO(),
+		connect.NewRequest(&multiv1.DeleteCharacterRequest{
+			UserId:        session.UserID,
+			CharacterName: data.CharacterName,
+		}),
+	); err != nil {
 		return err
 	}
 

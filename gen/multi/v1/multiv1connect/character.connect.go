@@ -42,6 +42,9 @@ const (
 	// CharacterServiceCreateCharacterProcedure is the fully-qualified name of the CharacterService's
 	// CreateCharacter RPC.
 	CharacterServiceCreateCharacterProcedure = "/multi.v1.CharacterService/CreateCharacter"
+	// CharacterServiceDeleteCharacterProcedure is the fully-qualified name of the CharacterService's
+	// DeleteCharacter RPC.
+	CharacterServiceDeleteCharacterProcedure = "/multi.v1.CharacterService/DeleteCharacter"
 )
 
 // CharacterServiceClient is a client for the multi.v1.CharacterService service.
@@ -49,6 +52,7 @@ type CharacterServiceClient interface {
 	GetCharacter(context.Context, *connect.Request[v1.GetCharacterRequest]) (*connect.Response[v1.GetCharacterResponse], error)
 	ListCharacters(context.Context, *connect.Request[v1.ListCharactersRequest]) (*connect.Response[v1.ListCharactersResponse], error)
 	CreateCharacter(context.Context, *connect.Request[v1.CreateCharacterRequest]) (*connect.Response[v1.CreateCharacterResponse], error)
+	DeleteCharacter(context.Context, *connect.Request[v1.DeleteCharacterRequest]) (*connect.Response[v1.DeleteCharacterResponse], error)
 }
 
 // NewCharacterServiceClient constructs a client for the multi.v1.CharacterService service. By
@@ -76,6 +80,11 @@ func NewCharacterServiceClient(httpClient connect.HTTPClient, baseURL string, op
 			baseURL+CharacterServiceCreateCharacterProcedure,
 			opts...,
 		),
+		deleteCharacter: connect.NewClient[v1.DeleteCharacterRequest, v1.DeleteCharacterResponse](
+			httpClient,
+			baseURL+CharacterServiceDeleteCharacterProcedure,
+			opts...,
+		),
 	}
 }
 
@@ -84,6 +93,7 @@ type characterServiceClient struct {
 	getCharacter    *connect.Client[v1.GetCharacterRequest, v1.GetCharacterResponse]
 	listCharacters  *connect.Client[v1.ListCharactersRequest, v1.ListCharactersResponse]
 	createCharacter *connect.Client[v1.CreateCharacterRequest, v1.CreateCharacterResponse]
+	deleteCharacter *connect.Client[v1.DeleteCharacterRequest, v1.DeleteCharacterResponse]
 }
 
 // GetCharacter calls multi.v1.CharacterService.GetCharacter.
@@ -101,11 +111,17 @@ func (c *characterServiceClient) CreateCharacter(ctx context.Context, req *conne
 	return c.createCharacter.CallUnary(ctx, req)
 }
 
+// DeleteCharacter calls multi.v1.CharacterService.DeleteCharacter.
+func (c *characterServiceClient) DeleteCharacter(ctx context.Context, req *connect.Request[v1.DeleteCharacterRequest]) (*connect.Response[v1.DeleteCharacterResponse], error) {
+	return c.deleteCharacter.CallUnary(ctx, req)
+}
+
 // CharacterServiceHandler is an implementation of the multi.v1.CharacterService service.
 type CharacterServiceHandler interface {
 	GetCharacter(context.Context, *connect.Request[v1.GetCharacterRequest]) (*connect.Response[v1.GetCharacterResponse], error)
 	ListCharacters(context.Context, *connect.Request[v1.ListCharactersRequest]) (*connect.Response[v1.ListCharactersResponse], error)
 	CreateCharacter(context.Context, *connect.Request[v1.CreateCharacterRequest]) (*connect.Response[v1.CreateCharacterResponse], error)
+	DeleteCharacter(context.Context, *connect.Request[v1.DeleteCharacterRequest]) (*connect.Response[v1.DeleteCharacterResponse], error)
 }
 
 // NewCharacterServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -129,6 +145,11 @@ func NewCharacterServiceHandler(svc CharacterServiceHandler, opts ...connect.Han
 		svc.CreateCharacter,
 		opts...,
 	)
+	characterServiceDeleteCharacterHandler := connect.NewUnaryHandler(
+		CharacterServiceDeleteCharacterProcedure,
+		svc.DeleteCharacter,
+		opts...,
+	)
 	return "/multi.v1.CharacterService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case CharacterServiceGetCharacterProcedure:
@@ -137,6 +158,8 @@ func NewCharacterServiceHandler(svc CharacterServiceHandler, opts ...connect.Han
 			characterServiceListCharactersHandler.ServeHTTP(w, r)
 		case CharacterServiceCreateCharacterProcedure:
 			characterServiceCreateCharacterHandler.ServeHTTP(w, r)
+		case CharacterServiceDeleteCharacterProcedure:
+			characterServiceDeleteCharacterHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -156,4 +179,8 @@ func (UnimplementedCharacterServiceHandler) ListCharacters(context.Context, *con
 
 func (UnimplementedCharacterServiceHandler) CreateCharacter(context.Context, *connect.Request[v1.CreateCharacterRequest]) (*connect.Response[v1.CreateCharacterResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("multi.v1.CharacterService.CreateCharacter is not implemented"))
+}
+
+func (UnimplementedCharacterServiceHandler) DeleteCharacter(context.Context, *connect.Request[v1.DeleteCharacterRequest]) (*connect.Response[v1.DeleteCharacterResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("multi.v1.CharacterService.DeleteCharacter is not implemented"))
 }

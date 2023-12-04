@@ -5,7 +5,7 @@ package multi.v1;
 message Character {
   int64 user_id = 1;
   int64 character_id = 2;
-  int64 character_name = 3;
+  string character_name = 3;
   bytes info = 4;
   bytes inventory = 5;
   bytes spell = 6;

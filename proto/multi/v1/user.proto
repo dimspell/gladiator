@@ -1,3 +1,17 @@
 syntax = "proto3";
 
 package multi.v1;
+
+import "multi/v1/user_type.proto";
+
+message GetUserRequest {
+  int64 user_id = 1;
+}
+
+message GetUserResponse {
+  User character = 1;
+}
+
+service UserService {
+  rpc GetUser(GetUserRequest) returns (GetUserResponse) {}
+}
