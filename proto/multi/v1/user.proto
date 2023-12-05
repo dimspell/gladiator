@@ -9,9 +9,30 @@ message GetUserRequest {
 }
 
 message GetUserResponse {
-  User character = 1;
+  User user = 1;
+}
+
+message AuthenticateRequest {
+  string username = 1;
+  string password = 2;
+}
+
+message AuthenticateResponse {
+  User user = 1;
+}
+
+message CreateUserRequest {
+  string username = 1;
+  string password = 2;
+}
+
+message CreateUserResponse {
+  User user = 1;
 }
 
 service UserService {
   rpc GetUser(GetUserRequest) returns (GetUserResponse) {}
+
+  rpc Authenticate(AuthenticateRequest) returns (AuthenticateResponse) {}
+  rpc CreateUser(CreateUserRequest) returns (CreateUserResponse) {}
 }

@@ -39,6 +39,10 @@ const (
 	GameServiceListGamesProcedure = "/multi.v1.GameService/ListGames"
 	// GameServiceCreateGameProcedure is the fully-qualified name of the GameService's CreateGame RPC.
 	GameServiceCreateGameProcedure = "/multi.v1.GameService/CreateGame"
+	// GameServiceJoinGameProcedure is the fully-qualified name of the GameService's JoinGame RPC.
+	GameServiceJoinGameProcedure = "/multi.v1.GameService/JoinGame"
+	// GameServiceListPlayersProcedure is the fully-qualified name of the GameService's ListPlayers RPC.
+	GameServiceListPlayersProcedure = "/multi.v1.GameService/ListPlayers"
 )
 
 // GameServiceClient is a client for the multi.v1.GameService service.
@@ -46,6 +50,8 @@ type GameServiceClient interface {
 	GetGame(context.Context, *connect.Request[v1.GetGameRequest]) (*connect.Response[v1.GetGameResponse], error)
 	ListGames(context.Context, *connect.Request[v1.ListGamesRequest]) (*connect.Response[v1.ListGamesResponse], error)
 	CreateGame(context.Context, *connect.Request[v1.CreateGameRequest]) (*connect.Response[v1.CreateGameResponse], error)
+	JoinGame(context.Context, *connect.Request[v1.JoinGameRequest]) (*connect.Response[v1.JoinGameResponse], error)
+	ListPlayers(context.Context, *connect.Request[v1.ListPlayersRequest]) (*connect.Response[v1.ListPlayersResponse], error)
 }
 
 // NewGameServiceClient constructs a client for the multi.v1.GameService service. By default, it
@@ -73,14 +79,26 @@ func NewGameServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			baseURL+GameServiceCreateGameProcedure,
 			opts...,
 		),
+		joinGame: connect.NewClient[v1.JoinGameRequest, v1.JoinGameResponse](
+			httpClient,
+			baseURL+GameServiceJoinGameProcedure,
+			opts...,
+		),
+		listPlayers: connect.NewClient[v1.ListPlayersRequest, v1.ListPlayersResponse](
+			httpClient,
+			baseURL+GameServiceListPlayersProcedure,
+			opts...,
+		),
 	}
 }
 
 // gameServiceClient implements GameServiceClient.
 type gameServiceClient struct {
-	getGame    *connect.Client[v1.GetGameRequest, v1.GetGameResponse]
-	listGames  *connect.Client[v1.ListGamesRequest, v1.ListGamesResponse]
-	createGame *connect.Client[v1.CreateGameRequest, v1.CreateGameResponse]
+	getGame     *connect.Client[v1.GetGameRequest, v1.GetGameResponse]
+	listGames   *connect.Client[v1.ListGamesRequest, v1.ListGamesResponse]
+	createGame  *connect.Client[v1.CreateGameRequest, v1.CreateGameResponse]
+	joinGame    *connect.Client[v1.JoinGameRequest, v1.JoinGameResponse]
+	listPlayers *connect.Client[v1.ListPlayersRequest, v1.ListPlayersResponse]
 }
 
 // GetGame calls multi.v1.GameService.GetGame.
@@ -98,11 +116,23 @@ func (c *gameServiceClient) CreateGame(ctx context.Context, req *connect.Request
 	return c.createGame.CallUnary(ctx, req)
 }
 
+// JoinGame calls multi.v1.GameService.JoinGame.
+func (c *gameServiceClient) JoinGame(ctx context.Context, req *connect.Request[v1.JoinGameRequest]) (*connect.Response[v1.JoinGameResponse], error) {
+	return c.joinGame.CallUnary(ctx, req)
+}
+
+// ListPlayers calls multi.v1.GameService.ListPlayers.
+func (c *gameServiceClient) ListPlayers(ctx context.Context, req *connect.Request[v1.ListPlayersRequest]) (*connect.Response[v1.ListPlayersResponse], error) {
+	return c.listPlayers.CallUnary(ctx, req)
+}
+
 // GameServiceHandler is an implementation of the multi.v1.GameService service.
 type GameServiceHandler interface {
 	GetGame(context.Context, *connect.Request[v1.GetGameRequest]) (*connect.Response[v1.GetGameResponse], error)
 	ListGames(context.Context, *connect.Request[v1.ListGamesRequest]) (*connect.Response[v1.ListGamesResponse], error)
 	CreateGame(context.Context, *connect.Request[v1.CreateGameRequest]) (*connect.Response[v1.CreateGameResponse], error)
+	JoinGame(context.Context, *connect.Request[v1.JoinGameRequest]) (*connect.Response[v1.JoinGameResponse], error)
+	ListPlayers(context.Context, *connect.Request[v1.ListPlayersRequest]) (*connect.Response[v1.ListPlayersResponse], error)
 }
 
 // NewGameServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -126,6 +156,16 @@ func NewGameServiceHandler(svc GameServiceHandler, opts ...connect.HandlerOption
 		svc.CreateGame,
 		opts...,
 	)
+	gameServiceJoinGameHandler := connect.NewUnaryHandler(
+		GameServiceJoinGameProcedure,
+		svc.JoinGame,
+		opts...,
+	)
+	gameServiceListPlayersHandler := connect.NewUnaryHandler(
+		GameServiceListPlayersProcedure,
+		svc.ListPlayers,
+		opts...,
+	)
 	return "/multi.v1.GameService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case GameServiceGetGameProcedure:
@@ -134,6 +174,10 @@ func NewGameServiceHandler(svc GameServiceHandler, opts ...connect.HandlerOption
 			gameServiceListGamesHandler.ServeHTTP(w, r)
 		case GameServiceCreateGameProcedure:
 			gameServiceCreateGameHandler.ServeHTTP(w, r)
+		case GameServiceJoinGameProcedure:
+			gameServiceJoinGameHandler.ServeHTTP(w, r)
+		case GameServiceListPlayersProcedure:
+			gameServiceListPlayersHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -153,4 +197,12 @@ func (UnimplementedGameServiceHandler) ListGames(context.Context, *connect.Reque
 
 func (UnimplementedGameServiceHandler) CreateGame(context.Context, *connect.Request[v1.CreateGameRequest]) (*connect.Response[v1.CreateGameResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("multi.v1.GameService.CreateGame is not implemented"))
+}
+
+func (UnimplementedGameServiceHandler) JoinGame(context.Context, *connect.Request[v1.JoinGameRequest]) (*connect.Response[v1.JoinGameResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("multi.v1.GameService.JoinGame is not implemented"))
+}
+
+func (UnimplementedGameServiceHandler) ListPlayers(context.Context, *connect.Request[v1.ListPlayersRequest]) (*connect.Response[v1.ListPlayersResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("multi.v1.GameService.ListPlayers is not implemented"))
 }

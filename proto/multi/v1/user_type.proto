@@ -3,5 +3,6 @@ syntax = "proto3";
 package multi.v1;
 
 message User {
-
+  int64 user_id = 1;
+  string username = 2;
 }

@@ -33,9 +33,31 @@ message ListGamesResponse {
   repeated Game games = 1;
 }
 
+message JoinGameRequest {
+  int64 user_id = 1;
+  int64 character_id = 2;
+  int64 game_room_id = 3;
+  string ip_address = 4;
+}
+
+message JoinGameResponse {
+}
+
+message ListPlayersRequest {
+  int64 game_room_id = 1;
+}
+
+message ListPlayersResponse {
+  repeated Player players = 1;
+}
+
 service GameService {
   rpc GetGame(GetGameRequest) returns (GetGameResponse) {}
   rpc ListGames(ListGamesRequest) returns (ListGamesResponse) {}
 
   rpc CreateGame(CreateGameRequest) returns (CreateGameResponse) {}
+  rpc JoinGame(JoinGameRequest) returns (JoinGameResponse) {}
+
+  rpc ListPlayers(ListPlayersRequest) returns (ListPlayersResponse) {}
 }
+

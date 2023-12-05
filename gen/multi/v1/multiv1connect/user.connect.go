@@ -35,11 +35,18 @@ const (
 const (
 	// UserServiceGetUserProcedure is the fully-qualified name of the UserService's GetUser RPC.
 	UserServiceGetUserProcedure = "/multi.v1.UserService/GetUser"
+	// UserServiceAuthenticateProcedure is the fully-qualified name of the UserService's Authenticate
+	// RPC.
+	UserServiceAuthenticateProcedure = "/multi.v1.UserService/Authenticate"
+	// UserServiceCreateUserProcedure is the fully-qualified name of the UserService's CreateUser RPC.
+	UserServiceCreateUserProcedure = "/multi.v1.UserService/CreateUser"
 )
 
 // UserServiceClient is a client for the multi.v1.UserService service.
 type UserServiceClient interface {
 	GetUser(context.Context, *connect.Request[v1.GetUserRequest]) (*connect.Response[v1.GetUserResponse], error)
+	Authenticate(context.Context, *connect.Request[v1.AuthenticateRequest]) (*connect.Response[v1.AuthenticateResponse], error)
+	CreateUser(context.Context, *connect.Request[v1.CreateUserRequest]) (*connect.Response[v1.CreateUserResponse], error)
 }
 
 // NewUserServiceClient constructs a client for the multi.v1.UserService service. By default, it
@@ -57,12 +64,24 @@ func NewUserServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			baseURL+UserServiceGetUserProcedure,
 			opts...,
 		),
+		authenticate: connect.NewClient[v1.AuthenticateRequest, v1.AuthenticateResponse](
+			httpClient,
+			baseURL+UserServiceAuthenticateProcedure,
+			opts...,
+		),
+		createUser: connect.NewClient[v1.CreateUserRequest, v1.CreateUserResponse](
+			httpClient,
+			baseURL+UserServiceCreateUserProcedure,
+			opts...,
+		),
 	}
 }
 
 // userServiceClient implements UserServiceClient.
 type userServiceClient struct {
-	getUser *connect.Client[v1.GetUserRequest, v1.GetUserResponse]
+	getUser      *connect.Client[v1.GetUserRequest, v1.GetUserResponse]
+	authenticate *connect.Client[v1.AuthenticateRequest, v1.AuthenticateResponse]
+	createUser   *connect.Client[v1.CreateUserRequest, v1.CreateUserResponse]
 }
 
 // GetUser calls multi.v1.UserService.GetUser.
@@ -70,9 +89,21 @@ func (c *userServiceClient) GetUser(ctx context.Context, req *connect.Request[v1
 	return c.getUser.CallUnary(ctx, req)
 }
 
+// Authenticate calls multi.v1.UserService.Authenticate.
+func (c *userServiceClient) Authenticate(ctx context.Context, req *connect.Request[v1.AuthenticateRequest]) (*connect.Response[v1.AuthenticateResponse], error) {
+	return c.authenticate.CallUnary(ctx, req)
+}
+
+// CreateUser calls multi.v1.UserService.CreateUser.
+func (c *userServiceClient) CreateUser(ctx context.Context, req *connect.Request[v1.CreateUserRequest]) (*connect.Response[v1.CreateUserResponse], error) {
+	return c.createUser.CallUnary(ctx, req)
+}
+
 // UserServiceHandler is an implementation of the multi.v1.UserService service.
 type UserServiceHandler interface {
 	GetUser(context.Context, *connect.Request[v1.GetUserRequest]) (*connect.Response[v1.GetUserResponse], error)
+	Authenticate(context.Context, *connect.Request[v1.AuthenticateRequest]) (*connect.Response[v1.AuthenticateResponse], error)
+	CreateUser(context.Context, *connect.Request[v1.CreateUserRequest]) (*connect.Response[v1.CreateUserResponse], error)
 }
 
 // NewUserServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -86,10 +117,24 @@ func NewUserServiceHandler(svc UserServiceHandler, opts ...connect.HandlerOption
 		svc.GetUser,
 		opts...,
 	)
+	userServiceAuthenticateHandler := connect.NewUnaryHandler(
+		UserServiceAuthenticateProcedure,
+		svc.Authenticate,
+		opts...,
+	)
+	userServiceCreateUserHandler := connect.NewUnaryHandler(
+		UserServiceCreateUserProcedure,
+		svc.CreateUser,
+		opts...,
+	)
 	return "/multi.v1.UserService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case UserServiceGetUserProcedure:
 			userServiceGetUserHandler.ServeHTTP(w, r)
+		case UserServiceAuthenticateProcedure:
+			userServiceAuthenticateHandler.ServeHTTP(w, r)
+		case UserServiceCreateUserProcedure:
+			userServiceCreateUserHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -101,4 +146,12 @@ type UnimplementedUserServiceHandler struct{}
 
 func (UnimplementedUserServiceHandler) GetUser(context.Context, *connect.Request[v1.GetUserRequest]) (*connect.Response[v1.GetUserResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("multi.v1.UserService.GetUser is not implemented"))
+}
+
+func (UnimplementedUserServiceHandler) Authenticate(context.Context, *connect.Request[v1.AuthenticateRequest]) (*connect.Response[v1.AuthenticateResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("multi.v1.UserService.Authenticate is not implemented"))
+}
+
+func (UnimplementedUserServiceHandler) CreateUser(context.Context, *connect.Request[v1.CreateUserRequest]) (*connect.Response[v1.CreateUserResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("multi.v1.UserService.CreateUser is not implemented"))
 }

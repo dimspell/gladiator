@@ -2,7 +2,6 @@ package backend
 
 import (
 	"bytes"
-	"context"
 	"encoding/binary"
 	"fmt"
 

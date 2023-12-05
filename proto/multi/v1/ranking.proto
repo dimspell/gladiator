@@ -1,3 +1,18 @@
 syntax = "proto3";
 
 package multi.v1;
+
+message GetRankingRequest {
+  int64 user_id = 1;
+  string character_name = 2;
+  int64 class_type = 3;
+  int64  offset = 4;
+}
+
+message GetRankingResponse {
+  //  User user = 1;
+}
+
+service RankingService {
+  rpc GetRanking(GetRankingRequest) returns (GetRankingResponse) {}
+}

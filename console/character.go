@@ -19,6 +19,28 @@ func (s *characterServiceServer) ListCharacters(
 	ctx context.Context,
 	req *connect.Request[multiv1.ListCharactersRequest],
 ) (*connect.Response[multiv1.ListCharactersResponse], error) {
+	// user, err := c.DB.GetUserByID(r.Context(), userId)
+	// if err != nil {
+	// 	http.Error(w, err.Error(), http.StatusNotFound)
+	// 	return
+	// }
+	//
+	// characters, err := c.DB.ListCharacters(r.Context(), userId)
+	// if err != nil {
+	// 	http.Error(w, err.Error(), http.StatusInternalServerError)
+	// 	return
+	// }
+	//
+	// response := make([]dto.Character, 0, len(characters))
+	// for _, character := range characters {
+	// 	response = append(response, dto.Character{
+	// 		UserId:        user.ID,
+	// 		UserName:      user.Username,
+	// 		CharacterId:   character.ID,
+	// 		CharacterName: character.CharacterName,
+	// 	})
+	// }
+
 	// characters, err := b.DB.ListCharacters(context.TODO(), session.UserID)
 	return nil, nil
 }

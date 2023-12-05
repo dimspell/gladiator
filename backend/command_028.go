@@ -3,13 +3,13 @@ package backend
 import (
 	"bytes"
 	"context"
-	"database/sql"
 	"encoding/binary"
 	"fmt"
 	"log/slog"
 	"net"
 
-	"github.com/dispel-re/dispel-multi/internal/database"
+	"connectrpc.com/connect"
+	multiv1 "github.com/dispel-re/dispel-multi/gen/multi/v1"
 	"github.com/dispel-re/dispel-multi/model"
 )
 
@@ -27,38 +27,40 @@ func (b *Backend) HandleCreateGame(session *model.Session, req CreateGameRequest
 		return err
 	}
 
-	resp := make([]byte, 4)
+	response := make([]byte, 4)
 
 	switch data.State {
 	case uint32(0):
 		hostIPAddress := session.Conn.RemoteAddr().(*net.TCPAddr).IP.String()
-		newGameRoom, err := b.DB.CreateGameRoom(context.TODO(), database.CreateGameRoomParams{
-			Name:          data.RoomName,
-			Password:      sql.NullString{String: data.Password, Valid: len(data.Password) > 0},
+
+		respGame, err := b.GameClient.CreateGame(context.TODO(), connect.NewRequest(&multiv1.CreateGameRequest{
+			UserId:        session.UserID,
+			GameName:      data.RoomName,
+			Password:      data.Password,
 			HostIpAddress: hostIPAddress,
-			MapID:         int64(data.MapID),
-		})
+			MapId:         int64(data.MapID),
+		}))
 		if err != nil {
 			return err
 		}
-		slog.Info("packet-28: created game room", "id", newGameRoom.ID, "name", newGameRoom.Name)
+		slog.Info("packet-28: created game room",
+			"id", respGame.Msg.Game.GameId,
+			"name", respGame.Msg.Game.Name)
 
-		if err := b.DB.AddPlayerToRoom(context.TODO(), database.AddPlayerToRoomParams{
-			GameRoomID:  newGameRoom.ID,
-			CharacterID: session.CharacterID,
+		_, err = b.GameClient.JoinGame(context.TODO(), connect.NewRequest(&multiv1.JoinGameRequest{
+			UserId:      session.UserID,
+			CharacterId: session.CharacterID,
+			GameRoomId:  respGame.Msg.Game.GetGameId(),
 			IpAddress:   hostIPAddress,
-		}); err != nil {
-			return err
-		}
-
-		binary.LittleEndian.PutUint32(resp[0:4], 1)
+		}))
+		binary.LittleEndian.PutUint32(response[0:4], 1)
 		break
 	case uint32(1):
-		binary.LittleEndian.PutUint32(resp[0:4], 2)
+		binary.LittleEndian.PutUint32(response[0:4], 2)
 		break
 	}
 
-	return b.Send(session.Conn, CreateGame, resp)
+	return b.Send(session.Conn, CreateGame, response)
 }
 
 type CreateGameRequest []byte

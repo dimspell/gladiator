@@ -2,17 +2,18 @@ package console
 
 import (
 	"context"
-	"fmt"
-	"log"
+	"errors"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/dispel-re/dispel-multi/backend"
 	"github.com/dispel-re/dispel-multi/internal/database"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 
-	"connectrpc.com/connect"
-	multiv1 "github.com/dispel-re/dispel-multi/gen/multi/v1"
 	"github.com/dispel-re/dispel-multi/gen/multi/v1/multiv1connect"
 )
 
@@ -29,63 +30,66 @@ func NewConsole(db *database.Queries, b *backend.Backend) *Console {
 }
 
 func (c *Console) Serve(ctx context.Context, consoleAddr, backendAddr string) error {
-	// "github.com/pocketbase/pocketbase"
-	// app := pocketbase.NewWithConfig(pocketbase.Config{
-	// 	DefaultDebug:         true,
-	// 	DefaultDataDir:       "./pb_data.ignore",
-	// 	DefaultEncryptionEnv: "",
-	// 	HideStartBanner:      false,
-	// 	DataMaxOpenConns:     core.DefaultDataMaxOpenConns,
-	// 	DataMaxIdleConns:     core.DefaultDataMaxIdleConns,
-	// 	LogsMaxOpenConns:     core.DefaultLogsMaxOpenConns,
-	// 	LogsMaxIdleConns:     core.DefaultLogsMaxIdleConns,
-	// })
-	// return app.Start()
-
-	// consoleServer := server.ConsoleServer{
-	// 	DB:      c.DB,
-	// 	Backend: c.Backend,
-	// }
-	// return consoleServer.Serve(ctx, consoleAddr, backendAddr)
-
-	return c.ServeGRPC()
-}
-
-func (c *Console) ServeGRPC() error {
-	const address = "localhost:8080"
-
 	mux := http.NewServeMux()
 
-	mux.Handle(multiv1connect.NewPetStoreServiceHandler(&petStoreServiceServer{}))
 	mux.Handle(multiv1connect.NewCharacterServiceHandler(&characterServiceServer{DB: c.DB}))
+	mux.Handle(multiv1connect.NewGameServiceHandler(&gameServiceServer{DB: c.DB}))
+	mux.Handle(multiv1connect.NewUserServiceHandler(&userServiceServer{DB: c.DB}))
+	mux.Handle(multiv1connect.NewRankingServiceHandler(&rankingServiceServer{DB: c.DB}))
 
-	fmt.Println("... Listening on", address)
-	return http.ListenAndServe(
-		address,
-		// Use h2c so we can serve HTTP/2 without TLS.
-		h2c.NewHandler(mux, &http2.Server{}),
+	server := &http.Server{
+		Addr:    consoleAddr,
+		Handler: h2c.NewHandler(mux, &http2.Server{}),
+	}
+
+	start := func() error {
+		go func() {
+			c.Backend.Listen(backendAddr)
+		}()
+
+		// TODO: Set readiness, startup, liveness probe
+		return server.ListenAndServe()
+	}
+
+	stop := func(ctx context.Context) error {
+		c.Backend.Shutdown(ctx)
+
+		return server.Shutdown(ctx)
+	}
+
+	return c.graceful(ctx, start, stop)
+}
+
+func (c *Console) graceful(ctx context.Context, start func() error, shutdown func(context.Context) error) error {
+	var (
+		stopChan = make(chan os.Signal, 1)
+		errChan  = make(chan error, 1)
 	)
-}
 
-// petStoreServiceServer implements the PetStoreService API.
-type petStoreServiceServer struct {
-	multiv1connect.UnimplementedPetStoreServiceHandler
-}
+	// Set up the graceful shutdown handler (traps SIGINT and SIGTERM)
+	go func() {
+		signal.Notify(stopChan, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 
-// PutPet adds the pet associated with the given request into the PetStore.
-func (s *petStoreServiceServer) PutPet(
-	ctx context.Context,
-	req *connect.Request[multiv1.PutPetRequest],
-) (*connect.Response[multiv1.PutPetResponse], error) {
-	name := req.Msg.GetName()
-	petType := req.Msg.GetPetType()
-	log.Printf("Got a request to create a %v named %s", petType, name)
+		select {
+		case <-stopChan:
+		case <-ctx.Done():
+		}
 
-	return connect.NewResponse(&multiv1.PutPetResponse{
-		Pet: &multiv1.Pet{
-			PetType: multiv1.PetType_PET_TYPE_CAT,
-			PetId:   "Id",
-			Name:    "Name",
-		},
-	}), nil
+		timer, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		if err := shutdown(timer); err != nil {
+			errChan <- err
+			return
+		}
+
+		errChan <- nil
+	}()
+
+	// Start the server
+	if err := start(); !errors.Is(err, http.ErrServerClosed) {
+		return err
+	}
+
+	return <-errChan
 }

@@ -26,37 +26,37 @@ func (b *Backend) HandleUpdateCharacterStats(session *model.Session, req UpdateC
 	}
 
 	if err := b.DB.UpdateCharacterStats(context.TODO(), database.UpdateCharacterStatsParams{
-		Strength:             int64(data.CharacterInfo.Strength),
-		Agility:              int64(data.CharacterInfo.Agility),
-		Wisdom:               int64(data.CharacterInfo.Wisdom),
-		Constitution:         int64(data.CharacterInfo.Constitution),
-		HealthPoints:         int64(data.CharacterInfo.HealthPoints),
-		MagicPoints:          int64(data.CharacterInfo.MagicPoints),
-		ExperiencePoints:     int64(data.CharacterInfo.ExperiencePoints),
-		Money:                int64(data.CharacterInfo.Money),
-		ScorePoints:          int64(data.CharacterInfo.ScorePoints),
-		ClassType:            int64(data.CharacterInfo.ClassType),
-		SkinCarnation:        int64(data.CharacterInfo.SkinCarnation),
-		HairStyle:            int64(data.CharacterInfo.HairStyle),
-		LightArmourLegs:      int64(data.CharacterInfo.LightArmourLegs),
-		LightArmourTorso:     int64(data.CharacterInfo.LightArmourTorso),
-		LightArmourHands:     int64(data.CharacterInfo.LightArmourHands),
-		LightArmourBoots:     int64(data.CharacterInfo.LightArmourBoots),
-		FullArmour:           int64(data.CharacterInfo.FullArmour),
-		ArmourEmblem:         int64(data.CharacterInfo.ArmourEmblem),
-		Helmet:               int64(data.CharacterInfo.Helmet),
-		SecondaryWeapon:      int64(data.CharacterInfo.SecondaryWeapon),
-		PrimaryWeapon:        int64(data.CharacterInfo.PrimaryWeapon),
-		Shield:               int64(data.CharacterInfo.Shield),
-		UnknownEquipmentSlot: int64(data.CharacterInfo.UnknownEquipmentSlot),
-		Gender:               int64(data.CharacterInfo.Gender),
-		Level:                int64(data.CharacterInfo.Level),
-		EdgedWeapons:         int64(data.CharacterInfo.EdgedWeapons),
-		BluntedWeapons:       int64(data.CharacterInfo.BluntedWeapons),
-		Archery:              int64(data.CharacterInfo.Archery),
-		Polearms:             int64(data.CharacterInfo.Polearms),
-		Wizardry:             int64(data.CharacterInfo.Wizardry),
-		Unknown:              sql.NullString{Valid: true, String: base64.StdEncoding.EncodeToString(data.CharacterInfo.Unknown)},
+		Strength:             int64(data.ParsedInfo.Strength),
+		Agility:              int64(data.ParsedInfo.Agility),
+		Wisdom:               int64(data.ParsedInfo.Wisdom),
+		Constitution:         int64(data.ParsedInfo.Constitution),
+		HealthPoints:         int64(data.ParsedInfo.HealthPoints),
+		MagicPoints:          int64(data.ParsedInfo.MagicPoints),
+		ExperiencePoints:     int64(data.ParsedInfo.ExperiencePoints),
+		Money:                int64(data.ParsedInfo.Money),
+		ScorePoints:          int64(data.ParsedInfo.ScorePoints),
+		ClassType:            int64(data.ParsedInfo.ClassType),
+		SkinCarnation:        int64(data.ParsedInfo.SkinCarnation),
+		HairStyle:            int64(data.ParsedInfo.HairStyle),
+		LightArmourLegs:      int64(data.ParsedInfo.LightArmourLegs),
+		LightArmourTorso:     int64(data.ParsedInfo.LightArmourTorso),
+		LightArmourHands:     int64(data.ParsedInfo.LightArmourHands),
+		LightArmourBoots:     int64(data.ParsedInfo.LightArmourBoots),
+		FullArmour:           int64(data.ParsedInfo.FullArmour),
+		ArmourEmblem:         int64(data.ParsedInfo.ArmourEmblem),
+		Helmet:               int64(data.ParsedInfo.Helmet),
+		SecondaryWeapon:      int64(data.ParsedInfo.SecondaryWeapon),
+		PrimaryWeapon:        int64(data.ParsedInfo.PrimaryWeapon),
+		Shield:               int64(data.ParsedInfo.Shield),
+		UnknownEquipmentSlot: int64(data.ParsedInfo.UnknownEquipmentSlot),
+		Gender:               int64(data.ParsedInfo.Gender),
+		Level:                int64(data.ParsedInfo.Level),
+		EdgedWeapons:         int64(data.ParsedInfo.EdgedWeapons),
+		BluntedWeapons:       int64(data.ParsedInfo.BluntedWeapons),
+		Archery:              int64(data.ParsedInfo.Archery),
+		Polearms:             int64(data.ParsedInfo.Polearms),
+		Wizardry:             int64(data.ParsedInfo.Wizardry),
+		Unknown:              sql.NullString{Valid: true, String: base64.StdEncoding.EncodeToString(data.ParsedInfo.Unknown)},
 		CharacterName:        data.Character,
 		UserID:               session.UserID,
 	}); err != nil {
@@ -69,10 +69,11 @@ func (b *Backend) HandleUpdateCharacterStats(session *model.Session, req UpdateC
 type UpdateCharacterStatsRequest []byte
 
 type UpdateCharacterStatsRequestData struct {
-	CharacterInfo model.CharacterInfo
-	User          string
-	Character     string
-	Unknown       []byte
+	Info       []byte
+	ParsedInfo model.CharacterInfo
+	User       string
+	Character  string
+	Unknown    []byte
 }
 
 func (r UpdateCharacterStatsRequest) Parse() (data UpdateCharacterStatsRequestData, err error) {
@@ -84,7 +85,8 @@ func (r UpdateCharacterStatsRequest) Parse() (data UpdateCharacterStatsRequestDa
 		return data, fmt.Errorf("no enough arguments, malformed request payload: %s", base64.StdEncoding.EncodeToString(r))
 	}
 
-	data.CharacterInfo = model.ParseCharacterInfo(r[:56])
+	data.Info = r[:56]
+	data.ParsedInfo = model.ParseCharacterInfo(r[:56])
 	data.User = string(split[0])
 	data.Character = string(split[1])
 	data.Unknown = split[2]

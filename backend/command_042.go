@@ -6,7 +6,8 @@ import (
 	"encoding/binary"
 	"log/slog"
 
-	"github.com/dispel-re/dispel-multi/internal/database"
+	"connectrpc.com/connect"
+	multiv1 "github.com/dispel-re/dispel-multi/gen/multi/v1"
 	"github.com/dispel-re/dispel-multi/model"
 )
 
@@ -17,22 +18,16 @@ func (b *Backend) HandleCreateNewAccount(session *model.Session, req CreateNewAc
 		return err
 	}
 
-	password, err := hashPassword(data.Password)
-	if err != nil {
-		slog.Warn("packet-42: could not hash the password", "err", err)
-		return b.Send(session.Conn, CreateNewAccount, []byte{0, 0, 0, 0})
-	}
-
-	user, err := b.DB.CreateUser(context.TODO(), database.CreateUserParams{
+	respUser, err := b.UserClient.CreateUser(context.TODO(), connect.NewRequest(&multiv1.CreateUserRequest{
 		Username: data.Username,
-		Password: password,
-	})
+		Password: data.Password,
+	}))
 	if err != nil {
 		slog.Warn("packet-42: could not save new user into database", "err", err)
 		return b.Send(session.Conn, CreateNewAccount, []byte{0, 0, 0, 0})
 	}
 
-	slog.Info("packet-42: new user created", "user", user.Username)
+	slog.Info("packet-42: new user created", "user", respUser.Msg.User.Username)
 
 	return b.Send(session.Conn, CreateNewAccount, []byte{1, 0, 0, 0})
 }

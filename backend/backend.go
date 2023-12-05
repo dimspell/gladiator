@@ -16,12 +16,12 @@ import (
 )
 
 type Backend struct {
-	DB           *database.Queries
 	Sessions     map[string]*model.Session
 	PacketLogger *slog.Logger
 
 	CharacterClient multiv1connect.CharacterServiceClient
 	GameClient      multiv1connect.GameServiceClient
+	UserClient      multiv1connect.UserServiceClient
 }
 
 // func NewBackend(db *memory.Memory) *Backend {
@@ -40,12 +40,12 @@ func NewBackend(db *database.Queries, consoleAddr string) *Backend {
 	}
 
 	return &Backend{
-		DB:           db,
 		Sessions:     make(map[string]*model.Session),
 		PacketLogger: slog.New(packetlogger.New(os.Stderr, &packetlogger.Options{Level: slog.LevelDebug})),
 
 		CharacterClient: multiv1connect.NewCharacterServiceClient(httpClient, consoleAddr),
 		GameClient:      multiv1connect.NewGameServiceClient(httpClient, consoleAddr),
+		UserClient:      multiv1connect.NewUserServiceClient(httpClient, consoleAddr),
 	}
 }
 

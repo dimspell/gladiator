@@ -3,11 +3,11 @@ package backend
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"fmt"
 	"log/slog"
 
-	"github.com/dispel-re/dispel-multi/internal/database"
+	"connectrpc.com/connect"
+	multiv1 "github.com/dispel-re/dispel-multi/gen/multi/v1"
 	"github.com/dispel-re/dispel-multi/model"
 )
 
@@ -21,29 +21,27 @@ func (b *Backend) HandleGetCharacterSpells(session *model.Session, req GetCharac
 		return err
 	}
 
-	character, err := b.DB.FindCharacter(context.TODO(), database.FindCharacterParams{
+	respChar, err := b.CharacterClient.GetCharacter(context.TODO(), connect.NewRequest(&multiv1.GetCharacterRequest{
+		UserId:        session.UserID,
 		CharacterName: data.CharacterName,
-		UserID:        session.UserID,
-	})
+	}))
 	if err != nil {
 		return err
 	}
 
-	if !character.Spells.Valid {
-		return nil
-	}
-	spells, err := base64.StdEncoding.DecodeString(character.Spells.String)
-	if len(spells) != 43 {
-		slog.Warn("packet-72: spells array should be 43-chars long", "spells", character.Spells.String, "err", err)
+	character := respChar.Msg.Character
+
+	if len(character.Spells) != 43 {
+		slog.Warn("packet-72: spells array should be 43-chars long", "spells", character.Spells, "err", err)
 		return nil
 	}
 	for i := 0; i < 41; i++ {
-		if spells[i] == 0 {
-			spells[i] = 1
+		if character.Spells[i] == 0 {
+			character.Spells[i] = 1
 		}
 	}
 
-	return b.Send(session.Conn, GetCharacterSpells, spells)
+	return b.Send(session.Conn, GetCharacterSpells, character.Spells)
 }
 
 type GetCharacterSpellsRequest []byte

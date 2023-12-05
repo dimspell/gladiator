@@ -8,7 +8,7 @@ message Character {
   string character_name = 3;
   bytes info = 4;
   bytes inventory = 5;
-  bytes spell = 6;
+  bytes spells = 6;
 }
 
 message CharacterInfo {

@@ -6,7 +6,8 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/dispel-re/dispel-multi/internal/database"
+	"connectrpc.com/connect"
+	multiv1 "github.com/dispel-re/dispel-multi/gen/multi/v1"
 	"github.com/dispel-re/dispel-multi/model"
 )
 
@@ -21,35 +22,42 @@ func (b *Backend) HandleJoinGame(session *model.Session, req JoinGameRequest) er
 		return err
 	}
 
-	room, err := b.DB.GetGameRoom(context.TODO(), data.RoomName)
+	respGame, err := b.GameClient.GetGame(context.TODO(), connect.NewRequest(&multiv1.GetGameRequest{
+		UserId:   session.UserID,
+		GameName: data.RoomName,
+	}))
 	if err != nil {
 		return err
 	}
 
 	tcpAddr := session.Conn.RemoteAddr().(*net.TCPAddr)
-	if err := b.DB.AddPlayerToRoom(context.TODO(), database.AddPlayerToRoomParams{
-		GameRoomID:  room.ID,
-		CharacterID: session.CharacterID,
+	_, err = b.GameClient.JoinGame(context.TODO(), connect.NewRequest(&multiv1.JoinGameRequest{
+		UserId:      session.UserID,
+		CharacterId: session.CharacterID,
+		GameRoomId:  respGame.Msg.Game.GameId,
 		IpAddress:   tcpAddr.IP.To4().String(),
-	}); err != nil {
+	}))
+	if err != nil {
 		return err
 	}
 
 	gameRoom := model.GameRoom{
 		Lobby: model.LobbyRoom{
 			HostIPAddress: [4]byte{},
-			Name:          room.Name,
-			Password:      room.Password.String,
+			Name:          respGame.Msg.Game.Name,
+			Password:      respGame.Msg.Game.Password,
 		},
-		MapID: uint32(room.MapID),
+		MapID: uint32(respGame.Msg.Game.GetMapId()),
 	}
-	copy(gameRoom.Lobby.HostIPAddress[:], net.ParseIP(room.HostIpAddress).To4())
+	copy(gameRoom.Lobby.HostIPAddress[:], net.ParseIP(respGame.Msg.Game.HostIpAddress).To4())
 
-	players, err := b.DB.GetGameRoomPlayers(context.TODO(), data.RoomName)
+	respPlayers, err := b.GameClient.ListPlayers(context.TODO(), connect.NewRequest(&multiv1.ListPlayersRequest{
+		GameRoomId: respGame.Msg.Game.GameId,
+	}))
 	if err != nil {
 		return err
 	}
-	for _, player := range players {
+	for _, player := range respPlayers.Msg.GetPlayers() {
 		lobbyPlayer := model.LobbyPlayer{
 			ClassType: model.ClassType(player.ClassType),
 			Name:      player.CharacterName,
