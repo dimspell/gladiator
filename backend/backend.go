@@ -22,6 +22,7 @@ type Backend struct {
 	CharacterClient multiv1connect.CharacterServiceClient
 	GameClient      multiv1connect.GameServiceClient
 	UserClient      multiv1connect.UserServiceClient
+	RankingClient   multiv1connect.RankingServiceClient
 }
 
 // func NewBackend(db *memory.Memory) *Backend {
@@ -46,6 +47,7 @@ func NewBackend(db *database.Queries, consoleAddr string) *Backend {
 		CharacterClient: multiv1connect.NewCharacterServiceClient(httpClient, consoleAddr),
 		GameClient:      multiv1connect.NewGameServiceClient(httpClient, consoleAddr),
 		UserClient:      multiv1connect.NewUserServiceClient(httpClient, consoleAddr),
+		RankingClient:   multiv1connect.NewRankingServiceClient(httpClient, consoleAddr),
 	}
 }
 

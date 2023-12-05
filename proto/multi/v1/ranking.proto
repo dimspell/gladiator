@@ -6,11 +6,19 @@ message GetRankingRequest {
   int64 user_id = 1;
   string character_name = 2;
   int64 class_type = 3;
-  int64  offset = 4;
+  int64 offset = 4;
 }
 
 message GetRankingResponse {
-  //  User user = 1;
+  RankingPosition CurrentPlayer = 1;
+  repeated RankingPosition Players = 2;
+}
+
+message RankingPosition {
+  uint32 rank = 1;
+  uint32 points = 2;
+  string username = 3;
+  string character_name = 4;
 }
 
 service RankingService {

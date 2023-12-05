@@ -2,21 +2,11 @@ package model
 
 import (
 	"encoding/binary"
+
+	multiv1 "github.com/dispel-re/dispel-multi/gen/multi/v1"
 )
 
-type Ranking struct {
-	Players       []RankingPosition
-	CurrentPlayer RankingPosition
-}
-
-type RankingPosition struct {
-	Rank          uint32
-	Points        uint32
-	Username      string
-	CharacterName string
-}
-
-func (ranking *Ranking) ToBytes() []byte {
+func RankingToBytes(ranking *multiv1.GetRankingResponse) []byte {
 	var buf = []byte{}
 
 	buf = binary.LittleEndian.AppendUint32(buf, uint32(len(ranking.Players)))

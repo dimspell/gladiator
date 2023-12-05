@@ -2,10 +2,12 @@ package backend
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"fmt"
 
-	"github.com/dispel-re/dispel-multi/internal/database"
+	"connectrpc.com/connect"
+	multiv1 "github.com/dispel-re/dispel-multi/gen/multi/v1"
 	"github.com/dispel-re/dispel-multi/model"
 )
 
@@ -20,42 +22,20 @@ func (b *Backend) HandleShowRanking(session *model.Session, req RankingRequest) 
 		return err
 	}
 
-	positions, err := b.DB.SelectRanking(context.TODO(), database.SelectRankingParams{
-		ClassType: int64(data.ClassType),
-		Offset:    int64(data.Offset),
-	})
-	if err != nil {
-		return err
-	}
-	currentPlayer, err := b.DB.GetCurrentUser(context.TODO(), database.GetCurrentUserParams{
-		Username:      data.Username,
-		CharacterName: data.CharacterName,
-	})
+	respRanking, err := b.RankingClient.GetRanking(context.TODO(),
+		connect.NewRequest(&multiv1.GetRankingRequest{
+			UserId:        session.UserID,
+			CharacterName: data.CharacterName,
+			ClassType:     int64(data.ClassType),
+			Offset:        int64(data.Offset),
+		}))
 	if err != nil {
 		return err
 	}
 
-	rankingPositions := make([]model.RankingPosition, len(positions))
-	for i, position := range positions {
-		rankingPositions[i] = model.RankingPosition{
-			Rank:          uint32(position.Position.(int64)),
-			Points:        uint32(position.ScorePoints),
-			Username:      position.Username,
-			CharacterName: position.CharacterName,
-		}
-	}
+	ranking := model.RankingToBytes(respRanking.Msg)
 
-	ranking := model.Ranking{
-		Players: rankingPositions,
-		CurrentPlayer: model.RankingPosition{
-			Rank:          uint32(currentPlayer.Position.(int64)),
-			Points:        uint32(currentPlayer.ScorePoints),
-			Username:      currentPlayer.Username,
-			CharacterName: currentPlayer.CharacterName,
-		},
-	}
-
-	return b.Send(session.Conn, ShowRanking, ranking.ToBytes())
+	return b.Send(session.Conn, ShowRanking, ranking)
 }
 
 type RankingRequest []byte
