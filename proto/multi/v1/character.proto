@@ -21,6 +21,40 @@ message ListCharactersResponse {
   repeated Character characters = 1;
 }
 
+message CreateCharacterRequest {
+  int64 user_id = 1;
+  string character_name = 2;
+  bytes stats = 3;
+}
+
+message CreateCharacterResponse {
+  Character character = 1;
+}
+
+message PutStatsRequest {
+  int64 user_id = 1;
+  string character_name = 2;
+  bytes stats = 3;
+}
+
+message PutStatsResponse {}
+
+message PutSpellsRequest {
+  int64 user_id = 1;
+  string character_name = 2;
+  bytes spells = 3;
+}
+
+message PutSpellsResponse {}
+
+message PutInventoryRequest {
+  int64 user_id = 1;
+  string character_name = 2;
+  bytes inventory = 3;
+}
+
+message PutInventoryResponse {}
+
 message DeleteCharacterRequest {
   int64 user_id = 1;
   string character_name = 2;
@@ -28,20 +62,13 @@ message DeleteCharacterRequest {
 
 message DeleteCharacterResponse {}
 
-message CreateCharacterRequest {
-  int64 user_id = 1;
-  string character_name = 2;
-  bytes info = 3;
-}
-
-message CreateCharacterResponse {
-  Character character = 1;
-}
-
 service CharacterService {
   rpc GetCharacter(GetCharacterRequest) returns (GetCharacterResponse) {}
   rpc ListCharacters(ListCharactersRequest) returns (ListCharactersResponse) {}
 
   rpc CreateCharacter(CreateCharacterRequest) returns (CreateCharacterResponse) {}
+  rpc PutStats(PutStatsRequest) returns (PutStatsResponse) {}
+  rpc PutSpells(PutSpellsRequest) returns (PutSpellsResponse) {}
+  rpc PutInventoryCharacter(PutInventoryRequest) returns (PutInventoryResponse) {}
   rpc DeleteCharacter(DeleteCharacterRequest) returns (DeleteCharacterResponse) {}
 }

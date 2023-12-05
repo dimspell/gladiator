@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net"
 
+	"connectrpc.com/connect"
+	multiv1 "github.com/dispel-re/dispel-multi/gen/multi/v1"
 	"github.com/dispel-re/dispel-multi/model"
 )
 
@@ -20,25 +22,32 @@ func (b *Backend) HandleSelectGame(session *model.Session, req SelectGameRequest
 		return err
 	}
 
-	room, err := b.DB.GetGameRoom(context.TODO(), data.RoomName)
+	respRoom, err := b.GameClient.GetGame(context.TODO(),
+		connect.NewRequest(&multiv1.GetGameRequest{
+			UserId:   session.UserID,
+			GameName: data.RoomName,
+		}))
 	if err != nil {
 		return err
 	}
 	gameRoom := model.GameRoom{
 		Lobby: model.LobbyRoom{
 			HostIPAddress: [4]byte{},
-			Name:          room.Name,
-			Password:      room.Password.String,
+			Name:          respRoom.Msg.Game.Name,
+			Password:      respRoom.Msg.Game.Password,
 		},
-		MapID: uint32(room.MapID),
+		MapID: uint32(respRoom.Msg.Game.MapId),
 	}
-	copy(gameRoom.Lobby.HostIPAddress[:], net.ParseIP(room.HostIpAddress).To4())
+	copy(gameRoom.Lobby.HostIPAddress[:], net.ParseIP(respRoom.Msg.Game.HostIpAddress).To4())
 
-	players, err := b.DB.GetGameRoomPlayers(context.TODO(), data.RoomName)
+	respPlayers, err := b.GameClient.ListPlayers(context.TODO(),
+		connect.NewRequest(&multiv1.ListPlayersRequest{
+			GameRoomId: respRoom.Msg.Game.GameId,
+		}))
 	if err != nil {
 		return err
 	}
-	for _, player := range players {
+	for _, player := range respPlayers.Msg.GetPlayers() {
 		lobbyPlayer := model.LobbyPlayer{
 			ClassType: model.ClassType(player.ClassType),
 			Name:      player.CharacterName,

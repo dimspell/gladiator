@@ -57,10 +57,10 @@ func (c *Console) Serve(ctx context.Context, consoleAddr, backendAddr string) er
 		return server.Shutdown(ctx)
 	}
 
-	return c.graceful(ctx, start, stop)
+	return c.gracefulStart(ctx, start, stop)
 }
 
-func (c *Console) graceful(ctx context.Context, start func() error, shutdown func(context.Context) error) error {
+func (c *Console) gracefulStart(ctx context.Context, start func() error, shutdown func(context.Context) error) error {
 	var (
 		stopChan = make(chan os.Signal, 1)
 		errChan  = make(chan error, 1)

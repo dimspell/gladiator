@@ -3,11 +3,10 @@ package backend
 import (
 	"bytes"
 	"context"
-	"database/sql"
-	"encoding/base64"
 	"fmt"
 
-	"github.com/dispel-re/dispel-multi/internal/database"
+	"connectrpc.com/connect"
+	multiv1 "github.com/dispel-re/dispel-multi/gen/multi/v1"
 	"github.com/dispel-re/dispel-multi/model"
 )
 
@@ -20,14 +19,13 @@ func (b *Backend) HandleUpdateCharacterInventory(session *model.Session, req Upd
 		return err
 	}
 
-	if err := b.DB.UpdateCharacterInventory(context.TODO(), database.UpdateCharacterInventoryParams{
-		Inventory: sql.NullString{
-			Valid:  true,
-			String: base64.StdEncoding.EncodeToString(data.Inventory),
-		},
-		CharacterName: data.CharacterName,
-		UserID:        session.UserID,
-	}); err != nil {
+	_, err = b.CharacterClient.PutInventoryCharacter(context.TODO(),
+		connect.NewRequest(&multiv1.PutInventoryRequest{
+			UserId:        session.UserID,
+			CharacterName: data.CharacterName,
+			Inventory:     data.Inventory,
+		}))
+	if err != nil {
 		return err
 	}
 

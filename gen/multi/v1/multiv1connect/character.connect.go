@@ -42,6 +42,15 @@ const (
 	// CharacterServiceCreateCharacterProcedure is the fully-qualified name of the CharacterService's
 	// CreateCharacter RPC.
 	CharacterServiceCreateCharacterProcedure = "/multi.v1.CharacterService/CreateCharacter"
+	// CharacterServicePutStatsProcedure is the fully-qualified name of the CharacterService's PutStats
+	// RPC.
+	CharacterServicePutStatsProcedure = "/multi.v1.CharacterService/PutStats"
+	// CharacterServicePutSpellsProcedure is the fully-qualified name of the CharacterService's
+	// PutSpells RPC.
+	CharacterServicePutSpellsProcedure = "/multi.v1.CharacterService/PutSpells"
+	// CharacterServicePutInventoryCharacterProcedure is the fully-qualified name of the
+	// CharacterService's PutInventoryCharacter RPC.
+	CharacterServicePutInventoryCharacterProcedure = "/multi.v1.CharacterService/PutInventoryCharacter"
 	// CharacterServiceDeleteCharacterProcedure is the fully-qualified name of the CharacterService's
 	// DeleteCharacter RPC.
 	CharacterServiceDeleteCharacterProcedure = "/multi.v1.CharacterService/DeleteCharacter"
@@ -52,6 +61,9 @@ type CharacterServiceClient interface {
 	GetCharacter(context.Context, *connect.Request[v1.GetCharacterRequest]) (*connect.Response[v1.GetCharacterResponse], error)
 	ListCharacters(context.Context, *connect.Request[v1.ListCharactersRequest]) (*connect.Response[v1.ListCharactersResponse], error)
 	CreateCharacter(context.Context, *connect.Request[v1.CreateCharacterRequest]) (*connect.Response[v1.CreateCharacterResponse], error)
+	PutStats(context.Context, *connect.Request[v1.PutStatsRequest]) (*connect.Response[v1.PutStatsResponse], error)
+	PutSpells(context.Context, *connect.Request[v1.PutSpellsRequest]) (*connect.Response[v1.PutSpellsResponse], error)
+	PutInventoryCharacter(context.Context, *connect.Request[v1.PutInventoryRequest]) (*connect.Response[v1.PutInventoryResponse], error)
 	DeleteCharacter(context.Context, *connect.Request[v1.DeleteCharacterRequest]) (*connect.Response[v1.DeleteCharacterResponse], error)
 }
 
@@ -80,6 +92,21 @@ func NewCharacterServiceClient(httpClient connect.HTTPClient, baseURL string, op
 			baseURL+CharacterServiceCreateCharacterProcedure,
 			opts...,
 		),
+		putStats: connect.NewClient[v1.PutStatsRequest, v1.PutStatsResponse](
+			httpClient,
+			baseURL+CharacterServicePutStatsProcedure,
+			opts...,
+		),
+		putSpells: connect.NewClient[v1.PutSpellsRequest, v1.PutSpellsResponse](
+			httpClient,
+			baseURL+CharacterServicePutSpellsProcedure,
+			opts...,
+		),
+		putInventoryCharacter: connect.NewClient[v1.PutInventoryRequest, v1.PutInventoryResponse](
+			httpClient,
+			baseURL+CharacterServicePutInventoryCharacterProcedure,
+			opts...,
+		),
 		deleteCharacter: connect.NewClient[v1.DeleteCharacterRequest, v1.DeleteCharacterResponse](
 			httpClient,
 			baseURL+CharacterServiceDeleteCharacterProcedure,
@@ -90,10 +117,13 @@ func NewCharacterServiceClient(httpClient connect.HTTPClient, baseURL string, op
 
 // characterServiceClient implements CharacterServiceClient.
 type characterServiceClient struct {
-	getCharacter    *connect.Client[v1.GetCharacterRequest, v1.GetCharacterResponse]
-	listCharacters  *connect.Client[v1.ListCharactersRequest, v1.ListCharactersResponse]
-	createCharacter *connect.Client[v1.CreateCharacterRequest, v1.CreateCharacterResponse]
-	deleteCharacter *connect.Client[v1.DeleteCharacterRequest, v1.DeleteCharacterResponse]
+	getCharacter          *connect.Client[v1.GetCharacterRequest, v1.GetCharacterResponse]
+	listCharacters        *connect.Client[v1.ListCharactersRequest, v1.ListCharactersResponse]
+	createCharacter       *connect.Client[v1.CreateCharacterRequest, v1.CreateCharacterResponse]
+	putStats              *connect.Client[v1.PutStatsRequest, v1.PutStatsResponse]
+	putSpells             *connect.Client[v1.PutSpellsRequest, v1.PutSpellsResponse]
+	putInventoryCharacter *connect.Client[v1.PutInventoryRequest, v1.PutInventoryResponse]
+	deleteCharacter       *connect.Client[v1.DeleteCharacterRequest, v1.DeleteCharacterResponse]
 }
 
 // GetCharacter calls multi.v1.CharacterService.GetCharacter.
@@ -111,6 +141,21 @@ func (c *characterServiceClient) CreateCharacter(ctx context.Context, req *conne
 	return c.createCharacter.CallUnary(ctx, req)
 }
 
+// PutStats calls multi.v1.CharacterService.PutStats.
+func (c *characterServiceClient) PutStats(ctx context.Context, req *connect.Request[v1.PutStatsRequest]) (*connect.Response[v1.PutStatsResponse], error) {
+	return c.putStats.CallUnary(ctx, req)
+}
+
+// PutSpells calls multi.v1.CharacterService.PutSpells.
+func (c *characterServiceClient) PutSpells(ctx context.Context, req *connect.Request[v1.PutSpellsRequest]) (*connect.Response[v1.PutSpellsResponse], error) {
+	return c.putSpells.CallUnary(ctx, req)
+}
+
+// PutInventoryCharacter calls multi.v1.CharacterService.PutInventoryCharacter.
+func (c *characterServiceClient) PutInventoryCharacter(ctx context.Context, req *connect.Request[v1.PutInventoryRequest]) (*connect.Response[v1.PutInventoryResponse], error) {
+	return c.putInventoryCharacter.CallUnary(ctx, req)
+}
+
 // DeleteCharacter calls multi.v1.CharacterService.DeleteCharacter.
 func (c *characterServiceClient) DeleteCharacter(ctx context.Context, req *connect.Request[v1.DeleteCharacterRequest]) (*connect.Response[v1.DeleteCharacterResponse], error) {
 	return c.deleteCharacter.CallUnary(ctx, req)
@@ -121,6 +166,9 @@ type CharacterServiceHandler interface {
 	GetCharacter(context.Context, *connect.Request[v1.GetCharacterRequest]) (*connect.Response[v1.GetCharacterResponse], error)
 	ListCharacters(context.Context, *connect.Request[v1.ListCharactersRequest]) (*connect.Response[v1.ListCharactersResponse], error)
 	CreateCharacter(context.Context, *connect.Request[v1.CreateCharacterRequest]) (*connect.Response[v1.CreateCharacterResponse], error)
+	PutStats(context.Context, *connect.Request[v1.PutStatsRequest]) (*connect.Response[v1.PutStatsResponse], error)
+	PutSpells(context.Context, *connect.Request[v1.PutSpellsRequest]) (*connect.Response[v1.PutSpellsResponse], error)
+	PutInventoryCharacter(context.Context, *connect.Request[v1.PutInventoryRequest]) (*connect.Response[v1.PutInventoryResponse], error)
 	DeleteCharacter(context.Context, *connect.Request[v1.DeleteCharacterRequest]) (*connect.Response[v1.DeleteCharacterResponse], error)
 }
 
@@ -145,6 +193,21 @@ func NewCharacterServiceHandler(svc CharacterServiceHandler, opts ...connect.Han
 		svc.CreateCharacter,
 		opts...,
 	)
+	characterServicePutStatsHandler := connect.NewUnaryHandler(
+		CharacterServicePutStatsProcedure,
+		svc.PutStats,
+		opts...,
+	)
+	characterServicePutSpellsHandler := connect.NewUnaryHandler(
+		CharacterServicePutSpellsProcedure,
+		svc.PutSpells,
+		opts...,
+	)
+	characterServicePutInventoryCharacterHandler := connect.NewUnaryHandler(
+		CharacterServicePutInventoryCharacterProcedure,
+		svc.PutInventoryCharacter,
+		opts...,
+	)
 	characterServiceDeleteCharacterHandler := connect.NewUnaryHandler(
 		CharacterServiceDeleteCharacterProcedure,
 		svc.DeleteCharacter,
@@ -158,6 +221,12 @@ func NewCharacterServiceHandler(svc CharacterServiceHandler, opts ...connect.Han
 			characterServiceListCharactersHandler.ServeHTTP(w, r)
 		case CharacterServiceCreateCharacterProcedure:
 			characterServiceCreateCharacterHandler.ServeHTTP(w, r)
+		case CharacterServicePutStatsProcedure:
+			characterServicePutStatsHandler.ServeHTTP(w, r)
+		case CharacterServicePutSpellsProcedure:
+			characterServicePutSpellsHandler.ServeHTTP(w, r)
+		case CharacterServicePutInventoryCharacterProcedure:
+			characterServicePutInventoryCharacterHandler.ServeHTTP(w, r)
 		case CharacterServiceDeleteCharacterProcedure:
 			characterServiceDeleteCharacterHandler.ServeHTTP(w, r)
 		default:
@@ -179,6 +248,18 @@ func (UnimplementedCharacterServiceHandler) ListCharacters(context.Context, *con
 
 func (UnimplementedCharacterServiceHandler) CreateCharacter(context.Context, *connect.Request[v1.CreateCharacterRequest]) (*connect.Response[v1.CreateCharacterResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("multi.v1.CharacterService.CreateCharacter is not implemented"))
+}
+
+func (UnimplementedCharacterServiceHandler) PutStats(context.Context, *connect.Request[v1.PutStatsRequest]) (*connect.Response[v1.PutStatsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("multi.v1.CharacterService.PutStats is not implemented"))
+}
+
+func (UnimplementedCharacterServiceHandler) PutSpells(context.Context, *connect.Request[v1.PutSpellsRequest]) (*connect.Response[v1.PutSpellsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("multi.v1.CharacterService.PutSpells is not implemented"))
+}
+
+func (UnimplementedCharacterServiceHandler) PutInventoryCharacter(context.Context, *connect.Request[v1.PutInventoryRequest]) (*connect.Response[v1.PutInventoryResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("multi.v1.CharacterService.PutInventoryCharacter is not implemented"))
 }
 
 func (UnimplementedCharacterServiceHandler) DeleteCharacter(context.Context, *connect.Request[v1.DeleteCharacterRequest]) (*connect.Response[v1.DeleteCharacterResponse], error) {

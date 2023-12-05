@@ -3,11 +3,11 @@ package backend
 import (
 	"bytes"
 	"context"
-	"database/sql"
 	"encoding/base64"
 	"fmt"
 
-	"github.com/dispel-re/dispel-multi/internal/database"
+	"connectrpc.com/connect"
+	multiv1 "github.com/dispel-re/dispel-multi/gen/multi/v1"
 	"github.com/dispel-re/dispel-multi/model"
 )
 
@@ -21,14 +21,13 @@ func (b *Backend) HandleUpdateCharacterSpells(session *model.Session, req Update
 		return err
 	}
 
-	if err := b.DB.UpdateCharacterSpells(context.TODO(), database.UpdateCharacterSpellsParams{
-		Spells: sql.NullString{
-			String: base64.StdEncoding.EncodeToString(data.Spells),
-			Valid:  len(data.Spells) > 0,
-		},
-		CharacterName: data.CharacterName,
-		UserID:        session.UserID,
-	}); err != nil {
+	_, err = b.CharacterClient.PutSpells(context.TODO(),
+		connect.NewRequest(&multiv1.PutSpellsRequest{
+			UserId:        session.UserID,
+			CharacterName: data.CharacterName,
+			Spells:        data.Spells,
+		}))
+	if err != nil {
 		return fmt.Errorf("packet-73: could not update character spells: %s", err)
 	}
 
