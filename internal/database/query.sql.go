@@ -312,14 +312,14 @@ FROM (SELECT ROW_NUMBER() over (ORDER BY score_points) as position,
              username,
              character_name
       FROM characters
-               JOIN users ON characters.user_id = users.id) as cte
-WHERE username = ?
-  AND character_name = ?
+               JOIN users ON characters.user_id = users.id
+      WHERE users.id = ?
+        AND characters.character_name = ?) as cte
 LIMIT 1
 `
 
 type GetCurrentUserParams struct {
-	Username      string
+	ID            int64
 	CharacterName string
 }
 
@@ -331,7 +331,7 @@ type GetCurrentUserRow struct {
 }
 
 func (q *Queries) GetCurrentUser(ctx context.Context, arg GetCurrentUserParams) (GetCurrentUserRow, error) {
-	row := q.queryRow(ctx, q.getCurrentUserStmt, getCurrentUser, arg.Username, arg.CharacterName)
+	row := q.queryRow(ctx, q.getCurrentUserStmt, getCurrentUser, arg.ID, arg.CharacterName)
 	var i GetCurrentUserRow
 	err := row.Scan(
 		&i.Position,

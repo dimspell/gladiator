@@ -137,9 +137,9 @@ FROM (SELECT ROW_NUMBER() over (ORDER BY score_points) as position,
              username,
              character_name
       FROM characters
-               JOIN users ON characters.user_id = users.id) as cte
-WHERE username = ?
-  AND character_name = ?
+               JOIN users ON characters.user_id = users.id
+      WHERE users.id = ?
+        AND characters.character_name = ?) as cte
 LIMIT 1;
 
 -- name: ListGameRooms :many
