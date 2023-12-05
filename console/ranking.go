@@ -9,23 +9,23 @@ import (
 	"github.com/dispel-re/dispel-multi/internal/database"
 )
 
-type rankingServiceServer struct {
-	multiv1connect.UnimplementedRankingServiceHandler
+var _ multiv1connect.RankingServiceHandler = (*rankingServiceServer)(nil)
 
+type rankingServiceServer struct {
 	DB *database.Queries
 }
 
-func (s *userServiceServer) GetRanking(ctx context.Context, req *connect.Request[multiv1.GetRankingRequest]) (*connect.Response[multiv1.GetRankingResponse], error) {
+func (s *rankingServiceServer) GetRanking(ctx context.Context, req *connect.Request[multiv1.GetRankingRequest]) (*connect.Response[multiv1.GetRankingResponse], error) {
 	data := req.Msg
 
-	positions, err := s.DB.SelectRanking(context.TODO(), database.SelectRankingParams{
+	positions, err := s.DB.SelectRanking(ctx, database.SelectRankingParams{
 		ClassType: int64(data.ClassType),
 		Offset:    int64(data.Offset),
 	})
 	if err != nil {
 		return nil, err
 	}
-	currentPlayer, err := s.DB.GetCurrentUser(context.TODO(), database.GetCurrentUserParams{
+	currentPlayer, err := s.DB.GetCurrentUser(ctx, database.GetCurrentUserParams{
 		ID:            data.UserId,
 		CharacterName: data.CharacterName,
 	})

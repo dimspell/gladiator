@@ -22,7 +22,7 @@ func (b *Backend) HandleClientAuthentication(session *model.Session, req ClientA
 		return err
 	}
 
-	user, err := b.UserClient.Authenticate(context.TODO(), connect.NewRequest(&multiv1.AuthenticateRequest{
+	user, err := b.UserClient.AuthenticateUser(context.TODO(), connect.NewRequest(&multiv1.AuthenticateUserRequest{
 		Username: data.Username,
 		Password: data.Password,
 	}))

@@ -373,7 +373,7 @@ SELECT character_name,
 FROM game_rooms
          JOIN game_room_players ON game_rooms.id = game_room_players.game_room_id
          JOIN characters ON game_room_players.character_id = characters.id
-WHERE game_rooms.name = ?
+WHERE game_rooms.id = ?
 `
 
 type GetGameRoomPlayersRow struct {
@@ -382,8 +382,8 @@ type GetGameRoomPlayersRow struct {
 	IpAddress     string
 }
 
-func (q *Queries) GetGameRoomPlayers(ctx context.Context, name string) ([]GetGameRoomPlayersRow, error) {
-	rows, err := q.query(ctx, q.getGameRoomPlayersStmt, getGameRoomPlayers, name)
+func (q *Queries) GetGameRoomPlayers(ctx context.Context, id int64) ([]GetGameRoomPlayersRow, error) {
+	rows, err := q.query(ctx, q.getGameRoomPlayersStmt, getGameRoomPlayers, id)
 	if err != nil {
 		return nil, err
 	}

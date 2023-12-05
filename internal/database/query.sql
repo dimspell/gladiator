@@ -168,7 +168,7 @@ SELECT character_name,
 FROM game_rooms
          JOIN game_room_players ON game_rooms.id = game_room_players.game_room_id
          JOIN characters ON game_room_players.character_id = characters.id
-WHERE game_rooms.name = ?;
+WHERE game_rooms.id = ?;
 
 -- name: AddPlayerToRoom :exec
 INSERT INTO game_room_players (game_room_id, character_id, ip_address)

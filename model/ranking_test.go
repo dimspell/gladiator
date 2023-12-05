@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"testing"
 
+	multiv1 "github.com/dispel-re/dispel-multi/gen/multi/v1"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestRanking(t *testing.T) {
-	ranking := Ranking{
-		Players: []RankingPosition{
+	ranking := &multiv1.GetRankingResponse{
+		Players: []*multiv1.RankingPosition{
 			{
 				Rank:          1,
 				Points:        200,
@@ -23,7 +24,7 @@ func TestRanking(t *testing.T) {
 				CharacterName: "Mage",
 			},
 		},
-		CurrentPlayer: RankingPosition{
+		CurrentPlayer: &multiv1.RankingPosition{
 			Rank:          2,
 			Points:        150,
 			Username:      "Current",
@@ -50,6 +51,6 @@ func TestRanking(t *testing.T) {
 			67, 117, 114, 114, 101, 110, 116, 0, // Username = "Current"
 			77, 97, 103, 101, 0, // Character name = "Mage"
 		},
-		ranking.ToBytes(),
+		RankingToBytes(ranking),
 	))
 }
