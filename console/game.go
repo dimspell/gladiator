@@ -5,9 +5,9 @@ import (
 	"database/sql"
 
 	"connectrpc.com/connect"
+	"github.com/dispel-re/dispel-multi/console/database"
 	multiv1 "github.com/dispel-re/dispel-multi/gen/multi/v1"
 	"github.com/dispel-re/dispel-multi/gen/multi/v1/multiv1connect"
-	"github.com/dispel-re/dispel-multi/internal/database"
 )
 
 var _ multiv1connect.GameServiceHandler = (*gameServiceServer)(nil)

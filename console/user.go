@@ -6,9 +6,9 @@ import (
 	"log/slog"
 
 	"connectrpc.com/connect"
+	"github.com/dispel-re/dispel-multi/console/database"
 	multiv1 "github.com/dispel-re/dispel-multi/gen/multi/v1"
 	"github.com/dispel-re/dispel-multi/gen/multi/v1/multiv1connect"
-	"github.com/dispel-re/dispel-multi/internal/database"
 	"golang.org/x/crypto/bcrypt"
 )
 

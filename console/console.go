@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/dispel-re/dispel-multi/backend"
-	"github.com/dispel-re/dispel-multi/internal/database"
+	"github.com/dispel-re/dispel-multi/console/database"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 

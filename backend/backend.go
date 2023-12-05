@@ -8,9 +8,9 @@ import (
 	"os"
 	"time"
 
+	"github.com/dispel-re/dispel-multi/backend/packetlogger"
+	"github.com/dispel-re/dispel-multi/console/database"
 	"github.com/dispel-re/dispel-multi/gen/multi/v1/multiv1connect"
-	"github.com/dispel-re/dispel-multi/internal/database"
-	"github.com/dispel-re/dispel-multi/internal/packetlogger"
 	"github.com/dispel-re/dispel-multi/model"
 	"github.com/google/uuid"
 )

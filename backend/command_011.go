@@ -1,7 +1,7 @@
 package backend
 
 import (
-	"github.com/dispel-re/dispel-multi/internal/database"
+	"github.com/dispel-re/dispel-multi/console/database"
 	"github.com/dispel-re/dispel-multi/model"
 )
 
