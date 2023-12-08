@@ -2,7 +2,6 @@ package backend
 
 import (
 	"context"
-	"errors"
 	"net"
 	"testing"
 	"time"
@@ -107,7 +106,12 @@ func testDB(t *testing.T) *database.Queries {
 type mockGameClient struct {
 	multiv1connect.UnimplementedGameServiceHandler
 
-	ListGamesResponse *connect.Response[v1.ListGamesResponse]
+	CreateGameResponse *connect.Response[v1.CreateGameResponse]
+	ListGamesResponse  *connect.Response[v1.ListGamesResponse]
+}
+
+func (m *mockGameClient) CreateGame(context.Context, *connect.Request[v1.CreateGameRequest]) (*connect.Response[v1.CreateGameResponse], error) {
+	return m.CreateGameResponse, nil
 }
 
 func (m *mockGameClient) ListGames(context.Context, *connect.Request[v1.ListGamesRequest]) (*connect.Response[v1.ListGamesResponse], error) {
@@ -116,8 +120,15 @@ func (m *mockGameClient) ListGames(context.Context, *connect.Request[v1.ListGame
 
 type mockCharacterClient struct {
 	multiv1connect.UnimplementedCharacterServiceHandler
+
+	GetCharacterResponse   *connect.Response[v1.GetCharacterResponse]
+	ListCharactersResponse *connect.Response[v1.ListCharactersResponse]
 }
 
-func (m *mockGameClient) ListCharacters(context.Context, *connect.Request[v1.ListCharactersRequest]) (*connect.Response[v1.ListCharactersResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("multi.v1.CharacterService.ListCharacters is not implemented"))
+func (m *mockCharacterClient) GetCharacter(context.Context, *connect.Request[v1.GetCharacterRequest]) (*connect.Response[v1.GetCharacterResponse], error) {
+	return m.GetCharacterResponse, nil
+}
+
+func (m *mockCharacterClient) ListCharacters(context.Context, *connect.Request[v1.ListCharactersRequest]) (*connect.Response[v1.ListCharactersResponse], error) {
+	return m.ListCharactersResponse, nil
 }

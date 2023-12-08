@@ -3,6 +3,8 @@ package backend
 import (
 	"testing"
 
+	"connectrpc.com/connect"
+	v1 "github.com/dispel-re/dispel-multi/gen/multi/v1"
 	"github.com/dispel-re/dispel-multi/model"
 	"github.com/stretchr/testify/assert"
 )
@@ -33,7 +35,19 @@ func TestBackend_HandleGetCharacterSpells(t *testing.T) {
 	}
 	spells[0] = 2
 
-	b := &Backend{CharacterClient: &mockCharacterClient{}}
+	spellsResponse := make([]byte, 43)
+	copy(spellsResponse[:], spells[:])
+
+	b := &Backend{CharacterClient: &mockCharacterClient{
+		GetCharacterResponse: connect.NewResponse(&v1.GetCharacterResponse{
+			Character: &v1.Character{
+				UserId:        1,
+				CharacterId:   0,
+				CharacterName: "characterName",
+				Spells:        spellsResponse,
+			},
+		}),
+	}}
 	conn := &mockConn{}
 	session := &model.Session{ID: "TEST", Conn: conn, UserID: 1, Username: "JP"}
 
