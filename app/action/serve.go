@@ -60,7 +60,7 @@ func ServeCommand() *cli.Command {
 			return err
 		}
 
-		bd := backend.NewBackend(queries, consoleAddr)
+		bd := backend.NewBackend(consoleAddr)
 		con := console.NewConsole(queries, bd)
 
 		return con.Serve(c.Context, consoleAddr, backendAddr)

@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/dispel-re/dispel-multi/backend/packetlogger"
-	"github.com/dispel-re/dispel-multi/console/database"
 	"github.com/dispel-re/dispel-multi/gen/multi/v1/multiv1connect"
 	"github.com/dispel-re/dispel-multi/model"
 	"github.com/google/uuid"
@@ -25,8 +24,7 @@ type Backend struct {
 	RankingClient   multiv1connect.RankingServiceClient
 }
 
-// func NewBackend(db *memory.Memory) *Backend {
-func NewBackend(db *database.Queries, consoleAddr string) *Backend {
+func NewBackend(consoleAddr string) *Backend {
 	httpClient := &http.Client{
 		Timeout: 5 * time.Second,
 		Transport: &http.Transport{
