@@ -2,12 +2,15 @@ package backend
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
 	"os"
 	"time"
 
+	"connectrpc.com/connect"
+	"connectrpc.com/otelconnect"
 	"github.com/dispel-re/dispel-multi/backend/packetlogger"
 	"github.com/dispel-re/dispel-multi/gen/multi/v1/multiv1connect"
 	"github.com/dispel-re/dispel-multi/model"
@@ -38,14 +41,17 @@ func NewBackend(consoleAddr string) *Backend {
 		},
 	}
 
+	interceptor := connect.WithInterceptors(otelconnect.NewInterceptor())
+	consoleUri := fmt.Sprintf("%s/grpc", consoleAddr)
+
 	return &Backend{
 		Sessions:     make(map[string]*model.Session),
 		PacketLogger: slog.New(packetlogger.New(os.Stderr, &packetlogger.Options{Level: slog.LevelDebug})),
 
-		CharacterClient: multiv1connect.NewCharacterServiceClient(httpClient, consoleAddr),
-		GameClient:      multiv1connect.NewGameServiceClient(httpClient, consoleAddr),
-		UserClient:      multiv1connect.NewUserServiceClient(httpClient, consoleAddr),
-		RankingClient:   multiv1connect.NewRankingServiceClient(httpClient, consoleAddr),
+		CharacterClient: multiv1connect.NewCharacterServiceClient(httpClient, consoleUri, interceptor),
+		GameClient:      multiv1connect.NewGameServiceClient(httpClient, consoleUri, interceptor),
+		UserClient:      multiv1connect.NewUserServiceClient(httpClient, consoleUri, interceptor),
+		RankingClient:   multiv1connect.NewRankingServiceClient(httpClient, consoleUri, interceptor),
 	}
 }
 
