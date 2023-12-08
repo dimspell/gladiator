@@ -1,11 +1,10 @@
 package backend
 
 import (
-	"context"
-	"database/sql"
 	"testing"
 
-	"github.com/dispel-re/dispel-multi/internal/database"
+	"connectrpc.com/connect"
+	v1 "github.com/dispel-re/dispel-multi/gen/multi/v1"
 	"github.com/dispel-re/dispel-multi/model"
 	"github.com/stretchr/testify/assert"
 )
@@ -26,8 +25,9 @@ func TestListGamesRequest(t *testing.T) {
 
 func TestBackend_HandleListGames(t *testing.T) {
 	t.Run("no games", func(t *testing.T) {
-		db := testDB(t)
-		b := &Backend{DB: db}
+		b := &Backend{GameClient: &mockGameClient{
+			ListGamesResponse: connect.NewResponse(&v1.ListGamesResponse{Games: []*v1.Game{}}),
+		}}
 		conn := &mockConn{}
 		session := &model.Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
 
@@ -38,23 +38,24 @@ func TestBackend_HandleListGames(t *testing.T) {
 	})
 
 	t.Run("with games", func(t *testing.T) {
-		db := testDB(t)
-		if _, err := db.CreateGameRoom(context.TODO(), database.CreateGameRoomParams{
-			Name:          "RoomName",
-			Password:      sql.NullString{Valid: true, String: "secret"},
-			HostIpAddress: "127.0.0.1",
-		}); err != nil {
-			t.Error(err)
-		}
-		if _, err := db.CreateGameRoom(context.TODO(), database.CreateGameRoomParams{
-			Name:          "Other",
-			Password:      sql.NullString{Valid: false},
-			HostIpAddress: "127.0.0.1",
-		}); err != nil {
-			t.Error(err)
-		}
-
-		b := &Backend{DB: db}
+		b := &Backend{GameClient: &mockGameClient{
+			ListGamesResponse: connect.NewResponse(&v1.ListGamesResponse{Games: []*v1.Game{
+				{
+					GameId:        1,
+					Name:          "RoomName",
+					Password:      "secret",
+					HostIpAddress: "127.0.0.1",
+					MapId:         2,
+				},
+				{
+					GameId:        1,
+					Name:          "Other",
+					Password:      "",
+					HostIpAddress: "127.0.0.1",
+					MapId:         5,
+				},
+			}}),
+		}}
 		conn := &mockConn{}
 		session := &model.Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
 

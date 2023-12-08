@@ -52,7 +52,7 @@ func TestCreateCharacterRequest(t *testing.T) {
 
 	// Assert
 	assert.NoError(t, err)
-	assert.Equal(t, packet[4:60], data.CharacterInfo.ToBytes())
+	assert.Equal(t, packet[4:60], data.ParsedInfo.ToBytes())
 	assert.Equal(t, "user", data.Username)
 	assert.Equal(t, "character", data.CharacterName)
 }

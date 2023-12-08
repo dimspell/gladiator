@@ -9,12 +9,14 @@ import (
 	"syscall"
 	"time"
 
+	"connectrpc.com/connect"
 	"github.com/dispel-re/dispel-multi/backend"
 	"github.com/dispel-re/dispel-multi/console/database"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 
+	"connectrpc.com/otelconnect"
 	"github.com/dispel-re/dispel-multi/gen/multi/v1/multiv1connect"
 )
 
@@ -31,11 +33,13 @@ func NewConsole(db *database.Queries, b *backend.Backend) *Console {
 }
 
 func (c *Console) Serve(ctx context.Context, consoleAddr, backendAddr string) error {
+	interceptors := connect.WithInterceptors(otelconnect.NewInterceptor())
+
 	api := http.NewServeMux()
-	api.Handle(multiv1connect.NewCharacterServiceHandler(&characterServiceServer{DB: c.DB}))
-	api.Handle(multiv1connect.NewGameServiceHandler(&gameServiceServer{DB: c.DB}))
-	api.Handle(multiv1connect.NewUserServiceHandler(&userServiceServer{DB: c.DB}))
-	api.Handle(multiv1connect.NewRankingServiceHandler(&rankingServiceServer{DB: c.DB}))
+	api.Handle(multiv1connect.NewCharacterServiceHandler(&characterServiceServer{DB: c.DB}, interceptors))
+	api.Handle(multiv1connect.NewGameServiceHandler(&gameServiceServer{DB: c.DB}, interceptors))
+	api.Handle(multiv1connect.NewUserServiceHandler(&userServiceServer{DB: c.DB}, interceptors))
+	api.Handle(multiv1connect.NewRankingServiceHandler(&rankingServiceServer{DB: c.DB}, interceptors))
 
 	mux := http.NewServeMux()
 	mux.Handle("/_health", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) }))

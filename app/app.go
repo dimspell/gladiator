@@ -7,7 +7,7 @@ import (
 	"os"
 
 	"github.com/dispel-re/dispel-multi/app/action"
-	"github.com/dispel-re/dispel-multi/internal/packetlogger"
+	"github.com/dispel-re/dispel-multi/backend/packetlogger"
 	"github.com/urfave/cli/v3"
 )
 

@@ -32,8 +32,7 @@ func TestCreateGameRequest(t *testing.T) {
 }
 
 func TestBackend_HandleCreateGame(t *testing.T) {
-	db := testDB(t)
-	b := &Backend{DB: db}
+	b := &Backend{GameClient: &mockGameClient{}}
 	conn := &mockConn{RemoteAddress: &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 12137}}
 	session := &model.Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
 
