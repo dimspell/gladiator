@@ -19,9 +19,6 @@ func (b *Backend) HandleCreateGame(session *model.Session, req CreateGameRequest
 		return fmt.Errorf("packet-28: user is not logged in")
 	}
 
-	fmt.Println(req)
-	fmt.Println(string(req))
-
 	data, err := req.Parse()
 	if err != nil {
 		return err

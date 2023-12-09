@@ -57,7 +57,7 @@ func (b *Backend) Listen(backendAddr string) {
 		// Listen for an incoming connection.
 		conn, err := l.Accept()
 		if err != nil {
-			fmt.Println("Error accepting: ", err.Error())
+			slog.Warn("Error, when accepting incoming connection", "err", err)
 			continue
 		}
 		slog.Info("Accepted connection",
