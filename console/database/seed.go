@@ -26,7 +26,7 @@ func Seed(queries *Queries) error {
 		HealthPoints:         100,
 		MagicPoints:          100,
 		ExperiencePoints:     9,
-		Money:                300,
+		Money:                300000,
 		ScorePoints:          0,
 		ClassType:            int64(model.ClassTypeArcher),
 		SkinCarnation:        int64(model.SkinCarnationMaleBrown),
