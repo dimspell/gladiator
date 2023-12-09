@@ -74,5 +74,5 @@ func TestAuthorizationHandshakeRequest(t *testing.T) {
 	// Assert
 	assert.NoError(t, err)
 	assert.Equal(t, "68XIPSID", data.AuthKey)
-	assert.Equal(t, uint32(3), data.UnknownCounter)
+	assert.Equal(t, uint32(3), data.VersionNumber)
 }

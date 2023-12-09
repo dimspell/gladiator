@@ -43,8 +43,8 @@ type AuthorizationHandshakeRequestData struct {
 	// Authorization key. Normally it should be equal to "68XIPSID".
 	AuthKey string
 
-	// TODO: Recognise what kind of integer does it store. It seems to be always equal to 3.
-	UnknownCounter uint32
+	// It seems to be always equal to 3.
+	VersionNumber uint32
 }
 
 // Parse extract data from the command packet.
@@ -54,6 +54,6 @@ func (r AuthorizationHandshakeRequest) Parse() (data AuthorizationHandshakeReque
 	}
 
 	data.AuthKey = string(r[:8])
-	data.UnknownCounter = binary.LittleEndian.Uint32(r[8:12])
+	data.VersionNumber = binary.LittleEndian.Uint32(r[8:12])
 	return data, err
 }
