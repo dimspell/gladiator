@@ -127,14 +127,17 @@ func (s *characterServiceServer) GetCharacter(ctx context.Context, req *connect.
 		Unknown:              kills,
 	}
 
+	inventory, _ := base64.StdEncoding.DecodeString(character.Inventory.String)
+	spells, _ := base64.StdEncoding.DecodeString(character.Spells.String)
+
 	resp := connect.NewResponse(&multiv1.GetCharacterResponse{
 		Character: &multiv1.Character{
 			UserId:        character.UserID,
 			CharacterId:   character.ID,
 			CharacterName: character.CharacterName,
 			Stats:         info.ToBytes(),
-			Inventory:     []byte(character.Inventory.String),
-			Spells:        []byte(character.Spells.String),
+			Inventory:     inventory,
+			Spells:        spells,
 		},
 	})
 	return resp, nil
