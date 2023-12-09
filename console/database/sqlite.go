@@ -7,6 +7,7 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/sqlite"
@@ -23,6 +24,8 @@ type SQLite struct {
 }
 
 func NewMemory() (*SQLite, error) {
+	slog.Debug("Creating new in-memory SQLite database")
+
 	conn, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		return nil, err
@@ -46,6 +49,7 @@ func NewLocal(pathToDatabase string) (*SQLite, error) {
 		"_pragma=temp_store(MEMORY)&" +
 		"_pragma=cache_size(-16000)"
 	uri := fmt.Sprintf("%s?%s", pathToDatabase, pragmas)
+	slog.Debug("Creating new local SQLite database", "uri", uri)
 
 	conn, err := sql.Open("sqlite", uri)
 	if err != nil {
@@ -77,7 +81,7 @@ func Migrate(conn *sql.DB) error {
 	}
 
 	// Migrate
-	_ = m.Down()
+	// _ = m.Down()
 
 	if err := m.Up(); err != nil {
 		if errors.Is(err, migrate.ErrNoChange) {

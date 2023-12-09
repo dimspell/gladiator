@@ -1,6 +1,8 @@
 package action
 
 import (
+	"fmt"
+
 	"github.com/dispel-re/dispel-multi/backend"
 	"github.com/dispel-re/dispel-multi/console"
 	"github.com/dispel-re/dispel-multi/console/database"
@@ -33,8 +35,8 @@ func ServeCommand() *cli.Command {
 				Usage: "Database type (memory, sqlite)",
 			},
 			&cli.StringFlag{
-				Name:  "sqlite-addr",
-				Value: "dispel-multi-db.sqlite",
+				Name:  "sqlite-path",
+				Value: "dispel-multi.sqlite",
 				Usage: "Path to sqlite database file",
 			},
 		},
@@ -44,13 +46,25 @@ func ServeCommand() *cli.Command {
 		consoleAddr := c.String("console-addr")
 		backendAddr := c.String("backend-addr")
 
-		// TODO: Use database-type flag and choose the database
-		// db := memory.NewMemory()
-		// db, err := database.NewLocal("database.sqlite")
-		db, err := database.NewMemory()
-		if err != nil {
-			return err
+		var (
+			db  *database.SQLite
+			err error
+		)
+		switch c.String("database-type") {
+		case "memory":
+			db, err = database.NewMemory()
+			if err != nil {
+				return err
+			}
+		case "sqlite":
+			db, err = database.NewLocal(c.String("sqlite-path"))
+			if err != nil {
+				return err
+			}
+		default:
+			return fmt.Errorf("unknown database type: %q", c.String("database-type"))
 		}
+
 		queries, err := db.Queries()
 		if err != nil {
 			return err
