@@ -411,3 +411,9 @@ package memory
 // 		},
 // 	}
 // }
+
+// magic spells on the start
+// mage: [ 2 2 2 2 1 2 2 1 1 1 2 1 1 2 1 1 2 1 1 1 1 1 1 2 1 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0] // infravision + cure + heal other + healing + magic arrow + firebolt + lighting + bless + lightorb + curse + darkorb
+// arch: [ 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0] // windy armour
+// knig: [ 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 1 1 1 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0] // divine armour + turnundead
+// warr: [ 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 1 1 1 1 1 1 1 1 1 1 0 0] // concentration
