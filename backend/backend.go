@@ -42,7 +42,7 @@ func NewBackend(consoleAddr string) *Backend {
 	}
 
 	interceptor := connect.WithInterceptors(otelconnect.NewInterceptor())
-	consoleUri := fmt.Sprintf("%s/grpc", consoleAddr)
+	consoleUri := fmt.Sprintf("http://%s/grpc", consoleAddr)
 
 	return &Backend{
 		Sessions:     make(map[string]*model.Session),

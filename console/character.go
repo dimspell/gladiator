@@ -197,7 +197,7 @@ func (s *characterServiceServer) CreateCharacter(ctx context.Context, req *conne
 
 func (s *characterServiceServer) PutStats(ctx context.Context, req *connect.Request[multiv1.PutStatsRequest]) (*connect.Response[multiv1.PutStatsResponse], error) {
 	info := model.ParseCharacterInfo(req.Msg.Stats)
-	_, err := s.DB.CreateCharacter(ctx, database.CreateCharacterParams{
+	err := s.DB.UpdateCharacterStats(ctx, database.UpdateCharacterStatsParams{
 		Strength:             int64(info.Strength),
 		Agility:              int64(info.Agility),
 		Wisdom:               int64(info.Wisdom),
@@ -231,7 +231,6 @@ func (s *characterServiceServer) PutStats(ctx context.Context, req *connect.Requ
 		Unknown:              sql.NullString{String: base64.StdEncoding.EncodeToString(info.Unknown), Valid: len(info.Unknown) > 0},
 		CharacterName:        req.Msg.CharacterName,
 		UserID:               req.Msg.UserId,
-		SortOrder:            0,
 	})
 	if err != nil {
 		return nil, err
