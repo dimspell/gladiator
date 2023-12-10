@@ -11,6 +11,7 @@ serve:
 tools-install:
 	go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
 	go install -tags sqlite github.com/golang-migrate/migrate/v4/cmd/migrate@latest
+	brew install bufbuild/buf/buf
 
 gen-sqlc:
 	sqlc generate
