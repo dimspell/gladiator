@@ -3,11 +3,30 @@ import { invoke } from '@tauri-apps/api/tauri'
 import './App.css'
 import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 import Home from './pages/Home/Home'
+import HostServer from './pages/HostServer/HostServer'
+import JoinServer from './pages/JoinServer/JoinServer'
+import ErrorPage from './pages/ErrorPage'
 
 const router = createBrowserRouter([
   {
     path: '/',
     element: <Home />,
+    errorElement: <ErrorPage />,
+  },
+  {
+    path: '/host-server',
+    element: <HostServer />,
+    errorElement: <ErrorPage />,
+  },
+  {
+    path: '/join-server',
+    element: <JoinServer />,
+    errorElement: <ErrorPage />,
+  },
+  {
+    path: '/home',
+    element: <Home />,
+    errorElement: <ErrorPage />,
   },
 ])
 
