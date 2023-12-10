@@ -8,6 +8,12 @@ mig_version ?= VERSION
 serve:
 	go run ./ serve --backend-addr=127.0.0.1:6112 --console-addr=127.0.0.1:2137
 
+console:
+	go run ./ console --console-addr=127.0.0.1:2137
+
+backend:
+	go run ./ backend --backend-addr=127.0.0.1:6112 --console-addr=127.0.0.1:2137
+
 tools-install:
 	go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
 	go install -tags sqlite github.com/golang-migrate/migrate/v4/cmd/migrate@latest
