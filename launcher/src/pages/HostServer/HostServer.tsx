@@ -3,7 +3,10 @@ import CardLayout from '../../components/CardLayout'
 function HostServer() {
   return (
     <CardLayout>
-      <p className='text-gray-100'>Host a Server</p>
+      <h2 className='text-gray-100'>Host a Server</h2>
+      <p>
+
+      </p>
     </CardLayout>
   )
 }

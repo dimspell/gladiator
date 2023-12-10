@@ -1,6 +1,4 @@
-import { ReactElement } from 'react'
-
-function CardLayout({ children }: {children: ReactElement}) {
+function CardLayout({ children }: {children: any}) {
   return (
     <div className='relative flex min-h-screen flex-col justify-center overflow-hidden bg-gray-700 py-6 sm:py-12'>
       <div

@@ -7,13 +7,13 @@ function Home() {
       <div className='divide-y divide-gray-700/50'>
         <div className='space-y-6 py-8 text-base leading-7 text-gray-300'>
           <h2 className='font-bold text-gray-100'>Greetings, brave adventurer!</h2>
-          <p className='text-gray-100 leading-'>
+          <p className='text-gray-100'>
             Whether you're stepping into the mystical realms of Dman for the first time or returning for another
             epic journey, we're thrilled to have you here. Prepare yourself for a world of magic, challenges, and
             camaraderie.
           </p>
           <h2 className='font-bold text-gray-100'>Ready to Begin Your Journey?</h2>
-          <p className='text-gray-100 leading-'>
+          <p className='text-gray-100'>
             Follow the wizard to host your very own server or choose an existing server to join forces and forge
             alliances as you embark on quests together.
           </p>
