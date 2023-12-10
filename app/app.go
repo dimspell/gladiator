@@ -3,11 +3,9 @@ package app
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"os"
 
 	"github.com/dispel-re/dispel-multi/app/action"
-	"github.com/dispel-re/dispel-multi/backend/packetlogger"
 	"github.com/urfave/cli/v3"
 )
 
@@ -71,19 +69,9 @@ func NewApp(version, commit, buildDate string) {
 
 	// Assign commands
 	app.Commands = append(app.Commands,
-		action.ServeCommand(),
 		action.ConsoleCommand(),
-		&cli.Command{
-			Name: "tester",
-			Action: func(c *cli.Context) error {
-				logger := slog.New(packetlogger.New(os.Stderr, &packetlogger.Options{Level: slog.LevelDebug}))
-
-				byteArray := make([]byte, 20)
-				logger.Debug("Hello, world!", "bytes", byteArray)
-
-				return nil
-			},
-		},
+		action.BackendCommand(),
+		action.ServeCommand(),
 	)
 
 	// Start the app

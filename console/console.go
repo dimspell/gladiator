@@ -52,16 +52,20 @@ func (c *Console) Serve(ctx context.Context, consoleAddr, backendAddr string) er
 	}
 
 	start := func() error {
-		go func() {
-			c.Backend.Listen(backendAddr)
-		}()
+		if c.Backend != nil {
+			go func() {
+				c.Backend.Listen(backendAddr)
+			}()
+		}
 
 		// TODO: Set readiness, startup, liveness probe
 		return server.ListenAndServe()
 	}
 
 	stop := func(ctx context.Context) error {
-		c.Backend.Shutdown(ctx)
+		if c.Backend != nil {
+			c.Backend.Shutdown(ctx)
+		}
 
 		return server.Shutdown(ctx)
 	}
