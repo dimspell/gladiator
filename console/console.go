@@ -2,6 +2,7 @@ package console
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"os"
@@ -44,6 +45,17 @@ func (c *Console) Serve(ctx context.Context, consoleAddr, backendAddr string) er
 	mux := http.NewServeMux()
 	mux.Handle("/_health", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) }))
 	mux.Handle("/_metrics", promhttp.Handler())
+	mux.Handle("/.well-known/dispel-multi.json", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		type response struct {
+			ZeroTier struct {
+				Enabled bool `json:"enabled"`
+			} `json:"zeroTier"`
+		}
+		resp := response{}
+		resp.ZeroTier.Enabled = false
+		document, _ := json.Marshal(resp)
+		w.Write(document)
+	}))
 	mux.Handle("/grpc/", http.StripPrefix("/grpc", api))
 
 	server := &http.Server{
