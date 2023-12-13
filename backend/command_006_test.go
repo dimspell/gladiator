@@ -64,7 +64,7 @@ func TestAuthorizationHandshakeRequest(t *testing.T) {
 		255, 6, // Command code
 		16, 0, // Packet length
 		54, 56, 88, 73, 80, 83, 73, 68, // "68XIPSID"
-		3, 0, 0, 0, // Unknown counter
+		3, 0, 0, 0, // Probably a version number
 	}
 
 	// Act
