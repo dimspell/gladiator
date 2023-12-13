@@ -37,12 +37,19 @@ func TestParseCharacterInfo(t *testing.T) {
 		100,  // Unknown slot
 		0,    // Gender
 		1,    // Character level
-		1, 0, // Edged weapons
-		2, 0, // Blunted weapons
-		1, 0, // Archery
-		1, 0, // Polearms
-		1, 0, // Wizardry
-		0, 0, 0, 0, 0, 0, // Unknown
+		1,    // Edged weapons stat
+		0,    // Edged weapons kills (remainder of 100)
+		2,    // Blunted weapons stat
+		0,    // Blunted weapons kills (remainder of 100)
+		1,    // Archery stat
+		0,    // Archery kills (remainder of 100)
+		1,    // Polearms stat
+		0,    // Polearms kills (remainder of 100)
+		1,    // Wizardry stat
+		0,    // Wizardry kills (remainder of 100)
+		0, 0, // Holy Magic (unused)
+		0, 0, // Dark Magic (unused)
+		0, 0, // Bonus points
 		117, 115, 101, 114, 0, // Username
 		99, 104, 97, 114, 97, 99, 116, 101, 114, 0, // Character name
 	}
@@ -81,7 +88,9 @@ func TestParseCharacterInfo(t *testing.T) {
 	assert.Equal(t, uint16(1), info.Archery)
 	assert.Equal(t, uint16(1), info.Polearms)
 	assert.Equal(t, uint16(1), info.Wizardry)
-	assert.Equal(t, []byte{0, 0, 0, 0, 0, 0}, info.Unknown)
+	assert.Equal(t, uint16(0), info.HolyMagic)
+	assert.Equal(t, uint16(0), info.DarkMagic)
+	assert.Equal(t, uint16(0), info.BonusPoints)
 	assert.True(t, bytes.Equal(packet[4:60], info.ToBytes()))
 }
 
@@ -118,7 +127,7 @@ func BenchmarkCharacterInfo_ToBytes(b *testing.B) {
 		Archery:              1,
 		Polearms:             1,
 		Wizardry:             1,
-		Unknown:              []byte{0, 0, 0, 0, 0, 0},
+		BonusPoints:          0,
 	}
 	b.StartTimer()
 
