@@ -11,15 +11,17 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"connectrpc.com/otelconnect"
 	"github.com/dispel-re/dispel-multi/backend"
 	"github.com/dispel-re/dispel-multi/console/database"
+	"github.com/dispel-re/dispel-multi/gen/multi/v1/multiv1connect"
 	"github.com/dispel-re/dispel-multi/model"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/riandyrn/otelchi"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
-
-	"connectrpc.com/otelconnect"
-	"github.com/dispel-re/dispel-multi/gen/multi/v1/multiv1connect"
 )
 
 type Console struct {
@@ -35,25 +37,34 @@ func NewConsole(db *database.Queries, b *backend.Backend) *Console {
 }
 
 func (c *Console) Serve(ctx context.Context, consoleAddr, backendAddr string) error {
-	interceptors := connect.WithInterceptors(otelconnect.NewInterceptor())
+	mux := chi.NewRouter()
 
-	api := http.NewServeMux()
-	api.Handle(multiv1connect.NewCharacterServiceHandler(&characterServiceServer{DB: c.DB}, interceptors))
-	api.Handle(multiv1connect.NewGameServiceHandler(&gameServiceServer{DB: c.DB}, interceptors))
-	api.Handle(multiv1connect.NewUserServiceHandler(&userServiceServer{DB: c.DB}, interceptors))
-	api.Handle(multiv1connect.NewRankingServiceHandler(&rankingServiceServer{DB: c.DB}, interceptors))
-
-	mux := http.NewServeMux()
-	mux.Handle("/_health", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) }))
-	mux.Handle("/_metrics", promhttp.Handler())
-	mux.Handle("/.well-known/dispel-multi.json", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mux.Get("/_health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("."))
+	})
+	mux.Get("/_metrics", promhttp.Handler().ServeHTTP)
+	mux.Get("/.well-known/dispel-multi.json", func(w http.ResponseWriter, r *http.Request) {
 		resp := model.WellKnown{ZeroTier: model.ZeroTier{
 			Enabled: false,
 		}}
 		document, _ := json.Marshal(resp)
 		w.Write(document)
-	}))
-	mux.Handle("/grpc/", http.StripPrefix("/grpc", api))
+	})
+
+	interceptors := connect.WithInterceptors(otelconnect.NewInterceptor())
+	mux.Route("/grpc", func(r chi.Router) {
+		r.Use(middleware.Timeout(5 * time.Second))
+
+		r.Handle(multiv1connect.NewCharacterServiceHandler(&characterServiceServer{DB: c.DB}, interceptors))
+		r.Handle(multiv1connect.NewGameServiceHandler(&gameServiceServer{DB: c.DB}, interceptors))
+		r.Handle(multiv1connect.NewUserServiceHandler(&userServiceServer{DB: c.DB}, interceptors))
+		r.Handle(multiv1connect.NewRankingServiceHandler(&rankingServiceServer{DB: c.DB}, interceptors))
+	})
+
+	mux.Use(middleware.Recoverer)
+	mux.Use(middleware.Throttle(100))
+	mux.Use(otelchi.Middleware("console", otelchi.WithChiRoutes(mux)))
 
 	server := &http.Server{
 		Addr:    consoleAddr,
