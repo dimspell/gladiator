@@ -13,6 +13,7 @@ import (
 	"connectrpc.com/connect"
 	"github.com/dispel-re/dispel-multi/backend"
 	"github.com/dispel-re/dispel-multi/console/database"
+	"github.com/dispel-re/dispel-multi/model"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
@@ -46,13 +47,9 @@ func (c *Console) Serve(ctx context.Context, consoleAddr, backendAddr string) er
 	mux.Handle("/_health", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) }))
 	mux.Handle("/_metrics", promhttp.Handler())
 	mux.Handle("/.well-known/dispel-multi.json", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		type response struct {
-			ZeroTier struct {
-				Enabled bool `json:"enabled"`
-			} `json:"zeroTier"`
-		}
-		resp := response{}
-		resp.ZeroTier.Enabled = false
+		resp := model.WellKnown{ZeroTier: model.ZeroTier{
+			Enabled: false,
+		}}
 		document, _ := json.Marshal(resp)
 		w.Write(document)
 	}))
