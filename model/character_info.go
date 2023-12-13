@@ -30,15 +30,14 @@ type CharacterInfo struct {
 	UnknownEquipmentSlot EquipmentSlot // Unknown
 	Gender               Gender
 	Level                byte
-	EdgedWeapons         uint16
-	BluntedWeapons       uint16
-	Archery              uint16
-	Polearms             uint16
-	Wizardry             uint16
-	Unknown              []byte
-	// HolyMagic            uint16
-	// DarkMagic            uint16
-	// BonusPoints          uint16
+	EdgedWeapons         uint16 // First byte is stat, the next one is number of kills
+	BluntedWeapons       uint16 // After advancing to 100 kills, the stat is increased
+	Archery              uint16 // by one point.
+	Polearms             uint16 // All stats (EdgedWeapons, BluntedWeapons, Archery, Polearms, Wizardry)
+	Wizardry             uint16 // start from 1 point.
+	HolyMagic            uint16 // Unused
+	DarkMagic            uint16 // Unused
+	BonusPoints          uint16
 }
 
 func ParseCharacterInfo(buf []byte) CharacterInfo {
@@ -73,7 +72,9 @@ func ParseCharacterInfo(buf []byte) CharacterInfo {
 		Archery:              binary.LittleEndian.Uint16(buf[44:46]),
 		Polearms:             binary.LittleEndian.Uint16(buf[46:48]),
 		Wizardry:             binary.LittleEndian.Uint16(buf[48:50]),
-		Unknown:              buf[50:56],
+		HolyMagic:            binary.LittleEndian.Uint16(buf[50:52]),
+		DarkMagic:            binary.LittleEndian.Uint16(buf[52:54]),
+		BonusPoints:          binary.LittleEndian.Uint16(buf[54:56]),
 	}
 }
 
@@ -114,8 +115,10 @@ func (c *CharacterInfo) ToBytes() []byte {
 	binary.LittleEndian.PutUint16(buf[44:46], c.Archery)
 	binary.LittleEndian.PutUint16(buf[46:48], c.Polearms)
 	binary.LittleEndian.PutUint16(buf[48:50], c.Wizardry)
+	binary.LittleEndian.PutUint16(buf[50:52], c.HolyMagic)
+	binary.LittleEndian.PutUint16(buf[52:54], c.DarkMagic)
+	binary.LittleEndian.PutUint16(buf[54:56], c.BonusPoints)
 
-	copy(buf[50:], c.Unknown)
 	return buf
 }
 

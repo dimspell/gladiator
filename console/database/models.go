@@ -12,7 +12,6 @@ type Character struct {
 	ID                   int64
 	UserID               int64
 	CharacterName        string
-	SortOrder            int64
 	Strength             int64
 	Agility              int64
 	Wisdom               int64
@@ -43,7 +42,9 @@ type Character struct {
 	Archery              int64
 	Polearms             int64
 	Wizardry             int64
-	Unknown              sql.NullString
+	HolyMagic            int64
+	DarkMagic            int64
+	BonusPoints          int64
 	Inventory            sql.NullString
 	Spells               sql.NullString
 }

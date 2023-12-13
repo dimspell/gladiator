@@ -18,8 +18,7 @@ RETURNING *;
 -- name: ListCharacters :many
 SELECT *
 FROM characters
-WHERE user_id = ?
-ORDER BY sort_order;
+WHERE user_id = ?;
 
 -- name: FindCharacter :one
 SELECT *
@@ -58,11 +57,12 @@ INSERT INTO characters (strength,
                         archery,
                         polearms,
                         wizardry,
-                        unknown,
+                        holy_magic,
+                        dark_magic,
+                        bonus_points,
                         character_name,
-                        user_id,
-                        sort_order)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        user_id)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 RETURNING *;
 
 -- name: UpdateCharacterStats :exec
@@ -97,7 +97,9 @@ SET strength               = ?,
     archery                = ?,
     polearms               = ?,
     wizardry               = ?,
-    unknown                = ?
+    holy_magic             = ?,
+    dark_magic             = ?,
+    bonus_points           = ?
 WHERE character_name = ?
   AND user_id = ?;
 

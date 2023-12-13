@@ -31,7 +31,6 @@ func (s *characterServiceServer) ListCharacters(ctx context.Context, req *connec
 
 	chars := make([]*multiv1.Character, len(characters))
 	for i, character := range characters {
-		kills, _ := base64.StdEncoding.DecodeString(character.Unknown.String)
 		info := model.CharacterInfo{
 			Strength:             uint16(character.Strength),
 			Agility:              uint16(character.Agility),
@@ -63,7 +62,9 @@ func (s *characterServiceServer) ListCharacters(ctx context.Context, req *connec
 			Archery:              uint16(character.Archery),
 			Polearms:             uint16(character.Polearms),
 			Wizardry:             uint16(character.Wizardry),
-			Unknown:              kills,
+			HolyMagic:            uint16(character.HolyMagic),
+			DarkMagic:            uint16(character.DarkMagic),
+			BonusPoints:          uint16(character.BonusPoints),
 		}
 
 		inventory, _ := base64.StdEncoding.DecodeString(character.Inventory.String)
@@ -92,7 +93,6 @@ func (s *characterServiceServer) GetCharacter(ctx context.Context, req *connect.
 		return nil, err
 	}
 
-	kills, _ := base64.StdEncoding.DecodeString(character.Unknown.String)
 	info := model.CharacterInfo{
 		Strength:             uint16(character.Strength),
 		Agility:              uint16(character.Agility),
@@ -124,7 +124,9 @@ func (s *characterServiceServer) GetCharacter(ctx context.Context, req *connect.
 		Archery:              uint16(character.Archery),
 		Polearms:             uint16(character.Polearms),
 		Wizardry:             uint16(character.Wizardry),
-		Unknown:              kills,
+		HolyMagic:            uint16(character.HolyMagic),
+		DarkMagic:            uint16(character.DarkMagic),
+		BonusPoints:          uint16(character.BonusPoints),
 	}
 
 	inventory, _ := base64.StdEncoding.DecodeString(character.Inventory.String)
@@ -176,10 +178,11 @@ func (s *characterServiceServer) CreateCharacter(ctx context.Context, req *conne
 		Archery:              int64(info.Archery),
 		Polearms:             int64(info.Polearms),
 		Wizardry:             int64(info.Wizardry),
-		Unknown:              sql.NullString{String: base64.StdEncoding.EncodeToString(info.Unknown), Valid: len(info.Unknown) > 0},
+		HolyMagic:            int64(info.HolyMagic),
+		DarkMagic:            int64(info.DarkMagic),
+		BonusPoints:          int64(info.BonusPoints),
 		CharacterName:        req.Msg.CharacterName,
 		UserID:               req.Msg.UserId,
-		SortOrder:            0,
 	})
 	if err != nil {
 		return nil, err
@@ -231,7 +234,9 @@ func (s *characterServiceServer) PutStats(ctx context.Context, req *connect.Requ
 		Archery:              int64(info.Archery),
 		Polearms:             int64(info.Polearms),
 		Wizardry:             int64(info.Wizardry),
-		Unknown:              sql.NullString{String: base64.StdEncoding.EncodeToString(info.Unknown), Valid: len(info.Unknown) > 0},
+		HolyMagic:            int64(info.HolyMagic),
+		DarkMagic:            int64(info.DarkMagic),
+		BonusPoints:          int64(info.BonusPoints),
 		CharacterName:        req.Msg.CharacterName,
 		UserID:               req.Msg.UserId,
 	})

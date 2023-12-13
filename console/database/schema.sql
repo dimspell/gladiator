@@ -10,7 +10,6 @@ CREATE TABLE characters
     id                     INTEGER PRIMARY KEY,
     user_id                INTEGER NOT NULL,
     character_name         TEXT    NOT NULL,
-    sort_order             INTEGER NOT NULL,
 
     strength               INTEGER NOT NULL,
     agility                INTEGER NOT NULL,
@@ -42,7 +41,9 @@ CREATE TABLE characters
     archery                INTEGER NOT NULL,
     polearms               INTEGER NOT NULL,
     wizardry               INTEGER NOT NULL,
-    unknown                TEXT,
+    holy_magic             INTEGER NOT NULL,
+    dark_magic             INTEGER NOT NULL,
+    bonus_points           INTEGER NOT NULL,
 
     inventory              TEXT,
     spells                 TEXT

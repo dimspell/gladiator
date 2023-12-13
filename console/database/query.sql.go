@@ -57,12 +57,13 @@ INSERT INTO characters (strength,
                         archery,
                         polearms,
                         wizardry,
-                        unknown,
+                        holy_magic,
+                        dark_magic,
+                        bonus_points,
                         character_name,
-                        user_id,
-                        sort_order)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-RETURNING id, user_id, character_name, sort_order, strength, agility, wisdom, constitution, health_points, magic_points, experience_points, money, score_points, class_type, skin_carnation, hair_style, light_armour_legs, light_armour_torso, light_armour_hands, light_armour_boots, full_armour, armour_emblem, helmet, secondary_weapon, primary_weapon, shield, unknown_equipment_slot, gender, level, edged_weapons, blunted_weapons, archery, polearms, wizardry, unknown, inventory, spells
+                        user_id)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+RETURNING id, user_id, character_name, strength, agility, wisdom, constitution, health_points, magic_points, experience_points, money, score_points, class_type, skin_carnation, hair_style, light_armour_legs, light_armour_torso, light_armour_hands, light_armour_boots, full_armour, armour_emblem, helmet, secondary_weapon, primary_weapon, shield, unknown_equipment_slot, gender, level, edged_weapons, blunted_weapons, archery, polearms, wizardry, holy_magic, dark_magic, bonus_points, inventory, spells
 `
 
 type CreateCharacterParams struct {
@@ -96,10 +97,11 @@ type CreateCharacterParams struct {
 	Archery              int64
 	Polearms             int64
 	Wizardry             int64
-	Unknown              sql.NullString
+	HolyMagic            int64
+	DarkMagic            int64
+	BonusPoints          int64
 	CharacterName        string
 	UserID               int64
-	SortOrder            int64
 }
 
 func (q *Queries) CreateCharacter(ctx context.Context, arg CreateCharacterParams) (Character, error) {
@@ -134,17 +136,17 @@ func (q *Queries) CreateCharacter(ctx context.Context, arg CreateCharacterParams
 		arg.Archery,
 		arg.Polearms,
 		arg.Wizardry,
-		arg.Unknown,
+		arg.HolyMagic,
+		arg.DarkMagic,
+		arg.BonusPoints,
 		arg.CharacterName,
 		arg.UserID,
-		arg.SortOrder,
 	)
 	var i Character
 	err := row.Scan(
 		&i.ID,
 		&i.UserID,
 		&i.CharacterName,
-		&i.SortOrder,
 		&i.Strength,
 		&i.Agility,
 		&i.Wisdom,
@@ -175,7 +177,9 @@ func (q *Queries) CreateCharacter(ctx context.Context, arg CreateCharacterParams
 		&i.Archery,
 		&i.Polearms,
 		&i.Wizardry,
-		&i.Unknown,
+		&i.HolyMagic,
+		&i.DarkMagic,
+		&i.BonusPoints,
 		&i.Inventory,
 		&i.Spells,
 	)
@@ -249,7 +253,7 @@ func (q *Queries) DeleteCharacter(ctx context.Context, arg DeleteCharacterParams
 }
 
 const findCharacter = `-- name: FindCharacter :one
-SELECT id, user_id, character_name, sort_order, strength, agility, wisdom, constitution, health_points, magic_points, experience_points, money, score_points, class_type, skin_carnation, hair_style, light_armour_legs, light_armour_torso, light_armour_hands, light_armour_boots, full_armour, armour_emblem, helmet, secondary_weapon, primary_weapon, shield, unknown_equipment_slot, gender, level, edged_weapons, blunted_weapons, archery, polearms, wizardry, unknown, inventory, spells
+SELECT id, user_id, character_name, strength, agility, wisdom, constitution, health_points, magic_points, experience_points, money, score_points, class_type, skin_carnation, hair_style, light_armour_legs, light_armour_torso, light_armour_hands, light_armour_boots, full_armour, armour_emblem, helmet, secondary_weapon, primary_weapon, shield, unknown_equipment_slot, gender, level, edged_weapons, blunted_weapons, archery, polearms, wizardry, holy_magic, dark_magic, bonus_points, inventory, spells
 FROM characters
 WHERE character_name = ?
   AND user_id = ?
@@ -267,7 +271,6 @@ func (q *Queries) FindCharacter(ctx context.Context, arg FindCharacterParams) (C
 		&i.ID,
 		&i.UserID,
 		&i.CharacterName,
-		&i.SortOrder,
 		&i.Strength,
 		&i.Agility,
 		&i.Wisdom,
@@ -298,7 +301,9 @@ func (q *Queries) FindCharacter(ctx context.Context, arg FindCharacterParams) (C
 		&i.Archery,
 		&i.Polearms,
 		&i.Wizardry,
-		&i.Unknown,
+		&i.HolyMagic,
+		&i.DarkMagic,
+		&i.BonusPoints,
 		&i.Inventory,
 		&i.Spells,
 	)
@@ -434,10 +439,9 @@ func (q *Queries) GetUserByName(ctx context.Context, username string) (User, err
 }
 
 const listCharacters = `-- name: ListCharacters :many
-SELECT id, user_id, character_name, sort_order, strength, agility, wisdom, constitution, health_points, magic_points, experience_points, money, score_points, class_type, skin_carnation, hair_style, light_armour_legs, light_armour_torso, light_armour_hands, light_armour_boots, full_armour, armour_emblem, helmet, secondary_weapon, primary_weapon, shield, unknown_equipment_slot, gender, level, edged_weapons, blunted_weapons, archery, polearms, wizardry, unknown, inventory, spells
+SELECT id, user_id, character_name, strength, agility, wisdom, constitution, health_points, magic_points, experience_points, money, score_points, class_type, skin_carnation, hair_style, light_armour_legs, light_armour_torso, light_armour_hands, light_armour_boots, full_armour, armour_emblem, helmet, secondary_weapon, primary_weapon, shield, unknown_equipment_slot, gender, level, edged_weapons, blunted_weapons, archery, polearms, wizardry, holy_magic, dark_magic, bonus_points, inventory, spells
 FROM characters
 WHERE user_id = ?
-ORDER BY sort_order
 `
 
 func (q *Queries) ListCharacters(ctx context.Context, userID int64) ([]Character, error) {
@@ -453,7 +457,6 @@ func (q *Queries) ListCharacters(ctx context.Context, userID int64) ([]Character
 			&i.ID,
 			&i.UserID,
 			&i.CharacterName,
-			&i.SortOrder,
 			&i.Strength,
 			&i.Agility,
 			&i.Wisdom,
@@ -484,7 +487,9 @@ func (q *Queries) ListCharacters(ctx context.Context, userID int64) ([]Character
 			&i.Archery,
 			&i.Polearms,
 			&i.Wizardry,
-			&i.Unknown,
+			&i.HolyMagic,
+			&i.DarkMagic,
+			&i.BonusPoints,
 			&i.Inventory,
 			&i.Spells,
 		); err != nil {
@@ -655,7 +660,9 @@ SET strength               = ?,
     archery                = ?,
     polearms               = ?,
     wizardry               = ?,
-    unknown                = ?
+    holy_magic             = ?,
+    dark_magic             = ?,
+    bonus_points           = ?
 WHERE character_name = ?
   AND user_id = ?
 `
@@ -691,7 +698,9 @@ type UpdateCharacterStatsParams struct {
 	Archery              int64
 	Polearms             int64
 	Wizardry             int64
-	Unknown              sql.NullString
+	HolyMagic            int64
+	DarkMagic            int64
+	BonusPoints          int64
 	CharacterName        string
 	UserID               int64
 }
@@ -728,7 +737,9 @@ func (q *Queries) UpdateCharacterStats(ctx context.Context, arg UpdateCharacterS
 		arg.Archery,
 		arg.Polearms,
 		arg.Wizardry,
-		arg.Unknown,
+		arg.HolyMagic,
+		arg.DarkMagic,
+		arg.BonusPoints,
 		arg.CharacterName,
 		arg.UserID,
 	)

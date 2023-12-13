@@ -2,7 +2,6 @@ package database
 
 import (
 	"context"
-	"database/sql"
 
 	"github.com/dispel-re/dispel-multi/model"
 	"golang.org/x/crypto/bcrypt"
@@ -49,10 +48,9 @@ func Seed(queries *Queries) error {
 		Archery:              1,
 		Polearms:             1,
 		Wizardry:             1,
-		Unknown:              sql.NullString{Valid: true, String: "\x00\x00\x00\x00\x00\x00"},
+		BonusPoints:          10,
 		CharacterName:        "tester",
 		UserID:               user.ID,
-		SortOrder:            0,
 	})
 	if err != nil {
 		return err
@@ -97,10 +95,9 @@ func Seed(queries *Queries) error {
 		Archery:              1,
 		Polearms:             1,
 		Wizardry:             1,
-		Unknown:              sql.NullString{Valid: true, String: "\x00\x00\x00\x00\x00\x00"},
+		BonusPoints:          10,
 		CharacterName:        "character",
 		UserID:               user2.ID,
-		SortOrder:            0,
 	})
 	if err != nil {
 		return err
