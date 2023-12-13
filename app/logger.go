@@ -28,20 +28,20 @@ var LogLevels = map[string]slog.Level{
 type CleanupFunc func()
 
 // initDefaultLogger initializes the default logger.
-func initDefaultLogger(ctx *cli.Context) (CleanupFunc, error) {
+func initDefaultLogger(app *cli.Command) (CleanupFunc, error) {
 	deferred := func() {
 		// noop
 	}
 
-	logLevel, ok := LogLevels[strings.ToLower(ctx.String("log-level"))]
+	logLevel, ok := LogLevels[strings.ToLower(app.String("log-level"))]
 	if !ok {
-		return deferred, fmt.Errorf("invalid log level: %s", ctx.String("log-level"))
+		return deferred, fmt.Errorf("invalid log level: %s", app.String("log-level"))
 	}
 
 	var w *os.File = os.Stderr
-	if ctx.String("log-file") != "" {
+	if app.String("log-file") != "" {
 		var err error
-		w, err = os.OpenFile(ctx.String("log-file"), os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+		w, err = os.OpenFile(app.String("log-file"), os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 		if err != nil {
 			return deferred, err
 		}
@@ -51,7 +51,7 @@ func initDefaultLogger(ctx *cli.Context) (CleanupFunc, error) {
 		}
 	}
 
-	switch strings.ToLower(ctx.String("log-format")) {
+	switch strings.ToLower(app.String("log-format")) {
 	case "text":
 		slog.SetDefault(slog.New(
 			tint.NewHandler(
@@ -59,7 +59,7 @@ func initDefaultLogger(ctx *cli.Context) (CleanupFunc, error) {
 				&tint.Options{
 					Level:      logLevel,
 					TimeFormat: time.TimeOnly,
-					NoColor:    !isatty.IsTerminal(w.Fd()) || os.Getenv("NO_COLOR") != "" || ctx.Bool("no-color"),
+					NoColor:    !isatty.IsTerminal(w.Fd()) || os.Getenv("NO_COLOR") != "" || app.Bool("no-color"),
 				},
 			),
 		))

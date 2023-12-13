@@ -18,7 +18,7 @@ import (
 // generated with a version of connect newer than the one compiled into your binary. You can fix the
 // problem by either regenerating this code with an older version of connect or updating the connect
 // version compiled into your binary.
-const _ = connect.IsAtLeastVersion0_1_0
+const _ = connect.IsAtLeastVersion1_13_0
 
 const (
 	// RankingServiceName is the fully-qualified name of the RankingService service.
@@ -36,6 +36,12 @@ const (
 	// RankingServiceGetRankingProcedure is the fully-qualified name of the RankingService's GetRanking
 	// RPC.
 	RankingServiceGetRankingProcedure = "/multi.v1.RankingService/GetRanking"
+)
+
+// These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
+var (
+	rankingServiceServiceDescriptor          = v1.File_multi_v1_ranking_proto.Services().ByName("RankingService")
+	rankingServiceGetRankingMethodDescriptor = rankingServiceServiceDescriptor.Methods().ByName("GetRanking")
 )
 
 // RankingServiceClient is a client for the multi.v1.RankingService service.
@@ -56,7 +62,8 @@ func NewRankingServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 		getRanking: connect.NewClient[v1.GetRankingRequest, v1.GetRankingResponse](
 			httpClient,
 			baseURL+RankingServiceGetRankingProcedure,
-			opts...,
+			connect.WithSchema(rankingServiceGetRankingMethodDescriptor),
+			connect.WithClientOptions(opts...),
 		),
 	}
 }
@@ -85,7 +92,8 @@ func NewRankingServiceHandler(svc RankingServiceHandler, opts ...connect.Handler
 	rankingServiceGetRankingHandler := connect.NewUnaryHandler(
 		RankingServiceGetRankingProcedure,
 		svc.GetRanking,
-		opts...,
+		connect.WithSchema(rankingServiceGetRankingMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
 	)
 	return "/multi.v1.RankingService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {

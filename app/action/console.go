@@ -1,6 +1,7 @@
 package action
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/dispel-re/dispel-multi/console"
@@ -31,8 +32,8 @@ func ConsoleCommand() *cli.Command {
 		},
 	}
 
-	cmd.Action = func(c *cli.Context) error {
-		consoleAddr := c.String("console-addr")
+	cmd.Action = func(ctx context.Context, c *cli.Command) error {
+		consoleAddr := cmd.String("console-addr")
 
 		var (
 			db  *database.SQLite
@@ -64,7 +65,7 @@ func ConsoleCommand() *cli.Command {
 
 		con := console.NewConsole(queries, nil)
 
-		return con.Serve(c.Context, consoleAddr, "")
+		return con.Serve(ctx, consoleAddr, "")
 	}
 
 	return cmd

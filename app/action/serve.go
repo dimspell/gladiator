@@ -1,6 +1,7 @@
 package action
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/dispel-re/dispel-multi/backend"
@@ -42,7 +43,7 @@ func ServeCommand() *cli.Command {
 		},
 	}
 
-	cmd.Action = func(c *cli.Context) error {
+	cmd.Action = func(ctx context.Context, c *cli.Command) error {
 		consoleAddr := c.String("console-addr")
 		backendAddr := c.String("backend-addr")
 
@@ -77,7 +78,7 @@ func ServeCommand() *cli.Command {
 		bd := backend.NewBackend(consoleAddr)
 		con := console.NewConsole(queries, bd)
 
-		return con.Serve(c.Context, consoleAddr, backendAddr)
+		return con.Serve(ctx, consoleAddr, backendAddr)
 	}
 
 	return cmd

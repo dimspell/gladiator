@@ -18,7 +18,7 @@ import (
 // generated with a version of connect newer than the one compiled into your binary. You can fix the
 // problem by either regenerating this code with an older version of connect or updating the connect
 // version compiled into your binary.
-const _ = connect.IsAtLeastVersion0_1_0
+const _ = connect.IsAtLeastVersion1_13_0
 
 const (
 	// CharacterServiceName is the fully-qualified name of the CharacterService service.
@@ -56,6 +56,18 @@ const (
 	CharacterServiceDeleteCharacterProcedure = "/multi.v1.CharacterService/DeleteCharacter"
 )
 
+// These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
+var (
+	characterServiceServiceDescriptor                     = v1.File_multi_v1_character_proto.Services().ByName("CharacterService")
+	characterServiceGetCharacterMethodDescriptor          = characterServiceServiceDescriptor.Methods().ByName("GetCharacter")
+	characterServiceListCharactersMethodDescriptor        = characterServiceServiceDescriptor.Methods().ByName("ListCharacters")
+	characterServiceCreateCharacterMethodDescriptor       = characterServiceServiceDescriptor.Methods().ByName("CreateCharacter")
+	characterServicePutStatsMethodDescriptor              = characterServiceServiceDescriptor.Methods().ByName("PutStats")
+	characterServicePutSpellsMethodDescriptor             = characterServiceServiceDescriptor.Methods().ByName("PutSpells")
+	characterServicePutInventoryCharacterMethodDescriptor = characterServiceServiceDescriptor.Methods().ByName("PutInventoryCharacter")
+	characterServiceDeleteCharacterMethodDescriptor       = characterServiceServiceDescriptor.Methods().ByName("DeleteCharacter")
+)
+
 // CharacterServiceClient is a client for the multi.v1.CharacterService service.
 type CharacterServiceClient interface {
 	GetCharacter(context.Context, *connect.Request[v1.GetCharacterRequest]) (*connect.Response[v1.GetCharacterResponse], error)
@@ -80,37 +92,44 @@ func NewCharacterServiceClient(httpClient connect.HTTPClient, baseURL string, op
 		getCharacter: connect.NewClient[v1.GetCharacterRequest, v1.GetCharacterResponse](
 			httpClient,
 			baseURL+CharacterServiceGetCharacterProcedure,
-			opts...,
+			connect.WithSchema(characterServiceGetCharacterMethodDescriptor),
+			connect.WithClientOptions(opts...),
 		),
 		listCharacters: connect.NewClient[v1.ListCharactersRequest, v1.ListCharactersResponse](
 			httpClient,
 			baseURL+CharacterServiceListCharactersProcedure,
-			opts...,
+			connect.WithSchema(characterServiceListCharactersMethodDescriptor),
+			connect.WithClientOptions(opts...),
 		),
 		createCharacter: connect.NewClient[v1.CreateCharacterRequest, v1.CreateCharacterResponse](
 			httpClient,
 			baseURL+CharacterServiceCreateCharacterProcedure,
-			opts...,
+			connect.WithSchema(characterServiceCreateCharacterMethodDescriptor),
+			connect.WithClientOptions(opts...),
 		),
 		putStats: connect.NewClient[v1.PutStatsRequest, v1.PutStatsResponse](
 			httpClient,
 			baseURL+CharacterServicePutStatsProcedure,
-			opts...,
+			connect.WithSchema(characterServicePutStatsMethodDescriptor),
+			connect.WithClientOptions(opts...),
 		),
 		putSpells: connect.NewClient[v1.PutSpellsRequest, v1.PutSpellsResponse](
 			httpClient,
 			baseURL+CharacterServicePutSpellsProcedure,
-			opts...,
+			connect.WithSchema(characterServicePutSpellsMethodDescriptor),
+			connect.WithClientOptions(opts...),
 		),
 		putInventoryCharacter: connect.NewClient[v1.PutInventoryRequest, v1.PutInventoryResponse](
 			httpClient,
 			baseURL+CharacterServicePutInventoryCharacterProcedure,
-			opts...,
+			connect.WithSchema(characterServicePutInventoryCharacterMethodDescriptor),
+			connect.WithClientOptions(opts...),
 		),
 		deleteCharacter: connect.NewClient[v1.DeleteCharacterRequest, v1.DeleteCharacterResponse](
 			httpClient,
 			baseURL+CharacterServiceDeleteCharacterProcedure,
-			opts...,
+			connect.WithSchema(characterServiceDeleteCharacterMethodDescriptor),
+			connect.WithClientOptions(opts...),
 		),
 	}
 }
@@ -181,37 +200,44 @@ func NewCharacterServiceHandler(svc CharacterServiceHandler, opts ...connect.Han
 	characterServiceGetCharacterHandler := connect.NewUnaryHandler(
 		CharacterServiceGetCharacterProcedure,
 		svc.GetCharacter,
-		opts...,
+		connect.WithSchema(characterServiceGetCharacterMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
 	)
 	characterServiceListCharactersHandler := connect.NewUnaryHandler(
 		CharacterServiceListCharactersProcedure,
 		svc.ListCharacters,
-		opts...,
+		connect.WithSchema(characterServiceListCharactersMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
 	)
 	characterServiceCreateCharacterHandler := connect.NewUnaryHandler(
 		CharacterServiceCreateCharacterProcedure,
 		svc.CreateCharacter,
-		opts...,
+		connect.WithSchema(characterServiceCreateCharacterMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
 	)
 	characterServicePutStatsHandler := connect.NewUnaryHandler(
 		CharacterServicePutStatsProcedure,
 		svc.PutStats,
-		opts...,
+		connect.WithSchema(characterServicePutStatsMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
 	)
 	characterServicePutSpellsHandler := connect.NewUnaryHandler(
 		CharacterServicePutSpellsProcedure,
 		svc.PutSpells,
-		opts...,
+		connect.WithSchema(characterServicePutSpellsMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
 	)
 	characterServicePutInventoryCharacterHandler := connect.NewUnaryHandler(
 		CharacterServicePutInventoryCharacterProcedure,
 		svc.PutInventoryCharacter,
-		opts...,
+		connect.WithSchema(characterServicePutInventoryCharacterMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
 	)
 	characterServiceDeleteCharacterHandler := connect.NewUnaryHandler(
 		CharacterServiceDeleteCharacterProcedure,
 		svc.DeleteCharacter,
-		opts...,
+		connect.WithSchema(characterServiceDeleteCharacterMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
 	)
 	return "/multi.v1.CharacterService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {

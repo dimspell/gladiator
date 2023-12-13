@@ -1,6 +1,8 @@
 package action
 
 import (
+	"context"
+
 	"github.com/dispel-re/dispel-multi/backend"
 	"github.com/urfave/cli/v3"
 )
@@ -23,7 +25,7 @@ func BackendCommand() *cli.Command {
 		},
 	}
 
-	cmd.Action = func(c *cli.Context) error {
+	cmd.Action = func(ctx context.Context, c *cli.Command) error {
 		consoleAddr := c.String("console-addr")
 		backendAddr := c.String("backend-addr")
 
@@ -31,6 +33,5 @@ func BackendCommand() *cli.Command {
 		bd.Listen(backendAddr)
 		return nil
 	}
-
 	return cmd
 }

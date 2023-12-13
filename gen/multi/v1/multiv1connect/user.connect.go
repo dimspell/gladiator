@@ -18,7 +18,7 @@ import (
 // generated with a version of connect newer than the one compiled into your binary. You can fix the
 // problem by either regenerating this code with an older version of connect or updating the connect
 // version compiled into your binary.
-const _ = connect.IsAtLeastVersion0_1_0
+const _ = connect.IsAtLeastVersion1_13_0
 
 const (
 	// UserServiceName is the fully-qualified name of the UserService service.
@@ -42,6 +42,14 @@ const (
 	UserServiceGetUserProcedure = "/multi.v1.UserService/GetUser"
 )
 
+// These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
+var (
+	userServiceServiceDescriptor                = v1.File_multi_v1_user_proto.Services().ByName("UserService")
+	userServiceCreateUserMethodDescriptor       = userServiceServiceDescriptor.Methods().ByName("CreateUser")
+	userServiceAuthenticateUserMethodDescriptor = userServiceServiceDescriptor.Methods().ByName("AuthenticateUser")
+	userServiceGetUserMethodDescriptor          = userServiceServiceDescriptor.Methods().ByName("GetUser")
+)
+
 // UserServiceClient is a client for the multi.v1.UserService service.
 type UserServiceClient interface {
 	CreateUser(context.Context, *connect.Request[v1.CreateUserRequest]) (*connect.Response[v1.CreateUserResponse], error)
@@ -62,17 +70,20 @@ func NewUserServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 		createUser: connect.NewClient[v1.CreateUserRequest, v1.CreateUserResponse](
 			httpClient,
 			baseURL+UserServiceCreateUserProcedure,
-			opts...,
+			connect.WithSchema(userServiceCreateUserMethodDescriptor),
+			connect.WithClientOptions(opts...),
 		),
 		authenticateUser: connect.NewClient[v1.AuthenticateUserRequest, v1.AuthenticateUserResponse](
 			httpClient,
 			baseURL+UserServiceAuthenticateUserProcedure,
-			opts...,
+			connect.WithSchema(userServiceAuthenticateUserMethodDescriptor),
+			connect.WithClientOptions(opts...),
 		),
 		getUser: connect.NewClient[v1.GetUserRequest, v1.GetUserResponse](
 			httpClient,
 			baseURL+UserServiceGetUserProcedure,
-			opts...,
+			connect.WithSchema(userServiceGetUserMethodDescriptor),
+			connect.WithClientOptions(opts...),
 		),
 	}
 }
@@ -115,17 +126,20 @@ func NewUserServiceHandler(svc UserServiceHandler, opts ...connect.HandlerOption
 	userServiceCreateUserHandler := connect.NewUnaryHandler(
 		UserServiceCreateUserProcedure,
 		svc.CreateUser,
-		opts...,
+		connect.WithSchema(userServiceCreateUserMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
 	)
 	userServiceAuthenticateUserHandler := connect.NewUnaryHandler(
 		UserServiceAuthenticateUserProcedure,
 		svc.AuthenticateUser,
-		opts...,
+		connect.WithSchema(userServiceAuthenticateUserMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
 	)
 	userServiceGetUserHandler := connect.NewUnaryHandler(
 		UserServiceGetUserProcedure,
 		svc.GetUser,
-		opts...,
+		connect.WithSchema(userServiceGetUserMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
 	)
 	return "/multi.v1.UserService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {

@@ -18,7 +18,7 @@ import (
 // generated with a version of connect newer than the one compiled into your binary. You can fix the
 // problem by either regenerating this code with an older version of connect or updating the connect
 // version compiled into your binary.
-const _ = connect.IsAtLeastVersion0_1_0
+const _ = connect.IsAtLeastVersion1_13_0
 
 const (
 	// GameServiceName is the fully-qualified name of the GameService service.
@@ -45,6 +45,16 @@ const (
 	GameServiceListPlayersProcedure = "/multi.v1.GameService/ListPlayers"
 )
 
+// These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
+var (
+	gameServiceServiceDescriptor           = v1.File_multi_v1_game_proto.Services().ByName("GameService")
+	gameServiceGetGameMethodDescriptor     = gameServiceServiceDescriptor.Methods().ByName("GetGame")
+	gameServiceListGamesMethodDescriptor   = gameServiceServiceDescriptor.Methods().ByName("ListGames")
+	gameServiceCreateGameMethodDescriptor  = gameServiceServiceDescriptor.Methods().ByName("CreateGame")
+	gameServiceJoinGameMethodDescriptor    = gameServiceServiceDescriptor.Methods().ByName("JoinGame")
+	gameServiceListPlayersMethodDescriptor = gameServiceServiceDescriptor.Methods().ByName("ListPlayers")
+)
+
 // GameServiceClient is a client for the multi.v1.GameService service.
 type GameServiceClient interface {
 	GetGame(context.Context, *connect.Request[v1.GetGameRequest]) (*connect.Response[v1.GetGameResponse], error)
@@ -67,27 +77,32 @@ func NewGameServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 		getGame: connect.NewClient[v1.GetGameRequest, v1.GetGameResponse](
 			httpClient,
 			baseURL+GameServiceGetGameProcedure,
-			opts...,
+			connect.WithSchema(gameServiceGetGameMethodDescriptor),
+			connect.WithClientOptions(opts...),
 		),
 		listGames: connect.NewClient[v1.ListGamesRequest, v1.ListGamesResponse](
 			httpClient,
 			baseURL+GameServiceListGamesProcedure,
-			opts...,
+			connect.WithSchema(gameServiceListGamesMethodDescriptor),
+			connect.WithClientOptions(opts...),
 		),
 		createGame: connect.NewClient[v1.CreateGameRequest, v1.CreateGameResponse](
 			httpClient,
 			baseURL+GameServiceCreateGameProcedure,
-			opts...,
+			connect.WithSchema(gameServiceCreateGameMethodDescriptor),
+			connect.WithClientOptions(opts...),
 		),
 		joinGame: connect.NewClient[v1.JoinGameRequest, v1.JoinGameResponse](
 			httpClient,
 			baseURL+GameServiceJoinGameProcedure,
-			opts...,
+			connect.WithSchema(gameServiceJoinGameMethodDescriptor),
+			connect.WithClientOptions(opts...),
 		),
 		listPlayers: connect.NewClient[v1.ListPlayersRequest, v1.ListPlayersResponse](
 			httpClient,
 			baseURL+GameServiceListPlayersProcedure,
-			opts...,
+			connect.WithSchema(gameServiceListPlayersMethodDescriptor),
+			connect.WithClientOptions(opts...),
 		),
 	}
 }
@@ -144,27 +159,32 @@ func NewGameServiceHandler(svc GameServiceHandler, opts ...connect.HandlerOption
 	gameServiceGetGameHandler := connect.NewUnaryHandler(
 		GameServiceGetGameProcedure,
 		svc.GetGame,
-		opts...,
+		connect.WithSchema(gameServiceGetGameMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
 	)
 	gameServiceListGamesHandler := connect.NewUnaryHandler(
 		GameServiceListGamesProcedure,
 		svc.ListGames,
-		opts...,
+		connect.WithSchema(gameServiceListGamesMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
 	)
 	gameServiceCreateGameHandler := connect.NewUnaryHandler(
 		GameServiceCreateGameProcedure,
 		svc.CreateGame,
-		opts...,
+		connect.WithSchema(gameServiceCreateGameMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
 	)
 	gameServiceJoinGameHandler := connect.NewUnaryHandler(
 		GameServiceJoinGameProcedure,
 		svc.JoinGame,
-		opts...,
+		connect.WithSchema(gameServiceJoinGameMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
 	)
 	gameServiceListPlayersHandler := connect.NewUnaryHandler(
 		GameServiceListPlayersProcedure,
 		svc.ListPlayers,
-		opts...,
+		connect.WithSchema(gameServiceListPlayersMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
 	)
 	return "/multi.v1.GameService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {

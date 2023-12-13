@@ -50,8 +50,8 @@ func NewApp(version, commit, buildDate string) {
 
 	// Setup function
 	var closers []CleanupFunc
-	app.Before = func(ctx *cli.Context) error {
-		closer, err := initDefaultLogger(ctx)
+	app.Before = func(_ context.Context, c *cli.Command) error {
+		closer, err := initDefaultLogger(c)
 		if err != nil {
 			return err
 		}
@@ -60,7 +60,7 @@ func NewApp(version, commit, buildDate string) {
 	}
 
 	// Cleanup function
-	app.After = func(ctx *cli.Context) error {
+	app.After = func(_ context.Context, _ *cli.Command) error {
 		for _, closer := range closers {
 			closer()
 		}

@@ -42,7 +42,9 @@ message CharacterInfo {
   int64 archery = 28;
   int64 polearms = 29;
   int64 wizardry = 30;
-  bytes kills = 31;
+  int64 holy_magic = 31;
+  int64 dark_magic = 32;
+  int64 bonus_points = 33;
 }
 
 enum Gender {
