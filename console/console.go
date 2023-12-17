@@ -40,32 +40,40 @@ func (c *Console) Serve(ctx context.Context, consoleAddr, backendAddr string) er
 	mux := chi.NewRouter()
 
 	mux.Use(middleware.Recoverer)
+	mux.Use(middleware.DefaultLogger)
 	mux.Use(middleware.Throttle(100))
 	mux.Use(otelchi.Middleware("console", otelchi.WithChiRoutes(mux)))
 
-	mux.Get("/_health", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("."))
-	})
-	mux.Get("/_metrics", promhttp.Handler().ServeHTTP)
-	mux.Get("/.well-known/dispel-multi.json", func(w http.ResponseWriter, r *http.Request) {
-		resp := model.WellKnown{ZeroTier: model.ZeroTier{
-			Enabled: false,
-		}}
-		document, _ := json.Marshal(resp)
-		w.Write(document)
-	})
+	{ // Setup meta routes (readiness, liveness, metrics etc.)
+		mux.Get("/_health", func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("."))
+		})
+		mux.Get("/_metrics", promhttp.Handler().ServeHTTP)
+	}
 
-	api := chi.NewRouter()
-	api.Use(middleware.Timeout(5 * time.Second))
-	api.Use(middleware.StripSlashes)
+	{ // Setup console config routes
+		mux.Get("/.well-known/dispel-multi.json", func(w http.ResponseWriter, r *http.Request) {
+			resp := model.WellKnown{ZeroTier: model.ZeroTier{
+				Enabled: false,
+			}}
+			document, _ := json.Marshal(resp)
+			w.Write(document)
+		})
+	}
 
-	interceptors := connect.WithInterceptors(otelconnect.NewInterceptor())
-	api.Mount(multiv1connect.NewCharacterServiceHandler(&characterServiceServer{DB: c.DB}, interceptors))
-	api.Mount(multiv1connect.NewGameServiceHandler(&gameServiceServer{DB: c.DB}, interceptors))
-	api.Mount(multiv1connect.NewUserServiceHandler(&userServiceServer{DB: c.DB}, interceptors))
-	api.Mount(multiv1connect.NewRankingServiceHandler(&rankingServiceServer{DB: c.DB}, interceptors))
-	mux.Mount("/grpc/", http.StripPrefix("/grpc", api))
+	{ // Setup gRPC server
+		api := chi.NewRouter()
+		api.Use(middleware.Timeout(5 * time.Second))
+		api.Use(middleware.StripSlashes)
+
+		interceptors := connect.WithInterceptors(otelconnect.NewInterceptor())
+		api.Mount(multiv1connect.NewCharacterServiceHandler(&characterServiceServer{DB: c.DB}, interceptors))
+		api.Mount(multiv1connect.NewGameServiceHandler(&gameServiceServer{DB: c.DB}, interceptors))
+		api.Mount(multiv1connect.NewUserServiceHandler(&userServiceServer{DB: c.DB}, interceptors))
+		api.Mount(multiv1connect.NewRankingServiceHandler(&rankingServiceServer{DB: c.DB}, interceptors))
+		mux.Mount("/grpc/", http.StripPrefix("/grpc", api))
+	}
 
 	server := &http.Server{
 		Addr:    consoleAddr,
