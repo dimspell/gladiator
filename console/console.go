@@ -39,6 +39,10 @@ func NewConsole(db *database.Queries, b *backend.Backend) *Console {
 func (c *Console) Serve(ctx context.Context, consoleAddr, backendAddr string) error {
 	mux := chi.NewRouter()
 
+	mux.Use(middleware.Recoverer)
+	mux.Use(middleware.Throttle(100))
+	mux.Use(otelchi.Middleware("console", otelchi.WithChiRoutes(mux)))
+
 	mux.Get("/_health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("."))
@@ -61,10 +65,6 @@ func (c *Console) Serve(ctx context.Context, consoleAddr, backendAddr string) er
 		r.Handle(multiv1connect.NewUserServiceHandler(&userServiceServer{DB: c.DB}, interceptors))
 		r.Handle(multiv1connect.NewRankingServiceHandler(&rankingServiceServer{DB: c.DB}, interceptors))
 	})
-
-	mux.Use(middleware.Recoverer)
-	mux.Use(middleware.Throttle(100))
-	mux.Use(otelchi.Middleware("console", otelchi.WithChiRoutes(mux)))
 
 	server := &http.Server{
 		Addr:    consoleAddr,
