@@ -2,11 +2,11 @@ package console
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"net/http"
 	"os"
 	"os/signal"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -22,6 +22,10 @@ import (
 	"github.com/riandyrn/otelchi"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
+)
+
+var (
+	healthy int32
 )
 
 type Console struct {
@@ -46,19 +50,20 @@ func (c *Console) Serve(ctx context.Context, consoleAddr, backendAddr string) er
 
 	{ // Setup meta routes (readiness, liveness, metrics etc.)
 		mux.Get("/_health", func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-			w.Write([]byte("."))
+			if atomic.LoadInt32(&healthy) == 0 {
+				renderJSON(w, r, map[string]string{"status": "OK"})
+				return
+			}
+			w.WriteHeader(http.StatusServiceUnavailable)
 		})
 		mux.Get("/_metrics", promhttp.Handler().ServeHTTP)
 	}
 
 	{ // Setup console config routes
 		mux.Get("/.well-known/dispel-multi.json", func(w http.ResponseWriter, r *http.Request) {
-			resp := model.WellKnown{ZeroTier: model.ZeroTier{
+			renderJSON(w, r, model.WellKnown{ZeroTier: model.ZeroTier{
 				Enabled: false,
-			}}
-			document, _ := json.Marshal(resp)
-			w.Write(document)
+			}})
 		})
 	}
 
@@ -88,6 +93,8 @@ func (c *Console) Serve(ctx context.Context, consoleAddr, backendAddr string) er
 		}
 
 		// TODO: Set readiness, startup, liveness probe
+		atomic.StoreInt32(&healthy, 1)
+
 		return server.ListenAndServe()
 	}
 
