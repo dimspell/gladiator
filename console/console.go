@@ -56,15 +56,16 @@ func (c *Console) Serve(ctx context.Context, consoleAddr, backendAddr string) er
 		w.Write(document)
 	})
 
-	interceptors := connect.WithInterceptors(otelconnect.NewInterceptor())
-	mux.Route("/grpc", func(r chi.Router) {
-		r.Use(middleware.Timeout(5 * time.Second))
+	api := chi.NewRouter()
+	api.Use(middleware.Timeout(5 * time.Second))
+	api.Use(middleware.StripSlashes)
 
-		r.Handle(multiv1connect.NewCharacterServiceHandler(&characterServiceServer{DB: c.DB}, interceptors))
-		r.Handle(multiv1connect.NewGameServiceHandler(&gameServiceServer{DB: c.DB}, interceptors))
-		r.Handle(multiv1connect.NewUserServiceHandler(&userServiceServer{DB: c.DB}, interceptors))
-		r.Handle(multiv1connect.NewRankingServiceHandler(&rankingServiceServer{DB: c.DB}, interceptors))
-	})
+	interceptors := connect.WithInterceptors(otelconnect.NewInterceptor())
+	api.Mount(multiv1connect.NewCharacterServiceHandler(&characterServiceServer{DB: c.DB}, interceptors))
+	api.Mount(multiv1connect.NewGameServiceHandler(&gameServiceServer{DB: c.DB}, interceptors))
+	api.Mount(multiv1connect.NewUserServiceHandler(&userServiceServer{DB: c.DB}, interceptors))
+	api.Mount(multiv1connect.NewRankingServiceHandler(&rankingServiceServer{DB: c.DB}, interceptors))
+	mux.Mount("/grpc/", http.StripPrefix("/grpc", api))
 
 	server := &http.Server{
 		Addr:    consoleAddr,
