@@ -3,6 +3,7 @@ package console
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -46,6 +47,7 @@ func (c *Console) Serve(ctx context.Context, consoleAddr, backendAddr string) er
 	mux.Use(middleware.Recoverer)
 	mux.Use(middleware.DefaultLogger)
 	mux.Use(middleware.Throttle(100))
+	mux.Use(middleware.Timeout(5 * time.Second))
 	mux.Use(otelchi.Middleware("console", otelchi.WithChiRoutes(mux)))
 
 	{ // Setup meta routes (readiness, liveness, metrics etc.)
@@ -69,8 +71,6 @@ func (c *Console) Serve(ctx context.Context, consoleAddr, backendAddr string) er
 
 	{ // Setup gRPC server
 		api := chi.NewRouter()
-		api.Use(middleware.Timeout(5 * time.Second))
-		api.Use(middleware.StripSlashes)
 
 		interceptors := connect.WithInterceptors(otelconnect.NewInterceptor())
 		api.Mount(multiv1connect.NewCharacterServiceHandler(&characterServiceServer{DB: c.DB}, interceptors))
@@ -94,6 +94,7 @@ func (c *Console) Serve(ctx context.Context, consoleAddr, backendAddr string) er
 
 		// TODO: Set readiness, startup, liveness probe
 		atomic.StoreInt32(&healthy, 1)
+		slog.Info("Starting console server", "addr", consoleAddr)
 
 		return server.ListenAndServe()
 	}
