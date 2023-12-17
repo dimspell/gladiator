@@ -61,7 +61,7 @@ func (c *Console) Serve(ctx context.Context, consoleAddr, backendAddr string) er
 		mux.Get("/_metrics", promhttp.Handler().ServeHTTP)
 	}
 
-	{ // Setup console config routes
+	{ // Setup routes used by the launcher
 		mux.Get("/.well-known/dispel-multi.json", func(w http.ResponseWriter, r *http.Request) {
 			renderJSON(w, r, model.WellKnown{ZeroTier: model.ZeroTier{
 				Enabled: false,
@@ -69,7 +69,7 @@ func (c *Console) Serve(ctx context.Context, consoleAddr, backendAddr string) er
 		})
 	}
 
-	{ // Setup gRPC server
+	{ // Setup gRPC routes for the backend
 		api := chi.NewRouter()
 
 		interceptors := connect.WithInterceptors(otelconnect.NewInterceptor())
@@ -93,7 +93,7 @@ func (c *Console) Serve(ctx context.Context, consoleAddr, backendAddr string) er
 		}
 
 		// TODO: Set readiness, startup, liveness probe
-		atomic.StoreInt32(&healthy, 1)
+		atomic.StoreInt32(&healthy, 0)
 		slog.Info("Starting console server", "addr", consoleAddr)
 
 		return server.ListenAndServe()
