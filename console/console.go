@@ -21,6 +21,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/riandyrn/otelchi"
+	"github.com/rs/cors"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 )
@@ -32,12 +33,15 @@ var (
 type Console struct {
 	DB      *database.Queries
 	Backend *backend.Backend
+
+	CORSAllowedOrigins []string
 }
 
 func NewConsole(db *database.Queries, b *backend.Backend) *Console {
 	return &Console{
-		DB:      db,
-		Backend: b,
+		DB:                 db,
+		Backend:            b,
+		CORSAllowedOrigins: []string{"*"}, // TODO: For production replace it with []string{"https://dispel-multi.net"}
 	}
 }
 
@@ -63,14 +67,37 @@ func (c *Console) Serve(ctx context.Context, consoleAddr, backendAddr string) er
 
 	{ // Setup routes used by the launcher
 		mux.Get("/.well-known/dispel-multi.json", func(w http.ResponseWriter, r *http.Request) {
-			renderJSON(w, r, model.WellKnown{ZeroTier: model.ZeroTier{
-				Enabled: false,
-			}})
+			renderJSON(w, r, model.WellKnown{
+				ZeroTier: model.ZeroTier{Enabled: false},
+			})
 		})
 	}
 
 	{ // Setup gRPC routes for the backend
 		api := chi.NewRouter()
+		api.Use(cors.New(cors.Options{
+			AllowedOrigins:   c.CORSAllowedOrigins,
+			AllowCredentials: false,
+			Debug:            false,
+			AllowedMethods: []string{
+				http.MethodGet,
+				http.MethodPost,
+			},
+			AllowedHeaders: []string{
+				"Content-Type",
+				"Connect-Protocol-Version",
+				"Connect-Timeout-Ms",
+				"Grpc-Timeout",
+				"X-Grpc-Web",
+				"X-User-Agent",
+			},
+			ExposedHeaders: []string{
+				"Grpc-Status",
+				"Grpc-Message",
+				"Grpc-Status-Details-Bin",
+			},
+			MaxAge: 7200,
+		}).Handler)
 
 		interceptors := connect.WithInterceptors(otelconnect.NewInterceptor())
 		api.Mount(multiv1connect.NewCharacterServiceHandler(&characterServiceServer{DB: c.DB}, interceptors))
