@@ -1,7 +1,6 @@
 package backend
 
 import (
-	"encoding/base64"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -160,7 +159,7 @@ func (b *Backend) handleCommands(session *model.Session) error {
 			b.PacketLogger.Debug("Recv",
 				"packetType", pt,
 				"bytes", packet,
-				"base64", base64.StdEncoding.EncodeToString(packet),
+				"length", len(packet),
 			)
 		}
 
@@ -277,7 +276,7 @@ func (b *Backend) Send(conn net.Conn, packetType PacketType, payload []byte) err
 		b.PacketLogger.Debug("Sent",
 			"packetType", packetType,
 			"bytes", data,
-			"base64", base64.StdEncoding.EncodeToString(data),
+			"length", len(data),
 		)
 	}
 
