@@ -38,6 +38,21 @@ func NewCharacterInventory(buf []byte) CharacterInventory {
 	return inv
 }
 
+func (inv *CharacterInventory) ToBytes() []byte {
+	out := make([]byte, 207)
+	for i, item := range inv.Backpack {
+		out[0+i*3] = item.TypeId
+		out[1+i*3] = item.ItemId
+		out[2+i*3] = item.Unknown
+	}
+	for i, item := range inv.Belt {
+		out[0+189+i*3] = item.TypeId
+		out[1+189+i*3] = item.ItemId
+		out[2+189+i*3] = item.Unknown
+	}
+	return out
+}
+
 func (inv *CharacterInventory) Print() {
 	i := 0
 	for x := 0; x < 9; x++ {

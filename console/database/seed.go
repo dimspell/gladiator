@@ -2,6 +2,8 @@ package database
 
 import (
 	"context"
+	"database/sql"
+	"encoding/base64"
 
 	"github.com/dispel-re/dispel-multi/model"
 	"golang.org/x/crypto/bcrypt"
@@ -17,7 +19,96 @@ func Seed(queries *Queries) error {
 		return err
 	}
 
-	_, err = queries.CreateCharacter(context.TODO(), CreateCharacterParams{
+	spells := make([]byte, 43)
+	for i := 0; i < 41; i++ {
+		spells[i] = 2
+	}
+
+	inventory := model.CharacterInventory{
+		Backpack: [63]model.InventoryItem{
+			{TypeId: 4, ItemId: 1, Unknown: 17}, // Money
+			{TypeId: 2, ItemId: 2, Unknown: 33}, // HP Potion
+			{TypeId: 2, ItemId: 2, Unknown: 49},
+			{TypeId: 2, ItemId: 2, Unknown: 65},
+			{TypeId: 2, ItemId: 2, Unknown: 81},
+			{TypeId: 2, ItemId: 2, Unknown: 97},
+			{TypeId: 2, ItemId: 2, Unknown: 113},
+
+			{TypeId: 2, ItemId: 4, Unknown: 18}, // MP Potion
+			{TypeId: 2, ItemId: 4, Unknown: 34},
+			{TypeId: 2, ItemId: 4, Unknown: 50},
+			{TypeId: 2, ItemId: 4, Unknown: 66},
+			{TypeId: 2, ItemId: 4, Unknown: 82},
+			{TypeId: 2, ItemId: 4, Unknown: 98},
+			{TypeId: 2, ItemId: 4, Unknown: 114},
+
+			{TypeId: 2, ItemId: 5, Unknown: 19}, // Antidote
+			{TypeId: 2, ItemId: 5, Unknown: 35},
+			{TypeId: 2, ItemId: 5, Unknown: 51},
+			{TypeId: 2, ItemId: 5, Unknown: 67},
+			{TypeId: 2, ItemId: 5, Unknown: 83},
+			{TypeId: 2, ItemId: 5, Unknown: 99},
+			{TypeId: 2, ItemId: 5, Unknown: 115},
+
+			{TypeId: 11, ItemId: 101, Unknown: 121},
+			{TypeId: 11, ItemId: 101, Unknown: 121},
+			{TypeId: 11, ItemId: 101, Unknown: 121},
+			{TypeId: 11, ItemId: 101, Unknown: 121},
+			{TypeId: 11, ItemId: 101, Unknown: 121},
+			{TypeId: 11, ItemId: 101, Unknown: 121},
+			{TypeId: 11, ItemId: 101, Unknown: 121},
+
+			{TypeId: 11, ItemId: 101, Unknown: 121},
+			{TypeId: 11, ItemId: 101, Unknown: 121},
+			{TypeId: 11, ItemId: 101, Unknown: 121},
+			{TypeId: 11, ItemId: 101, Unknown: 121},
+			{TypeId: 11, ItemId: 101, Unknown: 121},
+			{TypeId: 11, ItemId: 101, Unknown: 121},
+			{TypeId: 11, ItemId: 101, Unknown: 121},
+
+			{TypeId: 11, ItemId: 101, Unknown: 21},
+			{TypeId: 11, ItemId: 101, Unknown: 121},
+			{TypeId: 11, ItemId: 101, Unknown: 121},
+			{TypeId: 11, ItemId: 101, Unknown: 121},
+			{TypeId: 11, ItemId: 101, Unknown: 121},
+			{TypeId: 11, ItemId: 101, Unknown: 121},
+			{TypeId: 11, ItemId: 101, Unknown: 121},
+
+			{TypeId: 11, ItemId: 101, Unknown: 121},
+			{TypeId: 11, ItemId: 101, Unknown: 121},
+			{TypeId: 11, ItemId: 101, Unknown: 121},
+			{TypeId: 11, ItemId: 101, Unknown: 121},
+			{TypeId: 11, ItemId: 101, Unknown: 121},
+			{TypeId: 11, ItemId: 101, Unknown: 121},
+			{TypeId: 11, ItemId: 101, Unknown: 121},
+
+			{TypeId: 11, ItemId: 101, Unknown: 121},
+			{TypeId: 11, ItemId: 101, Unknown: 121},
+			{TypeId: 11, ItemId: 101, Unknown: 121},
+			{TypeId: 11, ItemId: 101, Unknown: 121},
+			{TypeId: 11, ItemId: 101, Unknown: 121},
+			{TypeId: 11, ItemId: 101, Unknown: 121},
+			{TypeId: 11, ItemId: 101, Unknown: 121},
+
+			{TypeId: 11, ItemId: 101, Unknown: 121},
+			{TypeId: 11, ItemId: 101, Unknown: 121},
+			{TypeId: 11, ItemId: 101, Unknown: 121},
+			{TypeId: 11, ItemId: 101, Unknown: 121},
+			{TypeId: 11, ItemId: 101, Unknown: 121},
+			{TypeId: 11, ItemId: 101, Unknown: 121},
+			{TypeId: 11, ItemId: 101, Unknown: 121},
+		},
+		Belt: [6]model.InventoryItem{
+			{TypeId: 2, ItemId: 2, Unknown: 17},
+			{TypeId: 2, ItemId: 2, Unknown: 33},
+			{TypeId: 2, ItemId: 2, Unknown: 49},
+			{TypeId: 2, ItemId: 4, Unknown: 65},
+			{TypeId: 2, ItemId: 4, Unknown: 81},
+			{TypeId: 11, ItemId: 101, Unknown: 97},
+		},
+	}
+
+	character, err := queries.CreateCharacter(context.TODO(), CreateCharacterParams{
 		Strength:             100,
 		Agility:              100,
 		Wisdom:               100,
@@ -47,7 +138,7 @@ func Seed(queries *Queries) error {
 		BluntedWeapons:       1,
 		Archery:              1,
 		Polearms:             1,
-		Wizardry:             1,
+		Wizardry:             100,
 		BonusPoints:          10,
 		CharacterName:        "tester",
 		UserID:               user.ID,
@@ -55,6 +146,24 @@ func Seed(queries *Queries) error {
 	if err != nil {
 		return err
 	}
+
+	queries.UpdateCharacterSpells(context.TODO(), UpdateCharacterSpellsParams{
+		CharacterName: character.CharacterName,
+		Spells: sql.NullString{
+			String: base64.StdEncoding.EncodeToString(spells),
+			Valid:  true,
+		},
+		UserID: user.ID,
+	})
+
+	queries.UpdateCharacterInventory(context.TODO(), UpdateCharacterInventoryParams{
+		CharacterName: character.CharacterName,
+		Inventory: sql.NullString{
+			String: base64.StdEncoding.EncodeToString(inventory.ToBytes()),
+			Valid:  true,
+		},
+		UserID: user.ID,
+	})
 
 	user2, err := queries.CreateUser(context.TODO(), CreateUserParams{
 		Username: "tester",
