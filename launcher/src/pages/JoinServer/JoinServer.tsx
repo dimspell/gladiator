@@ -25,6 +25,12 @@ function JoinServer() {
         </div>
         <form>
           <div className='max-w-sm w-full md:max-w-full'>
+            <p>TODO: Select a type of the server</p>
+            <ul>
+              <li>LAN</li>
+              <li>ZeroTier</li>
+              <li>Tailscale</li>
+            </ul>
             <div className='mb-6'>
               <label
                 className='block text-gray-300 font-bold mb-1 pr-4'
