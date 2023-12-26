@@ -9,6 +9,7 @@ import (
 	"net"
 
 	"connectrpc.com/connect"
+	"github.com/dispel-re/dispel-multi/backend/proxy"
 	multiv1 "github.com/dispel-re/dispel-multi/gen/multi/v1"
 	"github.com/dispel-re/dispel-multi/model"
 )
@@ -53,6 +54,12 @@ func (b *Backend) HandleCreateGame(session *model.Session, req CreateGameRequest
 		binary.LittleEndian.PutUint32(response[0:4], 1)
 		break
 	case uint32(1):
+		proxy.ListenTCP(10)
+		proxy.ListenUDP(10)
+		proxy.ReconcileConnections()
+
+		// Create a tcp listener on 6114
+		// Create an udp listener on 6113
 		binary.LittleEndian.PutUint32(response[0:4], 2)
 		break
 	}

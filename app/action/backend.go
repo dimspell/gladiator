@@ -30,7 +30,9 @@ func BackendCommand() *cli.Command {
 		backendAddr := c.String("backend-addr")
 
 		bd := backend.NewBackend(consoleAddr)
+		defer bd.Shutdown(ctx)
 		bd.Listen(backendAddr)
+
 		return nil
 	}
 	return cmd

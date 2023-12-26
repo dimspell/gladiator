@@ -3,6 +3,7 @@ package console
 import (
 	"context"
 	"errors"
+	"log"
 	"log/slog"
 	"net/http"
 	"os"
@@ -19,6 +20,7 @@ import (
 	"github.com/dispel-re/dispel-multi/model"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/nats-io/nats-server/v2/server"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/riandyrn/otelchi"
 	"github.com/rs/cors"
@@ -33,6 +35,7 @@ var (
 type Console struct {
 	DB      *database.Queries
 	Backend *backend.Backend
+	Queue   *server.Server
 
 	CORSAllowedOrigins []string
 }
@@ -43,6 +46,37 @@ func NewConsole(db *database.Queries, b *backend.Backend) *Console {
 		Backend:            b,
 		CORSAllowedOrigins: []string{"*"}, // TODO: For production replace it with []string{"https://dispel-multi.net"}
 	}
+}
+
+func (c *Console) NATS() *server.Server {
+	// serverTlsConfig, err := server.GenTLSConfig(&server.TLSConfigOpts{
+	// 	CertFile: certFile,
+	// 	KeyFile:  keyFile,
+	// 	CaFile:   caFile,
+	// 	Verify:   true,
+	// 	Timeout:  2,
+	// })
+	// if err != nil {
+	// 	log.Fatalf("tls config: %v", err)
+	// }
+
+	var (
+		host = "localhost"
+		port = server.DEFAULT_PORT
+	)
+
+	opts := server.Options{
+		Host: host,
+		Port: port,
+		// TLSConfig: serverTlsConfig,
+	}
+
+	ns, err := server.NewServer(&opts)
+	if err != nil {
+		log.Fatalf("server init: %v", err)
+	}
+
+	return ns
 }
 
 func (c *Console) HttpRouter() http.Handler {
@@ -111,7 +145,7 @@ func (c *Console) HttpRouter() http.Handler {
 }
 
 func (c *Console) Serve(ctx context.Context, consoleAddr, backendAddr string) error {
-	server := &http.Server{
+	httpServer := &http.Server{
 		Addr:         consoleAddr,
 		Handler:      h2c.NewHandler(c.HttpRouter(), &http2.Server{}),
 		ReadTimeout:  5 * time.Second,
@@ -126,11 +160,15 @@ func (c *Console) Serve(ctx context.Context, consoleAddr, backendAddr string) er
 			}()
 		}
 
+		// There is no need to gracefully quit the NATS by listening to signals.
+		c.Queue = c.NATS()
+		go c.Queue.Start()
+
 		// TODO: Set readiness, startup, liveness probe
 		atomic.StoreInt32(&healthy, 0)
 		slog.Info("Starting console server", "addr", consoleAddr)
 
-		return server.ListenAndServe()
+		return httpServer.ListenAndServe()
 	}
 
 	stop := func(ctx context.Context) error {
@@ -138,7 +176,7 @@ func (c *Console) Serve(ctx context.Context, consoleAddr, backendAddr string) er
 			c.Backend.Shutdown(ctx)
 		}
 
-		return server.Shutdown(ctx)
+		return httpServer.Shutdown(ctx)
 	}
 
 	return c.graceful(ctx, start, stop)

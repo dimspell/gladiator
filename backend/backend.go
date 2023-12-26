@@ -15,11 +15,14 @@ import (
 	"github.com/dispel-re/dispel-multi/gen/multi/v1/multiv1connect"
 	"github.com/dispel-re/dispel-multi/model"
 	"github.com/google/uuid"
+	"github.com/nats-io/nats-server/v2/server"
+	"github.com/nats-io/nats.go"
 )
 
 type Backend struct {
 	Sessions     map[string]*model.Session
 	PacketLogger *slog.Logger
+	Queue        *nats.Conn
 
 	CharacterClient multiv1connect.CharacterServiceClient
 	GameClient      multiv1connect.GameServiceClient
@@ -41,12 +44,15 @@ func NewBackend(consoleAddr string) *Backend {
 		},
 	}
 
+	nc, _ := nats.Connect(fmt.Sprintf("localhost:%", server.DEFAULT_PORT))
+
 	interceptor := connect.WithInterceptors(otelconnect.NewInterceptor())
 	consoleUri := fmt.Sprintf("http://%s/grpc", consoleAddr)
 
 	return &Backend{
 		Sessions:     make(map[string]*model.Session),
 		PacketLogger: slog.New(packetlogger.New(os.Stderr, &packetlogger.Options{Level: slog.LevelDebug})),
+		Queue:        nc,
 
 		CharacterClient: multiv1connect.NewCharacterServiceClient(httpClient, consoleUri, interceptor),
 		GameClient:      multiv1connect.NewGameServiceClient(httpClient, consoleUri, interceptor),
@@ -59,6 +65,10 @@ func (b *Backend) Shutdown(ctx context.Context) {
 	// Close all open connections
 	for _, session := range b.Sessions {
 		session.Conn.Close()
+	}
+
+	if b.Queue != nil {
+		b.Queue.Drain()
 	}
 
 	// TODO: Send a system message "(system) The server is going to close in less than 30 seconds"

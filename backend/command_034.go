@@ -7,6 +7,7 @@ import (
 	"net"
 
 	"connectrpc.com/connect"
+	"github.com/dispel-re/dispel-multi/backend/proxy"
 	multiv1 "github.com/dispel-re/dispel-multi/gen/multi/v1"
 	"github.com/dispel-re/dispel-multi/model"
 )
@@ -28,6 +29,28 @@ func (b *Backend) HandleJoinGame(session *model.Session, req JoinGameRequest) er
 	}))
 	if err != nil {
 		return err
+	}
+
+	// if err := pubsub.PublishJoinGame(b.Queue, pubsub.JoinGameRequest{
+	// 	GameId: respGame.Msg.GetGame().GetGameId(),
+	// }); err != nil {
+	// 	return err
+	// }
+	// Create a listener to 6114
+
+	proxy.ListenTCP(10)
+	proxy.ListenUDP(10)
+
+	{
+		respPlayers, err := b.GameClient.ListPlayers(context.TODO(), connect.NewRequest(&multiv1.ListPlayersRequest{
+			GameRoomId: respGame.Msg.Game.GameId,
+		}))
+		if err != nil {
+			return err
+		}
+		for i, _ := range respPlayers.Msg.GetPlayers() {
+			proxy.ListenUDP(byte(i + 1))
+		}
 	}
 
 	tcpAddr := session.Conn.RemoteAddr().(*net.TCPAddr)
