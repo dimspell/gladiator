@@ -108,8 +108,11 @@ func (c *Console) Serve(ctx context.Context, consoleAddr, backendAddr string) er
 	}
 
 	server := &http.Server{
-		Addr:    consoleAddr,
-		Handler: h2c.NewHandler(mux, &http2.Server{}),
+		Addr:         consoleAddr,
+		Handler:      h2c.NewHandler(mux, &http2.Server{}),
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  120 * time.Second,
 	}
 
 	start := func() error {
