@@ -3,6 +3,7 @@ package backend
 import (
 	"context"
 	"fmt"
+	"log"
 	"log/slog"
 	"net"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 	"connectrpc.com/connect"
 	"connectrpc.com/otelconnect"
 	"github.com/dispel-re/dispel-multi/backend/packetlogger"
+	"github.com/dispel-re/dispel-multi/backend/proxy"
 	"github.com/dispel-re/dispel-multi/gen/multi/v1/multiv1connect"
 	"github.com/dispel-re/dispel-multi/model"
 	"github.com/google/uuid"
@@ -23,6 +25,8 @@ type Backend struct {
 	Sessions     map[string]*model.Session
 	PacketLogger *slog.Logger
 	Queue        *nats.Conn
+
+	EventChan chan uint8
 
 	CharacterClient multiv1connect.CharacterServiceClient
 	GameClient      multiv1connect.GameServiceClient
@@ -61,6 +65,12 @@ func NewBackend(consoleAddr string) *Backend {
 	}
 }
 
+func (b *Backend) Start(ctx context.Context) {
+	if err := b.Events(ctx); err != nil {
+		log.Fatal("Backend.Start", err)
+	}
+}
+
 func (b *Backend) Shutdown(ctx context.Context) {
 	// Close all open connections
 	for _, session := range b.Sessions {
@@ -86,6 +96,35 @@ func (b *Backend) NewSession(conn net.Conn) *model.Session {
 	return session
 }
 
+func (b *Backend) Events(ctx context.Context) error {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case eventType := <-b.EventChan:
+			// TODO: Make a better distinction between events
+			switch eventType {
+			case EventNone:
+				continue
+			case EventHostGame:
+				go proxy.MockHostTCPServer(ctx)
+				go proxy.MockHostUDPServer(ctx)
+			case EventCloseConn:
+				cancel()
+			}
+		}
+	}
+}
+
+const (
+	EventNone uint8 = iota
+	EventHostGame
+	EventCloseConn
+)
+
 func (b *Backend) CloseSession(session *model.Session) error {
 	slog.Debug("Session closed", "session", session.ID)
 
@@ -99,6 +138,7 @@ func (b *Backend) CloseSession(session *model.Session) error {
 		_ = session.Conn.Close()
 	}
 
+	b.EventChan <- EventCloseConn
 	session = nil
 	return nil
 }

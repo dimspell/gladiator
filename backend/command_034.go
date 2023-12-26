@@ -7,7 +7,6 @@ import (
 	"net"
 
 	"connectrpc.com/connect"
-	"github.com/dispel-re/dispel-multi/backend/proxy"
 	multiv1 "github.com/dispel-re/dispel-multi/gen/multi/v1"
 	"github.com/dispel-re/dispel-multi/model"
 )
@@ -38,20 +37,20 @@ func (b *Backend) HandleJoinGame(session *model.Session, req JoinGameRequest) er
 	// }
 	// Create a listener to 6114
 
-	proxy.ListenTCP(10)
-	proxy.ListenUDP(10)
-
-	{
-		respPlayers, err := b.GameClient.ListPlayers(context.TODO(), connect.NewRequest(&multiv1.ListPlayersRequest{
-			GameRoomId: respGame.Msg.Game.GameId,
-		}))
-		if err != nil {
-			return err
-		}
-		for i, _ := range respPlayers.Msg.GetPlayers() {
-			proxy.ListenUDP(byte(i + 1))
-		}
-	}
+	// proxy.ListenTCP(10)
+	// proxy.ListenUDP(10)
+	//
+	// {
+	// 	respPlayers, err := b.GameClient.ListPlayers(context.TODO(), connect.NewRequest(&multiv1.ListPlayersRequest{
+	// 		GameRoomId: respGame.Msg.Game.GameId,
+	// 	}))
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	for i, _ := range respPlayers.Msg.GetPlayers() {
+	// 		proxy.ListenUDP(byte(i + 1))
+	// 	}
+	// }
 
 	tcpAddr := session.Conn.RemoteAddr().(*net.TCPAddr)
 	_, err = b.GameClient.JoinGame(context.TODO(), connect.NewRequest(&multiv1.JoinGameRequest{
@@ -72,7 +71,8 @@ func (b *Backend) HandleJoinGame(session *model.Session, req JoinGameRequest) er
 		},
 		MapID: uint32(respGame.Msg.Game.GetMapId()),
 	}
-	copy(gameRoom.Lobby.HostIPAddress[:], net.ParseIP(respGame.Msg.Game.HostIpAddress).To4())
+	// copy(gameRoom.Lobby.HostIPAddress[:], net.ParseIP(respGame.Msg.Game.HostIpAddress).To4())
+	gameRoom.Lobby.HostIPAddress = [4]byte{127, 21, 37, 10}
 
 	respPlayers, err := b.GameClient.ListPlayers(context.TODO(), connect.NewRequest(&multiv1.ListPlayersRequest{
 		GameRoomId: respGame.Msg.Game.GameId,

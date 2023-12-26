@@ -6,10 +6,8 @@ import (
 	"encoding/binary"
 	"fmt"
 	"log/slog"
-	"net"
 
 	"connectrpc.com/connect"
-	"github.com/dispel-re/dispel-multi/backend/proxy"
 	multiv1 "github.com/dispel-re/dispel-multi/gen/multi/v1"
 	"github.com/dispel-re/dispel-multi/model"
 )
@@ -29,14 +27,15 @@ func (b *Backend) HandleCreateGame(session *model.Session, req CreateGameRequest
 
 	switch data.State {
 	case uint32(0):
-		hostIPAddress := session.Conn.RemoteAddr().(*net.TCPAddr).IP.String()
+		// hostIPAddress := session.Conn.RemoteAddr().(*net.TCPAddr).IP.String()
 
 		respGame, err := b.GameClient.CreateGame(context.TODO(), connect.NewRequest(&multiv1.CreateGameRequest{
 			UserId:        session.UserID,
 			GameName:      data.RoomName,
 			Password:      data.Password,
-			HostIpAddress: hostIPAddress,
-			MapId:         int64(data.MapID),
+			HostIpAddress: "127.0.0.1",
+			// HostIpAddress: hostIPAddress,
+			MapId: int64(data.MapID),
 		}))
 		if err != nil {
 			return err
@@ -49,17 +48,13 @@ func (b *Backend) HandleCreateGame(session *model.Session, req CreateGameRequest
 			UserId:      session.UserID,
 			CharacterId: session.CharacterID,
 			GameRoomId:  respGame.Msg.Game.GetGameId(),
-			IpAddress:   hostIPAddress,
+			IpAddress:   "127.0.0.1",
+			// IpAddress:   hostIPAddress,
 		}))
 		binary.LittleEndian.PutUint32(response[0:4], 1)
 		break
 	case uint32(1):
-		proxy.ListenTCP(10)
-		proxy.ListenUDP(10)
-		proxy.ReconcileConnections()
-
-		// Create a tcp listener on 6114
-		// Create an udp listener on 6113
+		b.EventChan <- EventHostGame
 		binary.LittleEndian.PutUint32(response[0:4], 2)
 		break
 	}

@@ -76,6 +76,7 @@ func (c *Console) NATS() *server.Server {
 		log.Fatalf("server init: %v", err)
 	}
 
+	slog.Info("Configured NATS server", "addr", ns.ClientURL())
 	return ns
 }
 
@@ -153,9 +154,10 @@ func (c *Console) Serve(ctx context.Context, consoleAddr, backendAddr string) er
 		IdleTimeout:  120 * time.Second,
 	}
 
-	start := func() error {
+	start := func(ctx context.Context) error {
 		if c.Backend != nil {
 			go func() {
+				c.Backend.Start(ctx)
 				c.Backend.Listen(backendAddr)
 			}()
 		}
@@ -166,7 +168,7 @@ func (c *Console) Serve(ctx context.Context, consoleAddr, backendAddr string) er
 
 		// TODO: Set readiness, startup, liveness probe
 		atomic.StoreInt32(&healthy, 0)
-		slog.Info("Starting console server", "addr", consoleAddr)
+		slog.Info("Configured console server", "addr", consoleAddr)
 
 		return httpServer.ListenAndServe()
 	}
@@ -182,7 +184,9 @@ func (c *Console) Serve(ctx context.Context, consoleAddr, backendAddr string) er
 	return c.graceful(ctx, start, stop)
 }
 
-func (c *Console) graceful(ctx context.Context, start func() error, shutdown func(context.Context) error) error {
+type gracefulFunc func(context.Context) error
+
+func (c *Console) graceful(ctx context.Context, start gracefulFunc, shutdown gracefulFunc) error {
 	var (
 		stopChan = make(chan os.Signal, 1)
 		errChan  = make(chan error, 1)
@@ -209,7 +213,7 @@ func (c *Console) graceful(ctx context.Context, start func() error, shutdown fun
 	}()
 
 	// Start the server
-	if err := start(); !errors.Is(err, http.ErrServerClosed) {
+	if err := start(ctx); !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}
 
