@@ -45,7 +45,7 @@ func NewConsole(db *database.Queries, b *backend.Backend) *Console {
 	}
 }
 
-func (c *Console) Serve(ctx context.Context, consoleAddr, backendAddr string) error {
+func (c *Console) HttpRouter() http.Handler {
 	mux := chi.NewRouter()
 
 	mux.Use(middleware.Recoverer)
@@ -107,9 +107,13 @@ func (c *Console) Serve(ctx context.Context, consoleAddr, backendAddr string) er
 		mux.Mount("/grpc/", http.StripPrefix("/grpc", api))
 	}
 
+	return mux
+}
+
+func (c *Console) Serve(ctx context.Context, consoleAddr, backendAddr string) error {
 	server := &http.Server{
 		Addr:         consoleAddr,
-		Handler:      h2c.NewHandler(mux, &http2.Server{}),
+		Handler:      h2c.NewHandler(c.HttpRouter(), &http2.Server{}),
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  120 * time.Second,
