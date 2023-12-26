@@ -17,6 +17,10 @@ type gameServiceServer struct {
 }
 
 func (s *gameServiceServer) ListGames(ctx context.Context, req *connect.Request[multiv1.ListGamesRequest]) (*connect.Response[multiv1.ListGamesResponse], error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
 	gameRooms, err := s.DB.ListGameRooms(ctx)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
@@ -38,6 +42,10 @@ func (s *gameServiceServer) ListGames(ctx context.Context, req *connect.Request[
 }
 
 func (s gameServiceServer) GetGame(ctx context.Context, req *connect.Request[multiv1.GetGameRequest]) (*connect.Response[multiv1.GetGameResponse], error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
 	room, err := s.DB.GetGameRoom(ctx, req.Msg.GameName)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
@@ -79,6 +87,10 @@ func (s *gameServiceServer) CreateGame(ctx context.Context, req *connect.Request
 }
 
 func (s gameServiceServer) JoinGame(ctx context.Context, req *connect.Request[multiv1.JoinGameRequest]) (*connect.Response[multiv1.JoinGameResponse], error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
 	err := s.DB.AddPlayerToRoom(ctx, database.AddPlayerToRoomParams{
 		GameRoomID:  req.Msg.GameRoomId,
 		CharacterID: req.Msg.CharacterId,
@@ -93,6 +105,10 @@ func (s gameServiceServer) JoinGame(ctx context.Context, req *connect.Request[mu
 }
 
 func (s gameServiceServer) ListPlayers(ctx context.Context, req *connect.Request[multiv1.ListPlayersRequest]) (*connect.Response[multiv1.ListPlayersResponse], error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
 	roomPlayers, err := s.DB.GetGameRoomPlayers(ctx, req.Msg.GameRoomId)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)

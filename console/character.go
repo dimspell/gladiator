@@ -19,6 +19,10 @@ type characterServiceServer struct {
 }
 
 func (s *characterServiceServer) ListCharacters(ctx context.Context, req *connect.Request[multiv1.ListCharactersRequest]) (*connect.Response[multiv1.ListCharactersResponse], error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
 	user, err := s.DB.GetUserByID(ctx, req.Msg.UserId)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
@@ -85,6 +89,10 @@ func (s *characterServiceServer) ListCharacters(ctx context.Context, req *connec
 }
 
 func (s *characterServiceServer) GetCharacter(ctx context.Context, req *connect.Request[multiv1.GetCharacterRequest]) (*connect.Response[multiv1.GetCharacterResponse], error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
 	character, err := s.DB.FindCharacter(ctx, database.FindCharacterParams{
 		UserID:        req.Msg.UserId,
 		CharacterName: req.Msg.CharacterName,
@@ -146,6 +154,10 @@ func (s *characterServiceServer) GetCharacter(ctx context.Context, req *connect.
 }
 
 func (s *characterServiceServer) CreateCharacter(ctx context.Context, req *connect.Request[multiv1.CreateCharacterRequest]) (*connect.Response[multiv1.CreateCharacterResponse], error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
 	info := model.ParseCharacterInfo(req.Msg.Stats)
 	character, err := s.DB.CreateCharacter(ctx, database.CreateCharacterParams{
 		Strength:             int64(info.Strength),
@@ -202,6 +214,10 @@ func (s *characterServiceServer) CreateCharacter(ctx context.Context, req *conne
 }
 
 func (s *characterServiceServer) PutStats(ctx context.Context, req *connect.Request[multiv1.PutStatsRequest]) (*connect.Response[multiv1.PutStatsResponse], error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
 	info := model.ParseCharacterInfo(req.Msg.Stats)
 	err := s.DB.UpdateCharacterStats(ctx, database.UpdateCharacterStatsParams{
 		Strength:             int64(info.Strength),
@@ -249,6 +265,10 @@ func (s *characterServiceServer) PutStats(ctx context.Context, req *connect.Requ
 }
 
 func (s *characterServiceServer) PutSpells(ctx context.Context, req *connect.Request[multiv1.PutSpellsRequest]) (*connect.Response[multiv1.PutSpellsResponse], error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
 	spells := base64.StdEncoding.EncodeToString(req.Msg.Spells)
 
 	err := s.DB.UpdateCharacterSpells(ctx, database.UpdateCharacterSpellsParams{
@@ -265,6 +285,10 @@ func (s *characterServiceServer) PutSpells(ctx context.Context, req *connect.Req
 }
 
 func (s *characterServiceServer) PutInventoryCharacter(ctx context.Context, req *connect.Request[multiv1.PutInventoryRequest]) (*connect.Response[multiv1.PutInventoryResponse], error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
 	inventory := base64.StdEncoding.EncodeToString(req.Msg.Inventory)
 
 	err := s.DB.UpdateCharacterInventory(ctx, database.UpdateCharacterInventoryParams{
@@ -281,6 +305,10 @@ func (s *characterServiceServer) PutInventoryCharacter(ctx context.Context, req 
 }
 
 func (s *characterServiceServer) DeleteCharacter(ctx context.Context, req *connect.Request[multiv1.DeleteCharacterRequest]) (*connect.Response[multiv1.DeleteCharacterResponse], error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
 	err := s.DB.DeleteCharacter(ctx, database.DeleteCharacterParams{
 		CharacterName: req.Msg.CharacterName,
 		UserID:        req.Msg.UserId,

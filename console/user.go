@@ -19,6 +19,10 @@ type userServiceServer struct {
 }
 
 func (s *userServiceServer) CreateUser(ctx context.Context, req *connect.Request[multiv1.CreateUserRequest]) (*connect.Response[multiv1.CreateUserResponse], error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
 	password, err := hashPassword(req.Msg.Password)
 	if err != nil {
 		slog.Warn("packet-42: could not hash the password", "err", err)
@@ -43,6 +47,10 @@ func (s *userServiceServer) CreateUser(ctx context.Context, req *connect.Request
 }
 
 func (s *userServiceServer) AuthenticateUser(ctx context.Context, req *connect.Request[multiv1.AuthenticateUserRequest]) (*connect.Response[multiv1.AuthenticateUserResponse], error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
 	user, err := s.DB.GetUserByName(ctx, req.Msg.Username)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeNotFound, err)

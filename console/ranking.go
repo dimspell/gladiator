@@ -16,18 +16,20 @@ type rankingServiceServer struct {
 }
 
 func (s *rankingServiceServer) GetRanking(ctx context.Context, req *connect.Request[multiv1.GetRankingRequest]) (*connect.Response[multiv1.GetRankingResponse], error) {
-	data := req.Msg
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 
 	positions, err := s.DB.SelectRanking(ctx, database.SelectRankingParams{
-		ClassType: int64(data.ClassType),
-		Offset:    int64(data.Offset),
+		ClassType: int64(req.Msg.GetClassType()),
+		Offset:    int64(req.Msg.GetOffset()),
 	})
 	if err != nil {
 		return nil, err
 	}
 	currentPlayer, err := s.DB.GetCurrentUser(ctx, database.GetCurrentUserParams{
-		ID:            data.UserId,
-		CharacterName: data.CharacterName,
+		ID:            req.Msg.GetUserId(),
+		CharacterName: req.Msg.GetCharacterName(),
 	})
 	if err != nil {
 		return nil, err
