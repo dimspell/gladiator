@@ -22,7 +22,7 @@ func (b *Backend) HandleSelectGame(session *model.Session, req SelectGameRequest
 		return err
 	}
 
-	respRoom, err := b.GameClient.GetGame(context.TODO(),
+	respGame, err := b.GameClient.GetGame(context.TODO(),
 		connect.NewRequest(&multiv1.GetGameRequest{
 			UserId:   session.UserID,
 			GameName: data.RoomName,
@@ -30,19 +30,36 @@ func (b *Backend) HandleSelectGame(session *model.Session, req SelectGameRequest
 	if err != nil {
 		return err
 	}
+
+	// gameRoom := model.GameRoom{
+	// 	Lobby: model.LobbyRoom{
+	// 		HostIPAddress: [4]byte{127, 0, 0, 28},
+	// 		Name:          respGame.Msg.Game.Name,
+	// 		Password:      respGame.Msg.Game.Password,
+	// 	},
+	// 	MapID: uint32(respGame.Msg.Game.GetMapId()),
+	// 	Players: []model.LobbyPlayer{
+	// 		{
+	// 			ClassType: model.ClassType(model.ClassTypeArcher),
+	// 			Name:      "character2",
+	// 			IPAddress: [4]byte{127, 0, 0, 28},
+	// 		},
+	// 	},
+	// }
+
 	gameRoom := model.GameRoom{
 		Lobby: model.LobbyRoom{
 			HostIPAddress: [4]byte{},
-			Name:          respRoom.Msg.Game.Name,
-			Password:      respRoom.Msg.Game.Password,
+			Name:          respGame.Msg.Game.Name,
+			Password:      respGame.Msg.Game.Password,
 		},
-		MapID: uint32(respRoom.Msg.Game.MapId),
+		MapID: uint32(respGame.Msg.Game.MapId),
 	}
-	copy(gameRoom.Lobby.HostIPAddress[:], net.ParseIP(respRoom.Msg.Game.HostIpAddress).To4())
+	copy(gameRoom.Lobby.HostIPAddress[:], net.ParseIP(respGame.Msg.Game.HostIpAddress).To4())
 
 	respPlayers, err := b.GameClient.ListPlayers(context.TODO(),
 		connect.NewRequest(&multiv1.ListPlayersRequest{
-			GameRoomId: respRoom.Msg.Game.GameId,
+			GameRoomId: respGame.Msg.Game.GameId,
 		}))
 	if err != nil {
 		return err

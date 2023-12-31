@@ -3,7 +3,6 @@ package backend
 import (
 	"context"
 	"fmt"
-	"log"
 	"log/slog"
 	"net"
 	"net/http"
@@ -13,18 +12,16 @@ import (
 	"connectrpc.com/connect"
 	"connectrpc.com/otelconnect"
 	"github.com/dispel-re/dispel-multi/backend/packetlogger"
-	"github.com/dispel-re/dispel-multi/backend/proxy"
 	"github.com/dispel-re/dispel-multi/gen/multi/v1/multiv1connect"
 	"github.com/dispel-re/dispel-multi/model"
-	"github.com/google/uuid"
-	"github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats.go"
 )
 
 type Backend struct {
-	Sessions     map[string]*model.Session
-	PacketLogger *slog.Logger
-	Queue        *nats.Conn
+	Sessions       map[string]*model.Session
+	PacketLogger   *slog.Logger
+	Queue          *nats.Conn
+	SessionCounter int
 
 	EventChan chan uint8
 
@@ -48,7 +45,7 @@ func NewBackend(consoleAddr string) *Backend {
 		},
 	}
 
-	nc, _ := nats.Connect(fmt.Sprintf("localhost:%", server.DEFAULT_PORT))
+	// nc, _ := nats.Connect(fmt.Sprintf("localhost:%d", server.DEFAULT_PORT))
 
 	interceptor := connect.WithInterceptors(otelconnect.NewInterceptor())
 	consoleUri := fmt.Sprintf("http://%s/grpc", consoleAddr)
@@ -56,7 +53,7 @@ func NewBackend(consoleAddr string) *Backend {
 	return &Backend{
 		Sessions:     make(map[string]*model.Session),
 		PacketLogger: slog.New(packetlogger.New(os.Stderr, &packetlogger.Options{Level: slog.LevelDebug})),
-		Queue:        nc,
+		// Queue:        nc,
 
 		CharacterClient: multiv1connect.NewCharacterServiceClient(httpClient, consoleUri, interceptor),
 		GameClient:      multiv1connect.NewGameServiceClient(httpClient, consoleUri, interceptor),
@@ -66,9 +63,11 @@ func NewBackend(consoleAddr string) *Backend {
 }
 
 func (b *Backend) Start(ctx context.Context) {
-	if err := b.Events(ctx); err != nil {
-		log.Fatal("Backend.Start", err)
-	}
+	// go func(ctx context.Context) {
+	// 	if err := b.Events(ctx); err != nil {
+	// 		log.Fatal("Backend.Start", err)
+	// 	}
+	// }(ctx)
 }
 
 func (b *Backend) Shutdown(ctx context.Context) {
@@ -88,7 +87,9 @@ func (b *Backend) Shutdown(ctx context.Context) {
 }
 
 func (b *Backend) NewSession(conn net.Conn) *model.Session {
-	id := uuid.New().String()
+	// id := uuid.New().String()
+	b.SessionCounter++
+	id := fmt.Sprintf("%d", b.SessionCounter)
 	slog.Debug("New session", "session", id)
 
 	session := &model.Session{Conn: conn, ID: id}
@@ -97,26 +98,27 @@ func (b *Backend) NewSession(conn net.Conn) *model.Session {
 }
 
 func (b *Backend) Events(ctx context.Context) error {
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	// ctx, cancel := context.WithCancel(ctx)
+	// defer cancel()
 
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case eventType := <-b.EventChan:
-			// TODO: Make a better distinction between events
-			switch eventType {
-			case EventNone:
-				continue
-			case EventHostGame:
-				go proxy.MockHostTCPServer(ctx)
-				go proxy.MockHostUDPServer(ctx)
-			case EventCloseConn:
-				cancel()
-			}
-		}
-	}
+	// for {
+	// 	select {
+	// 	case <-ctx.Done():
+	// 		return ctx.Err()
+	// 	case eventType := <-b.EventChan:
+	// 		// TODO: Make a better distinction between events
+	// 		switch eventType {
+	// 		case EventNone:
+	// 			continue
+	// 		case EventHostGame:
+	// 			go proxy.MockHostTCPServer(ctx)
+	// 			go proxy.MockHostUDPServer(ctx)
+	// 		case EventCloseConn:
+	// 			cancel()
+	// 		}
+	// 	}
+	// }
+	return nil
 }
 
 const (
@@ -126,7 +128,7 @@ const (
 )
 
 func (b *Backend) CloseSession(session *model.Session) error {
-	slog.Debug("Session closed", "session", session.ID)
+	slog.Info("Session closed", "session", session.ID)
 
 	// TODO: wrap all errors
 	_, ok := b.Sessions[session.ID]

@@ -163,8 +163,8 @@ func (c *Console) Serve(ctx context.Context, consoleAddr, backendAddr string) er
 		}
 
 		// There is no need to gracefully quit the NATS by listening to signals.
-		c.Queue = c.NATS()
-		go c.Queue.Start()
+		// c.Queue = c.NATS()
+		// go c.Queue.Start()
 
 		// TODO: Set readiness, startup, liveness probe
 		atomic.StoreInt32(&healthy, 0)

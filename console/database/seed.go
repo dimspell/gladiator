@@ -173,7 +173,7 @@ func Seed(queries *Queries) error {
 		return err
 	}
 
-	_, err = queries.CreateCharacter(context.TODO(), CreateCharacterParams{
+	character2, err := queries.CreateCharacter(context.TODO(), CreateCharacterParams{
 		Strength:             100,
 		Agility:              100,
 		Wisdom:               100,
@@ -181,7 +181,7 @@ func Seed(queries *Queries) error {
 		HealthPoints:         100,
 		MagicPoints:          100,
 		ExperiencePoints:     9,
-		Money:                300,
+		Money:                300000,
 		ScorePoints:          0,
 		ClassType:            int64(model.ClassTypeArcher),
 		SkinCarnation:        int64(model.SkinCarnationMaleBrown),
@@ -203,14 +203,70 @@ func Seed(queries *Queries) error {
 		BluntedWeapons:       1,
 		Archery:              1,
 		Polearms:             1,
-		Wizardry:             1,
+		Wizardry:             100,
 		BonusPoints:          10,
-		CharacterName:        "character",
+		CharacterName:        "character2",
 		UserID:               user2.ID,
 	})
 	if err != nil {
 		return err
 	}
+
+	queries.UpdateCharacterSpells(context.TODO(), UpdateCharacterSpellsParams{
+		CharacterName: character2.CharacterName,
+		Spells: sql.NullString{
+			String: base64.StdEncoding.EncodeToString(spells),
+			Valid:  true,
+		},
+		UserID: user2.ID,
+	})
+
+	queries.UpdateCharacterInventory(context.TODO(), UpdateCharacterInventoryParams{
+		CharacterName: character2.CharacterName,
+		Inventory: sql.NullString{
+			String: base64.StdEncoding.EncodeToString(inventory.ToBytes()),
+			Valid:  true,
+		},
+		UserID: user2.ID,
+	})
+
+	gameRoom, _ := queries.CreateGameRoom(context.TODO(), CreateGameRoomParams{
+		Name:          "test",
+		Password:      sql.NullString{Valid: false},
+		MapID:         1,
+		HostIpAddress: "127.0.0.28",
+		// UserID:   user2.ID,
+	})
+
+	queries.AddPlayerToRoom(context.TODO(), AddPlayerToRoomParams{
+		GameRoomID:  gameRoom.ID,
+		CharacterID: character.ID,
+		IpAddress:   "127.0.0.28",
+	})
+
+	// respGame, err := b.GameClient.CreateGame(context.TODO(), connect.NewRequest(&multiv1.CreateGameRequest{
+	// 	UserId:        session.UserID,
+	// 	GameName:      data.RoomName,
+	// 	Password:      data.Password,
+	// 	HostIpAddress: hostIPAddress,
+	// 	MapId:         int64(data.MapID),
+	// }))
+	// if err != nil {
+	// 	return err
+	// }
+	// slog.Info("packet-28: created game room",
+	// 	"id", respGame.Msg.Game.GameId,
+	// 	"name", respGame.Msg.Game.Name)
+
+	// _, err = b.GameClient.JoinGame(context.TODO(), connect.NewRequest(&multiv1.JoinGameRequest{
+	// 	UserId:      session.UserID,
+	// 	CharacterId: session.CharacterID,
+	// 	GameRoomId:  respGame.Msg.Game.GetGameId(),
+	// 	IpAddress:   hostIPAddress,
+	// }))
+	// if err != nil {
+	// 	return err
+	// }
 
 	return nil
 }

@@ -82,12 +82,14 @@ func (b *Backend) handleClient(conn net.Conn) error {
 		if err == io.EOF {
 			return nil
 		}
+		slog.Warn("Handshake failed", "err", err)
 		return err
 	}
 	defer b.CloseSession(session)
 
 	for {
 		if err := b.handleCommands(session); err != nil {
+			slog.Warn("Command failed", "err", err)
 			return err
 		}
 	}

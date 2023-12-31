@@ -30,38 +30,39 @@ func (b *Backend) HandleJoinGame(session *model.Session, req JoinGameRequest) er
 		return err
 	}
 
-	// if err := pubsub.PublishJoinGame(b.Queue, pubsub.JoinGameRequest{
-	// 	GameId: respGame.Msg.GetGame().GetGameId(),
-	// }); err != nil {
-	// 	return err
-	// }
-	// Create a listener to 6114
+	clientIpAddress := session.Conn.RemoteAddr().(*net.TCPAddr).IP.To4().String()
+	// clientIpAddress := "127.0.0.34"
 
-	// proxy.ListenTCP(10)
-	// proxy.ListenUDP(10)
-	//
-	// {
-	// 	respPlayers, err := b.GameClient.ListPlayers(context.TODO(), connect.NewRequest(&multiv1.ListPlayersRequest{
-	// 		GameRoomId: respGame.Msg.Game.GameId,
-	// 	}))
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	for i, _ := range respPlayers.Msg.GetPlayers() {
-	// 		proxy.ListenUDP(byte(i + 1))
-	// 	}
-	// }
-
-	tcpAddr := session.Conn.RemoteAddr().(*net.TCPAddr)
 	_, err = b.GameClient.JoinGame(context.TODO(), connect.NewRequest(&multiv1.JoinGameRequest{
 		UserId:      session.UserID,
 		CharacterId: session.CharacterID,
 		GameRoomId:  respGame.Msg.Game.GameId,
-		IpAddress:   tcpAddr.IP.To4().String(),
+		IpAddress:   clientIpAddress,
 	}))
 	if err != nil {
 		return err
 	}
+
+	// gameRoom := model.GameRoom{
+	// 	Lobby: model.LobbyRoom{
+	// 		HostIPAddress: [4]byte{127, 0, 0, 28},
+	// 		Name:          respGame.Msg.Game.Name,
+	// 		Password:      respGame.Msg.Game.Password,
+	// 	},
+	// 	MapID: uint32(respGame.Msg.Game.GetMapId()),
+	// 	Players: []model.LobbyPlayer{
+	// 		{
+	// 			ClassType: model.ClassType(model.ClassTypeArcher),
+	// 			Name:      "character2",
+	// 			IPAddress: [4]byte{127, 0, 0, 28},
+	// 		},
+	// 		{
+	// 			ClassType: model.ClassType(model.ClassTypeArcher),
+	// 			Name:      "tester",
+	// 			IPAddress: [4]byte{127, 0, 0, 34},
+	// 		},
+	// 	},
+	// }
 
 	gameRoom := model.GameRoom{
 		Lobby: model.LobbyRoom{
@@ -71,8 +72,8 @@ func (b *Backend) HandleJoinGame(session *model.Session, req JoinGameRequest) er
 		},
 		MapID: uint32(respGame.Msg.Game.GetMapId()),
 	}
-	// copy(gameRoom.Lobby.HostIPAddress[:], net.ParseIP(respGame.Msg.Game.HostIpAddress).To4())
-	gameRoom.Lobby.HostIPAddress = [4]byte{127, 21, 37, 10}
+	copy(gameRoom.Lobby.HostIPAddress[:], net.ParseIP(respGame.Msg.Game.HostIpAddress).To4())
+	// gameRoom.Lobby.HostIPAddress = [4]byte{127, 21, 37, 28}
 
 	respPlayers, err := b.GameClient.ListPlayers(context.TODO(), connect.NewRequest(&multiv1.ListPlayersRequest{
 		GameRoomId: respGame.Msg.Game.GameId,
