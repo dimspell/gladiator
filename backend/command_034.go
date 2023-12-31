@@ -30,7 +30,8 @@ func (b *Backend) HandleJoinGame(session *model.Session, req JoinGameRequest) er
 		return err
 	}
 
-	clientIpAddress := session.Conn.RemoteAddr().(*net.TCPAddr).IP.To4().String()
+	// clientIpAddress := session.Conn.RemoteAddr().(*net.TCPAddr).IP.To4().String()
+	clientIpAddress := "192.168.121.212"
 	// clientIpAddress := "127.0.0.34"
 
 	_, err = b.GameClient.JoinGame(context.TODO(), connect.NewRequest(&multiv1.JoinGameRequest{
