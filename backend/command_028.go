@@ -6,7 +6,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"log/slog"
-	"net"
 
 	"connectrpc.com/connect"
 	multiv1 "github.com/dispel-re/dispel-multi/gen/multi/v1"
@@ -26,8 +25,9 @@ func (b *Backend) HandleCreateGame(session *model.Session, req CreateGameRequest
 
 	response := make([]byte, 4)
 
+	hostIPAddress := "192.168.121.169"
 	// hostIPAddress := "127.0.0.28"
-	hostIPAddress := session.Conn.RemoteAddr().(*net.TCPAddr).IP.String()
+	// hostIPAddress := session.Conn.RemoteAddr().(*net.TCPAddr).IP.String()
 
 	switch data.State {
 	case uint32(0):
