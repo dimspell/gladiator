@@ -51,7 +51,7 @@ func (b *Backend) HandleSelectGame(session *model.Session, req SelectGameRequest
 		Lobby: model.LobbyRoom{
 			HostIPAddress: [4]byte{},
 			Name:          respGame.Msg.Game.Name,
-			Password:      respGame.Msg.Game.Password,
+			Password:      "",
 		},
 		MapID: uint32(respGame.Msg.Game.MapId),
 	}

@@ -47,7 +47,7 @@ func (b *Backend) HandleJoinGame(session *model.Session, req JoinGameRequest) er
 		Lobby: model.LobbyRoom{
 			HostIPAddress: [4]byte{192, 168, 121, 169},
 			Name:          respGame.Msg.Game.Name,
-			Password:      respGame.Msg.Game.Password,
+			Password:      "",
 		},
 		MapID: uint32(respGame.Msg.Game.GetMapId()),
 		Players: []model.LobbyPlayer{
