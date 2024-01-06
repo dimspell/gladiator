@@ -252,6 +252,25 @@ func (q *Queries) DeleteCharacter(ctx context.Context, arg DeleteCharacterParams
 	return err
 }
 
+const existPlayerInRoom = `-- name: ExistPlayerInRoom :one
+SELECT 1 as exist
+FROM game_room_players
+WHERE game_room_id = ?
+  AND character_id = ?
+`
+
+type ExistPlayerInRoomParams struct {
+	GameRoomID  int64
+	CharacterID int64
+}
+
+func (q *Queries) ExistPlayerInRoom(ctx context.Context, arg ExistPlayerInRoomParams) (int64, error) {
+	row := q.queryRow(ctx, q.existPlayerInRoomStmt, existPlayerInRoom, arg.GameRoomID, arg.CharacterID)
+	var exist int64
+	err := row.Scan(&exist)
+	return exist, err
+}
+
 const findCharacter = `-- name: FindCharacter :one
 SELECT id, user_id, character_name, strength, agility, wisdom, constitution, health_points, magic_points, experience_points, money, score_points, class_type, skin_carnation, hair_style, light_armour_legs, light_armour_torso, light_armour_hands, light_armour_boots, full_armour, armour_emblem, helmet, secondary_weapon, primary_weapon, shield, unknown_equipment_slot, gender, level, edged_weapons, blunted_weapons, archery, polearms, wizardry, holy_magic, dark_magic, bonus_points, inventory, spells
 FROM characters
@@ -372,9 +391,9 @@ func (q *Queries) GetGameRoom(ctx context.Context, name string) (GameRoom, error
 }
 
 const getGameRoomPlayers = `-- name: GetGameRoomPlayers :many
-SELECT character_name,
-       class_type,
-       ip_address
+SELECT DISTINCT character_name,
+                class_type,
+                ip_address
 FROM game_rooms
          JOIN game_room_players ON game_rooms.id = game_room_players.game_room_id
          JOIN characters ON game_room_players.character_id = characters.id

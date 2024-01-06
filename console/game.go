@@ -91,6 +91,14 @@ func (s gameServiceServer) JoinGame(ctx context.Context, req *connect.Request[mu
 		return nil, err
 	}
 
+	exist, _ := s.DB.ExistPlayerInRoom(ctx, database.ExistPlayerInRoomParams{
+		GameRoomID:  req.Msg.GameRoomId,
+		CharacterID: req.Msg.CharacterId,
+	})
+	if exist == 1 {
+		return connect.NewResponse(&multiv1.JoinGameResponse{}), nil
+	}
+
 	err := s.DB.AddPlayerToRoom(ctx, database.AddPlayerToRoomParams{
 		GameRoomID:  req.Msg.GameRoomId,
 		CharacterID: req.Msg.CharacterId,

@@ -39,6 +39,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.deleteCharacterStmt, err = db.PrepareContext(ctx, deleteCharacter); err != nil {
 		return nil, fmt.Errorf("error preparing query DeleteCharacter: %w", err)
 	}
+	if q.existPlayerInRoomStmt, err = db.PrepareContext(ctx, existPlayerInRoom); err != nil {
+		return nil, fmt.Errorf("error preparing query ExistPlayerInRoom: %w", err)
+	}
 	if q.findCharacterStmt, err = db.PrepareContext(ctx, findCharacter); err != nil {
 		return nil, fmt.Errorf("error preparing query FindCharacter: %w", err)
 	}
@@ -103,6 +106,11 @@ func (q *Queries) Close() error {
 	if q.deleteCharacterStmt != nil {
 		if cerr := q.deleteCharacterStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing deleteCharacterStmt: %w", cerr)
+		}
+	}
+	if q.existPlayerInRoomStmt != nil {
+		if cerr := q.existPlayerInRoomStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing existPlayerInRoomStmt: %w", cerr)
 		}
 	}
 	if q.findCharacterStmt != nil {
@@ -209,6 +217,7 @@ type Queries struct {
 	createGameRoomStmt           *sql.Stmt
 	createUserStmt               *sql.Stmt
 	deleteCharacterStmt          *sql.Stmt
+	existPlayerInRoomStmt        *sql.Stmt
 	findCharacterStmt            *sql.Stmt
 	getCurrentUserStmt           *sql.Stmt
 	getGameRoomStmt              *sql.Stmt
@@ -232,6 +241,7 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		createGameRoomStmt:           q.createGameRoomStmt,
 		createUserStmt:               q.createUserStmt,
 		deleteCharacterStmt:          q.deleteCharacterStmt,
+		existPlayerInRoomStmt:        q.existPlayerInRoomStmt,
 		findCharacterStmt:            q.findCharacterStmt,
 		getCurrentUserStmt:           q.getCurrentUserStmt,
 		getGameRoomStmt:              q.getGameRoomStmt,
