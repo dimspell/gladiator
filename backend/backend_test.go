@@ -92,8 +92,23 @@ func (m *mockConn) ClearReadData() {
 type mockGameClient struct {
 	multiv1connect.UnimplementedGameServiceHandler
 
-	CreateGameResponse *connect.Response[v1.CreateGameResponse]
-	ListGamesResponse  *connect.Response[v1.ListGamesResponse]
+	GetGameResponse     *connect.Response[v1.GetGameResponse]
+	JoinGameResponse    *connect.Response[v1.JoinGameResponse]
+	ListPlayersResponse *connect.Response[v1.ListPlayersResponse]
+	CreateGameResponse  *connect.Response[v1.CreateGameResponse]
+	ListGamesResponse   *connect.Response[v1.ListGamesResponse]
+}
+
+func (m *mockGameClient) GetGame(context.Context, *connect.Request[v1.GetGameRequest]) (*connect.Response[v1.GetGameResponse], error) {
+	return m.GetGameResponse, nil
+}
+
+func (m *mockGameClient) JoinGame(context.Context, *connect.Request[v1.JoinGameRequest]) (*connect.Response[v1.JoinGameResponse], error) {
+	return m.JoinGameResponse, nil
+}
+
+func (m *mockGameClient) ListPlayers(context.Context, *connect.Request[v1.ListPlayersRequest]) (*connect.Response[v1.ListPlayersResponse], error) {
+	return m.ListPlayersResponse, nil
 }
 
 func (m *mockGameClient) CreateGame(context.Context, *connect.Request[v1.CreateGameRequest]) (*connect.Response[v1.CreateGameResponse], error) {
