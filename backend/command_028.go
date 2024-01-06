@@ -25,16 +25,17 @@ func (b *Backend) HandleCreateGame(session *model.Session, req CreateGameRequest
 
 	response := make([]byte, 4)
 
-	hostIPAddress := "192.168.121.169"
-	// hostIPAddress := "127.0.0.28"
+	// hostIPAddress := "192.168.121.169"
+	hostIPAddress := "127.0.0.28"
 	// hostIPAddress := session.Conn.RemoteAddr().(*net.TCPAddr).IP.String()
 
 	switch data.State {
 	case uint32(0):
 		respGame, err := b.GameClient.CreateGame(context.TODO(), connect.NewRequest(&multiv1.CreateGameRequest{
-			UserId:        session.UserID,
-			GameName:      data.RoomName,
-			Password:      data.Password,
+			UserId:   session.UserID,
+			GameName: data.RoomName,
+			// Password:      data.Password,
+			Password:      "",
 			HostIpAddress: hostIPAddress,
 			MapId:         int64(data.MapID),
 		}))

@@ -35,6 +35,7 @@ func (p *Proxy) listenUDP(ctx context.Context, connHost, connPort string) {
 	fmt.Println("Listening UDP on", udpAddr.String())
 
 	for {
+		fmt.Println("udp - waiting for read")
 		if ctx.Err() != nil {
 			return
 		}
@@ -45,7 +46,7 @@ func (p *Proxy) listenUDP(ctx context.Context, connHost, connPort string) {
 			break
 		}
 
-		log.Fatalln(connPort, addr.String(), string(buf[:n]), buf[:n])
+		fmt.Println(connPort, addr.String(), string(buf[:n]), buf[:n])
 	}
 }
 
@@ -61,6 +62,8 @@ func (p *Proxy) listenTCP(ctx context.Context, connHost, connPort string) {
 		defer conn.Close()
 
 		for {
+			fmt.Println("waiting for read")
+
 			buf := make([]byte, 1024)
 			n, err := conn.Read(buf)
 			if err != nil {
@@ -68,6 +71,9 @@ func (p *Proxy) listenTCP(ctx context.Context, connHost, connPort string) {
 				return
 			}
 			fmt.Println(connPort, string(buf[:n]), n, buf[:n])
+
+			conn.Write([]byte{35, 35, 116, 101, 115, 116, 0})
+			// conn.Write(buf[:n])
 		}
 	}
 
