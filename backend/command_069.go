@@ -67,7 +67,7 @@ func (b *Backend) HandleSelectGame(session *model.Session, req SelectGameRequest
 	for _, player := range respPlayers.Msg.GetPlayers() {
 		lobbyPlayer := model.LobbyPlayer{
 			ClassType: model.ClassType(player.ClassType),
-			Name:      player.CharacterName,
+			Name:      player.Username,
 		}
 		copy(lobbyPlayer.IPAddress[:], net.ParseIP(player.IpAddress).To4())
 		gameRoom.Players = append(gameRoom.Players, lobbyPlayer)
