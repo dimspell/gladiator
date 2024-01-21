@@ -164,12 +164,14 @@ VALUES (?, ?, ?, ?)
 RETURNING *;
 
 -- name: GetGameRoomPlayers :many
-SELECT DISTINCT character_name,
+SELECT DISTINCT username,
+                character_name,
                 class_type,
                 ip_address
 FROM game_rooms
          JOIN game_room_players ON game_rooms.id = game_room_players.game_room_id
          JOIN characters ON game_room_players.character_id = characters.id
+         JOIN users on users.id = characters.user_id
 WHERE game_rooms.id = ?;
 
 -- name: ExistPlayerInRoom :one

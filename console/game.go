@@ -125,6 +125,7 @@ func (s gameServiceServer) ListPlayers(ctx context.Context, req *connect.Request
 	players := make([]*multiv1.Player, len(roomPlayers))
 	for i, player := range roomPlayers {
 		players[i] = &multiv1.Player{
+			Username:      player.Username,
 			CharacterName: player.CharacterName,
 			ClassType:     player.ClassType,
 			IpAddress:     player.IpAddress,

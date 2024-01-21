@@ -11,7 +11,8 @@ message Game {
 }
 
 message Player {
-  string character_name = 1;
-  int64 class_type = 2;
-  string ip_address = 3;
+  string username = 1;
+  string character_name = 2;
+  int64 class_type = 3;
+  string ip_address = 4;
 }

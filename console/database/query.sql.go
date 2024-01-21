@@ -391,16 +391,19 @@ func (q *Queries) GetGameRoom(ctx context.Context, name string) (GameRoom, error
 }
 
 const getGameRoomPlayers = `-- name: GetGameRoomPlayers :many
-SELECT DISTINCT character_name,
+SELECT DISTINCT username,
+                character_name,
                 class_type,
                 ip_address
 FROM game_rooms
          JOIN game_room_players ON game_rooms.id = game_room_players.game_room_id
          JOIN characters ON game_room_players.character_id = characters.id
+         JOIN users on users.id = characters.user_id
 WHERE game_rooms.id = ?
 `
 
 type GetGameRoomPlayersRow struct {
+	Username      string
 	CharacterName string
 	ClassType     int64
 	IpAddress     string
@@ -415,7 +418,12 @@ func (q *Queries) GetGameRoomPlayers(ctx context.Context, id int64) ([]GetGameRo
 	var items []GetGameRoomPlayersRow
 	for rows.Next() {
 		var i GetGameRoomPlayersRow
-		if err := rows.Scan(&i.CharacterName, &i.ClassType, &i.IpAddress); err != nil {
+		if err := rows.Scan(
+			&i.Username,
+			&i.CharacterName,
+			&i.ClassType,
+			&i.IpAddress,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
