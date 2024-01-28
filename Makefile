@@ -7,7 +7,8 @@ mig_version ?= VERSION
 
 serve:
 	# go run ./ serve --backend-addr=127.0.0.1:6112 --console-addr=127.0.0.1:2137
-	go run ./ serve --backend-addr=127.0.0.1:6112 --console-addr=0.0.0.0:2137
+	go run ./ serve --backend-addr=0.0.0.0:6112 --console-addr=0.0.0.0:2137
+	(go build -v); (.\dispel-multi.exe serve --backend-addr=0.0.0.0:6112 --console-addr=0.0.0.0:2137)
 
 console:
 	go run ./ console --console-addr=127.0.0.1:2137
