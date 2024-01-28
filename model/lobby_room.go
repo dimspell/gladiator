@@ -1,15 +1,5 @@
 package model
 
-import (
-	"encoding/binary"
-)
-
-type GameRoom struct {
-	Lobby   LobbyRoom
-	MapID   uint32
-	Players []LobbyPlayer
-}
-
 type LobbyRoom struct {
 	HostIPAddress [4]byte
 	Name          string
@@ -28,15 +18,6 @@ func (room *LobbyRoom) ToBytes() []byte {
 	buf[ipLength+nameLength] = 0                     // Null byte
 	copy(buf[ipLength+nameLength+1:], room.Password) // Room password (null terminated string)
 
-	return buf
-}
-
-func (r *GameRoom) Details() []byte {
-	buf := []byte{}
-	buf = binary.LittleEndian.AppendUint32(buf, r.MapID)
-	for _, player := range r.Players {
-		buf = append(buf, player.ToBytes()...)
-	}
 	return buf
 }
 

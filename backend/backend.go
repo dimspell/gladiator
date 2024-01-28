@@ -17,6 +17,14 @@ import (
 	"github.com/nats-io/nats.go"
 )
 
+const DesktopIP byte = 212
+const LaptopIP byte = 169
+
+const GameRoomName = "room"
+
+const ClientIP byte = LaptopIP
+const HostIP byte = DesktopIP
+
 type Backend struct {
 	Sessions       map[string]*model.Session
 	PacketLogger   *slog.Logger

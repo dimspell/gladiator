@@ -2,13 +2,9 @@ package backend
 
 import (
 	"bytes"
-	"context"
 	"encoding/binary"
 	"fmt"
-	"log/slog"
 
-	"connectrpc.com/connect"
-	multiv1 "github.com/dispel-re/dispel-multi/gen/multi/v1"
 	"github.com/dispel-re/dispel-multi/model"
 )
 
@@ -25,36 +21,36 @@ func (b *Backend) HandleCreateGame(session *model.Session, req CreateGameRequest
 
 	response := make([]byte, 4)
 
-	// hostIPAddress := "192.168.121.169"
-	hostIPAddress := "127.0.0.28"
+	// hostIPAddress := "192.168.121.212"
+	// hostIPAddress := "127.0.0.28"
 	// hostIPAddress := session.Conn.RemoteAddr().(*net.TCPAddr).IP.String()
 
 	switch data.State {
 	case uint32(0):
-		respGame, err := b.GameClient.CreateGame(context.TODO(), connect.NewRequest(&multiv1.CreateGameRequest{
-			UserId:   session.UserID,
-			GameName: data.RoomName,
-			// Password:      data.Password,
-			Password:      "",
-			HostIpAddress: hostIPAddress,
-			MapId:         int64(data.MapID),
-		}))
-		if err != nil {
-			return err
-		}
-		slog.Info("packet-28: created game room",
-			"id", respGame.Msg.Game.GameId,
-			"name", respGame.Msg.Game.Name)
+		// respGame, err := b.GameClient.CreateGame(context.TODO(), connect.NewRequest(&multiv1.CreateGameRequest{
+		// 	UserId:   session.UserID,
+		// 	GameName: data.RoomName,
+		// 	// Password:      data.Password,
+		// 	Password:      "",
+		// 	HostIpAddress: hostIPAddress,
+		// 	MapId:         int64(data.MapID),
+		// }))
+		// if err != nil {
+		// 	return err
+		// }
+		// slog.Info("packet-28: created game room",
+		// 	"id", respGame.Msg.Game.GameId,
+		// 	"name", respGame.Msg.Game.Name)
 
-		_, err = b.GameClient.JoinGame(context.TODO(), connect.NewRequest(&multiv1.JoinGameRequest{
-			UserId:      session.UserID,
-			CharacterId: session.CharacterID,
-			GameRoomId:  respGame.Msg.Game.GetGameId(),
-			IpAddress:   hostIPAddress,
-		}))
-		if err != nil {
-			return err
-		}
+		// _, err = b.GameClient.JoinGame(context.TODO(), connect.NewRequest(&multiv1.JoinGameRequest{
+		// 	UserId:      session.UserID,
+		// 	CharacterId: session.CharacterID,
+		// 	GameRoomId:  respGame.Msg.Game.GetGameId(),
+		// 	IpAddress:   hostIPAddress,
+		// }))
+		// if err != nil {
+		// 	return err
+		// }
 		binary.LittleEndian.PutUint32(response[0:4], 1)
 		break
 	case uint32(1):
