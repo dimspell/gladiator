@@ -161,6 +161,7 @@ func (b *Backend) handleCommands(session *model.Session) error {
 			b.PacketLogger.Debug("Recv",
 				"packetType", pt,
 				"bytes", packet,
+				"sessionId", session.ID,
 				"length", len(packet),
 			)
 		}
@@ -277,6 +278,7 @@ func (b *Backend) Send(conn net.Conn, packetType PacketType, payload []byte) err
 	if b.PacketLogger != nil {
 		b.PacketLogger.Debug("Sent",
 			"packetType", packetType,
+			"remoteAddr", conn.RemoteAddr().String(),
 			"bytes", data,
 			"length", len(data),
 		)
