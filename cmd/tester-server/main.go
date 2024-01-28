@@ -8,12 +8,14 @@ import (
 	"os"
 )
 
+const backendIP = "192.168.121.212"
+
 func main() {
 	ctx := context.TODO()
 
 	p := Proxy{}
-	go p.listenTCP(ctx, "192.168.121.212", "6114")
-	go p.listenUDP(ctx, "192.168.121.212", "6113")
+	go p.listenTCP(ctx, backendIP, "6114")
+	go p.listenUDP(ctx, backendIP, "6113")
 
 	fmt.Println("Waiting...")
 	<-ctx.Done()

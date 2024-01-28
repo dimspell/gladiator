@@ -10,9 +10,12 @@ import (
 	"time"
 )
 
+const gameServerIP = "127.0.0.1"
+const clientIP = "127.0.0.34"
+
 func firstHelloPacket() []byte {
 	buf := bytes.NewBuffer([]byte{35, 35}) // header
-	buf.WriteString("username")            // user name (used in login)
+	buf.WriteString("test")                // user name (used in login)
 	buf.WriteByte(0)
 
 	return buf.Bytes()
@@ -22,19 +25,19 @@ func main() {
 	ctx := context.TODO()
 
 	p := Proxy{}
-	go p.listenUDP(ctx, "192.168.121.212", "6113")
+	go p.listenUDP(ctx, clientIP, "6113")
 
 	// Connect to tcp:6114 over TCP
 	// tcpConn, err := net.Dial("tcp4", "127.21.37.10:6114")
 	// tcpConn, err := net.Dial("tcp4", "127.0.0.1:6114")
-	tcpConn, err := net.Dial("tcp", "192.168.121.169:6114")
+	tcpConn, err := net.Dial("tcp", fmt.Sprintf("%s:6114", gameServerIP))
 	if err != nil {
 		log.Fatal(err)
 	}
 	log.Println("Connected TCP", tcpConn.LocalAddr().String(), tcpConn.RemoteAddr().String())
 	defer tcpConn.Close()
 
-	udpConn, err := net.Dial("udp", "192.168.121.169:6113")
+	udpConn, err := net.Dial("udp", fmt.Sprintf("%s:6113", gameServerIP))
 	if err != nil {
 		log.Fatal(err)
 	}
