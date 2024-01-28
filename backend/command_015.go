@@ -6,6 +6,13 @@ import (
 	"github.com/dispel-re/dispel-multi/model"
 )
 
+// TODO: Handle when host disconnect
+// msg: "Sent"
+// packetType: 15
+// remoteAddr: "127.0.0.1:7594"
+// bytes: [255 15 28 0 4 0 0 0 0 0 0 0 0 0 0 0 97 100 109 105 110 0 104 101 108 108 111 0]
+// length: 28
+
 func AppendCharacterToLobby(characterName string, classType model.ClassType, idx uint32) []byte {
 	buf := make([]byte, 4+4+4+len(characterName)+1)
 
