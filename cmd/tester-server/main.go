@@ -8,7 +8,7 @@ import (
 	"os"
 )
 
-const backendIP = "192.168.121.212"
+const backendIP = "127.0.1.28"
 
 func main() {
 	ctx := context.TODO()
@@ -50,7 +50,7 @@ func (p *Proxy) listenUDP(ctx context.Context, connHost, connPort string) {
 		}
 
 		if buf[0] == 26 {
-			udpConn.Write([]byte{26, 0, 2, 0})
+			udpConn.Write([]byte{27, 0, 2, 0})
 		}
 
 		fmt.Println(connPort, addr.String(), string(buf[:n]), buf[:n])

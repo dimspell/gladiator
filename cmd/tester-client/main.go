@@ -7,15 +7,15 @@ import (
 	"log"
 	"net"
 	"os"
-	"time"
 )
 
-const gameServerIP = "127.0.0.1"
-const clientIP = "127.0.0.34"
+const gameServerIP = "192.168.121.169"
+const clientIP = "192.168.121.212"
 
 func firstHelloPacket() []byte {
-	buf := bytes.NewBuffer([]byte{35, 35}) // header
-	buf.WriteString("test")                // user name (used in login)
+	// buf := bytes.NewBuffer([]byte{35, 35}) // header
+	buf := bytes.NewBuffer([]byte{'#', '#'}) // header
+	buf.WriteString("mage")                  // user name (used in login)
 	buf.WriteByte(0)
 
 	return buf.Bytes()
@@ -25,7 +25,7 @@ func main() {
 	ctx := context.TODO()
 
 	p := Proxy{}
-	go p.listenUDP(ctx, clientIP, "6113")
+	p.listenUDP(ctx, clientIP, "6113")
 
 	// Connect to tcp:6114 over TCP
 	// tcpConn, err := net.Dial("tcp4", "127.21.37.10:6114")
@@ -44,10 +44,19 @@ func main() {
 	log.Println("Connected UDP", udpConn.LocalAddr().String(), udpConn.RemoteAddr().String())
 
 	go func() {
-		time.Sleep(1 * time.Second)
 		log.Println("Writing")
 		var n int
 		var err error
+
+		{
+			udpPacket := []byte{26, 0, 2, 0}
+
+			n, err = udpConn.Write(udpPacket)
+			if err != nil {
+				log.Println("WRITE", err)
+			}
+			log.Println("Wrote UDP", udpPacket[:n])
+		}
 
 		// Write to tcp:6114 over TCP
 		log.Println("Payload to write", firstHelloPacket())
@@ -57,11 +66,6 @@ func main() {
 		}
 		log.Println("Wrote TCP", firstHelloPacket()[:n])
 
-		n, err = udpConn.Write([]byte{26, 0, 2, 0})
-		if err != nil {
-			log.Println("WRITE", err)
-		}
-		log.Println("Wrote UDP", []byte{26, 0, 2, 0}[:n])
 	}()
 
 	for {
@@ -83,33 +87,31 @@ func main() {
 type Proxy struct{}
 
 func (p *Proxy) listenUDP(ctx context.Context, connHost, connPort string) {
-	udpAddr, err := net.ResolveUDPAddr("udp", connHost+":"+connPort)
+	udpAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:6113", clientIP))
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	udpConn, err := net.ListenUDP("udp", udpAddr)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer udpConn.Close()
-
-	fmt.Println("Listening UDP on", udpAddr.String())
-
-	for {
-		if ctx.Err() != nil {
-			fmt.Println("Context done", ctx.Err().Error())
-			return
+	go func() {
+		udpListener, err := net.ListenUDP("udp", udpAddr)
+		if err != nil {
+			log.Fatal(err)
 		}
+		defer udpListener.Close()
 
 		buf := make([]byte, 1024)
-		n, addr, err := udpConn.ReadFrom(buf)
-		if err != nil {
-			break
-		}
+		log.Println("Listening on", udpListener.LocalAddr().String())
+		for {
+			n, addr, err := udpListener.ReadFromUDP(buf)
+			if err != nil {
+				log.Fatal(err)
+			}
 
-		log.Fatalln(connPort, addr.String(), string(buf[:n]), buf[:n])
-	}
+			// handle UDP packet
+			log.Printf("Received %d bytes from %s", n, addr.String())
+			fmt.Println(buf[:n])
+		}
+	}()
 }
 
 func (p *Proxy) listenTCP(ctx context.Context, connHost, connPort string) {
