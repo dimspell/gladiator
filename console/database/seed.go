@@ -187,7 +187,7 @@ func Seed(queries *Queries) error {
 		PrimaryWeapon:        73,
 		Shield:               100,
 		UnknownEquipmentSlot: 100,
-		Gender:               int64(model.GenderMale),
+		Gender:               int64(model.GenderFemale),
 		Level:                1,
 		EdgedWeapons:         1,
 		BluntedWeapons:       1,
@@ -220,23 +220,26 @@ func Seed(queries *Queries) error {
 	// 	UserID: user2.ID,
 	// })
 
-	// gameRoom, _ := queries.CreateGameRoom(context.TODO(), CreateGameRoomParams{
-	// 	Name:          "test",
-	// 	Password:      sql.NullString{Valid: false},
-	// 	MapID:         1,
-	// 	HostIpAddress: "127.0.0.28",
-	// 	// UserID:   user2.ID,
-	// })
-	// queries.AddPlayerToRoom(context.TODO(), AddPlayerToRoomParams{
-	// 	GameRoomID:  gameRoom.ID,
-	// 	CharacterID: character.ID,
-	// 	IpAddress:   "127.0.0.28",
-	// })
-	// queries.AddPlayerToRoom(context.TODO(), AddPlayerToRoomParams{
-	// 	GameRoomID:  gameRoom.ID,
-	// 	CharacterID: character2.ID,
-	// 	IpAddress:   "127.0.0.34",
-	// })
+	gameRoom, err := queries.CreateGameRoom(context.TODO(), CreateGameRoomParams{
+		Name:          "test",
+		Password:      sql.NullString{Valid: false},
+		MapID:         1,
+		HostIpAddress: "127.0.1.28",
+		// UserID:   user2.ID,
+	})
+	if err != nil {
+		return err
+	}
+	queries.AddPlayerToRoom(context.TODO(), AddPlayerToRoomParams{
+		GameRoomID:  gameRoom.ID,
+		CharacterID: character.ID,
+		IpAddress:   "127.0.1.28",
+	})
+	queries.AddPlayerToRoom(context.TODO(), AddPlayerToRoomParams{
+		GameRoomID:  gameRoom.ID,
+		CharacterID: character2.ID,
+		IpAddress:   "127.0.1.34",
+	})
 
 	// respGame, err := b.GameClient.CreateGame(context.TODO(), connect.NewRequest(&multiv1.CreateGameRequest{
 	// 	UserId:        session.UserID,
