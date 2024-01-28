@@ -14,3 +14,14 @@ This repository is a monorepo that contains multiple projects that helps to play
 - HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\AbalonStudio\Dispel\Multi\Server dispel.e2soft.com
 + HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\AbalonStudio\Dispel\Multi\Server localhost
 ```
+
+## Troubleshooting
+
+> "An attempt was made to access a socket in a way forbidden by its access permissions."
+
+Restart of the Host Network Service on Windows might fix this error. Open an elevated (with admin permissions) Command Prompt and run:
+
+```console
+net stop hns
+net start hns
+```
