@@ -65,7 +65,6 @@ func main() {
 			log.Println("WRITE", err)
 		}
 		log.Println("Wrote TCP", firstHelloPacket()[:n])
-
 	}()
 
 	for {

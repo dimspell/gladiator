@@ -14,8 +14,8 @@ func main() {
 	ctx := context.TODO()
 
 	p := Proxy{}
-	go p.listenTCP(ctx, backendIP, "6114")
-	go p.listenUDP(ctx, backendIP, "6113")
+	go p.listenTCP(ctx, "127.0.1.28", "6114")
+	go p.listenUDP(ctx, "127.0.1.28", "6113")
 
 	fmt.Println("Waiting...")
 	<-ctx.Done()
@@ -29,7 +29,7 @@ func (p *Proxy) listenUDP(ctx context.Context, connHost, connPort string) {
 		log.Fatal(err)
 	}
 
-	udpConn, err := net.ListenUDP("udp4", udpAddr)
+	udpConn, err := net.ListenUDP("udp", udpAddr)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -40,6 +40,7 @@ func (p *Proxy) listenUDP(ctx context.Context, connHost, connPort string) {
 	for {
 		fmt.Println("udp - waiting for read")
 		if ctx.Err() != nil {
+			fmt.Println("context err")
 			return
 		}
 
@@ -49,11 +50,15 @@ func (p *Proxy) listenUDP(ctx context.Context, connHost, connPort string) {
 			break
 		}
 
-		if buf[0] == 26 {
-			udpConn.Write([]byte{27, 0, 2, 0})
-		}
-
 		fmt.Println(connPort, addr.String(), string(buf[:n]), buf[:n])
+
+		if buf[0] == 26 {
+			{
+				_, err = udpConn.WriteToUDP([]byte{27, 0, 2, 0}, udpAddr)
+				fmt.Println(err)
+			}
+			fmt.Println("Responded with 27")
+		}
 	}
 }
 
