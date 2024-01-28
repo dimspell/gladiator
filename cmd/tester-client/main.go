@@ -12,7 +12,7 @@ import (
 
 func firstHelloPacket() []byte {
 	buf := bytes.NewBuffer([]byte{35, 35}) // header
-	buf.WriteString("hoster")              // game room name
+	buf.WriteString("username")            // user name (used in login)
 	buf.WriteByte(0)
 
 	return buf.Bytes()
@@ -22,18 +22,19 @@ func main() {
 	ctx := context.TODO()
 
 	p := Proxy{}
-	go p.listenUDP(ctx, "127.0.0.34", "6113")
+	go p.listenUDP(ctx, "192.168.121.212", "6113")
 
 	// Connect to tcp:6114 over TCP
 	// tcpConn, err := net.Dial("tcp4", "127.21.37.10:6114")
-	tcpConn, err := net.Dial("tcp4", "127.0.0.1:6114")
+	// tcpConn, err := net.Dial("tcp4", "127.0.0.1:6114")
+	tcpConn, err := net.Dial("tcp", "192.168.121.169:6114")
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Println("Connected", tcpConn.LocalAddr().String(), tcpConn.RemoteAddr().String())
+	log.Println("Connected TCP", tcpConn.LocalAddr().String(), tcpConn.RemoteAddr().String())
 	defer tcpConn.Close()
 
-	udpConn, err := net.Dial("udp4", "127.0.0.1:6113")
+	udpConn, err := net.Dial("udp", "192.168.121.169:6113")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -45,20 +46,19 @@ func main() {
 		var n int
 		var err error
 
-		n, err = udpConn.Write([]byte{26, 0, 2, 0})
-		if err != nil {
-			log.Println("WRITE", err)
-		}
-		log.Println("Wrote", []byte{26, 0, 2, 0}[:n])
-
 		// Write to tcp:6114 over TCP
-		log.Println("payload", firstHelloPacket())
+		log.Println("Payload to write", firstHelloPacket())
 		n, err = tcpConn.Write(firstHelloPacket())
 		if err != nil {
 			log.Println("WRITE", err)
 		}
-		log.Println("Wrote", firstHelloPacket()[:n])
+		log.Println("Wrote TCP", firstHelloPacket()[:n])
 
+		n, err = udpConn.Write([]byte{26, 0, 2, 0})
+		if err != nil {
+			log.Println("WRITE", err)
+		}
+		log.Println("Wrote UDP", []byte{26, 0, 2, 0}[:n])
 	}()
 
 	for {
@@ -80,12 +80,12 @@ func main() {
 type Proxy struct{}
 
 func (p *Proxy) listenUDP(ctx context.Context, connHost, connPort string) {
-	udpAddr, err := net.ResolveUDPAddr("udp4", connHost+":"+connPort)
+	udpAddr, err := net.ResolveUDPAddr("udp", connHost+":"+connPort)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	udpConn, err := net.ListenUDP("udp4", udpAddr)
+	udpConn, err := net.ListenUDP("udp", udpAddr)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -95,6 +95,7 @@ func (p *Proxy) listenUDP(ctx context.Context, connHost, connPort string) {
 
 	for {
 		if ctx.Err() != nil {
+			fmt.Println("Context done", ctx.Err().Error())
 			return
 		}
 

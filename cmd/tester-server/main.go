@@ -12,16 +12,17 @@ func main() {
 	ctx := context.TODO()
 
 	p := Proxy{}
-	go p.listenTCP(ctx, "127.0.0.28", "6114")
-	go p.listenUDP(ctx, "127.0.0.28", "6113")
+	go p.listenTCP(ctx, "192.168.121.212", "6114")
+	go p.listenUDP(ctx, "192.168.121.212", "6113")
 
+	fmt.Println("Waiting...")
 	<-ctx.Done()
 }
 
 type Proxy struct{}
 
 func (p *Proxy) listenUDP(ctx context.Context, connHost, connPort string) {
-	udpAddr, err := net.ResolveUDPAddr("udp4", connHost+":"+connPort)
+	udpAddr, err := net.ResolveUDPAddr("udp", connHost+":"+connPort)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -46,13 +47,17 @@ func (p *Proxy) listenUDP(ctx context.Context, connHost, connPort string) {
 			break
 		}
 
+		if buf[0] == 26 {
+			udpConn.Write([]byte{26, 0, 2, 0})
+		}
+
 		fmt.Println(connPort, addr.String(), string(buf[:n]), buf[:n])
 	}
 }
 
 func (p *Proxy) listenTCP(ctx context.Context, connHost, connPort string) {
 	// Listen for incoming connections.
-	l, err := net.Listen("tcp4", connHost+":"+connPort)
+	l, err := net.Listen("tcp", connHost+":"+connPort)
 	if err != nil {
 		fmt.Println("Error listening:", err.Error())
 		os.Exit(1)
@@ -95,4 +100,5 @@ func (p *Proxy) listenTCP(ctx context.Context, connHost, connPort string) {
 
 		go processPackets(conn)
 	}
+	fmt.Println("DONE")
 }
