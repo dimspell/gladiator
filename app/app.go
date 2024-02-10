@@ -72,6 +72,7 @@ func NewApp(version, commit, buildDate string) {
 		action.ConsoleCommand(),
 		action.BackendCommand(),
 		action.ServeCommand(),
+		action.ProxyCommand(),
 	)
 
 	// Start the app

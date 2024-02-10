@@ -25,8 +25,8 @@ func (b *Backend) HandleCreateGame(session *model.Session, req CreateGameRequest
 
 	response := make([]byte, 4)
 
-	hostIPAddress := "192.168.121.212"
-	// hostIPAddress := "127.0.0.28"
+	// hostIPAddress := "192.168.121.212"
+	hostIPAddress := "127.0.1.28"
 	// hostIPAddress := session.Conn.RemoteAddr().(*net.TCPAddr).IP.String()
 
 	switch data.State {

@@ -14,6 +14,7 @@ import (
 	"github.com/dispel-re/dispel-multi/backend/packetlogger"
 	"github.com/dispel-re/dispel-multi/gen/multi/v1/multiv1connect"
 	"github.com/dispel-re/dispel-multi/model"
+	"github.com/dispel-re/dispel-multi/proxy"
 	"github.com/nats-io/nats.go"
 )
 
@@ -31,7 +32,8 @@ type Backend struct {
 	Queue          *nats.Conn
 	SessionCounter int
 
-	EventChan chan uint8
+	ClientProxy *proxy.ClientProxy
+	EventChan   chan uint8
 
 	CharacterClient multiv1connect.CharacterServiceClient
 	GameClient      multiv1connect.GameServiceClient
@@ -62,6 +64,8 @@ func NewBackend(consoleAddr string) *Backend {
 		Sessions:     make(map[string]*model.Session),
 		PacketLogger: slog.New(packetlogger.New(os.Stderr, &packetlogger.Options{Level: slog.LevelDebug})),
 		// Queue:        nc,
+
+		ClientProxy: proxy.NewClientProxy(fmt.Sprintf("127.0.0.1:%b", HostIP)),
 
 		CharacterClient: multiv1connect.NewCharacterServiceClient(httpClient, consoleUri, interceptor),
 		GameClient:      multiv1connect.NewGameServiceClient(httpClient, consoleUri, interceptor),

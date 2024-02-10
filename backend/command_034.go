@@ -31,6 +31,8 @@ func (b *Backend) HandleJoinGame(session *model.Session, req JoinGameRequest) er
 		return err
 	}
 
+	b.ClientProxy.Start(context.TODO())
+
 	// clientIpAddress := session.Conn.RemoteAddr().(*net.TCPAddr).IP.To4().String()
 	clientIpAddress := "192.168.121.169"
 
