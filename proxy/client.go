@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"time"
 )
@@ -23,6 +24,7 @@ func NewClientProxy(masterIP string) *ClientProxy {
 		MasterIP:          masterIP,
 		ConnectionTimeout: DefaultConnectionTimeout,
 	}
+	slog.Info("Configured proxy", "masterIP", p.MasterIP, "proxyIP", p.HostIP)
 	return &p
 }
 
@@ -34,6 +36,8 @@ func (p *ClientProxy) Start(ctx context.Context) error {
 }
 
 func (p *ClientProxy) FakeHost(ctx context.Context) error {
+	slog.Info("Started proxy")
+
 	tcpListener, err := net.Listen("tcp", net.JoinHostPort(p.HostIP, "6114"))
 	if err != nil {
 		return err
