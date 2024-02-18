@@ -74,7 +74,7 @@ func (d *LocalDest) OnTCPMessage(ctx context.Context, handler func(msg []byte)) 
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		if d.udpConn == nil {
+		if d.tcpConn == nil {
 			return io.EOF
 		}
 
