@@ -30,11 +30,6 @@ func NewClientProxy(masterIP string) *ClientProxy {
 }
 
 func (p *ClientProxy) Start(ctx context.Context) error {
-	p.FakeHost(ctx)
-	return nil
-}
-
-func (p *ClientProxy) FakeHost(ctx context.Context) error {
 	go p.tcpAsHost(ctx)
 	go p.udpAsHost(ctx)
 
