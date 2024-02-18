@@ -10,8 +10,6 @@ import (
 	"time"
 )
 
-var DefaultConnectionTimeout = 2 * time.Second
-
 type ClientProxy struct {
 	HostIP   string
 	MasterIP string
