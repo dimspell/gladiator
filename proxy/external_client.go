@@ -6,18 +6,9 @@ import (
 	"log"
 	"log/slog"
 	"net"
+	"sync"
 	"time"
 )
-
-type Destination interface {
-	OnUDPMessage(ctx context.Context, handler func(msg []byte)) error
-	OnTCPMessage(ctx context.Context, handler func(msg []byte)) error
-
-	WriteUDPMessage(ctx context.Context, msg []byte) error
-	WriteTCPMessage(ctx context.Context, msg []byte) error
-
-	Close()
-}
 
 type ExternalClientProxy struct {
 	ExposedOnIP       string
@@ -61,7 +52,6 @@ func (p *ExternalClientProxy) tcpAsHost(ctx context.Context) {
 			if err != nil {
 				fmt.Println("(tcp): Error writing to client: ", err.Error())
 			}
-
 		})
 		defer func() {
 			log.Println("(tcp): Closed connection to client")
@@ -115,13 +105,22 @@ func (p *ExternalClientProxy) udpAsHost(ctx context.Context) error {
 	}
 	defer srcConn.Close()
 
-	var clientDest *net.UDPAddr
+	var (
+		clientDestAddr *net.UDPAddr
+		clientDestOnce sync.Once
+	)
+	setClientAddr := func(addr *net.UDPAddr) func() {
+		return func() { clientDestAddr = addr }
+	}
 
 	defer p.Destination.Close()
 	go p.Destination.OnUDPMessage(ctx, func(msg []byte) {
 		fmt.Println("(udp): (server): Received ", msg, " from ")
-		srcConn.WriteToUDP(msg, clientDest)
-		fmt.Println("(udp): (server): wrote to client", msg)
+
+		if clientDestAddr != nil {
+			srcConn.WriteToUDP(msg, clientDestAddr)
+			fmt.Println("(udp): (server): wrote to client", msg)
+		}
 	})
 
 	// Goroutine to forward source -> destination
@@ -132,8 +131,7 @@ func (p *ExternalClientProxy) udpAsHost(ctx context.Context) error {
 			fmt.Println("(udp): Error reading from client: ", err)
 			return err
 		}
-		clientDest = addr
-		fmt.Println("Client dest =", clientDest)
+		clientDestOnce.Do(setClientAddr(addr))
 
 		fmt.Println("(udp): (client): Received ", (buf[0:n]), " from ", addr)
 
