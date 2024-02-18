@@ -4,12 +4,13 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"log/slog"
 	"net"
 	"time"
 )
 
-var DefaultConnectionTimeout = 5 * time.Second
+var DefaultConnectionTimeout = 2 * time.Second
 
 type ClientProxy struct {
 	HostIP   string
@@ -29,53 +30,52 @@ func NewClientProxy(masterIP string) *ClientProxy {
 }
 
 func (p *ClientProxy) Start(ctx context.Context) error {
-	go p.FakeHost(ctx)
-
-	<-ctx.Done()
+	p.FakeHost(ctx)
 	return nil
 }
 
 func (p *ClientProxy) FakeHost(ctx context.Context) error {
-	slog.Info("Started proxy")
+	// go p.tcpAsHost(ctx)
+	// go p.udpAsHost(ctx)
 
-	tcpListener, err := net.Listen("tcp", net.JoinHostPort(p.HostIP, "6114"))
-	if err != nil {
-		return err
-	}
-	defer tcpListener.Close()
-
-	go p.tcpAsHost(ctx, tcpListener)
-
-	udpAddr, err := net.ResolveUDPAddr("udp", net.JoinHostPort(p.HostIP, "6113"))
-	if err != nil {
-		return err
-	}
-	udpConn, err := net.ListenUDP("udp", udpAddr)
-	if err != nil {
-		return err
-	}
-	go p.udpAsHost(ctx, udpConn)
-
-	<-ctx.Done()
+	// ch := make(chan struct{})
+	// <-ch
 	return nil
 }
 
-func (p *ClientProxy) tcpAsHost(ctx context.Context, tcpListener net.Listener) {
-	processPackets := func(ctx context.Context, clientConn net.Conn) {
-		// defer clientConn.Close()
+func (p *ClientProxy) tcpAsHost(ctx context.Context) {
+	slog.Info("Starting proxy for TCP")
 
-		serverConn, err := net.DialTimeout("tcp", net.JoinHostPort(p.MasterIP, "6114"), p.ConnectionTimeout)
-		if err != nil {
-			return
-		}
-		// defer serverConn.Close()
+	tcpListener, err := net.Listen("tcp", net.JoinHostPort(p.HostIP, "6114"))
+	if err != nil {
+		fmt.Println("Error listening on TCP:", err.Error())
+		return
+	}
+	defer tcpListener.Close()
+	fmt.Println("Listening TCP on", tcpListener.Addr().String())
+
+	serverConn, err := net.DialTimeout("tcp", net.JoinHostPort(p.MasterIP, "6114"), p.ConnectionTimeout)
+	if err != nil {
+		return
+	}
+	fmt.Println("(tcp): conencted to ", serverConn.RemoteAddr())
+	defer serverConn.Close()
+
+	processPackets := func(ctx context.Context, clientConn net.Conn) {
+		defer clientConn.Close()
 
 		go func() {
-			_, _ = io.Copy(serverConn, clientConn)
+			_, err = io.Copy(serverConn, clientConn)
+			if err != nil {
+				fmt.Println("(tcp): Error copying from client to server: ", err.Error())
+			}
 			clientConn.Close()
 		}()
 
-		_, _ = io.Copy(clientConn, serverConn)
+		_, err = io.Copy(clientConn, serverConn)
+		if err != nil {
+			fmt.Println("(tcp): Error copying from server to client: ", err.Error())
+		}
 		serverConn.Close()
 	}
 
@@ -96,49 +96,79 @@ func (p *ClientProxy) tcpAsHost(ctx context.Context, tcpListener net.Listener) {
 	}
 }
 
-func (p *ClientProxy) udpAsHost(ctx context.Context, udpConn *net.UDPConn) {
+func (p *ClientProxy) udpAsHost(ctx context.Context) error {
+	slog.Info("Starting proxy for UDP")
+
+	srcAddr, err := net.ResolveUDPAddr("udp", net.JoinHostPort(p.HostIP, "6113"))
+	if err != nil {
+		fmt.Println("Error resolving UDP address: ", err.Error())
+		return err
+	}
+	srcConn, err := net.ListenUDP("udp", srcAddr)
+	if err != nil {
+		fmt.Println("Error listening on UDP: ", err.Error())
+		return err
+	}
+	defer srcConn.Close()
+
+	var clientDest *net.UDPAddr
+
+	destAddr, err := net.ResolveUDPAddr("udp", net.JoinHostPort(p.MasterIP, "6113"))
+	if err != nil {
+		fmt.Println("Error resolving UDP address: ", err.Error())
+		return err
+	}
+	destConn, err := net.DialUDP("udp", nil, destAddr)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer destConn.Close()
+
+	// Goroutine to forward destination -> source
 	go func() {
-		buf := make([]byte, 1024)
 		for {
-			n, addr, err := udpConn.ReadFromUDP(buf)
+			buf := make([]byte, 1024)
+			n, addr, err := destConn.ReadFromUDP(buf)
 			if err != nil {
+				fmt.Println("(udp): Error reading from server: ", err)
 				return
 			}
 
-			fmt.Println("Received ", string(buf[0:n]), " from ", addr)
+			fmt.Println("(udp): (server): Received ", (buf[0:n]), " from ", addr, clientDest)
 
-			serverConn, err := net.Dial("udp", net.JoinHostPort(p.MasterIP, "6114"))
+			clientDestConn, err := net.DialUDP("udp", nil, clientDest)
 			if err != nil {
-				return
+				log.Fatal(err)
 			}
-			defer serverConn.Close()
 
-			// serverConn.(*net.UDPConn).WriteToUDP(buf[0:n], addr)
-			_, err = serverConn.Write(buf[0:n])
+			_, err = clientDestConn.Write(buf[0:n])
 			if err != nil {
-				return
+				fmt.Println("(udp): Error writing to client: ", err)
+				continue
 			}
+			fmt.Println("(udp): (server): wrote to client", buf[0:n])
 		}
 	}()
 
-	buf := make([]byte, 1024)
+	// Goroutine to forward source -> destination
 	for {
-		n, addr, err := udpConn.ReadFromUDP(buf)
+		buf := make([]byte, 1024)
+		n, addr, err := srcConn.ReadFromUDP(buf)
 		if err != nil {
-			return
+			fmt.Println("(udp): Error reading from client: ", err)
+			continue
 		}
+		clientDest = addr
+		fmt.Println("Client dest =", clientDest)
 
-		fmt.Println("Received ", string(buf[0:n]), " from ", addr)
+		fmt.Println("(udp): (client): Received ", (buf[0:n]), " from ", addr)
 
-		clientConn, err := net.Dial("udp", addr.String())
+		_, err = destConn.Write(buf[0:n])
 		if err != nil {
-			return
+			fmt.Println("(udp): Error writing to server: ", err)
+			continue
 		}
-		defer clientConn.Close()
-
-		_, err = clientConn.Write(buf[0:n])
-		if err != nil {
-			return
-		}
+		fmt.Println("(udp): (client): wrote to server", buf[0:n])
 	}
+	return nil
 }
