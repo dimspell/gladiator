@@ -23,3 +23,6 @@ go.work
 
 # Databases
 *.sqlite*
+
+# Profiling
+*.pcapng

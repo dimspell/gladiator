@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"log/slog"
-	"net"
 
 	"connectrpc.com/connect"
 	multiv1 "github.com/dispel-re/dispel-multi/gen/multi/v1"
@@ -32,8 +31,10 @@ func (b *Backend) HandleListGames(session *model.Session, req ListGamesRequest) 
 			Name: room.Name,
 			// Password: room.Password,
 			Password: "",
+			// HostIPAddress: [4]byte{192, 168, 121, LaptopIP},
+			HostIPAddress: [4]byte{127, 0, 1, 28},
 		}
-		copy(lobby.HostIPAddress[:], net.ParseIP(room.HostIpAddress).To4())
+		// copy(lobby.HostIPAddress[:], net.ParseIP(room.HostIpAddress).To4())
 		response = append(response, lobby.ToBytes()...)
 	}
 

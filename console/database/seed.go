@@ -223,8 +223,8 @@ func Seed(queries *Queries) error {
 	gameRoom, err := queries.CreateGameRoom(context.TODO(), CreateGameRoomParams{
 		Name:          "test",
 		Password:      sql.NullString{Valid: false},
-		MapID:         1,
-		HostIpAddress: "127.0.1.28",
+		MapID:         2,
+		HostIpAddress: "192.168.121.169",
 		// UserID:   user2.ID,
 	})
 	if err != nil {
@@ -232,13 +232,13 @@ func Seed(queries *Queries) error {
 	}
 	queries.AddPlayerToRoom(context.TODO(), AddPlayerToRoomParams{
 		GameRoomID:  gameRoom.ID,
-		CharacterID: character.ID,
-		IpAddress:   "127.0.1.28",
+		CharacterID: character2.ID,
+		IpAddress:   "192.168.121.169",
 	})
 	queries.AddPlayerToRoom(context.TODO(), AddPlayerToRoomParams{
 		GameRoomID:  gameRoom.ID,
-		CharacterID: character2.ID,
-		IpAddress:   "127.0.1.34",
+		CharacterID: character.ID,
+		IpAddress:   "192.168.121.212",
 	})
 
 	// respGame, err := b.GameClient.CreateGame(context.TODO(), connect.NewRequest(&multiv1.CreateGameRequest{

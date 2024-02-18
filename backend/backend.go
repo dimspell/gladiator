@@ -23,8 +23,8 @@ const LaptopIP byte = 169
 
 const GameRoomName = "room"
 
-const ClientIP byte = LaptopIP
-const HostIP byte = DesktopIP
+// const ClientIP byte = DesktopIP
+// const HostIP byte = LaptopIP
 
 type Backend struct {
 	Sessions       map[string]*model.Session
@@ -60,7 +60,7 @@ func NewBackend(consoleAddr string) *Backend {
 	interceptor := connect.WithInterceptors(otelconnect.NewInterceptor())
 	consoleUri := fmt.Sprintf("http://%s/grpc", consoleAddr)
 
-	p := proxy.NewClientProxy(fmt.Sprintf("192.168.121.%d", HostIP))
+	p := proxy.NewClientProxy(fmt.Sprintf("192.168.121.%d", LaptopIP))
 
 	return &Backend{
 		Sessions:     make(map[string]*model.Session),
@@ -77,6 +77,10 @@ func NewBackend(consoleAddr string) *Backend {
 }
 
 func (b *Backend) Start(ctx context.Context) {
+	slog.Info("Starting backend")
+
+	// go b.ClientProxy.Start(ctx)
+
 	// go func(ctx context.Context) {
 	// 	if err := b.Events(ctx); err != nil {
 	// 		log.Fatal("Backend.Start", err)
@@ -85,13 +89,15 @@ func (b *Backend) Start(ctx context.Context) {
 }
 
 func (b *Backend) Shutdown(ctx context.Context) {
+	if b.Queue != nil {
+		b.Queue.Drain()
+	}
+
+	// b.ClientProxy = nil
+
 	// Close all open connections
 	for _, session := range b.Sessions {
 		session.Conn.Close()
-	}
-
-	if b.Queue != nil {
-		b.Queue.Drain()
 	}
 
 	// TODO: Send a system message "(system) The server is going to close in less than 30 seconds"

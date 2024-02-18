@@ -7,7 +7,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"net"
 
 	"connectrpc.com/connect"
 	multiv1 "github.com/dispel-re/dispel-multi/gen/multi/v1"
@@ -40,29 +39,52 @@ func (b *Backend) HandleSelectGame(session *model.Session, req SelectGameRequest
 
 	gameRoom := SelectGameResponse{
 		Lobby: model.LobbyRoom{
-			HostIPAddress: [4]byte{},
+			// HostIPAddress: [4]byte{192, 168, 121, LaptopIP},
+			HostIPAddress: [4]byte{127, 0, 1, 28},
 			Name:          respGame.Msg.Game.Name,
 			Password:      "",
 		},
-		MapID: uint32(respGame.Msg.Game.MapId),
+		MapID: uint32(respGame.Msg.Game.GetMapId()),
+		Players: []model.LobbyPlayer{
+			{
+				ClassType: model.ClassTypeMage,
+				Name:      "mage",
+				// IPAddress: [4]byte{192, 168, 121, LaptopIP},
+				IPAddress: [4]byte{127, 0, 1, 28},
+			},
+			// {
+			// 	ClassType: model.ClassTypeKnight,
+			// 	Name:      "archer",
+			// 	IPAddress: [4]byte{192, 168, 121, DesktopIP},
+			// },
+		},
 	}
-	copy(gameRoom.Lobby.HostIPAddress[:], net.ParseIP(respGame.Msg.Game.HostIpAddress).To4())
 
-	respPlayers, err := b.GameClient.ListPlayers(context.TODO(),
-		connect.NewRequest(&multiv1.ListPlayersRequest{
-			GameRoomId: respGame.Msg.Game.GameId,
-		}))
-	if err != nil {
-		return err
-	}
-	for _, player := range respPlayers.Msg.GetPlayers() {
-		lobbyPlayer := model.LobbyPlayer{
-			ClassType: model.ClassType(player.ClassType),
-			Name:      player.Username,
-		}
-		copy(lobbyPlayer.IPAddress[:], net.ParseIP(player.IpAddress).To4())
-		gameRoom.Players = append(gameRoom.Players, lobbyPlayer)
-	}
+	// gameRoom := SelectGameResponse{
+	// 	Lobby: model.LobbyRoom{
+	// 		HostIPAddress: [4]byte{},
+	// 		Name:          respGame.Msg.Game.Name,
+	// 		Password:      "",
+	// 	},
+	// 	MapID: uint32(respGame.Msg.Game.MapId),
+	// }
+	// copy(gameRoom.Lobby.HostIPAddress[:], net.ParseIP(respGame.Msg.Game.HostIpAddress).To4())
+
+	// respPlayers, err := b.GameClient.ListPlayers(context.TODO(),
+	// 	connect.NewRequest(&multiv1.ListPlayersRequest{
+	// 		GameRoomId: respGame.Msg.Game.GameId,
+	// 	}))
+	// if err != nil {
+	// 	return err
+	// }
+	// for _, player := range respPlayers.Msg.GetPlayers() {
+	// 	lobbyPlayer := model.LobbyPlayer{
+	// 		ClassType: model.ClassType(player.ClassType),
+	// 		Name:      player.Username,
+	// 	}
+	// 	copy(lobbyPlayer.IPAddress[:], net.ParseIP(player.IpAddress).To4())
+	// 	gameRoom.Players = append(gameRoom.Players, lobbyPlayer)
+	// }
 
 	return b.Send(session.Conn, SelectGame, gameRoom.Details())
 }

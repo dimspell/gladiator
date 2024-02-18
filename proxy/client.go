@@ -35,11 +35,11 @@ func (p *ClientProxy) Start(ctx context.Context) error {
 }
 
 func (p *ClientProxy) FakeHost(ctx context.Context) error {
-	// go p.tcpAsHost(ctx)
-	// go p.udpAsHost(ctx)
+	go p.tcpAsHost(ctx)
+	go p.udpAsHost(ctx)
 
-	// ch := make(chan struct{})
-	// <-ch
+	ch := make(chan struct{})
+	<-ch
 	return nil
 }
 
@@ -62,21 +62,27 @@ func (p *ClientProxy) tcpAsHost(ctx context.Context) {
 	defer serverConn.Close()
 
 	processPackets := func(ctx context.Context, clientConn net.Conn) {
-		defer clientConn.Close()
+		defer func() {
+			log.Println("(tcp): Closed connection to client")
+			clientConn.Close()
+		}()
+		defer func() {
+			log.Println("(tcp): Closed connection to server")
+			serverConn.Close()
+		}()
 
 		go func() {
-			_, err = io.Copy(serverConn, clientConn)
+			_, err = io.Copy(clientConn, serverConn)
 			if err != nil {
 				fmt.Println("(tcp): Error copying from client to server: ", err.Error())
 			}
 			clientConn.Close()
 		}()
 
-		_, err = io.Copy(clientConn, serverConn)
+		_, err = io.Copy(serverConn, clientConn)
 		if err != nil {
 			fmt.Println("(tcp): Error copying from server to client: ", err.Error())
 		}
-		serverConn.Close()
 	}
 
 	for {
@@ -89,7 +95,7 @@ func (p *ClientProxy) tcpAsHost(ctx context.Context) {
 			fmt.Println("Error accepting: ", err.Error())
 			continue
 		}
-		fmt.Println("Accepted connection on port", conn.RemoteAddr())
+		fmt.Println("(tcp): Accepted connection on port", conn.RemoteAddr())
 
 		// TODO: Use workgroup
 		go processPackets(ctx, conn)
@@ -136,12 +142,14 @@ func (p *ClientProxy) udpAsHost(ctx context.Context) error {
 
 			fmt.Println("(udp): (server): Received ", (buf[0:n]), " from ", addr, clientDest)
 
-			clientDestConn, err := net.DialUDP("udp", nil, clientDest)
-			if err != nil {
-				log.Fatal(err)
-			}
+			// clientDestConn, err := net.DialUDP("udp", nil, clientDest)
+			// if err != nil {
+			// 	log.Fatal(err)
+			// }
 
-			_, err = clientDestConn.Write(buf[0:n])
+			srcConn.WriteToUDP(buf[0:n], clientDest)
+
+			// _, err = clientDestConn.Write(buf[0:n])
 			if err != nil {
 				fmt.Println("(udp): Error writing to client: ", err)
 				continue
