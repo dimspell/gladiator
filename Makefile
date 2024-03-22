@@ -5,6 +5,9 @@ mig_dir ?= internal/database/migrations
 mig_name ?= create_users_table
 mig_version ?= VERSION
 
+build:
+	go build -v -o /dev/null ./
+
 serve:
 	# go run ./ serve --backend-addr=127.0.0.1:6112 --console-addr=127.0.0.1:2137
 	go run ./ serve --backend-addr=0.0.0.0:6112 --console-addr=0.0.0.0:2137
