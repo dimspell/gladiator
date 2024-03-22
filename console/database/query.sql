@@ -164,7 +164,8 @@ VALUES (?, ?, ?, ?)
 RETURNING *;
 
 -- name: GetGameRoomPlayers :many
-SELECT DISTINCT username,
+SELECT DISTINCT characters.user_id,
+                username,
                 character_name,
                 class_type,
                 ip_address

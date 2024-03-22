@@ -12,6 +12,8 @@ func (b *Backend) HandleSelectChannel(session *model.Session, req SelectChannelR
 		b.Send(session.Conn, ReceiveMessage, NewLobbyMessage("admin", "hello"))
 	}
 
+	b.Proxy.Close()
+
 	return nil
 }
 

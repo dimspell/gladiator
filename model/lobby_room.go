@@ -1,7 +1,9 @@
 package model
 
+import "net"
+
 type LobbyRoom struct {
-	HostIPAddress [4]byte
+	HostIPAddress net.IP
 	Name          string
 	Password      string
 }
@@ -23,7 +25,7 @@ func (room *LobbyRoom) ToBytes() []byte {
 
 type LobbyPlayer struct {
 	ClassType ClassType
-	IPAddress [4]byte
+	IPAddress net.IP
 	Name      string
 }
 

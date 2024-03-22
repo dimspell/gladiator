@@ -5,6 +5,7 @@ go 1.21
 require (
 	connectrpc.com/connect v1.14.0
 	connectrpc.com/otelconnect v0.6.0
+	github.com/fxamacker/cbor/v2 v2.6.0
 	github.com/go-chi/chi/v5 v5.0.11
 	github.com/golang-migrate/migrate/v4 v4.17.0
 	github.com/google/uuid v1.5.0
@@ -20,6 +21,7 @@ require (
 	github.com/urfave/cli/v3 v3.0.0-alpha7
 	golang.org/x/crypto v0.17.0
 	golang.org/x/net v0.19.0
+	golang.org/x/sync v0.5.0
 	google.golang.org/protobuf v1.32.0
 	modernc.org/sqlite v1.28.0
 )
@@ -48,6 +50,7 @@ require (
 	github.com/prometheus/common v0.44.0 // indirect
 	github.com/prometheus/procfs v0.11.1 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
+	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673 // indirect
 	go.opentelemetry.io/contrib v1.0.0 // indirect
 	go.opentelemetry.io/otel v1.19.0 // indirect

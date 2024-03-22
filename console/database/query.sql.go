@@ -391,7 +391,8 @@ func (q *Queries) GetGameRoom(ctx context.Context, name string) (GameRoom, error
 }
 
 const getGameRoomPlayers = `-- name: GetGameRoomPlayers :many
-SELECT DISTINCT username,
+SELECT DISTINCT characters.user_id,
+                username,
                 character_name,
                 class_type,
                 ip_address
@@ -403,6 +404,7 @@ WHERE game_rooms.id = ?
 `
 
 type GetGameRoomPlayersRow struct {
+	UserID        int64
 	Username      string
 	CharacterName string
 	ClassType     int64
@@ -419,6 +421,7 @@ func (q *Queries) GetGameRoomPlayers(ctx context.Context, id int64) ([]GetGameRo
 	for rows.Next() {
 		var i GetGameRoomPlayersRow
 		if err := rows.Scan(
+			&i.UserID,
 			&i.Username,
 			&i.CharacterName,
 			&i.ClassType,

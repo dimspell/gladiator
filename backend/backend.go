@@ -12,9 +12,9 @@ import (
 	"connectrpc.com/connect"
 	"connectrpc.com/otelconnect"
 	"github.com/dispel-re/dispel-multi/backend/packetlogger"
+	"github.com/dispel-re/dispel-multi/backend/proxy"
 	"github.com/dispel-re/dispel-multi/gen/multi/v1/multiv1connect"
 	"github.com/dispel-re/dispel-multi/model"
-	"github.com/dispel-re/dispel-multi/proxy"
 	"github.com/nats-io/nats.go"
 )
 
@@ -32,8 +32,8 @@ type Backend struct {
 	Queue          *nats.Conn
 	SessionCounter int
 
-	ClientProxy *proxy.ClientProxy
-	EventChan   chan uint8
+	Proxy     proxy.Proxy
+	EventChan chan uint8
 
 	CharacterClient multiv1connect.CharacterServiceClient
 	GameClient      multiv1connect.GameServiceClient
@@ -60,14 +60,14 @@ func NewBackend(consoleAddr string) *Backend {
 	interceptor := connect.WithInterceptors(otelconnect.NewInterceptor())
 	consoleUri := fmt.Sprintf("http://%s/grpc", consoleAddr)
 
-	p := proxy.NewClientProxy(fmt.Sprintf("192.168.121.%d", LaptopIP))
+	// p := proxy.NewClientProxy(fmt.Sprintf("192.168.121.%d", LaptopIP))
 
 	return &Backend{
 		Sessions:     make(map[string]*model.Session),
 		PacketLogger: slog.New(packetlogger.New(os.Stderr, &packetlogger.Options{Level: slog.LevelDebug})),
 		// Queue:        nc,
 
-		ClientProxy: p,
+		// ClientProxy: p,
 
 		CharacterClient: multiv1connect.NewCharacterServiceClient(httpClient, consoleUri, interceptor),
 		GameClient:      multiv1connect.NewGameServiceClient(httpClient, consoleUri, interceptor),
@@ -149,6 +149,8 @@ const (
 
 func (b *Backend) CloseSession(session *model.Session) error {
 	slog.Info("Session closed", "session", session.ID)
+
+	b.Proxy.Close()
 
 	// TODO: wrap all errors
 	_, ok := b.Sessions[session.ID]
