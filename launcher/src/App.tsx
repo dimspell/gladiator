@@ -6,6 +6,7 @@ import Home from './pages/Home/Home'
 import HostServer from './pages/HostServer/HostServer'
 import JoinServer from './pages/JoinServer/JoinServer'
 import ErrorPage from './pages/ErrorPage'
+import { Provider as JotaiProvider } from 'jotai';
 
 const router = createBrowserRouter([
   {
@@ -41,7 +42,9 @@ function App() {
   }
 
   return (
-    <RouterProvider router={router} />
+    <JotaiProvider>
+      <RouterProvider router={router} />
+    </JotaiProvider>
 
     // <div className='container'>
     //   <div className='row'>
@@ -64,48 +67,48 @@ function App() {
   )
 }
 
-function unused() {
-  return (
-    <>
-      <ul about={'Join a Server'}>
-        <li className={'step-1'}>
-          <h2>Could not reach a server</h2>
-          <p>show an error</p>
-        </li>
-        <li className={'step-2'}>
-          <h2>Discovered server at 21.13.1.1:6128</h2>
-          <pre>
-            This server will GET {host}:/.well-known/dispel-multi.json
-            //{
-            //  "zerotier": {
-            //    "enabled": true,
-            //  }
-            //}
-          </pre>
-          <div className={'step-2-connected-to-unknown/lan'}>
-            This server is configured to use LAN network
-          </div>
-          <div className={'step-2-connected-to-zerotier'}>
-            This server is configured to use ZeroTier network.
-            <div>
-              <h2>Do you have ZeroTier One installed on your computer?</h2>
-              <button>
-                Yes
-                <div>Provide network key</div>
-              </button>
-              <button>
-                No, help me install it
-                <div>
-                  Tutorial how to install zerotier
-                </div>
-              </button>
-              <button>Back</button>
-            </div>
-          </div>
-        </li>
-      </ul>
-    </>
-  )
-}
+// function unused() {
+//   return (
+//     <>
+//       <ul about={'Join a Server'}>
+//         <li className={'step-1'}>
+//           <h2>Could not reach a server</h2>
+//           <p>show an error</p>
+//         </li>
+//         <li className={'step-2'}>
+//           <h2>Discovered server at 21.13.1.1:6128</h2>
+//           <pre>
+//             This server will GET {host}:/.well-known/dispel-multi.json
+//             //{
+//             //  "zerotier": {
+//             //    "enabled": true,
+//             //  }
+//             //}
+//           </pre>
+//           <div className={'step-2-connected-to-unknown/lan'}>
+//             This server is configured to use LAN network
+//           </div>
+//           <div className={'step-2-connected-to-zerotier'}>
+//             This server is configured to use ZeroTier network.
+//             <div>
+//               <h2>Do you have ZeroTier One installed on your computer?</h2>
+//               <button>
+//                 Yes
+//                 <div>Provide network key</div>
+//               </button>
+//               <button>
+//                 No, help me install it
+//                 <div>
+//                   Tutorial how to install zerotier
+//                 </div>
+//               </button>
+//               <button>Back</button>
+//             </div>
+//           </div>
+//         </li>
+//       </ul>
+//     </>
+//   )
+// }
 
 export default App

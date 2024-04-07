@@ -35,5 +35,10 @@
                 "PATH": "${env:PATH};/mingw64/bin"
             }
         }
-    }
+    },
+    "rust-analyzer.linkedProjects": [
+        "src-tauri/Cargo.toml"
+    ],
+    "github.gitAuthentication": false,
+    "git.terminalAuthentication": false
 }
