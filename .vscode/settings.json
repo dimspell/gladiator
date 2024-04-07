@@ -31,14 +31,15 @@
                 "GOPATH": "/mingw64",
                 "GOROOT": "/mingw64/lib/go",
                 "GOFLAGS": "-v",
-                "GOTOOLCHAIN": "go1.21.3",
+                "GOTOOLCHAIN": "go1.22.2",
                 "PATH": "${env:PATH};/mingw64/bin"
             }
         }
     },
     "rust-analyzer.linkedProjects": [
-        "src-tauri\\Cargo.toml"
+        "launcher\\src-tauri\\Cargo.toml"
     ],
+    "rust-analyzer.cargo.sysrootSrc": "C:\\Users\\Piotrek\\.cargo\\bin\\cargo.exe",
     "github.gitAuthentication": false,
     "git.terminalAuthentication": false
 }
