@@ -1,6 +1,7 @@
 import { atom, useAtom } from 'jotai'
 import BasicLayout from '../../components/BasicLayout'
 import { Link } from 'react-router-dom'
+import { invoke } from '@tauri-apps/api'
 
 
 const formAtom = atom({
@@ -20,8 +21,6 @@ function HostServer() {
   }
 
   const handleSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    // (e: ) => setForm({...form, databaseType: e.target.dispatchEvent.value})
-
     setForm({
       ...form,
       databaseType: e.target.value
@@ -31,6 +30,7 @@ function HostServer() {
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
 
+    invoke('run_background')
 
     console.log(form)
     // submit form data
@@ -45,7 +45,7 @@ function HostServer() {
           htmlFor={htmlFor}
         >{name}</label>
         <div className='flex flex-row items-top w-full space-x-8 justify-between'>
-          <div className='w-72'>
+          <div className=''>
             {children}
           </div>
           <div className='text-gray-100'>
@@ -82,7 +82,7 @@ function HostServer() {
                   name='bindAddress'
                   value={form.bindAddress}
                   onChange={handleChange}
-                  className="bg-gray-700 text-gray-100 border border-gray-500 p-2 w-full rounded mb-4 w-72"
+                  className="bg-gray-700 text-gray-100 border border-gray-500 p-2 rounded mb-4 w-72"
                 />
               </FormBlock>
 
@@ -92,7 +92,7 @@ function HostServer() {
                 name='Database type:'
               >
                 <select
-                  className="bg-gray-700 text-gray-100 border border-gray-500 p-2 w-full rounded mb-4  w-72"
+                  className="bg-gray-700 text-gray-100 border border-gray-500 p-2 rounded mb-4 w-72"
                   value={form.databaseType}
                   onChange={handleSelect}
                 >
@@ -112,7 +112,7 @@ function HostServer() {
                   value={form.databasePath}
                   onChange={handleChange}
                   disabled={form.databaseType === 'memory'}
-                  className="bg-gray-700 text-gray-100 border border-gray-500 p-2 w-full rounded mb-4 disabled:opacity-50 w-72"
+                  className="bg-gray-700 text-gray-100 border border-gray-500 p-2 rounded mb-4 disabled:opacity-50 w-72"
                 />
               </FormBlock>
 
