@@ -7,6 +7,58 @@ fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
 }
 
+#[tauri::command]
+async fn run_process() {
+  let mut child = Command::new("my_program")
+        // .stdout(std::process::Stdio::piped())
+
+      .spawn()
+      .expect("failed to execute process");
+
+// let stdout = child.stdout.take().expect("failed to get stdout");
+//   let mut lines = std::io::BufReader::new(stdout).lines();
+// let output = lines.next_line().await;
+  // return output
+//   output.unwrap() 
+
+  let _ = child.wait().await;
+  
+  // continue doing other work
+}
+
+
+use tokio::task;
+
+// #[tauri::command]
+// async fn run_background() {
+//   let child = task::spawn_blocking(|| {
+//     let mut child = Command::new("my_program")
+//         .spawn()
+//         .expect("failed to execute process");
+
+//     child.wait().expect("failed to wait on child");
+//   });
+
+//   // child runs in the background 
+//   // we can continue with other work
+
+//   child.await;
+// }
+
+// https://tauri.app/v1/guides/features/events/#window-specific-events-1
+
+
+#[tauri::command(async)]
+async fn run_background() {
+  let child = tokio::task::spawn_blocking(|| {
+    // run child process
+  });
+
+  // continue with other work
+  
+  child.await; // wait for background process
+}
+
 fn main() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![greet])

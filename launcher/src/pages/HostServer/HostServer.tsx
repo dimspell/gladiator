@@ -31,6 +31,7 @@ function HostServer() {
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
 
+   
     console.log(form)
     // submit form data
   }
@@ -61,7 +62,7 @@ function HostServer() {
 
       <div className="dark max-w-lg mx-auto">
         <form onSubmit={handleSubmit}>
-          <h2 className="font-bold text-gray-100 mt-4 mb-6">Register</h2>
+          <h2 className="text-xl font-bold text-gray-100 mt-4 mb-6">Register</h2>
 
           <label
             className="block font-medium text-gray-300 mb-2"
