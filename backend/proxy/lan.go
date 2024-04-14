@@ -22,12 +22,12 @@ func (p *LAN) Create(localIPAddress string, _ string) (net.IP, error) {
 	return ip, nil
 }
 
-func (p *LAN) Join(_ string, _ string, ipAddress string) (net.IP, error) {
+func (p *LAN) Join(_ string, _ string, _ string, ipAddress string) (net.IP, error) {
 	ip := net.ParseIP(ipAddress)
 	if ip == nil {
 		return net.IP{}, fmt.Errorf("incorrect host IP address: %s", ipAddress)
 	}
-	return net.IP{ip[0], ip[1], ip[2], ip[3]}, nil
+	return ip, nil
 }
 
 func (p *LAN) Exchange(_ string, _ string, ipAddress string) (net.IP, error) {

@@ -1,7 +1,7 @@
 package proxy
 
 import (
-	"context"
+	"container/ring"
 	"fmt"
 	"net"
 	"sync"
@@ -9,129 +9,127 @@ import (
 
 var _ Proxy = (*Loopback)(nil)
 
+// TODO: Not thread-safe. Implement RW-Mutexes
+
+type IpRing *ring.Ring
+
+func NewIpRing() IpRing {
+	r := ring.New(3)
+	n := r.Len()
+	for i := 0; i < n; i++ {
+		r.Value = i + 2
+		r = r.Next()
+	}
+	return r
+}
+
+func IPFromRing(r IpRing) net.IP {
+	d := byte(r.Value.(int))
+	return net.IPv4(127, 0, 1, d)
+}
+
 type Loopback struct {
-	Test bool
+	ProxyAddress string
 
-	GlobalProxyAddress string
-	GlobalProxyConn    net.Conn
+	MapUserToIP      map[string]net.IP
+	MapIPIndexToUser map[int]string
 
-	mtx               sync.RWMutex
-	HostIPAddress     net.IP
-	ClientIPAddresses [4]net.IP
-	MapUserToIP       map[string]net.IP
-	MapIPIndexToUser  map[int]string
-
-	CurrentPlayer string
-	HostPlayer    string
-
-	tcpDataCh chan Data
-	udpDataCh chan Data
-	closeCh   chan struct{}
+	mtx    sync.RWMutex
+	Wire   *Wire
+	IpRing *ring.Ring
 }
 
 func NewLoopback(masterProxyAddr string) (*Loopback, error) {
+	masterProxyAddr = net.JoinHostPort("localhost", "6115")
+
 	p := &Loopback{
-		GlobalProxyAddress: net.JoinHostPort("localhost", "6115"),
-
-		ClientIPAddresses: [4]net.IP{
-			net.IPv4(127, 0, 1, 1),
-			net.IPv4(127, 0, 1, 2),
-			net.IPv4(127, 0, 1, 3),
-			net.IPv4(127, 0, 1, 4),
-		},
-
+		ProxyAddress:     masterProxyAddr,
+		mtx:              sync.RWMutex{},
 		MapUserToIP:      make(map[string]net.IP),
 		MapIPIndexToUser: make(map[int]string),
-		tcpDataCh:        make(chan Data),
-		udpDataCh:        make(chan Data),
 	}
-	p.HostIPAddress = p.ClientIPAddresses[0]
+	p.Close()
 
 	return p, nil
 }
 
-// Create is used to start serving the traffic to the game host
-func (p *Loopback) Create(_ string, hostUser string) (net.IP, error) {
-	// p.Close()
-
-	// todo: mutex please
-	// p.mtx.Lock()
-	// defer p.mtx.Unlock()
-	hostIP := p.ClientIPAddresses[0]
-	p.HostIPAddress = hostIP
-	p.HostPlayer = hostUser
-
-	p.CurrentPlayer = hostUser
-	p.MapUserToIP[hostUser] = hostIP
-	p.MapIPIndexToUser[0] = hostUser
-
-	if err := p.connect(); err != nil {
-		return nil, err
-	}
-
-	go func() {
-		p.startTCP(context.TODO())
-	}()
-
-	return hostIP, nil
+func (p *Loopback) init() {
+	p.Wire = NewWire(p.ProxyAddress)
+	p.IpRing = NewIpRing()
 }
 
-// Join is used to connect to TCP game host
-func (p *Loopback) Join(gameId string, currentPlayer string, _ string) (net.IP, error) {
-	// p.Close()
+func (p *Loopback) Close() {
+	p.Wire.Stop()
+}
 
-	if err := p.connect(); err != nil {
+func (p *Loopback) Create(localIpAddress string, hostUser string) (net.IP, error) {
+	creds := &Credentials{}
+	host := &Player{
+		IP:       p.GetHostIP(""),
+		PlayerID: hostUser,
+	}
+
+	p.Close()
+	p.init()
+	if err := p.Wire.Start(creds, host, host); err != nil {
 		return nil, err
 	}
 
-	// p.mtx.Lock()
-	p.CurrentPlayer = currentPlayer
-	// p.mtx.Unlock()
+	return p.GetHostIP(hostUser), nil
+}
 
-	go func() {
-		p.startTCP(context.TODO())
-	}()
+func (p *Loopback) Join(gameId string, hostPlayer, currentPlayer string, _ string) (net.IP, error) {
+	creds := &Credentials{}
+	host := &Player{
+		PlayerID: hostPlayer,
+		IP:       p.GetHostIP(""),
+	}
+	me := &Player{
+		PlayerID: currentPlayer,
+		IP:       IPFromRing(p.IpRing),
+	}
+
+	p.Close()
+	p.init()
+	if err := p.Wire.Start(creds, host, me); err != nil {
+		return nil, err
+	}
 
 	return p.GetHostIP(""), nil
 }
 
-// Exchange is used by UDP clients
 func (p *Loopback) Exchange(gameId string, userId string, _ string) (net.IP, error) {
-	udpIP, index, err := p.nextIP()
-	if err != nil {
-		return nil, err
+	if p.Wire == nil || !p.Wire.isConnected {
+		return nil, fmt.Errorf("cannot exchange data over UDP - not connected")
 	}
 
-	p.CurrentPlayer = userId
-	p.MapUserToIP[userId] = udpIP
-	p.MapIPIndexToUser[index] = userId
+	udpIP := IPFromRing(p.IpRing)
 
-	go func() {
-		p.startUDP(context.TODO(), index, udpIP)
-	}()
+	p.Wire.UDP()
 
+	// p.Wire.startUDP()
+
+	// p.CurrentPlayer = userId
+	// p.MapUserToIP[userId] = udpIP
+	// p.MapIPIndexToUser[index] = userId
+
+	// go func() {
+	// 	p.startUDP(context.TODO(), index, udpIP)
+	// }()
+
+	p.IpRing.Next()
 	return udpIP, nil
 }
 
-func (p *Loopback) nextIP() (net.IP, int, error) {
-	if len(p.MapIPIndexToUser) > 4 {
-		return nil, 0, fmt.Errorf("beta: ip-user map not cleaned up")
-	}
-	index := len(p.MapIPIndexToUser)
-	ip := p.ClientIPAddresses[index]
-	return ip, index, nil
-}
+// func (p *Loopback) nextIP() (net.IP, int, error) {
+// 	if len(p.MapIPIndexToUser) > 4 {
+// 		return nil, 0, fmt.Errorf("ip-user map has not been cleaned up")
+// 	}
+// 	index := len(p.MapIPIndexToUser)
+// 	ip := p.ClientIPAddresses[index]
+// 	return ip, index, nil
+// }
 
 func (p *Loopback) GetHostIP(_ string) net.IP {
-	return p.HostIPAddress
-}
-
-func (p *Loopback) Close() {
-	if p.closeCh != nil {
-		close(p.closeCh)
-	}
-
-	p.GlobalProxyConn = nil
-	clear(p.MapIPIndexToUser)
-	clear(p.MapIPIndexToUser)
+	return net.IPv4(127, 0, 1, 1)
 }

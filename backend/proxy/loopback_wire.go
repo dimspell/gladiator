@@ -14,6 +14,8 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+var isUnitTest bool
+
 func writeCBOR[T any](conn io.Writer, command string, value T) error {
 	data, err := cbor.Marshal(value)
 	if err != nil {
@@ -34,6 +36,76 @@ func parseCBOR[T any](data []byte) (value T, err error) {
 		return value, err
 	}
 	return value, nil
+}
+
+type Wire struct {
+	isConnected bool
+
+	Address         string
+	GlobalProxyConn net.Conn
+
+	tcpDataCh chan Data
+	udpDataCh chan Data
+	closeCh   chan struct{}
+
+	Me      *Player
+	Host    *Player
+	Players map[int]*Player
+}
+
+func NewWire(addr string) *Wire {
+	return &Wire{
+		isConnected: false,
+
+		tcpDataCh: make(chan Data),
+		udpDataCh: make(chan Data),
+		closeCh:   make(chan struct{}),
+	}
+}
+
+type Credentials struct {
+	//
+}
+
+type Player struct {
+	IP       net.IP
+	PlayerID string
+}
+
+func (p *Wire) Start(credentials *Credentials, host *Player, me *Player) error {
+	if p.isConnected {
+		return nil
+	}
+	p.Host = host
+	p.Me = me
+
+	if err := p.connect(credentials); err != nil {
+		return err
+	}
+
+	go func() {
+		p.startTCP(context.TODO())
+	}()
+	return nil
+}
+
+func (p *Wire) UDP() {
+
+}
+
+func (p *Wire) Stop() {
+	if p == nil {
+		return
+	}
+	// Close all channels
+
+	if p.closeCh != nil {
+		close(p.closeCh)
+	}
+
+	// p.GlobalProxyConn = nil
+	// clear(p.MapIPIndexToUser)
+	// clear(p.MapIPIndexToUser)
 }
 
 const (
@@ -61,9 +133,9 @@ type Data struct {
 	Payload      []byte
 }
 
-func (p *Loopback) connect() error {
-	if !p.Test {
-		conn, err := net.DialTimeout("tcp", p.GlobalProxyAddress, DefaultConnectionTimeout)
+func (p *Wire) connect(credentials *Credentials) error {
+	if !isUnitTest {
+		conn, err := net.DialTimeout("tcp", p.Address, DefaultConnectionTimeout)
 		if err != nil {
 			return err
 		}
@@ -90,7 +162,7 @@ func (p *Loopback) connect() error {
 	return nil
 }
 
-func (p *Loopback) parsePackets(conn net.Conn) {
+func (p *Wire) parsePackets(conn net.Conn) {
 	buf := make([]byte, 512)
 	n, err := conn.Read(buf)
 	if err != nil {
@@ -124,10 +196,10 @@ func (p *Loopback) parsePackets(conn net.Conn) {
 	}
 }
 
-func (p *Loopback) hello(conn net.Conn) (*HelloOutput, error) {
+func (p *Wire) hello(conn net.Conn) (*HelloOutput, error) {
 	if err := writeCBOR(p.GlobalProxyConn,
 		"HELLO",
-		HelloInput{Username: p.CurrentPlayer},
+		HelloInput{Username: p.Me.PlayerID},
 	); err != nil {
 		return nil, err
 	}
@@ -151,7 +223,7 @@ func (p *Loopback) hello(conn net.Conn) (*HelloOutput, error) {
 	return &output, nil
 }
 
-func (p *Loopback) startUDP(ctx context.Context, index int, ip net.IP) error {
+func (p *Wire) startUDP(ctx context.Context, index int, ip net.IP) error {
 	slog.Info("Starting proxy for UDP", "ip", ip.String())
 
 	srcAddr, err := net.ResolveUDPAddr("udp", net.JoinHostPort(ip.To4().String(), "6113"))
@@ -241,8 +313,8 @@ func (p *Loopback) startUDP(ctx context.Context, index int, ip net.IP) error {
 	return nil
 }
 
-func (p *Loopback) startTCP(ctx context.Context) error {
-	tcpFakeHost, err := net.Listen("tcp", net.JoinHostPort(p.HostIPAddress.String(), "6114"))
+func (p *Wire) startTCP(ctx context.Context) error {
+	tcpFakeHost, err := net.Listen("tcp", net.JoinHostPort(p.Host.IP.To4().String(), "6114"))
 	if err != nil {
 		fmt.Println("Error listening on TCP:", err.Error())
 		return err
@@ -296,7 +368,7 @@ func (p *Loopback) startTCP(ctx context.Context) error {
 
 				if err := writeCBOR[Data](p.GlobalProxyConn, "DATAT", Data{
 					Payload:      buf[:n],
-					FromPlayerID: p.CurrentPlayer,
+					FromPlayerID: p.Me.PlayerID,
 					ToPlayerID:   "host", // TODO: Name the host
 				}); err != nil {
 					return

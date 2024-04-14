@@ -47,8 +47,9 @@ func (b *Backend) HandleSelectGame(session *model.Session, req SelectGameRequest
 	}
 
 	hostIP, err := b.Proxy.Join(
-		respGame.Msg.GetGame().GetGameId(),
-		session.UserID,
+		respGame.Msg.GetGame().GetName(),
+		session.Username,
+		session.Username,
 		respGame.Msg.GetGame().HostIpAddress,
 	)
 	if err != nil {
@@ -71,8 +72,8 @@ func (b *Backend) HandleSelectGame(session *model.Session, req SelectGameRequest
 		}
 
 		proxyIP, err := b.Proxy.Exchange(
-			respGame.Msg.GetGame().GetGameId(),
-			player.UserId,
+			respGame.Msg.GetGame().String(),
+			player.Username,
 			player.IpAddress,
 		)
 		if err != nil {

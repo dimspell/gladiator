@@ -42,6 +42,7 @@ func (b *Backend) HandleJoinGame(session *model.Session, req JoinGameRequest) er
 	hostIP, err := b.Proxy.Join(
 		respGame.Msg.GetGame().GetName(),
 		session.Username,
+		session.Username,
 		respGame.Msg.GetGame().HostIpAddress,
 	)
 
