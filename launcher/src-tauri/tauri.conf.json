@@ -14,8 +14,56 @@
     "allowlist": {
       "all": false,
       "shell": {
-        "all": false,
-        "open": true
+        "all": true,
+        "execute": true,
+        "open": true,
+        "scope": [
+          {
+            "name": "console-memory",
+            "cmd": "./dispel-multi",
+            "args": [
+              "console",
+              "--console-addr",
+              {
+                "validator": "\\S+"
+              },
+              "--database-type",
+              "memory"
+            ]
+          },
+          {
+            "name": "console-sqlite",
+            "cmd": "./dispel-multi",
+            "args": [
+              "console",
+              "--console-addr",
+              {
+                "validator": "\\S+"
+              },
+              "--database-type",
+              "sqlite",
+              "--sqlite-path",
+              {
+                "validator": "\\S+"
+              }
+            ]
+          },
+          {
+            "name": "backend",
+            "cmd": "./dispel-multi",
+            "args": [
+              "backend",
+              "--console-addr",
+              {
+                "validator": "\\S+"
+              },
+              "--backend-addr",
+              {
+                "validator": "\\S+"
+              }
+            ]
+          }
+        ]
       }
     },
     "bundle": {

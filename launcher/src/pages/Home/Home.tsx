@@ -1,5 +1,7 @@
 import CardLayout from '../../components/CardLayout'
 import { Link } from 'react-router-dom'
+import { Command } from '@tauri-apps/api/shell'
+
 
 function Home() {
   return (
@@ -19,11 +21,11 @@ function Home() {
           </p>
           <div className={'flex flex-row space-x-7'}>
             <Link to={'join-server'}
-               className='flex-1 text-center text-sky-100 hover:text-sky-200 bg-sky-700 hover:bg-sky-800 px-5 py-4 rounded'>
+                  className='flex-1 text-center text-sky-100 hover:text-sky-200 bg-sky-700 hover:bg-sky-800 px-5 py-4 rounded'>
               Join a Server
             </Link>
             <Link to={'host-server'}
-               className='flex-1 text-center text-amber-100 hover:text-amber-200 bg-amber-700 hover:bg-amber-800 px-5 py-4 rounded'>
+                  className='flex-1 text-center text-amber-100 hover:text-amber-200 bg-amber-700 hover:bg-amber-800 px-5 py-4 rounded'>
               Host a Server
             </Link>
           </div>
@@ -33,7 +35,40 @@ function Home() {
             Are you curious about the development?
           </p>
           <p>
-            <a href='https://tailwindcss.com/docs' className='text-sky-500 hover:text-sky-600'>
+            <a href='https://tailwindcss.com/docs'
+               className='text-sky-500 hover:text-sky-600'
+               onClick={async (event) => {
+                 event.preventDefault()
+                 console.log('clicked')
+
+
+                 const command = new Command('console-memory',
+                   ['console',
+                     '--console-addr', '127.0.0.1:2137',
+                     '--database-type', 'memory'])
+
+                 // await child.write('message');
+
+                 command.on('close', data => {
+                   console.log(`command finished with code ${data.code} and signal ${data.signal}`)
+                 })
+
+                 command.on('error', error => console.error(`command error: "${error}"`))
+                 command.stdout.on('data', line => console.log(`command stdout: "${line}"`))
+                 command.stderr.on('data', line => console.log(`command stderr: "${line}"`))
+
+                 const child = await command.spawn()
+
+                 console.log(child.pid)
+
+                 setTimeout(async () => {
+                   console.log('killing')
+                   console.log(await child.kill())
+                 }, 3000)
+
+
+                 // console.log('invoked:', await invoke('run_background'))
+               }}>
               Join Discord channel &rarr;
             </a>
           </p>
