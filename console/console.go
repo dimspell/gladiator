@@ -101,11 +101,37 @@ func (c *Console) HttpRouter() http.Handler {
 	}
 
 	{ // Setup routes used by the launcher
-		mux.Get("/.well-known/dispel-multi.json", func(w http.ResponseWriter, r *http.Request) {
+		wellKnown := chi.NewRouter()
+		wellKnown.Use(cors.New(cors.Options{
+			AllowedOrigins:   c.CORSAllowedOrigins,
+			AllowCredentials: false,
+			Debug:            false,
+			AllowedMethods: []string{
+				http.MethodGet,
+				http.MethodPost,
+			},
+			AllowedHeaders: []string{
+				"Content-Type",
+				"Connect-Protocol-Version",
+				"Connect-Timeout-Ms",
+				"Grpc-Timeout",
+				"X-Grpc-Web",
+				"X-User-Agent",
+			},
+			ExposedHeaders: []string{
+				"Grpc-Status",
+				"Grpc-Message",
+				"Grpc-Status-Details-Bin",
+			},
+			MaxAge: 7200,
+		}).Handler)
+
+		wellKnown.Get("/dispel-multi.json", func(w http.ResponseWriter, r *http.Request) {
 			renderJSON(w, r, model.WellKnown{
 				ZeroTier: model.ZeroTier{Enabled: false},
 			})
 		})
+		mux.Mount("/.well-known/", wellKnown)
 	}
 
 	{ // Setup gRPC routes for the backend
