@@ -7,15 +7,24 @@ import HostServer from './pages/HostServer/HostServer'
 import JoinServer from './pages/JoinServer/JoinServer'
 import ErrorPage from './pages/ErrorPage'
 import { Provider as JotaiProvider } from 'jotai';
+import HomeFranken from './pages/Home/HomeFranken'
+import HostServerFranken from './pages/HostServer/HostServerFranken'
+import AdminFranken from './pages/Admin/AdminFranken'
+import AdminPlayersFranken from './pages/Admin/Players/AdminPlayersFranken'
 
 const router = createBrowserRouter([
   {
     path: '/',
-    element: <Home />,
+    element: <HomeFranken />,
     errorElement: <ErrorPage />,
   },
   {
     path: '/host-server',
+    element: <HostServerFranken />,
+    errorElement: <ErrorPage />,
+  },
+  {
+    path: '/host-server2',
     element: <HostServer />,
     errorElement: <ErrorPage />,
   },
@@ -26,8 +35,20 @@ const router = createBrowserRouter([
   },
   {
     path: '/home',
-    element: <Home />,
+    element: <HomeFranken />,
     errorElement: <ErrorPage />,
+  },
+  {
+    path: '/admin',
+    element: <AdminFranken />,
+    errorElement: <ErrorPage />,
+    children: [
+      {
+        path: '/admin/players',
+        element: <AdminPlayersFranken />,
+        errorElement: <ErrorPage />,
+      }
+    ]
   },
 ])
 
