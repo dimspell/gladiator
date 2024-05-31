@@ -29,41 +29,46 @@ func WelcomeScreen(w fyne.Window) fyne.CanvasObject {
 	)
 
 	header1Label := widget.NewRichTextFromMarkdown(header1)
-	header1Label.Wrapping = fyne.TextWrapWord
+	// header1Label.Wrapping = fyne.TextWrapWord
 
-	text1Label := widget.NewLabel(text1)
+	text1Label := widget.NewRichTextFromMarkdown(text1)
 	text1Label.Wrapping = fyne.TextWrapWord
 
 	header2Label := widget.NewRichTextFromMarkdown(header2)
-	header2Label.Wrapping = fyne.TextWrapWord
+	// header2Label.Wrapping = fyne.TextWrapWord
 
-	text2Label := widget.NewLabel(text2)
+	text2Label := widget.NewRichTextFromMarkdown(text2)
 	text2Label.Wrapping = fyne.TextWrapWord
 
-	div := container.NewVBox(
+	return container.NewPadded(container.NewVBox(
 		widget.NewRichTextFromMarkdown("# Dispel Multi"),
 
-		header1Label,
-		text1Label,
-		header2Label,
-		text2Label,
+		container.NewVBox(
+			header1Label,
+			text1Label,
+			header2Label,
+			text2Label,
+		),
+
 		widget.NewLabel(""),
 
 		container.New(
 			layout.NewHBoxLayout(),
 			layout.NewSpacer(),
-			widget.NewButtonWithIcon("Join a server", theme.LoginIcon(), func() {
-				log.Println("Join")
-				w.SetContent(JoinScreen(w))
-			}),
 			widget.NewButtonWithIcon("Host a server", theme.ContentAddIcon(), func() {
 				log.Println("Host")
 				w.SetContent(HostScreen(w))
 			}),
+			widget.NewButtonWithIcon("Join a server", theme.LoginIcon(), func() {
+				log.Println("Join")
+				w.SetContent(JoinOptionsScreen(w))
+			}),
+
 			layout.NewSpacer(),
 		),
 
 		layout.NewSpacer(),
+
 		container.New(layout.NewHBoxLayout(),
 			layout.NewSpacer(),
 			widget.NewHyperlink("GitHub", parseURL("https://github.com/dispel-re/dispel-multi")),
@@ -73,8 +78,5 @@ func WelcomeScreen(w fyne.Window) fyne.CanvasObject {
 			widget.NewHyperlink("Reddit", parseURL("https://www.reddit.com/r/DispelRPG")),
 			layout.NewSpacer(),
 		),
-		// widget.NewLabel(""), // balance the header on the tutorial screen we leave blank on this content
-	)
-
-	return container.NewPadded(div)
+	))
 }

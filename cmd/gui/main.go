@@ -13,10 +13,11 @@ func main() {
 
 	// w.SetContent(widget.NewLabel("Hello World!"))
 	// w.SetContent(ui.AdminScreen(w))
-	w.SetContent(ui.JoinScreen(w))
+	// w.SetContent(ui.JoinScreen(w))
+	w.SetContent(ui.WelcomeScreen(w))
 
 	// w.SetContent(mainContent.MakeUI())
-	w.Resize(fyne.NewSize(600, 400))
+	w.Resize(fyne.NewSize(600, 500))
 	// err := mainContent.StagerController.TakeOver(mainContent.HomeView.GetStageName())
 	// if err != nil {
 	// 	dialog.ShowError(err, w)
