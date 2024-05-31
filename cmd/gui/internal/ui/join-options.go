@@ -45,8 +45,14 @@ func JoinOptionsScreen(w fyne.Window) fyne.CanvasObject {
 		container.NewCenter(
 			widget.NewButtonWithIcon("Next", theme.NavigateNextIcon(), func() {
 				log.Println(radioValue)
+				if radioValue == radioOptions[1] {
+					// Start backend (popup?)
+					w.SetContent(SignInScreen(w))
+					return
+				}
 				if radioValue == radioOptions[2] {
 					w.SetContent(JoinCustomScreen(w))
+					return
 				}
 			}),
 		),
