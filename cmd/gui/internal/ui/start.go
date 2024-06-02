@@ -21,29 +21,38 @@ func (c *Controller) StartScreen(w fyne.Window) fyne.CanvasObject {
 	})
 	radioGroup.Required = true
 
-	return container.NewPadded(container.NewVBox(
-		headerContainer(headerText, func() {
-			log.Println("Welcome")
-			w.SetContent(c.WelcomeScreen(w))
-		}),
-		widget.NewLabel(""),
-
-		widget.NewLabelWithStyle("What do you want to do?", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
-		radioGroup,
-
-		widget.NewLabel(""),
-		container.NewCenter(
-			widget.NewButtonWithIcon("Next", theme.NavigateNextIcon(), func() {
-				log.Println(radioGroup.Selected)
-				if radioGroup.Selected == radioOptions["join"] {
-					w.SetContent(c.JoinOptionsScreen(w))
-					return
-				}
-				if radioGroup.Selected == radioOptions["host"] {
-					w.SetContent(c.HostScreen(w))
-					return
-				}
+	return container.NewBorder(
+		container.NewPadded(
+			headerContainer(headerText, func() {
+				log.Println("Welcome")
+				w.SetContent(c.WelcomeScreen(w))
 			}),
 		),
-	))
+		nil,
+		nil,
+		nil,
+		container.NewPadded(
+			container.NewVBox(
+				widget.NewLabel(""),
+
+				widget.NewLabelWithStyle("What do you want to do?", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
+				radioGroup,
+
+				widget.NewLabel(""),
+				container.NewCenter(
+					widget.NewButtonWithIcon("Next", theme.NavigateNextIcon(), func() {
+						log.Println(radioGroup.Selected)
+						if radioGroup.Selected == radioOptions["join"] {
+							w.SetContent(c.JoinOptionsScreen(w))
+							return
+						}
+						if radioGroup.Selected == radioOptions["host"] {
+							w.SetContent(c.HostScreen(w))
+							return
+						}
+					}),
+				),
+			),
+		),
+	)
 }

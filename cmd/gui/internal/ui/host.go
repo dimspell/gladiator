@@ -70,6 +70,80 @@ func (c *Controller) HostScreen(w fyne.Window) fyne.CanvasObject {
 	pathEntry.Hidden = true
 	pathSelection.Hidden = true
 
+	pathEntry.Text, _ = os.UserHomeDir()
+
+	headerText := "Host a server"
+
+	onHost := func() {
+		loadingContainer := container.NewCenter(
+			widget.NewProgressBarInfinite(),
+		)
+		loadingDialog := dialog.NewCustom("Starting auth server...",
+			"Cancel",
+			loadingContainer,
+			w,
+		)
+		loadingDialog.Show()
+
+		// Configure the database connection
+		var (
+			db  *database.SQLite
+			err error
+		)
+		switch comboGroup.Selected {
+		case comboOptions[0]:
+			// sqlite
+			db, err = database.NewLocal(
+				pathEntry.Text +
+					string(os.PathSeparator) +
+					"dispel-multi.sqlite")
+			if err != nil {
+				dialog.ShowError(err, w)
+				return
+			}
+		case comboOptions[1]:
+			// memory
+			db, err = database.NewMemory()
+			if err != nil {
+				dialog.ShowError(err, w)
+				return
+			}
+		default:
+			dialog.ShowError(fmt.Errorf("unknown database type"), w)
+			return
+		}
+
+		queries, err := db.Queries()
+		if err != nil {
+			dialog.ShowError(err, w)
+			return
+		}
+
+		// Update the database to the latest migration
+		if err := database.Seed(queries); err != nil {
+			dialog.ShowError(err, w)
+			return
+		}
+
+		c.Console = console.NewConsole(queries, bindEntry.Text)
+
+		go func() {
+			if err := c.Console.Serve(context.TODO()); err != nil {
+				dialog.ShowError(err, w)
+				return
+			}
+		}()
+
+		loadingDialog.Hide()
+		loadingDialog = nil
+
+		// time.AfterFunc(5*time.Second, func() {
+		// 	log.Println(syscall.Kill(syscall.Getpid(), syscall.SIGINT))
+		// })
+
+		w.SetContent(c.AdminScreen(w))
+	}
+
 	formGrid := container.New(
 		layout.NewFormLayout(),
 		bindLabel, bindEntry,
@@ -77,88 +151,33 @@ func (c *Controller) HostScreen(w fyne.Window) fyne.CanvasObject {
 		pathLabel, pathContainer,
 	)
 
-	headerText := "Host a server"
+	btn := widget.NewButtonWithIcon("Submit", theme.NavigateNextIcon(), onHost)
+	label := widget.NewRichTextFromMarkdown("**Auth server configuration**\n\nLet's get your game server up and running. Please fill out the following form to specify the configuration details.")
+	label.Wrapping = fyne.TextWrapWord
+	size := label.Size()
+	size.Height /= 4
+	label.Resize(size)
+	label.Refresh()
 
-	return container.NewPadded(container.NewVBox(
-		headerContainer(headerText, func() {
-			log.Println("Start")
-			w.SetContent(c.StartScreen(w))
-		}),
-		widget.NewLabel(""),
+	return container.NewStack(
+		container.NewBorder(
+			container.NewPadded(
+				headerContainer(headerText, func() {
+					log.Println("Start")
+					w.SetContent(c.StartScreen(w))
+				})),
+			nil,
+			nil,
+			nil,
+			container.NewPadded(
+				container.NewVBox(
+					widget.NewLabel(""),
+					label,
 
-		formGrid,
-
-		widget.NewLabel(""),
-		container.NewCenter(
-			widget.NewButtonWithIcon("Submit", theme.NavigateNextIcon(), func() {
-				loadingContainer := container.NewCenter(
-					widget.NewProgressBarInfinite(),
-				)
-				loadingDialog := dialog.NewCustom("Starting auth server...",
-					"Cancel",
-					loadingContainer,
-					w,
-				)
-				loadingDialog.Show()
-
-				// Configure the database connection
-				var (
-					db  *database.SQLite
-					err error
-				)
-				switch comboGroup.Selected {
-				case comboOptions[0]:
-					// sqlite
-					db, err = database.NewLocal(
-						pathEntry.Text +
-							string(os.PathSeparator) +
-							"dispel-multi.sqlite")
-					if err != nil {
-						dialog.ShowError(err, w)
-						return
-					}
-				case comboOptions[1]:
-					// memory
-					db, err = database.NewMemory()
-					if err != nil {
-						dialog.ShowError(err, w)
-						return
-					}
-				default:
-					dialog.ShowError(fmt.Errorf("unknown database type"), w)
-					return
-				}
-
-				queries, err := db.Queries()
-				if err != nil {
-					dialog.ShowError(err, w)
-					return
-				}
-
-				// Update the database to the latest migration
-				if err := database.Seed(queries); err != nil {
-					dialog.ShowError(err, w)
-					return
-				}
-
-				c.Console = console.NewConsole(queries, bindEntry.Text)
-
-				go func() {
-					if err := c.Console.Serve(context.TODO()); err != nil {
-						dialog.ShowError(err, w)
-						return
-					}
-				}()
-
-				loadingDialog.Hide()
-				loadingDialog = nil
-
-				// time.AfterFunc(5*time.Second, func() {
-				// 	log.Println(syscall.Kill(syscall.Getpid(), syscall.SIGINT))
-				// })
-
-				w.SetContent(c.AdminScreen(w))
-			}),
+					container.NewPadded(formGrid),
+					container.NewCenter(btn),
+				),
+			),
 		),
-	))
+	)
 }

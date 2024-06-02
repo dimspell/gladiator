@@ -40,30 +40,8 @@ func (c *Controller) WelcomeScreen(w fyne.Window) fyne.CanvasObject {
 	text2Label := widget.NewRichTextFromMarkdown(text2)
 	text2Label.Wrapping = fyne.TextWrapWord
 
-	return container.NewPadded(container.NewVBox(
-		widget.NewRichTextFromMarkdown("# Dispel Multi"),
-
-		container.NewVBox(
-			header1Label,
-			text1Label,
-			header2Label,
-			text2Label,
-		),
-
-		widget.NewLabel(""),
-
-		container.New(
-			layout.NewHBoxLayout(),
-			layout.NewSpacer(),
-			widget.NewButtonWithIcon("Start", theme.NavigateNextIcon(), func() {
-				log.Println("Start")
-				w.SetContent(c.StartScreen(w))
-			}),
-			layout.NewSpacer(),
-		),
-
-		layout.NewSpacer(),
-
+	return container.NewBorder(
+		nil,
 		container.New(layout.NewHBoxLayout(),
 			layout.NewSpacer(),
 			widget.NewHyperlink("GitHub", parseURL("https://github.com/dispel-re/dispel-multi")),
@@ -73,5 +51,29 @@ func (c *Controller) WelcomeScreen(w fyne.Window) fyne.CanvasObject {
 			widget.NewHyperlink("Reddit", parseURL("https://www.reddit.com/r/DispelRPG")),
 			layout.NewSpacer(),
 		),
-	))
+		nil,
+		nil,
+		container.NewPadded(
+			container.NewVBox(
+				widget.NewRichTextFromMarkdown("# Dispel Multi"),
+
+				container.NewVBox(
+					header1Label,
+					text1Label,
+					header2Label,
+					text2Label,
+				),
+
+				widget.NewLabel(""),
+
+				container.NewHBox(
+					layout.NewSpacer(),
+					widget.NewButtonWithIcon("Start", theme.NavigateNextIcon(), func() {
+						log.Println("Start")
+						w.SetContent(c.StartScreen(w))
+					}),
+					layout.NewSpacer()),
+			),
+		),
+	)
 }
