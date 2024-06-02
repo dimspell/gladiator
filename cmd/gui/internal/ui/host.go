@@ -11,12 +11,32 @@ import (
 )
 
 func HostScreen(w fyne.Window) fyne.CanvasObject {
-	bindLabel := widget.NewLabel("Bind Address:")
-	bindEntry := widget.NewEntry()
-	typeLabel := widget.NewLabel("Database Type:")
-	typeEntry := widget.NewEntry()
 	pathLabel := widget.NewLabel("Database Path:")
 	pathEntry := widget.NewEntry()
+
+	comboOptions := []string{
+		"Saved on disk (sqlite)",
+		"Stored in-memory (for testing)",
+	}
+	comboGroup := widget.NewSelect(comboOptions, func(value string) {
+		log.Println("Select set to", value)
+
+		pathNotUsed := value == comboOptions[1]
+		pathLabel.Hidden = pathNotUsed
+		pathEntry.Hidden = pathNotUsed
+	})
+
+	bindLabel := widget.NewLabel("Bind Address:")
+	bindEntry := widget.NewEntry()
+	bindEntry.PlaceHolder = "Example: 0.0.0.0:2137"
+	bindEntry.Text = "127.0.0.1:2137"
+
+	typeLabel := widget.NewLabel("Database Type:")
+	typeEntry := comboGroup
+
+	comboGroup.SetSelected(comboOptions[1])
+	pathLabel.Hidden = true
+	pathEntry.Hidden = true
 
 	formGrid := container.New(layout.NewFormLayout(), bindLabel, bindEntry, typeLabel, typeEntry, pathLabel, pathEntry)
 
