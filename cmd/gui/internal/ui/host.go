@@ -1,7 +1,6 @@
 package ui
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"os"
@@ -86,6 +85,16 @@ func (c *Controller) HostScreen(w fyne.Window) fyne.CanvasObject {
 		widget.NewLabel(""),
 		container.NewCenter(
 			widget.NewButtonWithIcon("Submit", theme.NavigateNextIcon(), func() {
+				loadingContainer := container.NewCenter(
+					widget.NewProgressBarInfinite(),
+				)
+				loadingDialog := dialog.NewCustom("Starting auth server...",
+					"Cancel",
+					loadingContainer,
+					w,
+				)
+				loadingDialog.Show()
+
 				// Configure the database connection
 				var (
 					db  *database.SQLite
@@ -127,12 +136,15 @@ func (c *Controller) HostScreen(w fyne.Window) fyne.CanvasObject {
 				}
 
 				c.Console = console.NewConsole(queries, nil)
-				go func() {
-					if err := c.Console.Serve(context.TODO(), bindEntry.Text, ""); err != nil {
-						dialog.ShowError(err, w)
-						return
-					}
-				}()
+				// go func() {
+				// 	if err := c.Console.Serve(context.TODO(), bindEntry.Text, ""); err != nil {
+				// 		dialog.ShowError(err, w)
+				// 		return
+				// 	}
+				// }()
+
+				loadingDialog.Hide()
+				loadingDialog = nil
 
 				// time.AfterFunc(5*time.Second, func() {
 				// 	log.Println(syscall.Kill(syscall.Getpid(), syscall.SIGINT))
