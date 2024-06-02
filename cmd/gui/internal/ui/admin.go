@@ -5,6 +5,7 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
@@ -30,14 +31,27 @@ func AdminScreen(w fyne.Window) fyne.CanvasObject {
 	headerText := "## Console Admin Panel"
 	header := widget.NewRichTextFromMarkdown(headerText)
 
+	stopCallback := func(b bool) {
+		if b {
+			log.Println("Welcome")
+			w.SetContent(WelcomeScreen(w))
+		}
+	}
+
 	return container.NewPadded(
 		container.NewVBox(
 			container.NewHBox(
 				header,
 				layout.NewSpacer(),
-				widget.NewButtonWithIcon("", theme.MenuDropDownIcon(), func() {
-					log.Println("Dropdown menu")
-					w.SetContent(WelcomeScreen(w))
+				widget.NewButtonWithIcon("Stop", theme.LogoutIcon(), func() {
+					cnf := dialog.NewConfirm(
+						"Stopping server",
+						"Do you want to stop the auth server\n and go back to the start page?\n",
+						stopCallback,
+						w)
+					cnf.SetDismissText("Cancel")
+					cnf.SetConfirmText("Yes, stop the server")
+					cnf.Show()
 				}),
 			),
 			tabs,
