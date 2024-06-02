@@ -13,14 +13,14 @@ import (
 func (c *Controller) StartScreen(w fyne.Window) fyne.CanvasObject {
 	const headerText = "Start"
 
-	radioOptions := []string{
-		"Join - I want to join an already existing server.",
-		"Host - I would like to host my own server over LAN.",
+	radioOptions := map[string]string{
+		"join": "Join - I want to join an already existing server.",
+		"host": "Host - I would like to host my own server over LAN.",
 	}
-	radioGroup := widget.NewRadioGroup(radioOptions, func(value string) {
+	radioGroup := widget.NewRadioGroup(Values(radioOptions), func(value string) {
 		log.Println("Radio set to", value)
 	})
-	radioGroup.SetSelected(radioOptions[1])
+	radioGroup.SetSelected(radioOptions["host"])
 	radioGroup.Required = true
 
 	return container.NewPadded(container.NewVBox(
@@ -41,11 +41,11 @@ func (c *Controller) StartScreen(w fyne.Window) fyne.CanvasObject {
 		container.NewCenter(
 			widget.NewButtonWithIcon("Next", theme.NavigateNextIcon(), func() {
 				log.Println(radioGroup.Selected)
-				if radioGroup.Selected == radioOptions[0] {
+				if radioGroup.Selected == radioOptions["join"] {
 					w.SetContent(c.JoinOptionsScreen(w))
 					return
 				}
-				if radioGroup.Selected == radioOptions[1] {
+				if radioGroup.Selected == radioOptions["host"] {
 					w.SetContent(c.HostScreen(w))
 					return
 				}

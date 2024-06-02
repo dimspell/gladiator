@@ -13,16 +13,13 @@ import (
 func (c *Controller) JoinOptionsScreen(w fyne.Window) fyne.CanvasObject {
 	headerText := "Join a server"
 
-	var radioValue string
-
-	radioOptions := []string{
-		"Use dispelmulti.net network",
-		"Use loopback for testing (127.0.0.1:2137)",
-		"Define your own",
+	radioOptions := map[string]string{
+		"dispelmulti.net": "Use dispelmulti.net network",
+		"loopback":        "Use loopback for testing (127.0.0.1:2137)",
+		"define":          "Use LAN network - provide the address",
 	}
-	radioGroup := widget.NewRadioGroup(radioOptions, func(value string) {
+	radioGroup := widget.NewRadioGroup(Values(radioOptions), func(value string) {
 		log.Println("Radio set to", value)
-		radioValue = value
 	})
 	radioGroup.Required = true
 
@@ -43,14 +40,14 @@ func (c *Controller) JoinOptionsScreen(w fyne.Window) fyne.CanvasObject {
 		widget.NewLabel(""),
 		container.NewCenter(
 			widget.NewButtonWithIcon("Next", theme.NavigateNextIcon(), func() {
-				log.Println(radioValue)
-				if radioValue == radioOptions[1] {
+				log.Println(radioGroup.Selected)
+				if radioGroup.Selected == radioOptions["loopback"] {
 					// Start backend (popup?)
 					w.SetContent(c.SignInScreen(w))
 					return
 				}
-				if radioValue == radioOptions[2] {
-					w.SetContent(c.JoinCustomScreen(w))
+				if radioGroup.Selected == radioOptions["define"] {
+					w.SetContent(c.JoinDefineScreen(w))
 					return
 				}
 			}),

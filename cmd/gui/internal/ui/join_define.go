@@ -11,7 +11,7 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-func (c *Controller) JoinCustomScreen(w fyne.Window) fyne.CanvasObject {
+func (c *Controller) JoinDefineScreen(w fyne.Window) fyne.CanvasObject {
 	str := binding.NewString()
 
 	label1 := widget.NewLabel("Authorization Server Address:")
