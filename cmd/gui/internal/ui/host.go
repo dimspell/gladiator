@@ -1,7 +1,10 @@
 package ui
 
 import (
+	"context"
+	"fmt"
 	"log"
+	"os"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
@@ -9,6 +12,8 @@ import (
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	"github.com/dispel-re/dispel-multi/console"
+	"github.com/dispel-re/dispel-multi/console/database"
 )
 
 func (c *Controller) HostScreen(w fyne.Window) fyne.CanvasObject {
@@ -81,6 +86,58 @@ func (c *Controller) HostScreen(w fyne.Window) fyne.CanvasObject {
 		widget.NewLabel(""),
 		container.NewCenter(
 			widget.NewButtonWithIcon("Submit", theme.NavigateNextIcon(), func() {
+				// Configure the database connection
+				var (
+					db  *database.SQLite
+					err error
+				)
+				switch comboGroup.Selected {
+				case comboOptions[0]:
+					// sqlite
+					db, err = database.NewLocal(
+						pathEntry.Text +
+							string(os.PathSeparator) +
+							"dispel-multi.sqlite")
+					if err != nil {
+						dialog.ShowError(err, w)
+						return
+					}
+				case comboOptions[1]:
+					// memory
+					db, err = database.NewMemory()
+					if err != nil {
+						dialog.ShowError(err, w)
+						return
+					}
+				default:
+					dialog.ShowError(fmt.Errorf("unknown database type"), w)
+					return
+				}
+
+				queries, err := db.Queries()
+				if err != nil {
+					dialog.ShowError(err, w)
+					return
+				}
+
+				// Update the database to the latest migration
+				if err := database.Seed(queries); err != nil {
+					dialog.ShowError(err, w)
+					return
+				}
+
+				c.Console = console.NewConsole(queries, nil)
+				go func() {
+					if err := c.Console.Serve(context.TODO(), bindEntry.Text, ""); err != nil {
+						dialog.ShowError(err, w)
+						return
+					}
+				}()
+
+				// time.AfterFunc(5*time.Second, func() {
+				// 	log.Println(syscall.Kill(syscall.Getpid(), syscall.SIGINT))
+				// })
+
 				w.SetContent(c.AdminScreen(w))
 			}),
 		),
