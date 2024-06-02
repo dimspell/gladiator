@@ -2,6 +2,7 @@ package backend
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -115,8 +116,10 @@ func (b *Backend) Shutdown() {
 		session.Conn.Close()
 	}
 
-	b.Listener.Close()
-	b.Listener = nil
+	if b.Listener != nil {
+		b.Listener.Close()
+		b.Listener = nil
+	}
 
 	// TODO: Send a system message "(system) The server is going to close in less than 30 seconds"
 	// TODO: Send a packet to trigger stats saving
@@ -132,6 +135,9 @@ func (b *Backend) Listen() {
 		// Listen for an incoming connection.
 		conn, err := b.Listener.Accept()
 		if err != nil {
+			if errors.Is(err, net.ErrClosed) {
+				return
+			}
 			slog.Warn("Error, when accepting incoming connection", "err", err)
 			continue
 		}
