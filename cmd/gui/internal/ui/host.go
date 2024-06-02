@@ -10,7 +10,7 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-func HostScreen(w fyne.Window) fyne.CanvasObject {
+func (c *Controller) HostScreen(w fyne.Window) fyne.CanvasObject {
 	pathLabel := widget.NewLabel("Database Path:")
 	pathEntry := widget.NewEntry()
 
@@ -48,7 +48,7 @@ func HostScreen(w fyne.Window) fyne.CanvasObject {
 			layout.NewHBoxLayout(),
 			widget.NewButtonWithIcon("Go back", theme.NavigateBackIcon(), func() {
 				log.Println("Start")
-				w.SetContent(StartScreen(w))
+				w.SetContent(c.StartScreen(w))
 			}),
 			header,
 			layout.NewSpacer(),
@@ -60,7 +60,7 @@ func HostScreen(w fyne.Window) fyne.CanvasObject {
 		widget.NewLabel(""),
 		container.NewCenter(
 			widget.NewButtonWithIcon("Submit", theme.NavigateNextIcon(), func() {
-				w.SetContent(AdminScreen(w))
+				w.SetContent(c.AdminScreen(w))
 			}),
 		),
 	))

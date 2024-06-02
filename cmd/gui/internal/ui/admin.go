@@ -11,7 +11,7 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-func AdminScreen(w fyne.Window) fyne.CanvasObject {
+func (c *Controller) AdminScreen(w fyne.Window) fyne.CanvasObject {
 	consoleScreen := func() fyne.CanvasObject {
 		return widget.NewLabel("Console is running at 127.0.0.1:2137")
 	}
@@ -34,7 +34,7 @@ func AdminScreen(w fyne.Window) fyne.CanvasObject {
 	stopCallback := func(b bool) {
 		if b {
 			log.Println("Welcome")
-			w.SetContent(WelcomeScreen(w))
+			w.SetContent(c.WelcomeScreen(w))
 		}
 	}
 

@@ -7,6 +7,8 @@ require (
 	connectrpc.com/otelconnect v0.6.0
 	fyne.io/fyne/v2 v2.4.5
 	github.com/fxamacker/cbor/v2 v2.6.0
+	github.com/fynelabs/fyneselfupdate v0.1.1
+	github.com/fynelabs/selfupdate v0.2.0
 	github.com/go-chi/chi/v5 v5.0.11
 	github.com/golang-migrate/migrate/v4 v4.17.0
 	github.com/google/uuid v1.6.0

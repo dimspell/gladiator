@@ -10,7 +10,7 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-func StartScreen(w fyne.Window) fyne.CanvasObject {
+func (c *Controller) StartScreen(w fyne.Window) fyne.CanvasObject {
 	const headerText = "Start"
 
 	radioOptions := []string{
@@ -28,7 +28,7 @@ func StartScreen(w fyne.Window) fyne.CanvasObject {
 			layout.NewHBoxLayout(),
 			widget.NewButtonWithIcon("Go back", theme.NavigateBackIcon(), func() {
 				log.Println("Welcome")
-				w.SetContent(WelcomeScreen(w))
+				w.SetContent(c.WelcomeScreen(w))
 			}),
 			widget.NewLabelWithStyle(headerText, fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
 		),
@@ -42,11 +42,11 @@ func StartScreen(w fyne.Window) fyne.CanvasObject {
 			widget.NewButtonWithIcon("Next", theme.NavigateNextIcon(), func() {
 				log.Println(radioGroup.Selected)
 				if radioGroup.Selected == radioOptions[0] {
-					w.SetContent(JoinOptionsScreen(w))
+					w.SetContent(c.JoinOptionsScreen(w))
 					return
 				}
 				if radioGroup.Selected == radioOptions[1] {
-					w.SetContent(HostScreen(w))
+					w.SetContent(c.HostScreen(w))
 					return
 				}
 			}),

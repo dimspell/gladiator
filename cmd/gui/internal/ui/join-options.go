@@ -10,7 +10,7 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-func JoinOptionsScreen(w fyne.Window) fyne.CanvasObject {
+func (c *Controller) JoinOptionsScreen(w fyne.Window) fyne.CanvasObject {
 	headerText := "Join a server"
 
 	var radioValue string
@@ -31,7 +31,7 @@ func JoinOptionsScreen(w fyne.Window) fyne.CanvasObject {
 			layout.NewHBoxLayout(),
 			widget.NewButtonWithIcon("Go back", theme.NavigateBackIcon(), func() {
 				log.Println("Start")
-				w.SetContent(StartScreen(w))
+				w.SetContent(c.StartScreen(w))
 			}),
 			widget.NewLabelWithStyle(headerText, fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
 		),
@@ -46,11 +46,11 @@ func JoinOptionsScreen(w fyne.Window) fyne.CanvasObject {
 				log.Println(radioValue)
 				if radioValue == radioOptions[1] {
 					// Start backend (popup?)
-					w.SetContent(SignInScreen(w))
+					w.SetContent(c.SignInScreen(w))
 					return
 				}
 				if radioValue == radioOptions[2] {
-					w.SetContent(JoinCustomScreen(w))
+					w.SetContent(c.JoinCustomScreen(w))
 					return
 				}
 			}),

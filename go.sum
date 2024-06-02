@@ -98,6 +98,10 @@ github.com/fyne-io/glfw-js v0.0.0-20220120001248-ee7290d23504 h1:+31CdF/okdokeFN
 github.com/fyne-io/glfw-js v0.0.0-20220120001248-ee7290d23504/go.mod h1:gLRWYfYnMA9TONeppRSikMdXlHQ97xVsPojddUv3b/E=
 github.com/fyne-io/image v0.0.0-20220602074514-4956b0afb3d2 h1:hnLq+55b7Zh7/2IRzWCpiTcAvjv/P8ERF+N7+xXbZhk=
 github.com/fyne-io/image v0.0.0-20220602074514-4956b0afb3d2/go.mod h1:eO7W361vmlPOrykIg+Rsh1SZ3tQBaOsfzZhsIOb/Lm0=
+github.com/fynelabs/fyneselfupdate v0.1.1 h1:0K1Jj0NajvbQON/1g3cfSMaBD45jYi/RugRczOxe9mg=
+github.com/fynelabs/fyneselfupdate v0.1.1/go.mod h1:LZcVS/JbWcxg1JBGym6r2H2UbZehgBkZqs23nBYSqE0=
+github.com/fynelabs/selfupdate v0.2.0 h1:IDqwgV7BYj4lCcoD8hHvIapVGmS5ifWrc0sQTWh1eFw=
+github.com/fynelabs/selfupdate v0.2.0/go.mod h1:rCdliRnLw+koUanA+lrqub9wWlNc2wPDTsyRC6A+vfc=
 github.com/ghodss/yaml v1.0.0/go.mod h1:4dBDuWmgqj2HViK6kFavaiC9ZROes6MMH2rRYeMEF04=
 github.com/go-chi/chi/v5 v5.0.8/go.mod h1:DslCQbL2OYiznFReuXYUmQ2hGd1aDpCnlMNITLSKoi8=
 github.com/go-chi/chi/v5 v5.0.11 h1:BnpYbFZ3T3S1WMpD79r7R5ThWX40TaFB7L31Y8xqSwA=

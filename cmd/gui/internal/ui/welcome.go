@@ -20,7 +20,7 @@ func parseURL(urlStr string) *url.URL {
 	return link
 }
 
-func WelcomeScreen(w fyne.Window) fyne.CanvasObject {
+func (c *Controller) WelcomeScreen(w fyne.Window) fyne.CanvasObject {
 	const (
 		header1 = "## Greetings, brave adventurer!"
 		text1   = "Whether you're stepping into the mystical realms of Dman for the first time or returning for another epic journey, we're thrilled to have you here. Prepare yourself for a world of magic, challenges, and camaraderie."
@@ -57,7 +57,7 @@ func WelcomeScreen(w fyne.Window) fyne.CanvasObject {
 			layout.NewSpacer(),
 			widget.NewButtonWithIcon("Start", theme.NavigateNextIcon(), func() {
 				log.Println("Start")
-				w.SetContent(StartScreen(w))
+				w.SetContent(c.StartScreen(w))
 			}),
 			layout.NewSpacer(),
 		),

@@ -26,3 +26,7 @@ go.work
 
 # Profiling
 *.pcapng
+
+# Self-update
+*.pem
+*.key

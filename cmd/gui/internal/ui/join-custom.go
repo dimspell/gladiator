@@ -11,7 +11,7 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-func JoinCustomScreen(w fyne.Window) fyne.CanvasObject {
+func (c *Controller) JoinCustomScreen(w fyne.Window) fyne.CanvasObject {
 	str := binding.NewString()
 
 	label1 := widget.NewLabel("Authorization Server Address:")
@@ -26,7 +26,7 @@ func JoinCustomScreen(w fyne.Window) fyne.CanvasObject {
 			layout.NewHBoxLayout(),
 			widget.NewButtonWithIcon("Go back", theme.NavigateBackIcon(), func() {
 				log.Println("Welcome")
-				w.SetContent(JoinOptionsScreen(w))
+				w.SetContent(c.JoinOptionsScreen(w))
 			}),
 			widget.NewLabelWithStyle(headerText, fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
 		),
