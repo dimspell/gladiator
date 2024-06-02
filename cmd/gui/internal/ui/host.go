@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -141,12 +142,13 @@ func (c *Controller) HostScreen(w fyne.Window) fyne.CanvasObject {
 				}
 
 				c.Console = console.NewConsole(queries, bindEntry.Text)
-				// go func() {
-				// 	if err := c.Console.Serve(context.TODO(), bindEntry.Text, ""); err != nil {
-				// 		dialog.ShowError(err, w)
-				// 		return
-				// 	}
-				// }()
+
+				go func() {
+					if err := c.Console.Serve(context.TODO()); err != nil {
+						dialog.ShowError(err, w)
+						return
+					}
+				}()
 
 				loadingDialog.Hide()
 				loadingDialog = nil
