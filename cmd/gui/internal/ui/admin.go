@@ -11,7 +11,6 @@ import (
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
-	"github.com/dispel-re/dispel-multi/backend"
 )
 
 func (c *Controller) AdminScreen(w fyne.Window) fyne.CanvasObject {
@@ -35,8 +34,7 @@ func (c *Controller) AdminScreen(w fyne.Window) fyne.CanvasObject {
 	playContainer := container.NewCenter(
 		widget.NewButton("Play", func() {
 			go func() {
-				bd := backend.NewBackend(c.Console.Addr)
-				err := bd.Listen("127.0.0.1:6112")
+				err := c.StartBackend(c.Console.Addr, "")
 				dialog.ShowError(err, w)
 			}()
 		}),

@@ -3,6 +3,7 @@ package backend
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"net/http"
@@ -27,6 +28,8 @@ const GameRoomName = "room"
 // const HostIP byte = LaptopIP
 
 type Backend struct {
+	Addr string
+
 	Sessions       map[string]*model.Session
 	PacketLogger   *slog.Logger
 	Queue          *nats.Conn
@@ -34,6 +37,7 @@ type Backend struct {
 
 	Proxy     proxy.Proxy
 	EventChan chan uint8
+	Listener  net.Listener
 
 	CharacterClient multiv1connect.CharacterServiceClient
 	GameClient      multiv1connect.GameServiceClient
@@ -41,7 +45,7 @@ type Backend struct {
 	RankingClient   multiv1connect.RankingServiceClient
 }
 
-func NewBackend(consoleAddr string) *Backend {
+func NewBackend(backendAddr, consoleAddr string) *Backend {
 	httpClient := &http.Client{
 		Timeout: 5 * time.Second,
 		Transport: &http.Transport{
@@ -63,6 +67,7 @@ func NewBackend(consoleAddr string) *Backend {
 	// p := proxy.NewClientProxy(fmt.Sprintf("192.168.121.%d", LaptopIP))
 
 	return &Backend{
+		Addr:         backendAddr,
 		Sessions:     make(map[string]*model.Session),
 		PacketLogger: slog.New(packetlogger.New(os.Stderr, &packetlogger.Options{Level: slog.LevelDebug})),
 		// Queue:        nc,
@@ -76,19 +81,29 @@ func NewBackend(consoleAddr string) *Backend {
 	}
 }
 
-func (b *Backend) Start(ctx context.Context) {
+func (b *Backend) Start(ctx context.Context) error {
 	slog.Info("Starting backend")
 
-	// go b.ClientProxy.Start(ctx)
+	// Listen for incoming connections.
+	listener, err := net.Listen("tcp4", b.Addr)
+	if err != nil {
+		slog.Error("Could not start listening on port 6112", "err", err)
+		return err
+	}
+	b.Listener = listener
 
-	// go func(ctx context.Context) {
-	// 	if err := b.Events(ctx); err != nil {
-	// 		log.Fatal("Backend.Start", err)
-	// 	}
-	// }(ctx)
+	slog.Info("Listening for new connections...")
+
+	go func() {
+		<-ctx.Done()
+		b.Shutdown()
+	}()
+
+	// go b.ClientProxy.Start(ctx)
+	return nil
 }
 
-func (b *Backend) Shutdown(ctx context.Context) {
+func (b *Backend) Shutdown() {
 	if b.Queue != nil {
 		b.Queue.Drain()
 	}
@@ -100,10 +115,56 @@ func (b *Backend) Shutdown(ctx context.Context) {
 		session.Conn.Close()
 	}
 
+	b.Listener.Close()
+
 	// TODO: Send a system message "(system) The server is going to close in less than 30 seconds"
 	// TODO: Send a packet to trigger stats saving
 	// TODO: Send a system message "(system): Your stats were saving, your game client might close in the next 10 seconds"
 	// TODO: Send a packet to close the connection (malformed 255-21?)
+}
+
+func (b *Backend) Listen() {
+	for {
+		// Listen for an incoming connection.
+		conn, err := b.Listener.Accept()
+		if err != nil {
+			slog.Warn("Error, when accepting incoming connection", "err", err)
+			continue
+		}
+		slog.Info("Accepted connection",
+			slog.String("remoteAddr", conn.RemoteAddr().String()),
+			slog.String("localAddr", conn.LocalAddr().String()),
+		)
+
+		// Handle connections in a new goroutine.
+		// go handleRequest(connPort, conn)
+		go func() {
+			if err := b.handleClient(conn); err != nil {
+				slog.Warn("Communication with client has failed",
+					"err", err)
+			}
+		}()
+	}
+}
+
+func (b *Backend) handleClient(conn net.Conn) error {
+	session, err := b.handshake(conn)
+	if err != nil {
+		conn.Close()
+		if err == io.EOF {
+			return nil
+		}
+		slog.Warn("Handshake failed", "err", err)
+		return err
+	}
+	defer b.CloseSession(session)
+
+	for {
+		if err := b.handleCommands(session); err != nil {
+			slog.Warn("Command failed", "err", err)
+			return err
+		}
+	}
 }
 
 func (b *Backend) NewSession(conn net.Conn) *model.Session {

@@ -76,7 +76,7 @@ func ServeCommand() *cli.Command {
 			return err
 		}
 
-		bd := backend.NewBackend(consoleAddr)
+		bd := backend.NewBackend(backendAddr, consoleAddr)
 		con := console.NewConsole(queries, consoleAddr)
 
 		group, groupContext := errgroup.WithContext(ctx)
@@ -84,11 +84,18 @@ func ServeCommand() *cli.Command {
 			return con.Serve(groupContext)
 		})
 		group.Go(func() error {
-			bd.Start(groupContext)
-			return bd.Listen(backendAddr)
+			if err := bd.Start(groupContext); err != nil {
+				return err
+			}
+			bd.Listen()
+			return nil
 		})
 
-		return group.Wait()
+		if err := group.Wait(); err != nil {
+			bd.Shutdown()
+			// con.Shutdown()
+		}
+		return nil
 	}
 
 	return cmd

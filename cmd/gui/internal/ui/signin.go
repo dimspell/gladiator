@@ -10,15 +10,34 @@ import (
 )
 
 func (c *Controller) SignInScreen(w fyne.Window) fyne.CanvasObject {
-	return container.NewPadded(container.NewVBox(
-		headerContainer("Sign-up", func() {
-			log.Println("Join")
-			w.SetContent(c.JoinOptionsScreen(w))
-		}),
+	return container.NewBorder(
+		container.NewPadded(
+			headerContainer("Sign-up", func() {
+				log.Println("Join")
+				w.SetContent(c.JoinOptionsScreen(w))
+			}),
+		),
+		nil,
+		nil,
+		nil,
 		widget.NewLabel(""),
-		widget.NewLabel("Provide login & password to sign in:"),
-		signInForm(),
-	))
+		// widget.NewLabel("Provide login & password to sign in:"),
+		// signInForm(),
+
+		widget.NewButton("Connect", func() {
+			todoConsoleAddr := "127.0.0.1:2137"
+
+			if err := c.ConsoleHandshake(todoConsoleAddr); err != nil {
+				log.Println(err)
+				return
+			}
+
+			if err := c.StartBackend(todoConsoleAddr, ""); err != nil {
+				log.Println(err)
+				return
+			}
+		}),
+	)
 }
 
 func signInForm() *widget.Form {

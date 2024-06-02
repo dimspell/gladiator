@@ -3,8 +3,6 @@ package backend
 import (
 	"encoding/binary"
 	"fmt"
-	"io"
-	"log/slog"
 	"net"
 
 	"github.com/dispel-re/dispel-multi/model"
@@ -38,61 +36,6 @@ const (
 	CreateCharacter          PacketType = 92  // 0x5cff
 	UpdateCharacterStats     PacketType = 108 // 0x6cff
 )
-
-func (b *Backend) Listen(backendAddr string) error {
-	// Listen for incoming connections.
-	l, err := net.Listen("tcp4", backendAddr)
-	if err != nil {
-		slog.Error("Could not start listening on port 6112", "err", err)
-		return err
-	}
-
-	// Close the listener when the application closes.
-	defer l.Close()
-
-	slog.Info("Listening for new connections...")
-	for {
-		// Listen for an incoming connection.
-		conn, err := l.Accept()
-		if err != nil {
-			slog.Warn("Error, when accepting incoming connection", "err", err)
-			continue
-		}
-		slog.Info("Accepted connection",
-			slog.String("remoteAddr", conn.RemoteAddr().String()),
-			slog.String("localAddr", conn.LocalAddr().String()),
-		)
-
-		// Handle connections in a new goroutine.
-		// go handleRequest(connPort, conn)
-		go func() {
-			if err := b.handleClient(conn); err != nil {
-				slog.Warn("Communication with client has failed",
-					"err", err)
-			}
-		}()
-	}
-}
-
-func (b *Backend) handleClient(conn net.Conn) error {
-	session, err := b.handshake(conn)
-	if err != nil {
-		conn.Close()
-		if err == io.EOF {
-			return nil
-		}
-		slog.Warn("Handshake failed", "err", err)
-		return err
-	}
-	defer b.CloseSession(session)
-
-	for {
-		if err := b.handleCommands(session); err != nil {
-			slog.Warn("Command failed", "err", err)
-			return err
-		}
-	}
-}
 
 func (b *Backend) handshake(conn net.Conn) (*model.Session, error) {
 	// Ping (single byte - [0x01])
