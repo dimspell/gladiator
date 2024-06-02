@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net"
 	"os"
+	"strconv"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
@@ -57,11 +59,6 @@ func (c *Controller) HostScreen(w fyne.Window) fyne.CanvasObject {
 		}
 	})
 
-	bindLabel := widget.NewLabelWithStyle("Bind Address", fyne.TextAlignTrailing, fyne.TextStyle{Bold: true})
-	bindEntry := widget.NewEntry()
-	bindEntry.PlaceHolder = "Example: 0.0.0.0:2137"
-	bindEntry.Text = "127.0.0.1:2137"
-
 	typeLabel := widget.NewLabelWithStyle("Database Type", fyne.TextAlignTrailing, fyne.TextStyle{Bold: true})
 	typeEntry := comboGroup
 
@@ -74,7 +71,52 @@ func (c *Controller) HostScreen(w fyne.Window) fyne.CanvasObject {
 
 	headerText := "Host a server"
 
+	bindLabel := widget.NewLabelWithStyle("Bind Address (IP, Host)", fyne.TextAlignTrailing, fyne.TextStyle{Bold: true})
+
+	bindIP := widget.NewEntry()
+
+	bindIP.Validator = func(s string) error {
+		ip := net.ParseIP(s)
+		if ip == nil {
+			return fmt.Errorf("invalid IP address")
+		}
+		return nil
+	}
+	bindIP.PlaceHolder = "Example: 0.0.0.0"
+	bindIP.SetText("127.0.0.1")
+
+	bindPort := widget.NewEntry()
+
+	bindPort.Validator = func(s string) error {
+		i, err := strconv.Atoi(s)
+		if err != nil {
+			return err
+		}
+		if i < 1000 || i > 65535 {
+			return fmt.Errorf("invalid port number")
+		}
+		return nil
+	}
+	bindPort.PlaceHolder = "Example: 2137"
+	bindPort.SetText("2137")
+
+	bindGroup := container.NewGridWithColumns(2, bindIP, bindPort)
+
+	formGrid := container.New(
+		layout.NewFormLayout(),
+		bindLabel, bindGroup,
+		typeLabel, typeEntry,
+		pathLabel, pathContainer,
+	)
+
 	onHost := func() {
+		if err := bindIP.Validate(); err != nil {
+			return
+		}
+		if err := bindPort.Validate(); err != nil {
+			return
+		}
+
 		loadingContainer := container.NewCenter(
 			widget.NewProgressBarInfinite(),
 		)
@@ -125,7 +167,7 @@ func (c *Controller) HostScreen(w fyne.Window) fyne.CanvasObject {
 			return
 		}
 
-		c.Console = console.NewConsole(queries, bindEntry.Text)
+		c.Console = console.NewConsole(queries, net.JoinHostPort(bindIP.Text, bindPort.Text))
 
 		go func() {
 			if err := c.Console.Serve(context.TODO()); err != nil {
@@ -143,13 +185,6 @@ func (c *Controller) HostScreen(w fyne.Window) fyne.CanvasObject {
 
 		w.SetContent(c.AdminScreen(w))
 	}
-
-	formGrid := container.New(
-		layout.NewFormLayout(),
-		bindLabel, bindEntry,
-		typeLabel, typeEntry,
-		pathLabel, pathContainer,
-	)
 
 	btn := widget.NewButtonWithIcon("Submit", theme.NavigateNextIcon(), onHost)
 	label := widget.NewRichTextFromMarkdown("**Auth server configuration**\n\nLet's get your game server up and running. Please fill out the following form to specify the configuration details.")
