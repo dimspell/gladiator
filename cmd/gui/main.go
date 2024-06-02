@@ -31,6 +31,8 @@ func main() {
 	a := app.NewWithID("net.dispelmulti.app")
 	w := a.NewWindow("Dispel Multi")
 
+	// selfManage(a, w, "http://localhost:8080/myapp-{{.OS}}-{{.Arch}}{{.Ext}}")
+	
 	ctrl := ui.NewController(a.Storage())
 	w.SetContent(ctrl.WelcomeScreen(w))
 	// w.SetContent(mainContent.MakeUI())
