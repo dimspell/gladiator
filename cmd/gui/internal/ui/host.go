@@ -135,7 +135,7 @@ func (c *Controller) HostScreen(w fyne.Window) fyne.CanvasObject {
 					return
 				}
 
-				c.Console = console.NewConsole(queries, nil)
+				c.Console = console.NewConsole(queries, bindEntry.Text)
 				// go func() {
 				// 	if err := c.Console.Serve(context.TODO(), bindEntry.Text, ""); err != nil {
 				// 		dialog.ShowError(err, w)

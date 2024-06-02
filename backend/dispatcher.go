@@ -6,7 +6,6 @@ import (
 	"io"
 	"log/slog"
 	"net"
-	"os"
 
 	"github.com/dispel-re/dispel-multi/model"
 )
@@ -40,12 +39,12 @@ const (
 	UpdateCharacterStats     PacketType = 108 // 0x6cff
 )
 
-func (b *Backend) Listen(backendAddr string) {
+func (b *Backend) Listen(backendAddr string) error {
 	// Listen for incoming connections.
 	l, err := net.Listen("tcp4", backendAddr)
 	if err != nil {
 		slog.Error("Could not start listening on port 6112", "err", err)
-		os.Exit(1)
+		return err
 	}
 
 	// Close the listener when the application closes.

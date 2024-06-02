@@ -63,9 +63,9 @@ func ConsoleCommand() *cli.Command {
 			return err
 		}
 
-		con := console.NewConsole(queries, nil)
+		con := console.NewConsole(queries, consoleAddr)
 
-		return con.Serve(ctx, consoleAddr, "")
+		return con.Serve(ctx)
 	}
 
 	return cmd

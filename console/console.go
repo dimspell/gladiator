@@ -14,7 +14,6 @@ import (
 
 	"connectrpc.com/connect"
 	"connectrpc.com/otelconnect"
-	"github.com/dispel-re/dispel-multi/backend"
 	"github.com/dispel-re/dispel-multi/console/database"
 	"github.com/dispel-re/dispel-multi/gen/multi/v1/multiv1connect"
 	"github.com/dispel-re/dispel-multi/model"
@@ -33,17 +32,17 @@ var (
 )
 
 type Console struct {
-	DB      *database.Queries
-	Backend *backend.Backend
-	Queue   *server.Server
+	Addr  string
+	DB    *database.Queries
+	Queue *server.Server
 
 	CORSAllowedOrigins []string
 }
 
-func NewConsole(db *database.Queries, b *backend.Backend) *Console {
+func NewConsole(db *database.Queries, addr string) *Console {
 	return &Console{
+		Addr:               addr,
 		DB:                 db,
-		Backend:            b,
 		CORSAllowedOrigins: []string{"*"}, // TODO: For production replace it with []string{"https://dispel-multi.net"}
 	}
 }
@@ -171,9 +170,9 @@ func (c *Console) HttpRouter() http.Handler {
 	return mux
 }
 
-func (c *Console) Serve(ctx context.Context, consoleAddr, backendAddr string) error {
+func (c *Console) Serve(ctx context.Context) error {
 	httpServer := &http.Server{
-		Addr:         consoleAddr,
+		Addr:         c.Addr,
 		Handler:      h2c.NewHandler(c.HttpRouter(), &http2.Server{}),
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,
@@ -181,29 +180,18 @@ func (c *Console) Serve(ctx context.Context, consoleAddr, backendAddr string) er
 	}
 
 	start := func(ctx context.Context) error {
-		if c.Backend != nil {
-			go func() {
-				c.Backend.Start(ctx)
-				c.Backend.Listen(backendAddr)
-			}()
-		}
-
 		// There is no need to gracefully quit the NATS by listening to signals.
 		// c.Queue = c.NATS()
 		// go c.Queue.Start()
 
 		// TODO: Set readiness, startup, liveness probe
 		atomic.StoreInt32(&healthy, 0)
-		slog.Info("Configured console server", "addr", consoleAddr)
+		slog.Info("Configured console server", "addr", c.Addr)
 
 		return httpServer.ListenAndServe()
 	}
 
 	stop := func(ctx context.Context) error {
-		if c.Backend != nil {
-			c.Backend.Shutdown(ctx)
-		}
-
 		return httpServer.Shutdown(ctx)
 	}
 

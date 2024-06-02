@@ -8,6 +8,7 @@ import (
 	"github.com/dispel-re/dispel-multi/console"
 	"github.com/dispel-re/dispel-multi/console/database"
 	"github.com/urfave/cli/v3"
+	"golang.org/x/sync/errgroup"
 )
 
 const (
@@ -76,9 +77,18 @@ func ServeCommand() *cli.Command {
 		}
 
 		bd := backend.NewBackend(consoleAddr)
-		con := console.NewConsole(queries, bd)
+		con := console.NewConsole(queries, consoleAddr)
 
-		return con.Serve(ctx, consoleAddr, backendAddr)
+		group, groupContext := errgroup.WithContext(ctx)
+		group.Go(func() error {
+			return con.Serve(groupContext)
+		})
+		group.Go(func() error {
+			bd.Start(groupContext)
+			return bd.Listen(backendAddr)
+		})
+
+		return group.Wait()
 	}
 
 	return cmd
