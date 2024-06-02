@@ -16,7 +16,7 @@ import (
 )
 
 func (c *Controller) HostScreen(w fyne.Window) fyne.CanvasObject {
-	pathLabel := widget.NewLabel("Database Path:")
+	pathLabel := widget.NewLabelWithStyle("Database Path", fyne.TextAlignTrailing, fyne.TextStyle{Bold: true})
 
 	pathEntry := widget.NewEntry()
 
@@ -35,7 +35,8 @@ func (c *Controller) HostScreen(w fyne.Window) fyne.CanvasObject {
 		}, w)
 	})
 
-	pathContainer := container.NewVBox(pathEntry, layout.NewSpacer(), pathSelection)
+	pathEntry.SetMinRowsVisible(1)
+	pathContainer := container.NewBorder(nil, nil, nil, pathSelection, pathEntry)
 
 	comboOptions := []string{
 		"Saved on disk (sqlite)",
@@ -44,18 +45,23 @@ func (c *Controller) HostScreen(w fyne.Window) fyne.CanvasObject {
 	comboGroup := widget.NewSelect(comboOptions, func(value string) {
 		log.Println("Select set to", value)
 
-		pathNotUsed := value == comboOptions[1]
-		pathLabel.Hidden = pathNotUsed
-		pathEntry.Hidden = pathNotUsed
-		pathSelection.Hidden = pathNotUsed
+		if value == comboOptions[1] {
+			pathLabel.Hide()
+			pathEntry.Hide()
+			pathSelection.Hide()
+		} else {
+			pathLabel.Show()
+			pathEntry.Show()
+			pathSelection.Show()
+		}
 	})
 
-	bindLabel := widget.NewLabel("Bind Address:")
+	bindLabel := widget.NewLabelWithStyle("Bind Address", fyne.TextAlignTrailing, fyne.TextStyle{Bold: true})
 	bindEntry := widget.NewEntry()
 	bindEntry.PlaceHolder = "Example: 0.0.0.0:2137"
 	bindEntry.Text = "127.0.0.1:2137"
 
-	typeLabel := widget.NewLabel("Database Type:")
+	typeLabel := widget.NewLabelWithStyle("Database Type", fyne.TextAlignTrailing, fyne.TextStyle{Bold: true})
 	typeEntry := comboGroup
 
 	comboGroup.SetSelected(comboOptions[1])
@@ -63,7 +69,12 @@ func (c *Controller) HostScreen(w fyne.Window) fyne.CanvasObject {
 	pathEntry.Hidden = true
 	pathSelection.Hidden = true
 
-	formGrid := container.New(layout.NewFormLayout(), bindLabel, bindEntry, typeLabel, typeEntry, pathLabel, pathContainer)
+	formGrid := container.New(
+		layout.NewFormLayout(),
+		bindLabel, bindEntry,
+		typeLabel, typeEntry,
+		pathLabel, pathContainer,
+	)
 
 	headerText := "Host a server"
 
@@ -72,7 +83,6 @@ func (c *Controller) HostScreen(w fyne.Window) fyne.CanvasObject {
 			log.Println("Start")
 			w.SetContent(c.StartScreen(w))
 		}),
-		widget.NewLabel(""),
 		widget.NewLabel(""),
 
 		formGrid,
