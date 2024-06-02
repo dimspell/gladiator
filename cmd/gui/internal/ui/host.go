@@ -66,18 +66,13 @@ func (c *Controller) HostScreen(w fyne.Window) fyne.CanvasObject {
 	formGrid := container.New(layout.NewFormLayout(), bindLabel, bindEntry, typeLabel, typeEntry, pathLabel, pathContainer)
 
 	headerText := "Host a server"
-	header := widget.NewLabelWithStyle(headerText, fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 
 	return container.NewPadded(container.NewVBox(
-		container.New(
-			layout.NewHBoxLayout(),
-			widget.NewButtonWithIcon("Go back", theme.NavigateBackIcon(), func() {
-				log.Println("Start")
-				w.SetContent(c.StartScreen(w))
-			}),
-			header,
-			layout.NewSpacer(),
-		),
+		headerContainer(headerText, func() {
+			log.Println("Start")
+			w.SetContent(c.StartScreen(w))
+		}),
+		widget.NewLabel(""),
 		widget.NewLabel(""),
 
 		formGrid,

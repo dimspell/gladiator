@@ -5,7 +5,6 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 )
@@ -20,18 +19,13 @@ func (c *Controller) StartScreen(w fyne.Window) fyne.CanvasObject {
 	radioGroup := widget.NewRadioGroup(Values(radioOptions), func(value string) {
 		log.Println("Radio set to", value)
 	})
-	radioGroup.SetSelected(radioOptions["host"])
 	radioGroup.Required = true
 
 	return container.NewPadded(container.NewVBox(
-		container.New(
-			layout.NewHBoxLayout(),
-			widget.NewButtonWithIcon("Go back", theme.NavigateBackIcon(), func() {
-				log.Println("Welcome")
-				w.SetContent(c.WelcomeScreen(w))
-			}),
-			widget.NewLabelWithStyle(headerText, fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
-		),
+		headerContainer(headerText, func() {
+			log.Println("Welcome")
+			w.SetContent(c.WelcomeScreen(w))
+		}),
 		widget.NewLabel(""),
 
 		widget.NewLabelWithStyle("What do you want to do?", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),

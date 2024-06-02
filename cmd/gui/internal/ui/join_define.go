@@ -6,7 +6,6 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/data/binding"
-	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 )
@@ -22,14 +21,10 @@ func (c *Controller) JoinDefineScreen(w fyne.Window) fyne.CanvasObject {
 	headerText := "Join a server"
 
 	return container.NewPadded(container.NewVBox(
-		container.New(
-			layout.NewHBoxLayout(),
-			widget.NewButtonWithIcon("Go back", theme.NavigateBackIcon(), func() {
-				log.Println("Welcome")
-				w.SetContent(c.JoinOptionsScreen(w))
-			}),
-			widget.NewLabelWithStyle(headerText, fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
-		),
+		headerContainer(headerText, func() {
+			log.Println("Welcome")
+			w.SetContent(c.JoinOptionsScreen(w))
+		}),
 		widget.NewLabel(""),
 
 		label1,

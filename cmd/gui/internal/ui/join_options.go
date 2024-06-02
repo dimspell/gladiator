@@ -5,7 +5,6 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 )
@@ -21,17 +20,14 @@ func (c *Controller) JoinOptionsScreen(w fyne.Window) fyne.CanvasObject {
 	radioGroup := widget.NewRadioGroup(Values(radioOptions), func(value string) {
 		log.Println("Radio set to", value)
 	})
+	radioGroup.SetSelected(radioOptions["loopback"])
 	radioGroup.Required = true
 
 	return container.NewPadded(container.NewVBox(
-		container.New(
-			layout.NewHBoxLayout(),
-			widget.NewButtonWithIcon("Go back", theme.NavigateBackIcon(), func() {
-				log.Println("Start")
-				w.SetContent(c.StartScreen(w))
-			}),
-			widget.NewLabelWithStyle(headerText, fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
-		),
+		headerContainer(headerText, func() {
+			log.Println("Start")
+			w.SetContent(c.StartScreen(w))
+		}),
 		widget.NewLabel(""),
 
 		widget.NewLabel("Authorization Server Address:"),
