@@ -33,10 +33,17 @@ func (c *Controller) AdminScreen(w fyne.Window) fyne.CanvasObject {
 
 	playContainer := container.NewCenter(
 		widget.NewButton("Play", func() {
-			go func() {
-				err := c.StartBackend(c.Console.Addr)
+			loadingDialog := dialog.NewCustomWithoutButtons("Connecting to auth server...", widget.NewProgressBarInfinite(), w)
+			loadingDialog.Show()
+
+			if err := c.StartBackend(c.Console.Addr); err != nil {
+				loadingDialog.Hide()
 				dialog.ShowError(err, w)
-			}()
+				return
+			}
+
+			loadingDialog.Hide()
+			w.SetContent(c.JoinedScreen(w))
 		}),
 	)
 
