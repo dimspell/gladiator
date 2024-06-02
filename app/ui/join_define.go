@@ -2,23 +2,46 @@ package ui
 
 import (
 	"log"
+	"net"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/data/binding"
+	"fyne.io/fyne/v2/dialog"
+	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 )
 
 func (c *Controller) JoinDefineScreen(w fyne.Window) fyne.CanvasObject {
-	str := binding.NewString()
+	headerText := "Join a server - connect to custom auth server"
 
-	label1 := widget.NewLabel("Authorization Server Address:")
-	value1 := widget.NewEntryWithData(str)
-	value1.Validator = nil
-	value1.PlaceHolder = "Full address, for example http://127.0.0.1:2137"
+	bindIP := widget.NewEntry()
 
-	headerText := "Join a server - define auth server"
+	bindIP.Validator = ipValidator
+	bindIP.PlaceHolder = "Example: 0.0.0.0"
+	bindIP.SetText("127.0.0.1")
+
+	bindPort := widget.NewEntry()
+
+	bindPort.Validator = portValidator
+	bindPort.PlaceHolder = "Example: 2137"
+	bindPort.SetText("2137")
+
+	bindGroup := container.NewGridWithColumns(2, bindIP, bindPort)
+
+	bindLabel := widget.NewLabelWithStyle("Server address (IP, Host)", fyne.TextAlignTrailing, fyne.TextStyle{Bold: true})
+
+	formGrid := container.New(
+		layout.NewFormLayout(),
+		bindLabel, bindGroup,
+	)
+
+	label := widget.NewRichTextFromMarkdown("**Specify the address**\n\nSpecify the address of the authentication server you wish to connect to. To troubleshoot, you could ask your friend to give you all the IP addresses that can be found after running the _ipconfig_ command on his/her machine.")
+	label.Wrapping = fyne.TextWrapWord
+	size := label.Size()
+	size.Height /= 4
+	label.Resize(size)
+	label.Refresh()
 
 	return container.NewBorder(
 		container.NewPadded(headerContainer(headerText, func() {
@@ -32,13 +55,39 @@ func (c *Controller) JoinDefineScreen(w fyne.Window) fyne.CanvasObject {
 			container.NewVBox(
 				widget.NewLabel(""),
 
-				label1,
-				value1,
+				label,
+				formGrid,
 
 				widget.NewLabel(""),
 				container.NewCenter(
-					widget.NewButtonWithIcon("Next", theme.NavigateNextIcon(), func() {
-						log.Println(str.Get())
+					widget.NewButtonWithIcon("Connect", theme.NavigateNextIcon(), func() {
+						if err := bindIP.Validate(); err != nil {
+							dialog.NewError(err, w)
+							return
+						}
+						if err := bindPort.Validate(); err != nil {
+							dialog.NewError(err, w)
+							return
+						}
+						consoleAddr := net.JoinHostPort(bindIP.Text, bindPort.Text)
+
+						loadingDialog := dialog.NewCustomWithoutButtons("Connecting to auth server...", widget.NewProgressBarInfinite(), w)
+						loadingDialog.Show()
+
+						if err := c.ConsoleHandshake(consoleAddr); err != nil {
+							loadingDialog.Hide()
+							dialog.ShowError(err, w)
+							return
+						}
+
+						if err := c.StartBackend(consoleAddr); err != nil {
+							loadingDialog.Hide()
+							dialog.ShowError(err, w)
+							return
+						}
+
+						loadingDialog.Hide()
+						w.SetContent(c.JoinedScreen(w))
 					}),
 				),
 			),

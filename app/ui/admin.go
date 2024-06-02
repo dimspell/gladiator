@@ -34,7 +34,7 @@ func (c *Controller) AdminScreen(w fyne.Window) fyne.CanvasObject {
 	playContainer := container.NewCenter(
 		widget.NewButton("Play", func() {
 			go func() {
-				err := c.StartBackend(c.Console.Addr, "")
+				err := c.StartBackend(c.Console.Addr)
 				dialog.ShowError(err, w)
 			}()
 		}),

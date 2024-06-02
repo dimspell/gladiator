@@ -116,6 +116,7 @@ func (b *Backend) Shutdown() {
 	}
 
 	b.Listener.Close()
+	b.Listener = nil
 
 	// TODO: Send a system message "(system) The server is going to close in less than 30 seconds"
 	// TODO: Send a packet to trigger stats saving
@@ -125,6 +126,9 @@ func (b *Backend) Shutdown() {
 
 func (b *Backend) Listen() {
 	for {
+		if b.Listener == nil {
+			return
+		}
 		// Listen for an incoming connection.
 		conn, err := b.Listener.Accept()
 		if err != nil {

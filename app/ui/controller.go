@@ -21,7 +21,7 @@ func NewController(storage fyne.Storage) *Controller {
 }
 
 func (c *Controller) ConsoleHandshake(consoleAddr string) error {
-	client := &http.Client{Timeout: 10 * time.Second}
+	client := &http.Client{Timeout: 3 * time.Second}
 
 	res, err := client.Get(fmt.Sprintf("http://%s/.well-known/dispel-multi.json", consoleAddr))
 	if err != nil {
@@ -41,15 +41,22 @@ func (c *Controller) ConsoleHandshake(consoleAddr string) error {
 	return nil
 }
 
-func (c *Controller) StartBackend(consoleAddr, backendAddr string) error {
-	if backendAddr == "" {
-		backendAddr = "127.0.0.1:6112"
+func (c *Controller) StartBackend(consoleAddr string) error {
+	if c.Backend != nil {
+		c.Backend.Shutdown()
+		c.Backend = nil
 	}
-
-	bd := backend.NewBackend(backendAddr, consoleAddr)
-	if err := bd.Start(context.TODO()); err != nil {
+	c.Backend = backend.NewBackend("127.0.0.1:6112", consoleAddr)
+	if err := c.Backend.Start(context.TODO()); err != nil {
 		return err
 	}
-	go bd.Listen()
+	go c.Backend.Listen()
 	return nil
+}
+
+func (c *Controller) StopBackend() {
+	if c.Backend == nil {
+		return
+	}
+	c.Backend.Shutdown()
 }

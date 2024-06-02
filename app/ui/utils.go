@@ -1,6 +1,10 @@
 package ui
 
 import (
+	"fmt"
+	"net"
+	"strconv"
+
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/layout"
@@ -31,4 +35,23 @@ func headerContainer(headerText string, backCallback func()) *fyne.Container {
 		widget.NewLabelWithStyle(headerText, fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
 		layout.NewSpacer(),
 	)
+}
+
+func ipValidator(s string) error {
+	ip := net.ParseIP(s)
+	if ip == nil {
+		return fmt.Errorf("invalid IP address")
+	}
+	return nil
+}
+
+func portValidator(s string) error {
+	i, err := strconv.Atoi(s)
+	if err != nil {
+		return err
+	}
+	if i < 1000 || i > 65535 {
+		return fmt.Errorf("invalid port number")
+	}
+	return nil
 }

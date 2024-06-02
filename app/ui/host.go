@@ -6,7 +6,6 @@ import (
 	"log"
 	"net"
 	"os"
-	"strconv"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
@@ -75,28 +74,13 @@ func (c *Controller) HostScreen(w fyne.Window) fyne.CanvasObject {
 
 	bindIP := widget.NewEntry()
 
-	bindIP.Validator = func(s string) error {
-		ip := net.ParseIP(s)
-		if ip == nil {
-			return fmt.Errorf("invalid IP address")
-		}
-		return nil
-	}
+	bindIP.Validator = ipValidator
 	bindIP.PlaceHolder = "Example: 0.0.0.0"
 	bindIP.SetText("127.0.0.1")
 
 	bindPort := widget.NewEntry()
 
-	bindPort.Validator = func(s string) error {
-		i, err := strconv.Atoi(s)
-		if err != nil {
-			return err
-		}
-		if i < 1000 || i > 65535 {
-			return fmt.Errorf("invalid port number")
-		}
-		return nil
-	}
+	bindPort.Validator = portValidator
 	bindPort.PlaceHolder = "Example: 2137"
 	bindPort.SetText("2137")
 
@@ -111,20 +95,15 @@ func (c *Controller) HostScreen(w fyne.Window) fyne.CanvasObject {
 
 	onHost := func() {
 		if err := bindIP.Validate(); err != nil {
+			dialog.NewError(err, w)
 			return
 		}
 		if err := bindPort.Validate(); err != nil {
+			dialog.NewError(err, w)
 			return
 		}
 
-		loadingContainer := container.NewCenter(
-			widget.NewProgressBarInfinite(),
-		)
-		loadingDialog := dialog.NewCustom("Starting auth server...",
-			"Cancel",
-			loadingContainer,
-			w,
-		)
+		loadingDialog := dialog.NewCustomWithoutButtons("Starting auth server...", widget.NewProgressBarInfinite(), w)
 		loadingDialog.Show()
 
 		// Configure the database connection
