@@ -73,6 +73,7 @@ func NewApp(version, commit, buildDate string) {
 		action.BackendCommand(),
 		action.ServeCommand(),
 		action.ProxyCommand(),
+		action.GUICommand(),
 		&cli.Command{
 			Name: "hello",
 			Action: func(_ context.Context, command *cli.Command) error {

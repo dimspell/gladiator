@@ -1,17 +1,20 @@
-package main
+package action
 
 import (
+	"context"
 	"log"
 	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
-	"github.com/dispel-re/dispel-multi/cmd/gui/internal/ui"
+	"github.com/dispel-re/dispel-multi/app/ui"
 	"github.com/fynelabs/fyneselfupdate"
 	"github.com/fynelabs/selfupdate"
+	"github.com/urfave/cli/v3"
 	"golang.org/x/crypto/ed25519"
 )
 
+// TODO: Set-up the self updates with S3-compatible server
 func selfManage(a fyne.App, w fyne.Window, sourceURL string) {
 	// Used `selfupdatectl create-keys` followed by `selfupdatectl print-key`
 	publicKey := ed25519.PublicKey{154, 136, 116, 223, 168, 77, 245, 149, 98, 81, 84, 4, 10, 79, 102, 226, 217, 174, 215, 192, 237, 41, 151, 252, 233, 39, 34, 99, 157, 166, 224, 148}
@@ -27,16 +30,25 @@ func selfManage(a fyne.App, w fyne.Window, sourceURL string) {
 	}
 }
 
-func main() {
-	a := app.NewWithID("net.dispelmulti.app")
-	w := a.NewWindow("Dispel Multi")
+func GUICommand() *cli.Command {
+	cmd := &cli.Command{
+		Name:        "gui",
+		Description: "Start the GUI app",
+	}
 
-	// selfManage(a, w, "http://localhost:8080/myapp-{{.OS}}-{{.Arch}}{{.Ext}}")
+	cmd.Action = func(ctx context.Context, c *cli.Command) error {
+		a := app.NewWithID("net.dispelmulti.app")
+		w := a.NewWindow("Dispel Multi")
 
-	ctrl := ui.NewController(a.Storage())
-	w.SetContent(ctrl.WelcomeScreen(w))
-	// w.SetContent(mainContent.MakeUI())
+		// selfManage(a, w, "http://localhost:8080/myapp-{{.OS}}-{{.Arch}}{{.Ext}}")
 
-	w.Resize(fyne.NewSize(600, 500))
-	w.ShowAndRun()
+		ctrl := ui.NewController(a.Storage())
+		w.SetContent(ctrl.WelcomeScreen(w))
+		// w.SetContent(mainContent.MakeUI())
+
+		w.Resize(fyne.NewSize(600, 500))
+		w.ShowAndRun()
+		return nil
+	}
+	return cmd
 }
