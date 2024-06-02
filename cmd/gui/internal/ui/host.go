@@ -11,14 +11,14 @@ import (
 )
 
 func HostScreen(w fyne.Window) fyne.CanvasObject {
-	label1 := widget.NewLabel("Bind Address:")
-	value1 := widget.NewEntry()
-	label2 := widget.NewLabel("Database Type:")
-	value2 := widget.NewEntry()
-	label3 := widget.NewLabel("Database Path:")
-	value3 := widget.NewEntry()
+	bindLabel := widget.NewLabel("Bind Address:")
+	bindEntry := widget.NewEntry()
+	typeLabel := widget.NewLabel("Database Type:")
+	typeEntry := widget.NewEntry()
+	pathLabel := widget.NewLabel("Database Path:")
+	pathEntry := widget.NewEntry()
 
-	formGrid := container.New(layout.NewFormLayout(), label1, value1, label2, value2, label3, value3)
+	formGrid := container.New(layout.NewFormLayout(), bindLabel, bindEntry, typeLabel, typeEntry, pathLabel, pathEntry)
 
 	headerText := "Host a server"
 	header := widget.NewLabelWithStyle(headerText, fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
@@ -27,8 +27,8 @@ func HostScreen(w fyne.Window) fyne.CanvasObject {
 		container.New(
 			layout.NewHBoxLayout(),
 			widget.NewButtonWithIcon("Go back", theme.NavigateBackIcon(), func() {
-				log.Println("Welcome")
-				w.SetContent(WelcomeScreen(w))
+				log.Println("Start")
+				w.SetContent(StartScreen(w))
 			}),
 			header,
 			layout.NewSpacer(),
@@ -36,6 +36,8 @@ func HostScreen(w fyne.Window) fyne.CanvasObject {
 		widget.NewLabel(""),
 
 		formGrid,
+
+		widget.NewLabel(""),
 		container.NewCenter(
 			widget.NewButtonWithIcon("Submit", theme.NavigateNextIcon(), func() {
 				w.SetContent(AdminScreen(w))

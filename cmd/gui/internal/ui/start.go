@@ -10,47 +10,43 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-func JoinOptionsScreen(w fyne.Window) fyne.CanvasObject {
-	headerText := "Join a server"
-
-	var radioValue string
+func StartScreen(w fyne.Window) fyne.CanvasObject {
+	const headerText = "Start"
 
 	radioOptions := []string{
-		"Use dispelmulti.net network",
-		"Use loopback for testing (127.0.0.1:2137)",
-		"Define your own",
+		"Join - I want to join an already existing server.",
+		"Host - I would like to host my own server over LAN.",
 	}
 	radioGroup := widget.NewRadioGroup(radioOptions, func(value string) {
 		log.Println("Radio set to", value)
-		radioValue = value
 	})
+	radioGroup.SetSelected(radioOptions[1])
 	radioGroup.Required = true
 
 	return container.NewPadded(container.NewVBox(
 		container.New(
 			layout.NewHBoxLayout(),
 			widget.NewButtonWithIcon("Go back", theme.NavigateBackIcon(), func() {
-				log.Println("Start")
-				w.SetContent(StartScreen(w))
+				log.Println("Welcome")
+				w.SetContent(WelcomeScreen(w))
 			}),
 			widget.NewLabelWithStyle(headerText, fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
 		),
 		widget.NewLabel(""),
 
-		widget.NewLabel("Authorization Server Address:"),
+		widget.NewLabelWithStyle("What do you want to do?", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
 		radioGroup,
 
 		widget.NewLabel(""),
 		container.NewCenter(
 			widget.NewButtonWithIcon("Next", theme.NavigateNextIcon(), func() {
-				log.Println(radioValue)
-				if radioValue == radioOptions[1] {
-					// Start backend (popup?)
-					w.SetContent(SignInScreen(w))
+				log.Println(radioGroup.Selected)
+				if radioGroup.Selected == radioOptions[0] {
+					w.SetContent(JoinOptionsScreen(w))
 					return
 				}
-				if radioValue == radioOptions[2] {
-					w.SetContent(JoinCustomScreen(w))
+				if radioGroup.Selected == radioOptions[1] {
+					w.SetContent(HostScreen(w))
 					return
 				}
 			}),

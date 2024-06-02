@@ -55,15 +55,10 @@ func WelcomeScreen(w fyne.Window) fyne.CanvasObject {
 		container.New(
 			layout.NewHBoxLayout(),
 			layout.NewSpacer(),
-			widget.NewButtonWithIcon("Host a server", theme.ContentAddIcon(), func() {
-				log.Println("Host")
-				w.SetContent(HostScreen(w))
+			widget.NewButtonWithIcon("Start", theme.NavigateNextIcon(), func() {
+				log.Println("Start")
+				w.SetContent(StartScreen(w))
 			}),
-			widget.NewButtonWithIcon("Join a server", theme.LoginIcon(), func() {
-				log.Println("Join")
-				w.SetContent(JoinOptionsScreen(w))
-			}),
-
 			layout.NewSpacer(),
 		),
 
