@@ -5,6 +5,7 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
@@ -12,7 +13,25 @@ import (
 
 func (c *Controller) HostScreen(w fyne.Window) fyne.CanvasObject {
 	pathLabel := widget.NewLabel("Database Path:")
+
 	pathEntry := widget.NewEntry()
+
+	pathSelection := widget.NewButtonWithIcon("Select folder", theme.FolderOpenIcon(), func() {
+		dialog.ShowFolderOpen(func(list fyne.ListableURI, err error) {
+			if err != nil {
+				dialog.ShowError(err, w)
+				return
+			}
+			if list == nil {
+				log.Println("Cancelled")
+				return
+			}
+
+			pathEntry.SetText(list.Path())
+		}, w)
+	})
+
+	pathContainer := container.NewVBox(pathEntry, layout.NewSpacer(), pathSelection)
 
 	comboOptions := []string{
 		"Saved on disk (sqlite)",
@@ -24,6 +43,7 @@ func (c *Controller) HostScreen(w fyne.Window) fyne.CanvasObject {
 		pathNotUsed := value == comboOptions[1]
 		pathLabel.Hidden = pathNotUsed
 		pathEntry.Hidden = pathNotUsed
+		pathSelection.Hidden = pathNotUsed
 	})
 
 	bindLabel := widget.NewLabel("Bind Address:")
@@ -37,8 +57,9 @@ func (c *Controller) HostScreen(w fyne.Window) fyne.CanvasObject {
 	comboGroup.SetSelected(comboOptions[1])
 	pathLabel.Hidden = true
 	pathEntry.Hidden = true
+	pathSelection.Hidden = true
 
-	formGrid := container.New(layout.NewFormLayout(), bindLabel, bindEntry, typeLabel, typeEntry, pathLabel, pathEntry)
+	formGrid := container.New(layout.NewFormLayout(), bindLabel, bindEntry, typeLabel, typeEntry, pathLabel, pathContainer)
 
 	headerText := "Host a server"
 	header := widget.NewLabelWithStyle(headerText, fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
