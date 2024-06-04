@@ -64,15 +64,13 @@ func NewBackend(backendAddr, consoleAddr string) *Backend {
 	interceptor := connect.WithInterceptors(otelconnect.NewInterceptor())
 	consoleUri := fmt.Sprintf("http://%s/grpc", consoleAddr)
 
-	// p := proxy.NewClientProxy(fmt.Sprintf("192.168.121.%d", LaptopIP))
-
 	return &Backend{
 		Addr:         backendAddr,
 		Sessions:     make(map[string]*model.Session),
 		PacketLogger: slog.New(packetlogger.New(os.Stderr, &packetlogger.Options{Level: slog.LevelDebug})),
 		// Queue:        nc,
 
-		// ClientProxy: p,
+		Proxy: proxy.NewLAN(),
 
 		CharacterClient: multiv1connect.NewCharacterServiceClient(httpClient, consoleUri, interceptor),
 		GameClient:      multiv1connect.NewGameServiceClient(httpClient, consoleUri, interceptor),
