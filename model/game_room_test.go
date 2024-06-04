@@ -1,6 +1,7 @@
 package model
 
 import (
+	"net"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -8,7 +9,7 @@ import (
 
 func TestGameRoom_ToBytes(t *testing.T) {
 	room := LobbyRoom{
-		HostIPAddress: [4]byte{127, 0, 0, 1},
+		HostIPAddress: net.IP{127, 0, 0, 1},
 		Name:          "Game room",
 		Password:      "secret123",
 	}
@@ -23,7 +24,7 @@ func TestGameRoom_ToBytes(t *testing.T) {
 func BenchmarkGameRoom_ToBytes(b *testing.B) {
 	b.StopTimer()
 	room := LobbyRoom{
-		HostIPAddress: [4]byte{127, 0, 0, 1},
+		HostIPAddress: net.IP{127, 0, 0, 1},
 		Name:          "Game room",
 		Password:      "secret123",
 	}

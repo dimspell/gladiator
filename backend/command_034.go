@@ -61,12 +61,15 @@ func (b *Backend) HandleJoinGame(session *model.Session, req JoinGameRequest) er
 		if err != nil {
 			return err
 		}
+		if bytes.Equal(proxyIP, []byte{0, 0, 0, 0}) {
+			return fmt.Errorf("incorrect proxy for %v", player.IpAddress)
+		}
 
 		// TODO: make sure the host is the first one
 		lobbyPlayer := model.LobbyPlayer{
 			ClassType: model.ClassType(player.ClassType),
 			Name:      player.Username,
-			IPAddress: proxyIP,
+			IPAddress: proxyIP.To4(),
 		}
 		gameRoom.Players = append(gameRoom.Players, lobbyPlayer)
 	}

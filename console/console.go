@@ -3,7 +3,6 @@ package console
 import (
 	"context"
 	"errors"
-	"log"
 	"log/slog"
 	"net/http"
 	"os"
@@ -19,7 +18,6 @@ import (
 	"github.com/dispel-re/dispel-multi/model"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/nats-io/nats-server/v2/server"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/riandyrn/otelchi"
 	"github.com/rs/cors"
@@ -32,9 +30,9 @@ var (
 )
 
 type Console struct {
-	Addr  string
-	DB    *database.Queries
-	Queue *server.Server
+	Addr string
+	DB   *database.Queries
+	// Queue *server.Server
 
 	CORSAllowedOrigins []string
 }
@@ -47,37 +45,37 @@ func NewConsole(db *database.Queries, addr string) *Console {
 	}
 }
 
-func (c *Console) NATS() *server.Server {
-	// serverTlsConfig, err := server.GenTLSConfig(&server.TLSConfigOpts{
-	// 	CertFile: certFile,
-	// 	KeyFile:  keyFile,
-	// 	CaFile:   caFile,
-	// 	Verify:   true,
-	// 	Timeout:  2,
-	// })
-	// if err != nil {
-	// 	log.Fatalf("tls config: %v", err)
-	// }
-
-	var (
-		host = "localhost"
-		port = server.DEFAULT_PORT
-	)
-
-	opts := server.Options{
-		Host: host,
-		Port: port,
-		// TLSConfig: serverTlsConfig,
-	}
-
-	ns, err := server.NewServer(&opts)
-	if err != nil {
-		log.Fatalf("server init: %v", err)
-	}
-
-	slog.Info("Configured NATS server", "addr", ns.ClientURL())
-	return ns
-}
+// func (c *Console) NATS() *server.Server {
+// 	// serverTlsConfig, err := server.GenTLSConfig(&server.TLSConfigOpts{
+// 	// 	CertFile: certFile,
+// 	// 	KeyFile:  keyFile,
+// 	// 	CaFile:   caFile,
+// 	// 	Verify:   true,
+// 	// 	Timeout:  2,
+// 	// })
+// 	// if err != nil {
+// 	// 	log.Fatalf("tls config: %v", err)
+// 	// }
+//
+// 	var (
+// 		host = "localhost"
+// 		port = server.DEFAULT_PORT
+// 	)
+//
+// 	opts := server.Options{
+// 		Host: host,
+// 		Port: port,
+// 		// TLSConfig: serverTlsConfig,
+// 	}
+//
+// 	ns, err := server.NewServer(&opts)
+// 	if err != nil {
+// 		log.Fatalf("server init: %v", err)
+// 	}
+//
+// 	slog.Info("Configured NATS server", "addr", ns.ClientURL())
+// 	return ns
+// }
 
 func (c *Console) HttpRouter() http.Handler {
 	mux := chi.NewRouter()

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"connectrpc.com/connect"
+	"github.com/dispel-re/dispel-multi/backend/proxy"
 	v1 "github.com/dispel-re/dispel-multi/gen/multi/v1"
 	"github.com/dispel-re/dispel-multi/model"
 	"github.com/stretchr/testify/assert"
@@ -38,26 +39,37 @@ func TestBackend_HandleListGames(t *testing.T) {
 	})
 
 	t.Run("with games", func(t *testing.T) {
-		b := &Backend{GameClient: &mockGameClient{
-			ListGamesResponse: connect.NewResponse(&v1.ListGamesResponse{Games: []*v1.Game{
-				{
-					GameId:        1,
-					Name:          "RoomName",
-					Password:      "secret",
-					HostIpAddress: "127.0.0.1",
-					MapId:         2,
-				},
-				{
-					GameId:        1,
-					Name:          "Other",
-					Password:      "",
-					HostIpAddress: "127.0.0.1",
-					MapId:         5,
-				},
-			}}),
-		}}
+		b := &Backend{
+			Proxy: proxy.NewLAN(),
+			GameClient: &mockGameClient{
+				ListGamesResponse: connect.NewResponse(&v1.ListGamesResponse{Games: []*v1.Game{
+					{
+						GameId:        1,
+						Name:          "RoomName",
+						Password:      "secret",
+						HostIpAddress: "127.0.0.1",
+						MapId:         2,
+					},
+					{
+						GameId:        1,
+						Name:          "Other",
+						Password:      "",
+						HostIpAddress: "127.0.0.1",
+						MapId:         5,
+					},
+				}}),
+			}}
 		conn := &mockConn{}
 		session := &model.Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
+
+		// 255 9 33 0
+		// 2 0 0 0
+		// 127 0 0 1
+		// 82 111 111 109 78 97 109 101 0
+		// 0
+		// 127 0 0 1
+		// 79 116 104 101 114 0
+		// 0
 
 		assert.NoError(t, b.HandleListGames(session, ListGamesRequest{}))
 		assert.Len(t, conn.Written, 39)

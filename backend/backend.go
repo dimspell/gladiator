@@ -17,7 +17,6 @@ import (
 	"github.com/dispel-re/dispel-multi/backend/proxy"
 	"github.com/dispel-re/dispel-multi/gen/multi/v1/multiv1connect"
 	"github.com/dispel-re/dispel-multi/model"
-	"github.com/nats-io/nats.go"
 )
 
 const DesktopIP byte = 212
@@ -31,9 +30,9 @@ const GameRoomName = "room"
 type Backend struct {
 	Addr string
 
-	Sessions       map[string]*model.Session
-	PacketLogger   *slog.Logger
-	Queue          *nats.Conn
+	Sessions     map[string]*model.Session
+	PacketLogger *slog.Logger
+	// Queue          *nats.Conn
 	SessionCounter int
 
 	Proxy     proxy.Proxy
@@ -105,9 +104,9 @@ func (b *Backend) Start(ctx context.Context) error {
 }
 
 func (b *Backend) Shutdown() {
-	if b.Queue != nil {
-		b.Queue.Drain()
-	}
+	// if b.Queue != nil {
+	// 	b.Queue.Drain()
+	// }
 
 	// b.ClientProxy = nil
 

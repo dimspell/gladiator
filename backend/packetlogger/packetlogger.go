@@ -7,7 +7,6 @@ import (
 	"io"
 	"log/slog"
 	"runtime"
-	"slices"
 	"strconv"
 	"sync"
 	"time"
@@ -23,7 +22,7 @@ type IndentHandler struct {
 	out            io.Writer
 }
 
-//!-IndentHandler
+// !-IndentHandler
 
 type Options struct {
 	// Level reports the minimum level to log.
@@ -64,7 +63,7 @@ func (h *IndentHandler) WithGroup(name string) slog.Handler {
 	return &h2
 }
 
-//!-WithGroup
+// !-WithGroup
 
 // !+WithAttrs
 func (h *IndentHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
@@ -73,7 +72,8 @@ func (h *IndentHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 	}
 	h2 := *h
 	// Force an append to copy the underlying array.
-	pre := slices.Clip(h.preformatted)
+	// pre := slices.Clip(h.preformatted)
+	pre := []byte{}
 	// Add all groups from WithGroup that haven't already been added.
 	h2.preformatted = h2.appendUnopenedGroups(pre, h2.indentLevel)
 	// Each of those groups increased the indent level by 1.
@@ -95,7 +95,7 @@ func (h *IndentHandler) appendUnopenedGroups(buf []byte, indentLevel int) []byte
 	return buf
 }
 
-//!-WithAttrs
+// !-WithAttrs
 
 // !+Handle
 func (h *IndentHandler) Handle(ctx context.Context, r slog.Record) error {
@@ -144,7 +144,7 @@ func (h *IndentHandler) Handle(ctx context.Context, r slog.Record) error {
 	return err
 }
 
-//!-Handle
+// !-Handle
 
 func (h *IndentHandler) appendAttr(buf []byte, a slog.Attr, indentLevel int) []byte {
 	// Resolve the Attr's value before doing anything else.

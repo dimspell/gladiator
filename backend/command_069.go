@@ -58,7 +58,7 @@ func (b *Backend) HandleSelectGame(session *model.Session, req SelectGameRequest
 
 	gameRoom := SelectGameResponse{
 		Lobby: model.LobbyRoom{
-			HostIPAddress: hostIP,
+			HostIPAddress: hostIP.To4(),
 			Name:          respGame.Msg.Game.Name,
 			Password:      "",
 		},
@@ -84,7 +84,7 @@ func (b *Backend) HandleSelectGame(session *model.Session, req SelectGameRequest
 		lobbyPlayer := model.LobbyPlayer{
 			ClassType: model.ClassType(player.ClassType),
 			Name:      player.Username,
-			IPAddress: proxyIP,
+			IPAddress: proxyIP.To4(),
 		}
 		gameRoom.Players = append(gameRoom.Players, lobbyPlayer)
 	}

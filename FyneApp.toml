@@ -1,0 +1,8 @@
+Website = "https://example.com"
+
+[Details]
+#Icon = "Icon.png"
+Name = "Dispel Multi"
+ID = "net.dispelmulti.app"
+Version = "1.0.0"
+Build = 1

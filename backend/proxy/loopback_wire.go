@@ -7,7 +7,6 @@ import (
 	"io"
 	"log/slog"
 	"net"
-	"slices"
 	"sync"
 
 	"github.com/fxamacker/cbor/v2"
@@ -17,17 +16,17 @@ import (
 var isUnitTest bool
 
 func writeCBOR[T any](conn io.Writer, command string, value T) error {
-	data, err := cbor.Marshal(value)
-	if err != nil {
-		return err
-	}
+	// data, err := cbor.Marshal(value)
+	// if err != nil {
+	// 	return err
+	// }
+	//
+	// prefix := make([]byte, 5)
+	// copy(prefix, command)
 
-	prefix := make([]byte, 5)
-	copy(prefix, command)
-
-	if _, err := conn.Write(slices.Concat(prefix, data)); err != nil {
-		return err
-	}
+	// if _, err := conn.Write(slices.Concat(prefix, data)); err != nil {
+	// 	return err
+	// }
 	return nil
 }
 

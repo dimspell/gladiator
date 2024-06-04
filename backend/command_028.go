@@ -27,7 +27,7 @@ func (b *Backend) HandleCreateGame(session *model.Session, req CreateGameRequest
 
 	hostIPAddress, err := b.Proxy.Create(session.LocalIpAddress, session.Username)
 	if err != nil {
-		return err
+		return fmt.Errorf("packet-28: incorrect host address %w", err)
 	}
 
 	switch data.State {

@@ -73,16 +73,11 @@ func NewApp(version, commit, buildDate string) {
 		action.BackendCommand(),
 		action.ServeCommand(),
 		action.ProxyCommand(),
-		action.GUICommand(),
-		&cli.Command{
-			Name: "hello",
-			Action: func(_ context.Context, command *cli.Command) error {
-				fmt.Println("hello args:", command.Args())
-				fmt.Println("STARTED")
-				return nil
-			},
-		},
 	)
+	if guiCmd := action.GUICommand(); guiCmd != nil {
+		app.Commands = append(app.Commands, guiCmd)
+		app.Action = guiCmd.Action
+	}
 
 	// Start the app
 	if err := app.Run(context.Background(), os.Args); err != nil {

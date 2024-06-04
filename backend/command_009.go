@@ -28,10 +28,9 @@ func (b *Backend) HandleListGames(session *model.Session, req ListGamesRequest) 
 
 	for _, room := range resp.Msg.GetGames() {
 		lobby := model.LobbyRoom{
-			Name: room.Name,
-			// Password: room.Password,
-			Password:      "",
-			HostIPAddress: b.Proxy.GetHostIP(room.HostIpAddress),
+			Name:          room.Name,
+			Password:      room.Password,
+			HostIPAddress: b.Proxy.GetHostIP(room.HostIpAddress).To4(),
 		}
 		response = append(response, lobby.ToBytes()...)
 	}
