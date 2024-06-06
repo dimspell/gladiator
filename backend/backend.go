@@ -180,7 +180,7 @@ func (b *Backend) NewSession(conn net.Conn) *model.Session {
 	id := fmt.Sprintf("%d", b.SessionCounter)
 	slog.Debug("New session", "session", id)
 
-	session := &model.Session{Conn: conn, ID: id}
+	session := &model.Session{Conn: conn, ID: id, LocalIpAddress: string("127.0.0.1")}
 	b.Sessions[id] = session
 	return session
 }
