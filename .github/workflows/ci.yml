@@ -34,14 +34,14 @@ jobs:
     needs:
       - test
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Setup Go environment
         id: setup-go
         uses: actions/setup-go@v5
         with:
           go-version: "1.21"
-
-      - name: Checkout code
-        uses: actions/checkout@v4
 
       - name: Get short SHA
         run: echo "REVISION=${GITHUB_SHA::7}" >> $GITHUB_ENV
