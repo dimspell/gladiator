@@ -189,11 +189,12 @@ func (c *Console) Serve(ctx context.Context) error {
 		return httpServer.ListenAndServe()
 	}
 
-	stop := func(ctx context.Context) error {
-		return httpServer.Shutdown(ctx)
-	}
+	// stop := func(ctx context.Context) error {
+	// 	return httpServer.Shutdown(ctx)
+	// }
 
-	return c.graceful(ctx, start, stop)
+	// return c.graceful(ctx, start, stop)
+	return start(ctx)
 }
 
 type gracefulFunc func(context.Context) error

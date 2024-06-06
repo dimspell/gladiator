@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	defaultConsoleAddr = "127.0.0.1:12137"
+	defaultConsoleAddr = "127.0.0.1:2137"
 	defaultBackendAddr = "127.0.0.1:6112"
 )
 
@@ -83,6 +83,18 @@ func ServeCommand() *cli.Command {
 		group.Go(func() error {
 			return con.Serve(groupContext)
 		})
+		// group.Go(func() error {
+		// 	ticker := time.NewTicker(3*time.Second)
+		// 	for {
+		// 		select {
+		// 		case <-ticker.C:
+		// 			con.Healthy
+		// 			// con.Check()
+		// 		case <-groupContext.Done():
+		// 			break
+		// 		}
+		// 	}
+		// })
 		group.Go(func() error {
 			if err := bd.Start(groupContext); err != nil {
 				return err
