@@ -32,7 +32,10 @@ var (
 type Console struct {
 	Addr string
 	DB   *database.Queries
-	// Queue *server.Server
+
+	StartupChan   chan bool
+	ReadinessChan chan bool
+	LivenessChan  chan bool
 
 	CORSAllowedOrigins []string
 }
@@ -41,41 +44,22 @@ func NewConsole(db *database.Queries, addr string) *Console {
 	return &Console{
 		Addr:               addr,
 		DB:                 db,
-		CORSAllowedOrigins: []string{"*"}, // TODO: For production replace it with []string{"https://dispel-multi.net"}
+		StartupChan:        make(chan bool),
+		ReadinessChan:      make(chan bool),
+		LivenessChan:       make(chan bool),
+		CORSAllowedOrigins: []string{"*"},
 	}
 }
 
-// func (c *Console) NATS() *server.Server {
-// 	// serverTlsConfig, err := server.GenTLSConfig(&server.TLSConfigOpts{
-// 	// 	CertFile: certFile,
-// 	// 	KeyFile:  keyFile,
-// 	// 	CaFile:   caFile,
-// 	// 	Verify:   true,
-// 	// 	Timeout:  2,
-// 	// })
-// 	// if err != nil {
-// 	// 	log.Fatalf("tls config: %v", err)
-// 	// }
-//
-// 	var (
-// 		host = "localhost"
-// 		port = server.DEFAULT_PORT
-// 	)
-//
-// 	opts := server.Options{
-// 		Host: host,
-// 		Port: port,
-// 		// TLSConfig: serverTlsConfig,
-// 	}
-//
-// 	ns, err := server.NewServer(&opts)
-// 	if err != nil {
-// 		log.Fatalf("server init: %v", err)
-// 	}
-//
-// 	slog.Info("Configured NATS server", "addr", ns.ClientURL())
-// 	return ns
-// }
+type Option func(*Console) error
+
+// TODO: For production replace it with []string{"https://dispel-multi.net"}
+func WithCORSAllowedOrigins(allowedOrigins []string) Option {
+	return func(c *Console) error {
+		c.CORSAllowedOrigins = allowedOrigins
+		return nil
+	}
+}
 
 func (c *Console) HttpRouter() http.Handler {
 	mux := chi.NewRouter()
@@ -178,10 +162,6 @@ func (c *Console) Serve(ctx context.Context) error {
 	}
 
 	start := func(ctx context.Context) error {
-		// There is no need to gracefully quit the NATS by listening to signals.
-		// c.Queue = c.NATS()
-		// go c.Queue.Start()
-
 		// TODO: Set readiness, startup, liveness probe
 		atomic.StoreInt32(&healthy, 0)
 		slog.Info("Configured console server", "addr", c.Addr)

@@ -30,9 +30,8 @@ const GameRoomName = "room"
 type Backend struct {
 	Addr string
 
-	Sessions     map[string]*model.Session
-	PacketLogger *slog.Logger
-	// Queue          *nats.Conn
+	Sessions       map[string]*model.Session
+	PacketLogger   *slog.Logger
 	SessionCounter int
 
 	Proxy     proxy.Proxy
@@ -59,8 +58,6 @@ func NewBackend(backendAddr, consoleAddr string) *Backend {
 		},
 	}
 
-	// nc, _ := nats.Connect(fmt.Sprintf("localhost:%d", server.DEFAULT_PORT))
-
 	interceptor := connect.WithInterceptors(otelconnect.NewInterceptor())
 	consoleUri := fmt.Sprintf("http://%s/grpc", consoleAddr)
 
@@ -68,7 +65,6 @@ func NewBackend(backendAddr, consoleAddr string) *Backend {
 		Addr:         backendAddr,
 		Sessions:     make(map[string]*model.Session),
 		PacketLogger: slog.New(packetlogger.New(os.Stderr, &packetlogger.Options{Level: slog.LevelDebug})),
-		// Queue:        nc,
 
 		Proxy: proxy.NewLAN(),
 
