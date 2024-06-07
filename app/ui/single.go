@@ -127,6 +127,7 @@ func (c *Controller) SinglePlayerScreen(w fyne.Window, initial *SinglePlayerScre
 	})
 
 	createUser := widget.NewButtonWithIcon("Create New User", theme.AccountIcon(), func() {
+		dialog.ShowError(errors.New("not implemented"), w)
 	})
 
 	registryUpdatedText := widget.NewRichTextFromMarkdown("**1. Update the registry (e.g. with regedit)**\n\n" +
