@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"fmt"
 	"log"
 	"os"
 
@@ -72,7 +73,7 @@ func (c *Controller) HostScreen(w fyne.Window) fyne.CanvasObject {
 	pathEntry.Hidden = true
 	pathSelection.Hidden = true
 
-	pathEntry.Text, _ = os.UserHomeDir()
+	pathEntry.Text, _ = defaultDirectory()
 
 	headerText := "Host a server"
 
@@ -114,6 +115,8 @@ func (c *Controller) HostScreen(w fyne.Window) fyne.CanvasObject {
 
 		databaseType, ok := databaseTypes[comboGroup.Selected]
 		if !ok {
+			dialog.ShowError(fmt.Errorf("unknown database type: %q", databaseType), w)
+			loadingDialog.Hide()
 			return
 		}
 		databasePath := pathEntry.Text + string(os.PathSeparator) + "dispel-multi.sqlite"

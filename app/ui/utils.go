@@ -3,6 +3,7 @@ package ui
 import (
 	"fmt"
 	"net"
+	"os"
 	"sort"
 	"strconv"
 
@@ -62,4 +63,16 @@ func portValidator(s string) error {
 		return fmt.Errorf("invalid port number")
 	}
 	return nil
+}
+
+func defaultDirectory() (string, error) {
+	directoryPath, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	directoryPath += string(os.PathSeparator)
+	directoryPath += "dispel-multi"
+	directoryPath += string(os.PathSeparator)
+	directoryPath += "dispel-multi.sql"
+	return directoryPath, nil
 }
