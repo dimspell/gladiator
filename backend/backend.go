@@ -23,7 +23,9 @@ import (
 )
 
 type Backend struct {
-	Addr   string
+	Addr        string
+	MyIPAddress string
+
 	Status *atomic.Int32
 
 	Sessions       map[string]*model.Session
@@ -40,7 +42,11 @@ type Backend struct {
 	rankingClient   multiv1connect.RankingServiceClient
 }
 
-func NewBackend(backendAddr, consoleAddr string) *Backend {
+func NewBackend(backendAddr, consoleAddr, myIPAddress string) *Backend {
+	if myIPAddress == "" {
+		myIPAddress = "127.0.0.1"
+	}
+
 	httpClient := &http.Client{
 		Timeout: 5 * time.Second,
 		Transport: &http.Transport{
@@ -60,6 +66,7 @@ func NewBackend(backendAddr, consoleAddr string) *Backend {
 
 	return &Backend{
 		Addr:         backendAddr,
+		MyIPAddress:  myIPAddress,
 		Sessions:     make(map[string]*model.Session),
 		PacketLogger: slog.New(packetlogger.New(os.Stderr, &packetlogger.Options{Level: slog.LevelDebug})),
 		Status:       new(atomic.Int32),
@@ -169,14 +176,22 @@ func (b *Backend) Listen() {
 func (b *Backend) handleClient(conn net.Conn) error {
 	session, err := b.handshake(conn)
 	if err != nil {
-		conn.Close()
+		if err := conn.Close(); err != nil {
+			slog.Error("Could not close connection in handshake", "err", err)
+			return err
+		}
 		if err == io.EOF {
 			return nil
 		}
 		slog.Warn("Handshake failed", "err", err)
 		return err
 	}
-	defer b.CloseSession(session)
+	defer func() {
+		err := b.CloseSession(session)
+		if err != nil {
+			slog.Warn("Close session failed", "err", err)
+		}
+	}()
 
 	for {
 		if err := b.handleCommands(session); err != nil {
@@ -194,7 +209,11 @@ func (b *Backend) NewSession(conn net.Conn) *model.Session {
 	id := fmt.Sprintf("%s-%d", uuid.New().String(), b.SessionCounter)
 	slog.Debug("New session", "session", id)
 
-	session := &model.Session{Conn: conn, ID: id, LocalIpAddress: string("127.0.0.1")}
+	session := &model.Session{
+		Conn:           conn,
+		ID:             id,
+		LocalIpAddress: b.MyIPAddress,
+	}
 	b.Sessions[id] = session
 	return session
 }

@@ -14,6 +14,7 @@ import (
 const (
 	defaultConsoleAddr = "127.0.0.1:2137"
 	defaultBackendAddr = "127.0.0.1:6112"
+	defaultMyIPAddr    = "127.0.0.1"
 )
 
 func ServeCommand() *cli.Command {
@@ -32,6 +33,11 @@ func ServeCommand() *cli.Command {
 				Usage: "Port for the backend server",
 			},
 			&cli.StringFlag{
+				Name:  "my-ip-addr",
+				Value: defaultMyIPAddr,
+				Usage: "IP address used in intercommunication between the users",
+			},
+			&cli.StringFlag{
 				Name:  "database-type",
 				Value: "memory",
 				Usage: "Database type (memory, sqlite)",
@@ -47,6 +53,7 @@ func ServeCommand() *cli.Command {
 	cmd.Action = func(ctx context.Context, c *cli.Command) error {
 		consoleAddr := c.String("console-addr")
 		backendAddr := c.String("backend-addr")
+		myIpAddr := c.String("my-ip-addr")
 
 		var (
 			db  *database.SQLite
@@ -76,7 +83,7 @@ func ServeCommand() *cli.Command {
 			return err
 		}
 
-		bd := backend.NewBackend(backendAddr, consoleAddr)
+		bd := backend.NewBackend(backendAddr, consoleAddr, myIpAddr)
 		con := console.NewConsole(queries, consoleAddr)
 
 		group, groupContext := errgroup.WithContext(ctx)

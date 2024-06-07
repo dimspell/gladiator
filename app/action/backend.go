@@ -22,14 +22,20 @@ func BackendCommand() *cli.Command {
 				Value: defaultBackendAddr,
 				Usage: "Port for the backend server",
 			},
+			&cli.StringFlag{
+				Name:  "my-ip-addr",
+				Value: defaultMyIPAddr,
+				Usage: "IP address used in intercommunication between the users",
+			},
 		},
 	}
 
 	cmd.Action = func(ctx context.Context, c *cli.Command) error {
 		consoleAddr := c.String("console-addr")
 		backendAddr := c.String("backend-addr")
+		myIpAddr := c.String("my-ip-addr")
 
-		bd := backend.NewBackend(backendAddr, consoleAddr)
+		bd := backend.NewBackend(backendAddr, consoleAddr, myIpAddr)
 
 		if err := bd.Start(ctx); err != nil {
 			return err

@@ -52,7 +52,8 @@ func (c *Controller) StartBackend(consoleAddr string) error {
 		c.Backend.Shutdown()
 		c.Backend = nil
 	}
-	c.Backend = backend.NewBackend("127.0.0.1:6112", consoleAddr)
+	// TODO: Define the IP address used for proxy
+	c.Backend = backend.NewBackend("127.0.0.1:6112", consoleAddr, "")
 	if err := c.Backend.Start(context.TODO()); err != nil {
 		return err
 	}
