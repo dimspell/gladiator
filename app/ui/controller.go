@@ -3,17 +3,21 @@ package ui
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"time"
 
 	"fyne.io/fyne/v2"
 	"github.com/dispel-re/dispel-multi/backend"
 	"github.com/dispel-re/dispel-multi/console"
+	"github.com/dispel-re/dispel-multi/console/database"
 )
 
 type Controller struct {
 	Console *console.Console
 	Backend *backend.Backend
+
+	consoleStop console.GracefulFunc
 
 	app          fyne.App
 	consoleProbe chan bool
@@ -87,4 +91,54 @@ func (c *Controller) StopBackend() {
 		return
 	}
 	c.Backend.Shutdown()
+}
+
+func (c *Controller) StartConsole(databaseType, databasePath string, bindIP, bindPort string) error {
+	// Configure the database connection
+	var (
+		db  *database.SQLite
+		err error
+	)
+	switch databaseType {
+	case "sqlite":
+		db, err = database.NewLocal(databasePath)
+		if err != nil {
+			return err
+		}
+	case "memory":
+		db, err = database.NewMemory()
+		if err != nil {
+			return err
+		}
+	default:
+		return fmt.Errorf("unknown database type")
+	}
+
+	queries, err := db.Queries()
+	if err != nil {
+		return err
+	}
+
+	// Update the database to the latest migration
+	if err := database.Seed(queries); err != nil {
+		return err
+	}
+
+	c.Console = console.NewConsole(queries, net.JoinHostPort(bindIP, bindPort))
+	start, stop := c.Console.Handlers()
+	c.consoleStop = stop
+
+	go func() {
+		if err := start(context.TODO()); err != nil {
+			return
+		}
+	}()
+	return nil
+}
+
+func (c *Controller) StopConsole() error {
+	if c.consoleStop == nil {
+		return nil
+	}
+	return c.consoleStop(context.TODO())
 }

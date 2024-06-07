@@ -33,7 +33,6 @@ type Console struct {
 	Addr string
 	DB   *database.Queries
 
-	closeFunc     func(ctx context.Context) error
 	StartupChan   chan bool
 	ReadinessChan chan bool
 	LivenessChan  chan bool
@@ -153,7 +152,7 @@ func (c *Console) HttpRouter() http.Handler {
 	return mux
 }
 
-func (c *Console) Serve(ctx context.Context) error {
+func (c *Console) Handlers() (start GracefulFunc, stop GracefulFunc) {
 	httpServer := &http.Server{
 		Addr:         c.Addr,
 		Handler:      h2c.NewHandler(c.HttpRouter(), &http2.Server{}),
@@ -162,7 +161,7 @@ func (c *Console) Serve(ctx context.Context) error {
 		IdleTimeout:  120 * time.Second,
 	}
 
-	start := func(ctx context.Context) error {
+	start = func(ctx context.Context) error {
 		// TODO: Set readiness, startup, liveness probe
 		atomic.StoreInt32(&healthy, 0)
 		slog.Info("Configured console server", "addr", c.Addr)
@@ -170,25 +169,22 @@ func (c *Console) Serve(ctx context.Context) error {
 		return httpServer.ListenAndServe()
 	}
 
-	stop := func(ctx context.Context) error {
-		return httpServer.Shutdown(ctx)
+	stop = func(ctx context.Context) error {
+		slog.Info("Started shutting down the console server")
+		if err := httpServer.Shutdown(ctx); err != nil {
+			slog.Error("Failed shutting down the console server", "error", err)
+			return err
+		}
+		slog.Info("Shut down the console server")
+		return nil
 	}
-	c.closeFunc = stop
 
-	// return c.graceful(ctx, start, stop)
-	return start(ctx)
+	return start, stop
 }
 
-func (c *Console) Stop(ctx context.Context) error {
-	if c.closeFunc != nil {
-		return c.closeFunc(ctx)
-	}
-	return nil
-}
+type GracefulFunc func(context.Context) error
 
-type gracefulFunc func(context.Context) error
-
-func (c *Console) graceful(ctx context.Context, start gracefulFunc, shutdown gracefulFunc) error {
+func (c *Console) Graceful(ctx context.Context, start GracefulFunc, shutdown GracefulFunc) error {
 	var (
 		stopChan = make(chan os.Signal, 1)
 		errChan  = make(chan error, 1)

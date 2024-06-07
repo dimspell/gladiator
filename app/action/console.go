@@ -64,8 +64,8 @@ func ConsoleCommand() *cli.Command {
 		}
 
 		con := console.NewConsole(queries, consoleAddr)
-
-		return con.Serve(ctx)
+		start, stop := con.Handlers()
+		return con.Graceful(ctx, start, stop)
 	}
 
 	return cmd

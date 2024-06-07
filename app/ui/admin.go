@@ -1,7 +1,6 @@
 package ui
 
 import (
-	"context"
 	"fmt"
 	"log"
 
@@ -67,7 +66,7 @@ func (c *Controller) AdminScreen(w fyne.Window) fyne.CanvasObject {
 		}
 
 		if c.Console != nil {
-			if err := c.Console.Stop(context.TODO()); err != nil {
+			if err := c.StopConsole(); err != nil {
 				dialog.ShowError(err, w)
 			}
 		}

@@ -85,23 +85,12 @@ func ServeCommand() *cli.Command {
 
 		bd := backend.NewBackend(backendAddr, consoleAddr, myIpAddr)
 		con := console.NewConsole(queries, consoleAddr)
+		startConsole, stopConsole := con.Handlers()
 
 		group, groupContext := errgroup.WithContext(ctx)
 		group.Go(func() error {
-			return con.Serve(groupContext)
+			return startConsole(groupContext)
 		})
-		// group.Go(func() error {
-		// 	ticker := time.NewTicker(3*time.Second)
-		// 	for {
-		// 		select {
-		// 		case <-ticker.C:
-		// 			con.Healthy
-		// 			// con.Check()
-		// 		case <-groupContext.Done():
-		// 			break
-		// 		}
-		// 	}
-		// })
 		group.Go(func() error {
 			if err := bd.Start(groupContext); err != nil {
 				return err
@@ -112,7 +101,7 @@ func ServeCommand() *cli.Command {
 
 		if err := group.Wait(); err != nil {
 			bd.Shutdown()
-			// con.Shutdown()
+			_ = stopConsole(context.TODO())
 		}
 		return nil
 	}

@@ -1,10 +1,7 @@
 package ui
 
 import (
-	"context"
-	"fmt"
 	"log"
-	"net"
 	"os"
 
 	"fyne.io/fyne/v2"
@@ -13,8 +10,13 @@ import (
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
-	"github.com/dispel-re/dispel-multi/console"
-	"github.com/dispel-re/dispel-multi/console/database"
+)
+
+type hostDatabaseType string
+
+const (
+	hostDatabaseTypeSqlite hostDatabaseType = "1_sqlite"
+	hostDatabaseTypeMemory hostDatabaseType = "2_memory"
 )
 
 func (c *Controller) HostScreen(w fyne.Window) fyne.CanvasObject {
@@ -40,14 +42,18 @@ func (c *Controller) HostScreen(w fyne.Window) fyne.CanvasObject {
 	pathEntry.SetMinRowsVisible(1)
 	pathContainer := container.NewBorder(nil, nil, nil, pathSelection, pathEntry)
 
-	comboOptions := []string{
-		"Saved on disk (sqlite)",
-		"Stored in-memory (for testing)",
+	comboOptions := map[hostDatabaseType]string{
+		hostDatabaseTypeSqlite: "Saved on disk (sqlite)",
+		hostDatabaseTypeMemory: "Stored in-memory (for testing)",
 	}
-	comboGroup := widget.NewSelect(comboOptions, func(value string) {
+	databaseTypes := map[string]string{
+		comboOptions[hostDatabaseTypeSqlite]: "sqlite",
+		comboOptions[hostDatabaseTypeMemory]: "memory",
+	}
+	comboGroup := widget.NewSelect(Values(comboOptions), func(value string) {
 		log.Println("Select set to", value)
 
-		if value == comboOptions[1] {
+		if value == comboOptions[hostDatabaseTypeMemory] {
 			pathLabel.Hide()
 			pathEntry.Hide()
 			pathSelection.Hide()
@@ -61,7 +67,7 @@ func (c *Controller) HostScreen(w fyne.Window) fyne.CanvasObject {
 	typeLabel := widget.NewLabelWithStyle("Database Type", fyne.TextAlignTrailing, fyne.TextStyle{Bold: true})
 	typeEntry := comboGroup
 
-	comboGroup.SetSelected(comboOptions[1])
+	comboGroup.SetSelected(comboOptions[hostDatabaseTypeSqlite])
 	pathLabel.Hidden = true
 	pathEntry.Hidden = true
 	pathSelection.Hidden = true
@@ -106,55 +112,16 @@ func (c *Controller) HostScreen(w fyne.Window) fyne.CanvasObject {
 		loadingDialog := dialog.NewCustomWithoutButtons("Starting auth server...", widget.NewProgressBarInfinite(), w)
 		loadingDialog.Show()
 
-		// Configure the database connection
-		var (
-			db  *database.SQLite
-			err error
-		)
-		switch comboGroup.Selected {
-		case comboOptions[0]:
-			// sqlite
-			db, err = database.NewLocal(
-				pathEntry.Text +
-					string(os.PathSeparator) +
-					"dispel-multi.sqlite")
-			if err != nil {
-				dialog.ShowError(err, w)
-				return
-			}
-		case comboOptions[1]:
-			// memory
-			db, err = database.NewMemory()
-			if err != nil {
-				dialog.ShowError(err, w)
-				return
-			}
-		default:
-			dialog.ShowError(fmt.Errorf("unknown database type"), w)
+		databaseType, ok := databaseTypes[comboGroup.Selected]
+		if !ok {
 			return
 		}
+		databasePath := pathEntry.Text + string(os.PathSeparator) + "dispel-multi.sqlite"
 
-		queries, err := db.Queries()
-		if err != nil {
+		if err := c.StartConsole(databaseType, databasePath, bindIP.Text, bindPort.Text); err != nil {
 			dialog.ShowError(err, w)
 			return
 		}
-
-		// Update the database to the latest migration
-		if err := database.Seed(queries); err != nil {
-			dialog.ShowError(err, w)
-			return
-		}
-
-		c.Console = console.NewConsole(queries, net.JoinHostPort(bindIP.Text, bindPort.Text))
-
-		go func() {
-			if err := c.Console.Serve(context.TODO()); err != nil {
-				dialog.ShowError(err, w)
-				w.SetContent(c.HostScreen(w))
-				return
-			}
-		}()
 
 		loadingDialog.Hide()
 		loadingDialog = nil
