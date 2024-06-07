@@ -84,7 +84,7 @@ func ServeCommand() *cli.Command {
 		}
 
 		bd := backend.NewBackend(backendAddr, consoleAddr, myIpAddr)
-		con := console.NewConsole(queries, consoleAddr)
+		con := console.NewConsole(db, queries, consoleAddr)
 		startConsole, stopConsole := con.Handlers()
 
 		group, groupContext := errgroup.WithContext(ctx)

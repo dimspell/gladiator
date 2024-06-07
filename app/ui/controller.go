@@ -22,7 +22,7 @@ type Controller struct {
 	consoleStop console.GracefulFunc
 
 	app          fyne.App
-	consoleProbe chan bool
+	consoleProbe *console.Probe
 	backendProbe chan bool
 }
 
@@ -32,12 +32,17 @@ func NewController(fyneApp fyne.App) *Controller {
 		myIPAddress: "127.0.0.1",
 
 		app:          fyneApp,
-		consoleProbe: make(chan bool),
+		consoleProbe: console.NewProbe(),
 		backendProbe: make(chan bool),
 	}
 }
 
 func (c *Controller) StartConsole(databaseType, databasePath, consoleAddr string) error {
+	if c.Console != nil {
+		slog.Warn("Console is already running")
+		return nil
+	}
+
 	slog.Info("Starting the console server",
 		"databaseType", databaseType,
 		"consoleAddr", consoleAddr,
@@ -73,10 +78,21 @@ func (c *Controller) StartConsole(databaseType, databasePath, consoleAddr string
 		return err
 	}
 
-	c.Console = console.NewConsole(queries, consoleAddr)
+	c.Console = console.NewConsole(db, queries, consoleAddr)
 	start, stop := c.Console.Handlers()
-	c.consoleStop = stop
+	c.consoleStop = func(ctx context.Context) error {
+		if c.Console == nil {
+			return nil
+		}
+		c.consoleProbe.Stop()
+		err := stop(ctx)
+		c.Console = nil
+		return err
+	}
 
+	c.consoleProbe.StartupProbe(console.HealthCheckProbe(
+		fmt.Sprintf("http://%s/_health", consoleAddr),
+	))
 	go func() {
 		if err := start(context.TODO()); err != nil {
 			return
@@ -86,10 +102,10 @@ func (c *Controller) StartConsole(databaseType, databasePath, consoleAddr string
 }
 
 func (c *Controller) StopConsole() error {
-	slog.Info("Going to stop the backend server")
+	slog.Info("Going to stop the console server")
 
-	if c.consoleStop == nil {
-		slog.Warn("Backend has been already shut down")
+	if c.Console == nil {
+		slog.Warn("Console has been already shut down")
 		return nil
 	}
 	if err := c.consoleStop(context.TODO()); err != nil {

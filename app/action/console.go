@@ -63,7 +63,7 @@ func ConsoleCommand() *cli.Command {
 			return err
 		}
 
-		con := console.NewConsole(queries, consoleAddr)
+		con := console.NewConsole(db, queries, consoleAddr)
 		start, stop := con.Handlers()
 		return con.Graceful(ctx, start, stop)
 	}

@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -18,35 +17,25 @@ import (
 	"github.com/dispel-re/dispel-multi/model"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/riandyrn/otelchi"
 	"github.com/rs/cors"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 )
 
-var (
-	healthy int32
-)
-
 type Console struct {
-	Addr string
-	DB   *database.Queries
-
-	StartupChan   chan bool
-	ReadinessChan chan bool
-	LivenessChan  chan bool
-
+	Addr               string
+	DB                 *database.SQLite
+	Queries            *database.Queries
 	CORSAllowedOrigins []string
+
+	StartupProbe func()
 }
 
-func NewConsole(db *database.Queries, addr string) *Console {
+func NewConsole(db *database.SQLite, queries *database.Queries, addr string) *Console {
 	return &Console{
 		Addr:               addr,
 		DB:                 db,
-		StartupChan:        make(chan bool),
-		ReadinessChan:      make(chan bool),
-		LivenessChan:       make(chan bool),
+		Queries:            queries,
 		CORSAllowedOrigins: []string{"*"},
 	}
 }
@@ -65,24 +54,31 @@ func (c *Console) HttpRouter() http.Handler {
 	mux := chi.NewRouter()
 
 	mux.Use(middleware.Recoverer)
-	mux.Use(middleware.DefaultLogger)
 	mux.Use(middleware.Throttle(100))
 	mux.Use(middleware.Timeout(5 * time.Second))
-	mux.Use(otelchi.Middleware("console", otelchi.WithChiRoutes(mux)))
+	// mux.Use(otelchi.Middleware("console", otelchi.WithChiRoutes(mux)))
 
 	{ // Setup meta routes (readiness, liveness, metrics etc.)
 		mux.Get("/_health", func(w http.ResponseWriter, r *http.Request) {
-			if atomic.LoadInt32(&healthy) == 0 {
-				renderJSON(w, r, map[string]string{"status": "OK"})
+			if err := c.DB.Ping(); err != nil {
+				w.WriteHeader(http.StatusServiceUnavailable)
+				renderJSON(w, r, map[string]string{
+					"status":    "ERROR",
+					"component": "database",
+					"error":     err.Error(),
+				})
 				return
 			}
-			w.WriteHeader(http.StatusServiceUnavailable)
+
+			w.WriteHeader(http.StatusOK)
+			renderJSON(w, r, map[string]string{"status": "OK"})
 		})
-		mux.Get("/_metrics", promhttp.Handler().ServeHTTP)
+		// mux.Get("/_metrics", promhttp.Handler().ServeHTTP)
 	}
 
 	{ // Setup routes used by the launcher
 		wellKnown := chi.NewRouter()
+		wellKnown.Use(middleware.DefaultLogger)
 		wellKnown.Use(cors.New(cors.Options{
 			AllowedOrigins:   c.CORSAllowedOrigins,
 			AllowCredentials: false,
@@ -109,7 +105,7 @@ func (c *Console) HttpRouter() http.Handler {
 
 		wellKnown.Get("/dispel-multi.json", func(w http.ResponseWriter, r *http.Request) {
 			renderJSON(w, r, model.WellKnown{
-				ZeroTier: model.ZeroTier{Enabled: false},
+				Addr: c.Addr,
 			})
 		})
 		mux.Mount("/.well-known/", wellKnown)
@@ -117,6 +113,7 @@ func (c *Console) HttpRouter() http.Handler {
 
 	{ // Setup gRPC routes for the backend
 		api := chi.NewRouter()
+		api.Use(middleware.DefaultLogger)
 		api.Use(cors.New(cors.Options{
 			AllowedOrigins:   c.CORSAllowedOrigins,
 			AllowCredentials: false,
@@ -142,17 +139,17 @@ func (c *Console) HttpRouter() http.Handler {
 		}).Handler)
 
 		interceptors := connect.WithInterceptors(otelconnect.NewInterceptor())
-		api.Mount(multiv1connect.NewCharacterServiceHandler(&characterServiceServer{DB: c.DB}, interceptors))
-		api.Mount(multiv1connect.NewGameServiceHandler(&gameServiceServer{DB: c.DB}, interceptors))
-		api.Mount(multiv1connect.NewUserServiceHandler(&userServiceServer{DB: c.DB}, interceptors))
-		api.Mount(multiv1connect.NewRankingServiceHandler(&rankingServiceServer{DB: c.DB}, interceptors))
+		api.Mount(multiv1connect.NewCharacterServiceHandler(&characterServiceServer{DB: c.Queries}, interceptors))
+		api.Mount(multiv1connect.NewGameServiceHandler(&gameServiceServer{DB: c.Queries}, interceptors))
+		api.Mount(multiv1connect.NewUserServiceHandler(&userServiceServer{DB: c.Queries}, interceptors))
+		api.Mount(multiv1connect.NewRankingServiceHandler(&rankingServiceServer{DB: c.Queries}, interceptors))
 		mux.Mount("/grpc/", http.StripPrefix("/grpc", api))
 	}
 
 	return mux
 }
 
-func (c *Console) Handlers() (start GracefulFunc, stop GracefulFunc) {
+func (c *Console) Handlers() (start GracefulFunc, shutdown GracefulFunc) {
 	httpServer := &http.Server{
 		Addr:         c.Addr,
 		Handler:      h2c.NewHandler(c.HttpRouter(), &http2.Server{}),
@@ -162,14 +159,11 @@ func (c *Console) Handlers() (start GracefulFunc, stop GracefulFunc) {
 	}
 
 	start = func(ctx context.Context) error {
-		// TODO: Set readiness, startup, liveness probe
-		atomic.StoreInt32(&healthy, 0)
 		slog.Info("Configured console server", "addr", c.Addr)
-
 		return httpServer.ListenAndServe()
 	}
 
-	stop = func(ctx context.Context) error {
+	shutdown = func(ctx context.Context) error {
 		slog.Info("Started shutting down the console server")
 		if err := httpServer.Shutdown(ctx); err != nil {
 			slog.Error("Failed shutting down the console server", "error", err)
@@ -179,7 +173,7 @@ func (c *Console) Handlers() (start GracefulFunc, stop GracefulFunc) {
 		return nil
 	}
 
-	return start, stop
+	return start, shutdown
 }
 
 type GracefulFunc func(context.Context) error

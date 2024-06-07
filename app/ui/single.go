@@ -21,6 +21,8 @@ type SinglePlayerScreenParameters struct {
 }
 
 func (c *Controller) SinglePlayerScreen(w fyne.Window, initial *SinglePlayerScreenParameters) fyne.CanvasObject {
+	closer := make(chan struct{})
+
 	const headerText = "Single Player"
 	consoleAddr := "127.0.0.1:2137"
 
@@ -69,6 +71,7 @@ func (c *Controller) SinglePlayerScreen(w fyne.Window, initial *SinglePlayerScre
 	)
 
 	consoleRunning := binding.NewBool()
+	c.consoleProbe.OnChange(func(code int32, isRunning bool) { _ = consoleRunning.Set(isRunning) }, closer)
 	consoleRunningCheck := widget.NewCheckWithData("Console running?", consoleRunning)
 
 	consoleStart := widget.NewButtonWithIcon("Start console", theme.MediaPlayIcon(), func() {
@@ -140,7 +143,10 @@ func (c *Controller) SinglePlayerScreen(w fyne.Window, initial *SinglePlayerScre
 	return container.NewBorder(
 		container.NewPadded(
 			headerContainer(headerText, func() {
-				log.Println("Welcome")
+				closer <- struct{}{}
+				close(closer)
+
+				log.Println("Start")
 				w.SetContent(c.StartScreen(w, startOptionPlay))
 			}),
 		),

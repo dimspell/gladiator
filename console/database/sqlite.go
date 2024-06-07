@@ -92,6 +92,13 @@ func Migrate(conn *sql.DB) error {
 	return nil
 }
 
+func (db *SQLite) Ping() error {
+	if err := db.Conn.Ping(); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (db *SQLite) Queries() (*Queries, error) {
 	return Prepare(context.Background(), db.Conn)
 }
