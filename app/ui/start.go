@@ -69,7 +69,11 @@ func (c *Controller) StartScreen(w fyne.Window, selectedOption startOption) fyne
 							return
 						}
 						if radioGroup.Selected == radioOptions[startOptionPlay] {
-							w.SetContent(c.SinglePlayerScreen(w))
+							w.SetContent(c.SinglePlayerScreen(w,
+								&SinglePlayerScreenParameters{
+									DatabaseType: HostDatabaseTypeSqlite,
+								}),
+							)
 							return
 						}
 					}),

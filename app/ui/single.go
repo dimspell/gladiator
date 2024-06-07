@@ -17,7 +17,11 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-func (c *Controller) SinglePlayerScreen(w fyne.Window) fyne.CanvasObject {
+type SinglePlayerScreenParameters struct {
+	DatabaseType HostDatabaseType
+}
+
+func (c *Controller) SinglePlayerScreen(w fyne.Window, initial *SinglePlayerScreenParameters) fyne.CanvasObject {
 	const headerText = "Single Player"
 	var (
 		consoleAddrIP, consoleAddrPort = "127.0.0.1", "2137"
@@ -47,18 +51,18 @@ func (c *Controller) SinglePlayerScreen(w fyne.Window) fyne.CanvasObject {
 
 	pathContainer := container.NewBorder(nil, nil, nil, pathSelection, pathEntry)
 
-	comboOptions := map[hostDatabaseType]string{
-		hostDatabaseTypeSqlite: "Saved on disk (sqlite)",
-		hostDatabaseTypeMemory: "Stored in-memory (for testing)",
+	comboOptions := map[HostDatabaseType]string{
+		HostDatabaseTypeSqlite: "Saved on disk (sqlite)",
+		HostDatabaseTypeMemory: "Stored in-memory (for testing)",
 	}
 	databaseTypes := map[string]string{
-		comboOptions[hostDatabaseTypeSqlite]: "sqlite",
-		comboOptions[hostDatabaseTypeMemory]: "memory",
+		comboOptions[HostDatabaseTypeSqlite]: "sqlite",
+		comboOptions[HostDatabaseTypeMemory]: "memory",
 	}
 	comboGroup := widget.NewSelect(Values(comboOptions), func(value string) {
 		log.Println("Select set to", value)
 
-		if value == comboOptions[hostDatabaseTypeMemory] {
+		if value == comboOptions[HostDatabaseTypeMemory] {
 			pathLabel.Hide()
 			pathContainer.Hide()
 		} else {
@@ -66,7 +70,11 @@ func (c *Controller) SinglePlayerScreen(w fyne.Window) fyne.CanvasObject {
 			pathContainer.Show()
 		}
 	})
-	comboGroup.SetSelected(comboOptions[hostDatabaseTypeSqlite])
+	comboGroup.SetSelected(comboOptions[initial.DatabaseType])
+	if initial.DatabaseType == HostDatabaseTypeMemory {
+		pathLabel.Hide()
+		pathContainer.Hide()
+	}
 
 	advancedContainer := container.NewVBox(
 		container.New(

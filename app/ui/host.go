@@ -13,11 +13,11 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-type hostDatabaseType string
+type HostDatabaseType string
 
 const (
-	hostDatabaseTypeSqlite hostDatabaseType = "1_sqlite"
-	hostDatabaseTypeMemory hostDatabaseType = "2_memory"
+	HostDatabaseTypeSqlite HostDatabaseType = "1_sqlite"
+	HostDatabaseTypeMemory HostDatabaseType = "2_memory"
 )
 
 func (c *Controller) HostScreen(w fyne.Window) fyne.CanvasObject {
@@ -43,18 +43,18 @@ func (c *Controller) HostScreen(w fyne.Window) fyne.CanvasObject {
 	pathEntry.SetMinRowsVisible(1)
 	pathContainer := container.NewBorder(nil, nil, nil, pathSelection, pathEntry)
 
-	comboOptions := map[hostDatabaseType]string{
-		hostDatabaseTypeSqlite: "Saved on disk (sqlite)",
-		hostDatabaseTypeMemory: "Stored in-memory (for testing)",
+	comboOptions := map[HostDatabaseType]string{
+		HostDatabaseTypeSqlite: "Saved on disk (sqlite)",
+		HostDatabaseTypeMemory: "Stored in-memory (for testing)",
 	}
 	databaseTypes := map[string]string{
-		comboOptions[hostDatabaseTypeSqlite]: "sqlite",
-		comboOptions[hostDatabaseTypeMemory]: "memory",
+		comboOptions[HostDatabaseTypeSqlite]: "sqlite",
+		comboOptions[HostDatabaseTypeMemory]: "memory",
 	}
 	comboGroup := widget.NewSelect(Values(comboOptions), func(value string) {
 		log.Println("Select set to", value)
 
-		if value == comboOptions[hostDatabaseTypeMemory] {
+		if value == comboOptions[HostDatabaseTypeMemory] {
 			pathLabel.Hide()
 			pathEntry.Hide()
 			pathSelection.Hide()
@@ -68,7 +68,7 @@ func (c *Controller) HostScreen(w fyne.Window) fyne.CanvasObject {
 	typeLabel := widget.NewLabelWithStyle("Database Type", fyne.TextAlignTrailing, fyne.TextStyle{Bold: true})
 	typeEntry := comboGroup
 
-	comboGroup.SetSelected(comboOptions[hostDatabaseTypeSqlite])
+	comboGroup.SetSelected(comboOptions[HostDatabaseTypeSqlite])
 	pathLabel.Hidden = true
 	pathEntry.Hidden = true
 	pathSelection.Hidden = true
