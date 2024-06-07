@@ -59,9 +59,9 @@ func ConsoleCommand() *cli.Command {
 			return err
 		}
 
-		if err := database.Seed(queries); err != nil {
-			return err
-		}
+		// if err := database.Seed(queries); err != nil {
+		// 	return err
+		// }
 
 		con := console.NewConsole(db, queries, consoleAddr)
 		start, stop := con.Handlers()

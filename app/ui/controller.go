@@ -74,9 +74,9 @@ func (c *Controller) StartConsole(databaseType, databasePath, consoleAddr string
 	}
 
 	// Update the database to the latest migration
-	if err := database.Seed(queries); err != nil {
-		return err
-	}
+	// if err := database.Seed(queries); err != nil {
+	// 	return err
+	// }
 
 	c.Console = console.NewConsole(db, queries, consoleAddr)
 	start, stop := c.Console.Handlers()

@@ -79,9 +79,9 @@ func ServeCommand() *cli.Command {
 			return err
 		}
 
-		if err := database.Seed(queries); err != nil {
-			return err
-		}
+		// if err := database.Seed(queries); err != nil {
+		// 	return err
+		// }
 
 		bd := backend.NewBackend(backendAddr, consoleAddr, myIpAddr)
 		con := console.NewConsole(db, queries, consoleAddr)
