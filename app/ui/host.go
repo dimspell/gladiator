@@ -3,6 +3,7 @@ package ui
 import (
 	"fmt"
 	"log"
+	"net"
 	"os"
 
 	"fyne.io/fyne/v2"
@@ -96,7 +97,7 @@ func (c *Controller) HostScreen(w fyne.Window) fyne.CanvasObject {
 		}
 		databasePath := pathEntry.Text + string(os.PathSeparator) + "dispel-multi.sqlite"
 
-		if err := c.StartConsole(databaseType, databasePath, bindIP.Text, bindPort.Text); err != nil {
+		if err := c.StartConsole(databaseType, databasePath, net.JoinHostPort(bindIP.Text, bindPort.Text)); err != nil {
 			dialog.ShowError(err, w)
 			return
 		}

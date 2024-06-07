@@ -116,6 +116,7 @@ func (b *Backend) Start(ctx context.Context) error {
 }
 
 func (b *Backend) Shutdown() {
+	slog.Info("Shutting down the backend...")
 	b.Signal(StatusClosing)
 
 	// b.ClientProxy = nil
@@ -139,6 +140,7 @@ func (b *Backend) Shutdown() {
 	// TODO: Send a system message "(system): Your stats were saving, your game client might close in the next 10 seconds"
 	// TODO: Send a packet to close the connection (malformed 255-21?)
 	b.Signal(StatusNotRunning)
+	slog.Info("The backend is successfully shut down")
 }
 
 func (b *Backend) Listen() {

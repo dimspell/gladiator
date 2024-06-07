@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"net"
 	"os"
 	"path"
 
@@ -23,7 +22,7 @@ type SinglePlayerScreenParameters struct {
 
 func (c *Controller) SinglePlayerScreen(w fyne.Window, initial *SinglePlayerScreenParameters) fyne.CanvasObject {
 	const headerText = "Single Player"
-	consoleAddrIP, consoleAddrPort := "127.0.0.1", "2137"
+	consoleAddr := "127.0.0.1:2137"
 
 	pathLabel := widget.NewLabelWithStyle("Database Path:", fyne.TextAlignTrailing, fyne.TextStyle{Bold: true})
 	pathEntry := widget.NewEntry()
@@ -32,7 +31,6 @@ func (c *Controller) SinglePlayerScreen(w fyne.Window, initial *SinglePlayerScre
 		pathEntry.SetText(dir)
 	}
 	pathSelection := widget.NewButtonWithIcon("Select folder", theme.FolderOpenIcon(), selectDatabasePath(w, pathEntry))
-
 	pathContainer := container.NewBorder(nil, nil, nil, pathSelection, pathEntry)
 
 	comboOptions := map[HostDatabaseType]string{
@@ -92,19 +90,22 @@ func (c *Controller) SinglePlayerScreen(w fyne.Window, initial *SinglePlayerScre
 			dialog.ShowError(fmt.Errorf("unknown database type: %q", databaseType), w)
 			return
 		}
-		if err := c.StartConsole(databaseType, dispelDir, consoleAddrIP, consoleAddrPort); err != nil {
+		if err := c.StartConsole(databaseType, dispelDir, consoleAddr); err != nil {
 			dialog.ShowError(err, w)
 			return
 		}
 	})
 	consoleStop := widget.NewButtonWithIcon("Stop console", theme.MediaStopIcon(), func() {
-		c.StopBackend()
+		if err := c.StopConsole(); err != nil {
+			dialog.ShowError(err, w)
+			return
+		}
 	})
 
 	backendRunning := binding.NewBool()
 	backendRunningCheck := widget.NewCheckWithData("Backend running?", backendRunning)
 	backendStart := widget.NewButtonWithIcon("Start backend", theme.MediaPlayIcon(), func() {
-		if err := c.StartBackend(net.JoinHostPort(consoleAddrIP, consoleAddrPort)); err != nil {
+		if err := c.StartBackend(consoleAddr); err != nil {
 			dialog.ShowError(err, w)
 			return
 		}

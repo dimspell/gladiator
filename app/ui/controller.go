@@ -3,7 +3,7 @@ package ui
 import (
 	"context"
 	"fmt"
-	"net"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -30,6 +30,68 @@ func NewController(fyneApp fyne.App) *Controller {
 		consoleProbe: make(chan bool),
 		backendProbe: make(chan bool),
 	}
+}
+
+func (c *Controller) StartConsole(databaseType, databasePath, consoleAddr string) error {
+	slog.Info("Starting the console server",
+		"databaseType", databaseType,
+		"consoleAddr", consoleAddr,
+	)
+
+	// Configure the database connection
+	var (
+		db  *database.SQLite
+		err error
+	)
+	switch databaseType {
+	case "sqlite":
+		db, err = database.NewLocal(databasePath)
+		if err != nil {
+			return err
+		}
+	case "memory":
+		db, err = database.NewMemory()
+		if err != nil {
+			return err
+		}
+	default:
+		return fmt.Errorf("unknown database type")
+	}
+
+	queries, err := db.Queries()
+	if err != nil {
+		return err
+	}
+
+	// Update the database to the latest migration
+	if err := database.Seed(queries); err != nil {
+		return err
+	}
+
+	c.Console = console.NewConsole(queries, consoleAddr)
+	start, stop := c.Console.Handlers()
+	c.consoleStop = stop
+
+	go func() {
+		if err := start(context.TODO()); err != nil {
+			return
+		}
+	}()
+	return nil
+}
+
+func (c *Controller) StopConsole() error {
+	slog.Info("Going to stop the backend server")
+
+	if c.consoleStop == nil {
+		slog.Warn("Backend has been already shut down")
+		return nil
+	}
+	if err := c.consoleStop(context.TODO()); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (c *Controller) ConsoleHandshake(consoleAddr string) error {
@@ -65,80 +127,37 @@ func (c *Controller) StartBackend(consoleAddr string) error {
 	if err := c.Backend.Start(context.TODO()); err != nil {
 		return err
 	}
+
+	// Healthcheck
+	go func() {
+		for {
+			if c.Backend == nil {
+				c.backendProbe <- false
+				return
+			}
+			select {
+			case probe := <-c.backendProbe:
+				if probe {
+
+				}
+				break
+			}
+		}
+	}()
+
+	// Start listening
 	go c.Backend.Listen()
 
-	// go func() {
-	// 	// Delay
-	// 	ticker := time.NewTicker(time.Second * 2)
-	//
-	// 	for {
-	// 		if c.Backend == nil {
-	// 			return
-	// 		}
-	//
-	// 		select {
-	// 		case <-ticker.C:
-	// 			if c.Backend.Status == backend.StatusRunning {
-	// 			}
-	// 		}
-	// 	}
-	// }()
 	return nil
 }
 
 func (c *Controller) StopBackend() {
+	slog.Info("Going to stop the backend server")
+
 	if c.Backend == nil {
+		slog.Warn("Backend has been already shut down")
 		return
 	}
 	c.Backend.Shutdown()
-}
-
-func (c *Controller) StartConsole(databaseType, databasePath string, bindIP, bindPort string) error {
-	// Configure the database connection
-	var (
-		db  *database.SQLite
-		err error
-	)
-	switch databaseType {
-	case "sqlite":
-		db, err = database.NewLocal(databasePath)
-		if err != nil {
-			return err
-		}
-	case "memory":
-		db, err = database.NewMemory()
-		if err != nil {
-			return err
-		}
-	default:
-		return fmt.Errorf("unknown database type")
-	}
-
-	queries, err := db.Queries()
-	if err != nil {
-		return err
-	}
-
-	// Update the database to the latest migration
-	if err := database.Seed(queries); err != nil {
-		return err
-	}
-
-	c.Console = console.NewConsole(queries, net.JoinHostPort(bindIP, bindPort))
-	start, stop := c.Console.Handlers()
-	c.consoleStop = stop
-
-	go func() {
-		if err := start(context.TODO()); err != nil {
-			return
-		}
-	}()
-	return nil
-}
-
-func (c *Controller) StopConsole() error {
-	if c.consoleStop == nil {
-		return nil
-	}
-	return c.consoleStop(context.TODO())
+	c.Backend = nil
 }
