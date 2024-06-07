@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -14,8 +15,9 @@ import (
 )
 
 type Controller struct {
-	Console *console.Console
-	Backend *backend.Backend
+	myIPAddress string
+	Console     *console.Console
+	Backend     *backend.Backend
 
 	consoleStop console.GracefulFunc
 
@@ -26,6 +28,9 @@ type Controller struct {
 
 func NewController(fyneApp fyne.App) *Controller {
 	return &Controller{
+		// TODO: Define the IP address used for proxy
+		myIPAddress: "127.0.0.1",
+
 		app:          fyneApp,
 		consoleProbe: make(chan bool),
 		backendProbe: make(chan bool),
@@ -97,9 +102,10 @@ func (c *Controller) StopConsole() error {
 func (c *Controller) ConsoleHandshake(consoleAddr string) error {
 	client := &http.Client{Timeout: 3 * time.Second}
 
-	// TODO: name the schema
-	consoleSchema := "http"
-	res, err := client.Get(fmt.Sprintf("%s://%s/.well-known/dispel-multi.json", consoleSchema, consoleAddr))
+	if !strings.Contains(consoleAddr, "://") {
+		consoleAddr = "http://" + consoleAddr
+	}
+	res, err := client.Get(fmt.Sprintf("%s/.well-known/dispel-multi.json", consoleAddr))
 	if err != nil {
 		return err
 	}
@@ -122,8 +128,7 @@ func (c *Controller) StartBackend(consoleAddr string) error {
 		c.Backend.Shutdown()
 		c.Backend = nil
 	}
-	// TODO: Define the IP address used for proxy
-	c.Backend = backend.NewBackend("127.0.0.1:6112", consoleAddr, "")
+	c.Backend = backend.NewBackend("127.0.0.1:6112", consoleAddr, c.myIPAddress)
 	if err := c.Backend.Start(context.TODO()); err != nil {
 		return err
 	}
