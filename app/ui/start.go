@@ -28,9 +28,12 @@ func (c *Controller) StartScreen(w fyne.Window, selectedOption startOption) fyne
 		startOptionHost: "Host - I would like to host my own server via a LAN or WAN.",
 		startOptionPlay: "Play alone - I want to play in single player mode.",
 	}
-	radioGroup := widget.NewRadioGroup(Values(radioOptions), func(value string) {
-		slog.Debug(fmt.Sprintf("Radio set to %s", value), "page", "start")
-	})
+	radioGroup := widget.NewRadioGroup(
+		Values(radioOptions),
+		func(value string) {
+			slog.Debug(fmt.Sprintf("Radio set to %s", value), "page", "start")
+		},
+	)
 	radioGroup.Required = true
 	if selectedOption != startOptionNone {
 		radioGroup.Selected = radioOptions[selectedOption]

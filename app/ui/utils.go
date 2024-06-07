@@ -3,6 +3,7 @@ package ui
 import (
 	"fmt"
 	"net"
+	"sort"
 	"strconv"
 
 	"fyne.io/fyne/v2"
@@ -20,10 +21,17 @@ func Keys[K comparable, V any](m map[K]V) []K {
 	return r
 }
 
-func Values[K comparable, V any](m map[K]V) []V {
+func Values[K ~string, V any](m map[K]V) []V {
 	r := make([]V, 0, len(m))
-	for _, v := range m {
-		r = append(r, v)
+
+	// Sort keys
+	keys := Keys(m)
+	sort.Slice(keys, func(i, j int) bool {
+		return keys[i] < keys[j]
+	})
+
+	for _, key := range keys {
+		r = append(r, m[key])
 	}
 	return r
 }
