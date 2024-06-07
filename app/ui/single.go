@@ -155,8 +155,10 @@ func (c *Controller) SinglePlayerScreen(w fyne.Window, initial *SinglePlayerScre
 	return container.NewBorder(
 		container.NewPadded(
 			headerContainer(headerText, func() {
-				closer <- struct{}{}
-				close(closer)
+				if closer != nil {
+					closer <- struct{}{}
+					close(closer)
+				}
 
 				// TODO: It should be asked only whether the servers are running
 				dialog.ShowConfirm("Are you sure?",
