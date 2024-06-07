@@ -27,7 +27,7 @@ func (c *Controller) SinglePlayerScreen(w fyne.Window, initial *SinglePlayerScre
 		consoleAddrIP, consoleAddrPort = "127.0.0.1", "2137"
 	)
 
-	pathLabel := widget.NewLabelWithStyle("Database Path", fyne.TextAlignTrailing, fyne.TextStyle{Bold: true})
+	pathLabel := widget.NewLabelWithStyle("Database Path:", fyne.TextAlignTrailing, fyne.TextStyle{Bold: true})
 
 	pathEntry := widget.NewEntry()
 	{
