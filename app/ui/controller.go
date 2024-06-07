@@ -15,12 +15,14 @@ type Controller struct {
 	Console *console.Console
 	Backend *backend.Backend
 
+	app          fyne.App
 	consoleProbe chan bool
 	backendProbe chan bool
 }
 
-func NewController(storage fyne.Storage) *Controller {
+func NewController(fyneApp fyne.App) *Controller {
 	return &Controller{
+		app:          fyneApp,
 		consoleProbe: make(chan bool),
 		backendProbe: make(chan bool),
 	}
@@ -29,7 +31,9 @@ func NewController(storage fyne.Storage) *Controller {
 func (c *Controller) ConsoleHandshake(consoleAddr string) error {
 	client := &http.Client{Timeout: 3 * time.Second}
 
-	res, err := client.Get(fmt.Sprintf("http://%s/.well-known/dispel-multi.json", consoleAddr))
+	// TODO: name the schema
+	consoleSchema := "http"
+	res, err := client.Get(fmt.Sprintf("%s://%s/.well-known/dispel-multi.json", consoleSchema, consoleAddr))
 	if err != nil {
 		return err
 	}
@@ -59,17 +63,22 @@ func (c *Controller) StartBackend(consoleAddr string) error {
 	}
 	go c.Backend.Listen()
 
-	go func() {
-		// Delay
-		ticker := time.NewTicker(time.Second * 2)
-
-		for {
-			select {
-			case <-ticker.C:
-				// c.Backend.Status
-			}
-		}
-	}()
+	// go func() {
+	// 	// Delay
+	// 	ticker := time.NewTicker(time.Second * 2)
+	//
+	// 	for {
+	// 		if c.Backend == nil {
+	// 			return
+	// 		}
+	//
+	// 		select {
+	// 		case <-ticker.C:
+	// 			if c.Backend.Status == backend.StatusRunning {
+	// 			}
+	// 		}
+	// 	}
+	// }()
 	return nil
 }
 
