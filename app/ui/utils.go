@@ -9,6 +9,7 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
@@ -75,4 +76,28 @@ func defaultDirectory() (string, error) {
 	directoryPath += string(os.PathSeparator)
 	directoryPath += "dispel-multi.sql"
 	return directoryPath, nil
+}
+
+func selectDatabasePath(w fyne.Window, pathEntry *widget.Entry) func() {
+	return func() {
+		dialog.ShowFolderOpen(func(list fyne.ListableURI, err error) {
+			if err := insertDatabasePath(list, err, func(filePath string) {
+				pathEntry.SetText(filePath)
+			}); err != nil {
+				dialog.ShowError(err, w)
+			}
+		}, w)
+	}
+}
+
+func insertDatabasePath(list fyne.ListableURI, err error, setFn func(string)) error {
+	if err != nil {
+		return err
+	}
+	if list == nil {
+		return nil
+	}
+
+	setFn(list.Path() + string(os.PathSeparator) + "dispel-multi.sqlite")
+	return nil
 }

@@ -23,31 +23,15 @@ type SinglePlayerScreenParameters struct {
 
 func (c *Controller) SinglePlayerScreen(w fyne.Window, initial *SinglePlayerScreenParameters) fyne.CanvasObject {
 	const headerText = "Single Player"
-	var (
-		consoleAddrIP, consoleAddrPort = "127.0.0.1", "2137"
-	)
+	consoleAddrIP, consoleAddrPort := "127.0.0.1", "2137"
 
 	pathLabel := widget.NewLabelWithStyle("Database Path:", fyne.TextAlignTrailing, fyne.TextStyle{Bold: true})
-
 	pathEntry := widget.NewEntry()
 	{
 		dir, _ := defaultDirectory()
 		pathEntry.SetText(dir)
 	}
-
-	pathSelection := widget.NewButtonWithIcon("Select folder", theme.FolderOpenIcon(), func() {
-		dialog.ShowFolderOpen(func(list fyne.ListableURI, err error) {
-			if err != nil {
-				dialog.ShowError(err, w)
-				return
-			}
-			if list == nil {
-				return
-			}
-
-			pathEntry.SetText(list.Path() + string(os.PathSeparator) + "dispel-multi.sqlite")
-		}, w)
-	})
+	pathSelection := widget.NewButtonWithIcon("Select folder", theme.FolderOpenIcon(), selectDatabasePath(w, pathEntry))
 
 	pathContainer := container.NewBorder(nil, nil, nil, pathSelection, pathEntry)
 

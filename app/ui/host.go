@@ -21,26 +21,12 @@ const (
 )
 
 func (c *Controller) HostScreen(w fyne.Window) fyne.CanvasObject {
-	pathLabel := widget.NewLabelWithStyle("Database Path", fyne.TextAlignTrailing, fyne.TextStyle{Bold: true})
+	headerText := "Host a server"
 
+	pathLabel := widget.NewLabelWithStyle("Database Path:", fyne.TextAlignTrailing, fyne.TextStyle{Bold: true})
 	pathEntry := widget.NewEntry()
-
-	pathSelection := widget.NewButtonWithIcon("Select folder", theme.FolderOpenIcon(), func() {
-		dialog.ShowFolderOpen(func(list fyne.ListableURI, err error) {
-			if err != nil {
-				dialog.ShowError(err, w)
-				return
-			}
-			if list == nil {
-				log.Println("Cancelled")
-				return
-			}
-
-			pathEntry.SetText(list.Path())
-		}, w)
-	})
-
-	pathEntry.SetMinRowsVisible(1)
+	pathEntry.Text, _ = defaultDirectory()
+	pathSelection := widget.NewButtonWithIcon("Select Folder", theme.FolderOpenIcon(), selectDatabasePath(w, pathEntry))
 	pathContainer := container.NewBorder(nil, nil, nil, pathSelection, pathEntry)
 
 	comboOptions := map[HostDatabaseType]string{
@@ -56,48 +42,37 @@ func (c *Controller) HostScreen(w fyne.Window) fyne.CanvasObject {
 
 		if value == comboOptions[HostDatabaseTypeMemory] {
 			pathLabel.Hide()
-			pathEntry.Hide()
-			pathSelection.Hide()
+			pathContainer.Hide()
 		} else {
 			pathLabel.Show()
-			pathEntry.Show()
-			pathSelection.Show()
+			pathContainer.Show()
 		}
 	})
-
-	typeLabel := widget.NewLabelWithStyle("Database Type", fyne.TextAlignTrailing, fyne.TextStyle{Bold: true})
-	typeEntry := comboGroup
-
-	comboGroup.SetSelected(comboOptions[HostDatabaseTypeSqlite])
-	pathLabel.Hidden = true
-	pathEntry.Hidden = true
-	pathSelection.Hidden = true
-
-	pathEntry.Text, _ = defaultDirectory()
-
-	headerText := "Host a server"
-
-	bindLabel := widget.NewLabelWithStyle("Bind Address (IP, Host)", fyne.TextAlignTrailing, fyne.TextStyle{Bold: true})
+	comboGroup.SetSelected(comboOptions[HostDatabaseTypeMemory])
+	pathLabel.Hide()
+	pathContainer.Hide()
 
 	bindIP := widget.NewEntry()
-
 	bindIP.Validator = ipValidator
 	bindIP.PlaceHolder = "Example: 0.0.0.0"
 	bindIP.SetText("127.0.0.1")
 
 	bindPort := widget.NewEntry()
-
 	bindPort.Validator = portValidator
 	bindPort.PlaceHolder = "Example: 2137"
 	bindPort.SetText("2137")
 
-	bindGroup := container.NewGridWithColumns(2, bindIP, bindPort)
-
 	formGrid := container.New(
 		layout.NewFormLayout(),
-		bindLabel, bindGroup,
-		typeLabel, typeEntry,
-		pathLabel, pathContainer,
+
+		widget.NewLabelWithStyle("Bind Address (IP, Host):", fyne.TextAlignTrailing, fyne.TextStyle{Bold: true}),
+		container.NewGridWithColumns(2, bindIP, bindPort),
+
+		widget.NewLabelWithStyle("Database Type:", fyne.TextAlignTrailing, fyne.TextStyle{Bold: true}),
+		comboGroup,
+
+		pathLabel,
+		pathContainer,
 	)
 
 	onHost := func() {
