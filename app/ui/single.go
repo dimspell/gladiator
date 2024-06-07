@@ -21,8 +21,6 @@ type SinglePlayerScreenParameters struct {
 }
 
 func (c *Controller) SinglePlayerScreen(w fyne.Window, initial *SinglePlayerScreenParameters) fyne.CanvasObject {
-	closer := make(chan struct{})
-
 	const headerText = "Single Player"
 	consoleAddr := "127.0.0.1:2137"
 
@@ -73,18 +71,6 @@ func (c *Controller) SinglePlayerScreen(w fyne.Window, initial *SinglePlayerScre
 	consoleRunningLabel := binding.NewString()
 	consoleRunningCheck := widget.NewLabelWithData(consoleRunningLabel)
 	consoleRunningCheck.Alignment = fyne.TextAlignCenter
-
-	consoleRunningLabel.Set("Console: Not Running")
-	c.consoleProbe.OnChange(func(code int32, isRunning bool) {
-		if isRunning {
-			consoleRunningLabel.Set("Console: Running")
-			consoleRunningCheck.TextStyle = fyne.TextStyle{Bold: true}
-		} else {
-			consoleRunningLabel.Set("Console: Not Running")
-			consoleRunningCheck.TextStyle = fyne.TextStyle{Bold: false}
-		}
-	}, closer)
-
 	consoleStart := widget.NewButtonWithIcon("Start console", theme.MediaPlayIcon(), func() {
 		dispelDir, err := defaultDirectory()
 		if err != nil {
@@ -116,8 +102,9 @@ func (c *Controller) SinglePlayerScreen(w fyne.Window, initial *SinglePlayerScre
 		}
 	})
 
-	backendRunning := binding.NewBool()
-	backendRunningCheck := widget.NewCheckWithData("Backend running?", backendRunning)
+	backendRunningLabel := binding.NewString()
+	backendRunningCheck := widget.NewLabelWithData(backendRunningLabel)
+	backendRunningCheck.Alignment = fyne.TextAlignCenter
 	backendStart := widget.NewButtonWithIcon("Start backend", theme.MediaPlayIcon(), func() {
 		if err := c.StartBackend(consoleAddr); err != nil {
 			dialog.ShowError(err, w)
@@ -127,6 +114,34 @@ func (c *Controller) SinglePlayerScreen(w fyne.Window, initial *SinglePlayerScre
 	backendStop := widget.NewButtonWithIcon("Stop backend", theme.MediaStopIcon(), func() {
 		c.StopBackend()
 	})
+
+	c.backendRunning.AddListener(binding.NewDataListener(func() {
+		if _, isRunning := c.backendProbe.Get(); isRunning {
+			backendStart.Disable()
+			backendStop.Enable()
+			backendRunningLabel.Set("Backend: Running")
+			backendRunningCheck.TextStyle = fyne.TextStyle{Bold: true}
+		} else {
+			backendStart.Enable()
+			backendStop.Disable()
+			backendRunningLabel.Set("Backend: Not Running")
+			backendRunningCheck.TextStyle = fyne.TextStyle{Bold: false}
+		}
+	}))
+
+	c.consoleRunning.AddListener(binding.NewDataListener(func() {
+		if _, isRunning := c.consoleProbe.Get(); isRunning {
+			consoleStart.Disable()
+			consoleStop.Enable()
+			consoleRunningLabel.Set("Console: Running")
+			consoleRunningCheck.TextStyle = fyne.TextStyle{Bold: true}
+		} else {
+			consoleStart.Enable()
+			consoleStop.Disable()
+			consoleRunningLabel.Set("Console: Not Running")
+			consoleRunningCheck.TextStyle = fyne.TextStyle{Bold: false}
+		}
+	}))
 
 	createUser := widget.NewButtonWithIcon("Create New User", theme.AccountIcon(), func() {
 		dialog.ShowError(errors.New("not implemented"), w)
@@ -155,11 +170,6 @@ func (c *Controller) SinglePlayerScreen(w fyne.Window, initial *SinglePlayerScre
 	return container.NewBorder(
 		container.NewPadded(
 			headerContainer(headerText, func() {
-				if closer != nil {
-					closer <- struct{}{}
-					close(closer)
-				}
-
 				// TODO: It should be asked only whether the servers are running
 				dialog.ShowConfirm("Are you sure?",
 					"This action will close all servers if you have any started?",
@@ -168,11 +178,12 @@ func (c *Controller) SinglePlayerScreen(w fyne.Window, initial *SinglePlayerScre
 							return
 						}
 
+						c.StopBackend()
+
 						if err := c.StopConsole(); err != nil {
 							dialog.ShowError(err, w)
 							return
 						}
-						c.StopBackend()
 
 						log.Println("Start")
 						w.SetContent(c.StartScreen(w, startOptionPlay))

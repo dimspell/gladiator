@@ -92,7 +92,7 @@ func ServeCommand() *cli.Command {
 			return startConsole(groupContext)
 		})
 		group.Go(func() error {
-			if err := bd.Start(groupContext); err != nil {
+			if err := bd.Start(); err != nil {
 				return err
 			}
 			bd.Listen()

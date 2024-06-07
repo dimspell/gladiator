@@ -1,10 +1,10 @@
-package console
+package probe
 
 import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"sync/atomic"
+	"sync"
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
@@ -16,12 +16,14 @@ const (
 	StatusFailingToStart
 	StatusRunning
 	StatusClosing
+	StatusFailed
 )
 
 type Probe struct {
-	Health       atomic.Int32
+	Health       int32
 	SignalChange chan int32
 
+	mtx    sync.Mutex
 	cancel chan struct{}
 }
 
@@ -31,16 +33,32 @@ func NewProbe() *Probe {
 	}
 }
 
+func (p *Probe) Get() (int32, bool) {
+	if p == nil {
+		return StatusNotRunning, false
+	}
+	v := p.Health
+	return v, v == StatusRunning
+}
+
 func (p *Probe) Signal(signalCode int32) {
-	p.Health.Store(signalCode)
+	if p == nil {
+		return
+	}
+	if v := p.Health; v == signalCode {
+		return
+	}
+	p.Health = signalCode
 	p.SignalChange <- signalCode
 }
 
 func (p *Probe) StartupProbe(operation func() error) {
+	// TODO: replace it with the context
 	p.cancel = make(chan struct{})
-	p.Signal(StatusStarting)
 
 	go func() {
+		defer close(p.cancel)
+
 		// Run the startup probe
 		time.Sleep(200 * time.Millisecond)
 		if err := retryUntil(operation, 10*time.Second); err != nil {
@@ -58,6 +76,7 @@ func (p *Probe) StartupProbe(operation func() error) {
 				return
 			case <-ticker.C:
 				if err := operation(); err != nil {
+					slog.Error("error", "err", err)
 					p.Signal(StatusNotRunning)
 					return
 				}
@@ -67,22 +86,12 @@ func (p *Probe) StartupProbe(operation func() error) {
 	}()
 }
 
-func (p *Probe) Stop() {
+func (p *Probe) StopStartupProbe() {
+	if p.cancel == nil {
+		return
+	}
 	p.cancel <- struct{}{}
-	close(p.cancel)
-}
-
-func (p *Probe) OnChange(handle func(code int32, isRunning bool), closer <-chan struct{}) {
-	go func() {
-		for {
-			select {
-			case code := <-p.SignalChange:
-				handle(code, code == StatusRunning)
-			case <-closer:
-				return
-			}
-		}
-	}()
+	// close(p.cancel)
 }
 
 func retryUntil(operation func() error, maxElapsedTime time.Duration) error {
@@ -100,7 +109,7 @@ func retryUntil(operation func() error, maxElapsedTime time.Duration) error {
 	)
 }
 
-func HealthCheckProbe(httpURL string) func() error {
+func HttpGet(httpURL string) func() error {
 	httpClient := &http.Client{Timeout: 3 * time.Second}
 
 	return func() error {

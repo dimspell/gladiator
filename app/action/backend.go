@@ -37,7 +37,7 @@ func BackendCommand() *cli.Command {
 
 		bd := backend.NewBackend(backendAddr, consoleAddr, myIpAddr)
 
-		if err := bd.Start(ctx); err != nil {
+		if err := bd.Start(); err != nil {
 			return err
 		}
 		defer bd.Shutdown()

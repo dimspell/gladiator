@@ -10,7 +10,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	atomic "sync/atomic"
 	"time"
 
 	"connectrpc.com/connect"
@@ -25,8 +24,6 @@ import (
 type Backend struct {
 	Addr        string
 	MyIPAddress string
-
-	Status *atomic.Int32
 
 	Sessions       map[string]*model.Session
 	PacketLogger   *slog.Logger
@@ -69,7 +66,6 @@ func NewBackend(backendAddr, consoleAddr, myIPAddress string) *Backend {
 		MyIPAddress:  myIPAddress,
 		Sessions:     make(map[string]*model.Session),
 		PacketLogger: slog.New(packetlogger.New(os.Stderr, &packetlogger.Options{Level: slog.LevelDebug})),
-		Status:       new(atomic.Int32),
 
 		Proxy: proxy.NewLAN(),
 
@@ -80,20 +76,7 @@ func NewBackend(backendAddr, consoleAddr, myIPAddress string) *Backend {
 	}
 }
 
-const (
-	StatusNotRunning int32 = iota
-	StatusRunning
-	StatusClosing
-)
-
-func (b *Backend) Signal(signalCode int32) { b.Status.Store(signalCode) }
-
-func (b *Backend) Start(ctx context.Context) error {
-	status := b.Status.Load()
-	if status != StatusNotRunning {
-		return errors.New("backend already running")
-	}
-
+func (b *Backend) Start() error {
 	slog.Info("Starting backend")
 
 	// Listen for incoming connections.
@@ -104,22 +87,12 @@ func (b *Backend) Start(ctx context.Context) error {
 	}
 	b.listener = listener
 
-	go func() {
-		<-ctx.Done()
-		b.Shutdown()
-	}()
-
-	// go b.ClientProxy.Start(ctx)
-
-	b.Signal(StatusRunning)
+	slog.Info("Backend listening", "addr", b.listener.Addr())
 	return nil
 }
 
 func (b *Backend) Shutdown() {
 	slog.Info("Shutting down the backend...")
-	b.Signal(StatusClosing)
-
-	// b.ClientProxy = nil
 
 	// Close all open connections
 	for _, session := range b.Sessions {
@@ -139,7 +112,6 @@ func (b *Backend) Shutdown() {
 	// TODO: Send a packet to trigger stats saving
 	// TODO: Send a system message "(system): Your stats were saving, your game client might close in the next 10 seconds"
 	// TODO: Send a packet to close the connection (malformed 255-21?)
-	b.Signal(StatusNotRunning)
 	slog.Info("The backend is successfully shut down")
 }
 
@@ -165,7 +137,6 @@ func (b *Backend) Listen() {
 		)
 
 		// Handle connections in a new goroutine.
-		// go handleRequest(connPort, conn)
 		go func() {
 			if err := b.handleClient(conn); err != nil {
 				slog.Warn("Communication with client has failed",
@@ -265,7 +236,7 @@ func (b *Backend) CloseSession(session *model.Session) error {
 		_ = session.Conn.Close()
 	}
 
-	b.EventChan <- EventCloseConn
+	// b.EventChan <- EventCloseConn
 	session = nil
 	return nil
 }

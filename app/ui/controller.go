@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/data/binding"
+	"github.com/dispel-re/dispel-multi/app/ui/probe"
 	"github.com/dispel-re/dispel-multi/backend"
 	"github.com/dispel-re/dispel-multi/console"
 	"github.com/dispel-re/dispel-multi/console/database"
@@ -22,8 +24,11 @@ type Controller struct {
 	consoleStop console.GracefulFunc
 
 	app          fyne.App
-	consoleProbe *console.Probe
-	backendProbe chan bool
+	consoleProbe *probe.Probe
+	backendProbe *probe.Probe
+
+	backendRunning binding.Bool
+	consoleRunning binding.Bool
 }
 
 func NewController(fyneApp fyne.App) *Controller {
@@ -31,9 +36,11 @@ func NewController(fyneApp fyne.App) *Controller {
 		// TODO: Define the IP address used for proxy
 		myIPAddress: "127.0.0.1",
 
-		app:          fyneApp,
-		consoleProbe: console.NewProbe(),
-		backendProbe: make(chan bool),
+		app:            fyneApp,
+		consoleProbe:   probe.NewProbe(),
+		backendProbe:   probe.NewProbe(),
+		backendRunning: binding.NewBool(),
+		consoleRunning: binding.NewBool(),
 	}
 }
 
@@ -78,23 +85,42 @@ func (c *Controller) StartConsole(databaseType, databasePath, consoleAddr string
 	// 	return err
 	// }
 
+	ctx, cancel := context.WithCancel(context.Background())
+
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				continue
+			case code := <-c.consoleProbe.SignalChange:
+				if code == probe.StatusRunning {
+					_ = c.consoleRunning.Set(true)
+				} else {
+					_ = c.consoleRunning.Set(false)
+				}
+			}
+		}
+	}()
+
 	c.Console = console.NewConsole(db, queries, consoleAddr)
 	start, stop := c.Console.Handlers()
 	c.consoleStop = func(ctx context.Context) error {
 		if c.Console == nil {
 			return nil
 		}
-		c.consoleProbe.Stop()
+		c.consoleProbe.StopStartupProbe()
 		err := stop(ctx)
 		c.Console = nil
+		cancel()
 		return err
 	}
 
-	c.consoleProbe.StartupProbe(console.HealthCheckProbe(
+	c.consoleProbe.StartupProbe(probe.HttpGet(
 		fmt.Sprintf("http://%s/_health", consoleAddr),
 	))
 	go func() {
-		if err := start(context.TODO()); err != nil {
+		if err := start(ctx); err != nil {
+			cancel()
 			return
 		}
 	}()
@@ -141,44 +167,56 @@ func (c *Controller) ConsoleHandshake(consoleAddr string) error {
 
 func (c *Controller) StartBackend(consoleAddr string) error {
 	if c.Backend != nil {
-		c.Backend.Shutdown()
-		c.Backend = nil
-	}
-	c.Backend = backend.NewBackend("127.0.0.1:6112", consoleAddr, c.myIPAddress)
-	if err := c.Backend.Start(context.TODO()); err != nil {
-		return err
+		slog.Warn("Backend is already running")
+		return nil
 	}
 
-	// Healthcheck
+	ctx, cancel := context.WithCancel(context.Background())
+
 	go func() {
 		for {
-			if c.Backend == nil {
-				c.backendProbe <- false
-				return
-			}
 			select {
-			case probe := <-c.backendProbe:
-				if probe {
-
+			case <-ctx.Done():
+				continue
+			case code := <-c.backendProbe.SignalChange:
+				if code == probe.StatusRunning {
+					_ = c.backendRunning.Set(true)
+				} else {
+					_ = c.backendRunning.Set(false)
 				}
-				break
 			}
 		}
 	}()
 
+	c.Backend = backend.NewBackend("127.0.0.1:6112", consoleAddr, c.myIPAddress)
+	if err := c.Backend.Start(); err != nil {
+		cancel()
+		return err
+	}
+
+	// Healthcheck
+	c.backendProbe.Signal(probe.StatusRunning)
+
 	// Start listening
-	go c.Backend.Listen()
+	go func() {
+		c.Backend.Listen()
+		c.backendProbe.Signal(probe.StatusNotRunning)
+		cancel()
+	}()
 
 	return nil
 }
 
 func (c *Controller) StopBackend() {
 	slog.Info("Going to stop the backend server")
-
 	if c.Backend == nil {
 		slog.Warn("Backend has been already shut down")
 		return
 	}
+	c.backendProbe.Signal(probe.StatusClosing)
+
 	c.Backend.Shutdown()
 	c.Backend = nil
+
+	c.backendProbe.Signal(probe.StatusNotRunning)
 }
