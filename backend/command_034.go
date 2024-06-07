@@ -23,7 +23,7 @@ func (b *Backend) HandleJoinGame(session *model.Session, req JoinGameRequest) er
 		return err
 	}
 
-	respGame, err := b.GameClient.GetGame(context.TODO(), connect.NewRequest(&multiv1.GetGameRequest{
+	respGame, err := b.gameClient.GetGame(context.TODO(), connect.NewRequest(&multiv1.GetGameRequest{
 		UserId:   session.UserID,
 		GameName: data.RoomName,
 	}))
@@ -31,7 +31,7 @@ func (b *Backend) HandleJoinGame(session *model.Session, req JoinGameRequest) er
 		return err
 	}
 
-	respPlayers, err := b.GameClient.ListPlayers(context.TODO(), connect.NewRequest(&multiv1.ListPlayersRequest{
+	respPlayers, err := b.gameClient.ListPlayers(context.TODO(), connect.NewRequest(&multiv1.ListPlayersRequest{
 		GameRoomId: respGame.Msg.Game.GameId,
 	}))
 	if err != nil {

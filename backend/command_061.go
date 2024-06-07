@@ -20,7 +20,7 @@ func (b *Backend) HandleDeleteCharacter(session *model.Session, req DeleteCharac
 		return err
 	}
 
-	if _, err := b.CharacterClient.DeleteCharacter(context.TODO(),
+	if _, err := b.characterClient.DeleteCharacter(context.TODO(),
 		connect.NewRequest(&multiv1.DeleteCharacterRequest{
 			UserId:        session.UserID,
 			CharacterName: data.CharacterName,

@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"context"
 	"fmt"
 	"log"
 
@@ -60,11 +61,19 @@ func (c *Controller) AdminScreen(w fyne.Window) fyne.CanvasObject {
 	headerText := "## Admin Panel"
 	header := widget.NewRichTextFromMarkdown(headerText)
 
-	stopCallback := func(b bool) {
-		if b {
-			log.Println("Welcome")
-			w.SetContent(c.WelcomeScreen(w))
+	stopCallback := func(stop bool) {
+		if !stop {
+			return
 		}
+
+		if c.Console != nil {
+			if err := c.Console.Stop(context.TODO()); err != nil {
+				dialog.ShowError(err, w)
+			}
+		}
+
+		log.Println("Welcome")
+		w.SetContent(c.WelcomeScreen(w))
 	}
 
 	return container.NewStack(

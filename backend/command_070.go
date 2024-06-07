@@ -22,7 +22,7 @@ func (b *Backend) HandleShowRanking(session *model.Session, req RankingRequest) 
 		return err
 	}
 
-	respRanking, err := b.RankingClient.GetRanking(context.TODO(),
+	respRanking, err := b.rankingClient.GetRanking(context.TODO(),
 		connect.NewRequest(&multiv1.GetRankingRequest{
 			UserId:        session.UserID,
 			CharacterName: data.CharacterName,

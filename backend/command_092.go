@@ -22,7 +22,7 @@ func (b *Backend) HandleCreateCharacter(session *model.Session, req CreateCharac
 		return err
 	}
 
-	respChar, err := b.CharacterClient.CreateCharacter(context.TODO(),
+	respChar, err := b.characterClient.CreateCharacter(context.TODO(),
 		connect.NewRequest(&multiv1.CreateCharacterRequest{
 			UserId:        session.UserID,
 			CharacterName: data.CharacterName,

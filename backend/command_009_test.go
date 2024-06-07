@@ -26,7 +26,7 @@ func TestListGamesRequest(t *testing.T) {
 
 func TestBackend_HandleListGames(t *testing.T) {
 	t.Run("no games", func(t *testing.T) {
-		b := &Backend{GameClient: &mockGameClient{
+		b := &Backend{gameClient: &mockGameClient{
 			ListGamesResponse: connect.NewResponse(&v1.ListGamesResponse{Games: []*v1.Game{}}),
 		}}
 		conn := &mockConn{}
@@ -41,7 +41,7 @@ func TestBackend_HandleListGames(t *testing.T) {
 	t.Run("with games", func(t *testing.T) {
 		b := &Backend{
 			Proxy: proxy.NewLAN(),
-			GameClient: &mockGameClient{
+			gameClient: &mockGameClient{
 				ListGamesResponse: connect.NewResponse(&v1.ListGamesResponse{Games: []*v1.Game{
 					{
 						GameId:        1,

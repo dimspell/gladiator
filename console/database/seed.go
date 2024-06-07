@@ -241,29 +241,5 @@ func Seed(queries *Queries) error {
 		IpAddress:   "192.168.121.212",
 	})
 
-	// respGame, err := b.GameClient.CreateGame(context.TODO(), connect.NewRequest(&multiv1.CreateGameRequest{
-	// 	UserId:        session.UserID,
-	// 	GameName:      data.RoomName,
-	// 	Password:      data.Password,
-	// 	HostIpAddress: hostIPAddress,
-	// 	MapId:         int64(data.MapID),
-	// }))
-	// if err != nil {
-	// 	return err
-	// }
-	// slog.Info("packet-28: created game room",
-	// 	"id", respGame.Msg.Game.GameId,
-	// 	"name", respGame.Msg.Game.Name)
-
-	// _, err = b.GameClient.JoinGame(context.TODO(), connect.NewRequest(&multiv1.JoinGameRequest{
-	// 	UserId:      session.UserID,
-	// 	CharacterId: session.CharacterID,
-	// 	GameRoomId:  respGame.Msg.Game.GetGameId(),
-	// 	IpAddress:   hostIPAddress,
-	// }))
-	// if err != nil {
-	// 	return err
-	// }
-
 	return nil
 }

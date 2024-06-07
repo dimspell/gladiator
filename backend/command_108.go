@@ -25,7 +25,7 @@ func (b *Backend) HandleUpdateCharacterStats(session *model.Session, req UpdateC
 		return fmt.Errorf("packet-108: could not parse request: %w", err)
 	}
 
-	_, err = b.CharacterClient.PutStats(context.TODO(),
+	_, err = b.characterClient.PutStats(context.TODO(),
 		connect.NewRequest(&multiv1.PutStatsRequest{
 			UserId:        session.UserID,
 			CharacterName: data.Character,

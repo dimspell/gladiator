@@ -14,10 +14,16 @@ import (
 type Controller struct {
 	Console *console.Console
 	Backend *backend.Backend
+
+	consoleProbe chan bool
+	backendProbe chan bool
 }
 
 func NewController(storage fyne.Storage) *Controller {
-	return &Controller{}
+	return &Controller{
+		consoleProbe: make(chan bool),
+		backendProbe: make(chan bool),
+	}
 }
 
 func (c *Controller) ConsoleHandshake(consoleAddr string) error {
@@ -51,6 +57,18 @@ func (c *Controller) StartBackend(consoleAddr string) error {
 		return err
 	}
 	go c.Backend.Listen()
+
+	go func() {
+		// Delay
+		ticker := time.NewTicker(time.Second * 2)
+
+		for {
+			select {
+			case <-ticker.C:
+				// c.Backend.Status
+			}
+		}
+	}()
 	return nil
 }
 

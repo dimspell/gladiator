@@ -16,7 +16,7 @@ func (b *Backend) HandleGetCharacters(session *model.Session, req GetCharactersR
 		return fmt.Errorf("packet-60: user is not logged in")
 	}
 
-	resp, err := b.CharacterClient.ListCharacters(context.TODO(),
+	resp, err := b.characterClient.ListCharacters(context.TODO(),
 		connect.NewRequest(&multiv1.ListCharactersRequest{
 			UserId: session.UserID,
 		}))

@@ -23,7 +23,7 @@ func (b *Backend) HandleGetCharacterInventory(session *model.Session, req GetCha
 		return err
 	}
 
-	resp, err := b.CharacterClient.GetCharacter(context.TODO(),
+	resp, err := b.characterClient.GetCharacter(context.TODO(),
 		connect.NewRequest(&multiv1.GetCharacterRequest{
 			UserId:        session.UserID,
 			CharacterName: data.CharacterName,

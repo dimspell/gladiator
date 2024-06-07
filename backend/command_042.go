@@ -18,7 +18,7 @@ func (b *Backend) HandleCreateNewAccount(session *model.Session, req CreateNewAc
 		return err
 	}
 
-	respUser, err := b.UserClient.CreateUser(context.TODO(), connect.NewRequest(&multiv1.CreateUserRequest{
+	respUser, err := b.userClient.CreateUser(context.TODO(), connect.NewRequest(&multiv1.CreateUserRequest{
 		Username: data.Username,
 		Password: data.Password,
 	}))

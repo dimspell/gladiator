@@ -17,7 +17,7 @@ func (b *Backend) HandleListGames(session *model.Session, req ListGamesRequest) 
 		return fmt.Errorf("packet-09: user is not logged in")
 	}
 
-	resp, err := b.GameClient.ListGames(context.TODO(), connect.NewRequest(&multiv1.ListGamesRequest{}))
+	resp, err := b.gameClient.ListGames(context.TODO(), connect.NewRequest(&multiv1.ListGamesRequest{}))
 	if err != nil {
 		slog.Error("packet-09: could not list game rooms")
 		return nil

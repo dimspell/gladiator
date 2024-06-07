@@ -27,7 +27,7 @@ func TestGetCharactersRequest(t *testing.T) {
 }
 
 func TestBackend_HandleGetCharacters(t *testing.T) {
-	b := &Backend{CharacterClient: &mockCharacterClient{
+	b := &Backend{characterClient: &mockCharacterClient{
 		ListCharactersResponse: connect.NewResponse(&v1.ListCharactersResponse{
 			Characters: []*v1.Character{
 				{

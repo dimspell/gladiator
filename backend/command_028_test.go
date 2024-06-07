@@ -37,7 +37,7 @@ func TestCreateGameRequest(t *testing.T) {
 func TestBackend_HandleCreateGame(t *testing.T) {
 	b := &Backend{
 		Proxy: proxy.NewLAN(),
-		GameClient: &mockGameClient{
+		gameClient: &mockGameClient{
 			CreateGameResponse: connect.NewResponse(&v1.CreateGameResponse{
 				Game: &v1.Game{
 					GameId:        1,

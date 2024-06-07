@@ -21,7 +21,7 @@ func (b *Backend) HandleUpdateCharacterSpells(session *model.Session, req Update
 		return err
 	}
 
-	_, err = b.CharacterClient.PutSpells(context.TODO(),
+	_, err = b.characterClient.PutSpells(context.TODO(),
 		connect.NewRequest(&multiv1.PutSpellsRequest{
 			UserId:        session.UserID,
 			CharacterName: data.CharacterName,

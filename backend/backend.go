@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math"
 	"net"
 	"net/http"
 	"os"
+	atomic "sync/atomic"
 	"time"
 
 	"connectrpc.com/connect"
@@ -17,31 +19,25 @@ import (
 	"github.com/dispel-re/dispel-multi/backend/proxy"
 	"github.com/dispel-re/dispel-multi/gen/multi/v1/multiv1connect"
 	"github.com/dispel-re/dispel-multi/model"
+	"github.com/google/uuid"
 )
 
-const DesktopIP byte = 212
-const LaptopIP byte = 169
-
-const GameRoomName = "room"
-
-// const ClientIP byte = DesktopIP
-// const HostIP byte = LaptopIP
-
 type Backend struct {
-	Addr string
+	Addr   string
+	Status *atomic.Int32
 
 	Sessions       map[string]*model.Session
 	PacketLogger   *slog.Logger
-	SessionCounter int
+	SessionCounter uint64
 
 	Proxy     proxy.Proxy
 	EventChan chan uint8
-	Listener  net.Listener
+	listener  net.Listener
 
-	CharacterClient multiv1connect.CharacterServiceClient
-	GameClient      multiv1connect.GameServiceClient
-	UserClient      multiv1connect.UserServiceClient
-	RankingClient   multiv1connect.RankingServiceClient
+	characterClient multiv1connect.CharacterServiceClient
+	gameClient      multiv1connect.GameServiceClient
+	userClient      multiv1connect.UserServiceClient
+	rankingClient   multiv1connect.RankingServiceClient
 }
 
 func NewBackend(backendAddr, consoleAddr string) *Backend {
@@ -59,23 +55,38 @@ func NewBackend(backendAddr, consoleAddr string) *Backend {
 	}
 
 	interceptor := connect.WithInterceptors(otelconnect.NewInterceptor())
-	consoleUri := fmt.Sprintf("http://%s/grpc", consoleAddr)
+	// TODO: Name the schema as parameter
+	consoleUri := fmt.Sprintf("%s://%s/grpc", "http", consoleAddr)
 
 	return &Backend{
 		Addr:         backendAddr,
 		Sessions:     make(map[string]*model.Session),
 		PacketLogger: slog.New(packetlogger.New(os.Stderr, &packetlogger.Options{Level: slog.LevelDebug})),
+		Status:       new(atomic.Int32),
 
 		Proxy: proxy.NewLAN(),
 
-		CharacterClient: multiv1connect.NewCharacterServiceClient(httpClient, consoleUri, interceptor),
-		GameClient:      multiv1connect.NewGameServiceClient(httpClient, consoleUri, interceptor),
-		UserClient:      multiv1connect.NewUserServiceClient(httpClient, consoleUri, interceptor),
-		RankingClient:   multiv1connect.NewRankingServiceClient(httpClient, consoleUri, interceptor),
+		characterClient: multiv1connect.NewCharacterServiceClient(httpClient, consoleUri, interceptor),
+		gameClient:      multiv1connect.NewGameServiceClient(httpClient, consoleUri, interceptor),
+		userClient:      multiv1connect.NewUserServiceClient(httpClient, consoleUri, interceptor),
+		rankingClient:   multiv1connect.NewRankingServiceClient(httpClient, consoleUri, interceptor),
 	}
 }
 
+const (
+	StatusNotRunning int32 = iota
+	StatusRunning
+	StatusClosing
+)
+
+func (b *Backend) Signal(signalCode int32) { b.Status.Store(signalCode) }
+
 func (b *Backend) Start(ctx context.Context) error {
+	status := b.Status.Load()
+	if status != StatusNotRunning {
+		return errors.New("backend already running")
+	}
+
 	slog.Info("Starting backend")
 
 	// Listen for incoming connections.
@@ -84,9 +95,7 @@ func (b *Backend) Start(ctx context.Context) error {
 		slog.Error("Could not start listening on port 6112", "err", err)
 		return err
 	}
-	b.Listener = listener
-
-	slog.Info("Listening for new connections...")
+	b.listener = listener
 
 	go func() {
 		<-ctx.Done()
@@ -94,39 +103,46 @@ func (b *Backend) Start(ctx context.Context) error {
 	}()
 
 	// go b.ClientProxy.Start(ctx)
+
+	b.Signal(StatusRunning)
 	return nil
 }
 
 func (b *Backend) Shutdown() {
-	// if b.Queue != nil {
-	// 	b.Queue.Drain()
-	// }
+	b.Signal(StatusClosing)
 
 	// b.ClientProxy = nil
 
 	// Close all open connections
 	for _, session := range b.Sessions {
-		session.Conn.Close()
+		if err := session.Conn.Close(); err != nil {
+			slog.Error("Could not close session", "err", err, "session", session.ID)
+		}
 	}
 
-	if b.Listener != nil {
-		b.Listener.Close()
-		b.Listener = nil
+	if b.listener != nil {
+		if err := b.listener.Close(); err != nil {
+			slog.Warn("Could not close listener", "err", err)
+		}
+		b.listener = nil
 	}
 
 	// TODO: Send a system message "(system) The server is going to close in less than 30 seconds"
 	// TODO: Send a packet to trigger stats saving
 	// TODO: Send a system message "(system): Your stats were saving, your game client might close in the next 10 seconds"
 	// TODO: Send a packet to close the connection (malformed 255-21?)
+	b.Signal(StatusNotRunning)
 }
 
 func (b *Backend) Listen() {
+	slog.Info("Backend is listening for new connections...", "addr", b.Addr)
+
 	for {
-		if b.Listener == nil {
+		if b.listener == nil {
 			return
 		}
 		// Listen for an incoming connection.
-		conn, err := b.Listener.Accept()
+		conn, err := b.listener.Accept()
 		if err != nil {
 			if errors.Is(err, net.ErrClosed) {
 				return
@@ -171,9 +187,11 @@ func (b *Backend) handleClient(conn net.Conn) error {
 }
 
 func (b *Backend) NewSession(conn net.Conn) *model.Session {
-	// id := uuid.New().String()
+	if b.SessionCounter == math.MaxUint64 {
+		b.SessionCounter = 0
+	}
 	b.SessionCounter++
-	id := fmt.Sprintf("%d", b.SessionCounter)
+	id := fmt.Sprintf("%s-%d", uuid.New().String(), b.SessionCounter)
 	slog.Debug("New session", "session", id)
 
 	session := &model.Session{Conn: conn, ID: id, LocalIpAddress: string("127.0.0.1")}

@@ -32,7 +32,7 @@ func (b *Backend) HandleCreateGame(session *model.Session, req CreateGameRequest
 
 	switch data.State {
 	case uint32(0):
-		respGame, err := b.GameClient.CreateGame(context.TODO(), connect.NewRequest(&multiv1.CreateGameRequest{
+		respGame, err := b.gameClient.CreateGame(context.TODO(), connect.NewRequest(&multiv1.CreateGameRequest{
 			UserId:   session.UserID,
 			GameName: data.RoomName,
 			// Password:      data.Password,
@@ -47,7 +47,7 @@ func (b *Backend) HandleCreateGame(session *model.Session, req CreateGameRequest
 			"id", respGame.Msg.Game.GameId,
 			"name", respGame.Msg.Game.Name)
 
-		_, err = b.GameClient.JoinGame(context.TODO(), connect.NewRequest(&multiv1.JoinGameRequest{
+		_, err = b.gameClient.JoinGame(context.TODO(), connect.NewRequest(&multiv1.JoinGameRequest{
 			UserId:      session.UserID,
 			CharacterId: session.CharacterID,
 			GameRoomId:  respGame.Msg.Game.GetGameId(),

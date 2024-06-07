@@ -19,7 +19,7 @@ func (b *Backend) HandleUpdateCharacterInventory(session *model.Session, req Upd
 		return err
 	}
 
-	_, err = b.CharacterClient.PutInventoryCharacter(context.TODO(),
+	_, err = b.characterClient.PutInventoryCharacter(context.TODO(),
 		connect.NewRequest(&multiv1.PutInventoryRequest{
 			UserId:        session.UserID,
 			CharacterName: data.CharacterName,

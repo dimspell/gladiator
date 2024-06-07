@@ -33,6 +33,7 @@ type Console struct {
 	Addr string
 	DB   *database.Queries
 
+	closeFunc     func(ctx context.Context) error
 	StartupChan   chan bool
 	ReadinessChan chan bool
 	LivenessChan  chan bool
@@ -169,12 +170,20 @@ func (c *Console) Serve(ctx context.Context) error {
 		return httpServer.ListenAndServe()
 	}
 
-	// stop := func(ctx context.Context) error {
-	// 	return httpServer.Shutdown(ctx)
-	// }
+	stop := func(ctx context.Context) error {
+		return httpServer.Shutdown(ctx)
+	}
+	c.closeFunc = stop
 
 	// return c.graceful(ctx, start, stop)
 	return start(ctx)
+}
+
+func (c *Console) Stop(ctx context.Context) error {
+	if c.closeFunc != nil {
+		return c.closeFunc(ctx)
+	}
+	return nil
 }
 
 type gracefulFunc func(context.Context) error
@@ -194,7 +203,7 @@ func (c *Console) graceful(ctx context.Context, start gracefulFunc, shutdown gra
 		case <-ctx.Done():
 		}
 
-		timer, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		timer, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
 		if err := shutdown(timer); err != nil {

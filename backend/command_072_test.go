@@ -38,7 +38,7 @@ func TestBackend_HandleGetCharacterSpells(t *testing.T) {
 	spellsResponse := make([]byte, 43)
 	copy(spellsResponse[:], spells[:])
 
-	b := &Backend{CharacterClient: &mockCharacterClient{
+	b := &Backend{characterClient: &mockCharacterClient{
 		GetCharacterResponse: connect.NewResponse(&v1.GetCharacterResponse{
 			Character: &v1.Character{
 				UserId:        1,

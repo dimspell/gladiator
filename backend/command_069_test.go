@@ -13,7 +13,7 @@ import (
 func TestBackend_HandleSelectGame(t *testing.T) {
 	b := &Backend{
 		Proxy: proxy.NewLAN(),
-		GameClient: &mockGameClient{
+		gameClient: &mockGameClient{
 			GetGameResponse: connect.NewResponse(&v1.GetGameResponse{
 				Game: &v1.Game{
 					GameId:        100,
