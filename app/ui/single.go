@@ -70,9 +70,18 @@ func (c *Controller) SinglePlayerScreen(w fyne.Window, initial *SinglePlayerScre
 		),
 	)
 
-	consoleRunning := binding.NewBool()
-	c.consoleProbe.OnChange(func(code int32, isRunning bool) { _ = consoleRunning.Set(isRunning) }, closer)
-	consoleRunningCheck := widget.NewCheckWithData("Console running?", consoleRunning)
+	consoleRunningLabel := binding.NewString()
+	consoleRunningLabel.Set("Console: Not Running")
+	c.consoleProbe.OnChange(func(code int32, isRunning bool) {
+		if isRunning {
+			consoleRunningLabel.Set("Console: Running")
+		} else {
+			consoleRunningLabel.Set("Console: Not Running")
+		}
+	}, closer)
+	consoleRunningCheck := widget.NewLabelWithData(consoleRunningLabel)
+	consoleRunningCheck.TextStyle = fyne.TextStyle{Bold: true}
+	consoleRunningCheck.Alignment = fyne.TextAlignCenter
 
 	consoleStart := widget.NewButtonWithIcon("Start console", theme.MediaPlayIcon(), func() {
 		dispelDir, err := defaultDirectory()
