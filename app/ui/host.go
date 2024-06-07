@@ -179,7 +179,7 @@ func (c *Controller) HostScreen(w fyne.Window) fyne.CanvasObject {
 			container.NewPadded(
 				headerContainer(headerText, func() {
 					log.Println("Start")
-					w.SetContent(c.StartScreen(w))
+					w.SetContent(c.StartScreen(w, startOptionHost))
 				})),
 			nil,
 			nil,

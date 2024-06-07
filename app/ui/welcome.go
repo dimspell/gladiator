@@ -70,7 +70,7 @@ func (c *Controller) WelcomeScreen(w fyne.Window) fyne.CanvasObject {
 					layout.NewSpacer(),
 					widget.NewButtonWithIcon("Start", theme.NavigateNextIcon(), func() {
 						log.Println("Start")
-						w.SetContent(c.StartScreen(w))
+						w.SetContent(c.StartScreen(w, startOptionNone))
 					}),
 					layout.NewSpacer()),
 			),

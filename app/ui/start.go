@@ -1,7 +1,9 @@
 package ui
 
 import (
+	"fmt"
 	"log"
+	"log/slog"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
@@ -9,17 +11,30 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-func (c *Controller) StartScreen(w fyne.Window) fyne.CanvasObject {
+type startOption string
+
+const (
+	startOptionNone startOption = ""
+	startOptionJoin startOption = "1_join"
+	startOptionHost startOption = "2_host"
+	startOptionPlay startOption = "3_play"
+)
+
+func (c *Controller) StartScreen(w fyne.Window, selectedOption startOption) fyne.CanvasObject {
 	const headerText = "Start"
 
-	radioOptions := map[string]string{
-		"join": "Join - I want to join an already existing server.",
-		"host": "Host - I would like to host my own server over LAN.",
+	radioOptions := map[startOption]string{
+		startOptionJoin: "Join - I would like to join an existing server.",
+		startOptionHost: "Host - I would like to host my own server via a LAN or WAN.",
+		startOptionPlay: "Play alone - I want to play in single player mode.",
 	}
 	radioGroup := widget.NewRadioGroup(Values(radioOptions), func(value string) {
-		log.Println("Radio set to", value)
+		slog.Debug(fmt.Sprintf("Radio set to %s", value), "page", "start")
 	})
 	radioGroup.Required = true
+	if selectedOption != startOptionNone {
+		radioGroup.Selected = radioOptions[selectedOption]
+	}
 
 	return container.NewBorder(
 		container.NewPadded(
@@ -42,12 +57,16 @@ func (c *Controller) StartScreen(w fyne.Window) fyne.CanvasObject {
 				container.NewCenter(
 					widget.NewButtonWithIcon("Next", theme.NavigateNextIcon(), func() {
 						log.Println(radioGroup.Selected)
-						if radioGroup.Selected == radioOptions["join"] {
+						if radioGroup.Selected == radioOptions[startOptionJoin] {
 							w.SetContent(c.JoinOptionsScreen(w))
 							return
 						}
-						if radioGroup.Selected == radioOptions["host"] {
+						if radioGroup.Selected == radioOptions[startOptionHost] {
 							w.SetContent(c.HostScreen(w))
+							return
+						}
+						if radioGroup.Selected == radioOptions[startOptionPlay] {
+							w.SetContent(c.SinglePlayerScreen(w))
 							return
 						}
 					}),
