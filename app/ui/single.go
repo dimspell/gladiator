@@ -156,8 +156,23 @@ func (c *Controller) SinglePlayerScreen(w fyne.Window, initial *SinglePlayerScre
 				closer <- struct{}{}
 				close(closer)
 
-				log.Println("Start")
-				w.SetContent(c.StartScreen(w, startOptionPlay))
+				// TODO: It should be asked only whether the servers are running
+				dialog.ShowConfirm("Are you sure?",
+					"This action will close all servers if you have any started?",
+					func(b bool) {
+						if !b {
+							return
+						}
+
+						if err := c.StopConsole(); err != nil {
+							dialog.ShowError(err, w)
+							return
+						}
+						c.StopBackend()
+
+						log.Println("Start")
+						w.SetContent(c.StartScreen(w, startOptionPlay))
+					}, w)
 			}),
 		),
 		nil,
