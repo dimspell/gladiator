@@ -1,7 +1,6 @@
 package backend
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 
@@ -43,13 +42,17 @@ type DeleteCharacterRequestData struct {
 }
 
 func (r DeleteCharacterRequest) Parse() (data DeleteCharacterRequestData, err error) {
-	if bytes.Count(r, []byte{0}) < 2 {
-		return data, fmt.Errorf("packet-61: malformed packet, not enough null-terminators")
+	rd := NewPacketReader(r)
+
+	data.Username, err = rd.ReadString()
+	if err != nil {
+		return data, fmt.Errorf("packet-61: malformed username: %w", err)
+	}
+	data.CharacterName, err = rd.ReadString()
+	if err != nil {
+		return data, fmt.Errorf("packet-61: malformed character name: %w", err)
 	}
 
-	split := bytes.SplitN(r, []byte{0}, 3)
-	data.Username = string(split[0])
-	data.CharacterName = string(split[1])
-
+	rd = nil
 	return data, nil
 }

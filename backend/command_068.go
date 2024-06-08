@@ -56,13 +56,13 @@ func (r GetCharacterInventoryRequest) Parse() (data GetCharacterInventoryRequest
 	rd := NewPacketReader(r)
 	data.Username, err = rd.ReadString()
 	if err != nil {
-		return data, fmt.Errorf("packet-68: malformed packet: %w", err)
+		return data, fmt.Errorf("packet-68: malformed username: %w", err)
 	}
 	data.CharacterName, err = rd.ReadString()
 	if err != nil {
-		return data, fmt.Errorf("packet-68: malformed packet: %w", err)
+		return data, fmt.Errorf("packet-68: malformed character name: %w", err)
 	}
 	data.Unknown, _ = rd.RestBytes()
-
+	rd = nil
 	return data, nil
 }
