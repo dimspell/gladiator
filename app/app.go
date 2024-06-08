@@ -74,7 +74,7 @@ func NewApp(version, commit, buildDate string) {
 		action.ServeCommand(),
 		action.ProxyCommand(),
 	)
-	if guiCmd := action.GUICommand(); guiCmd != nil {
+	if guiCmd := action.GUICommand(app.Version); guiCmd != nil {
 		app.Commands = append(app.Commands, guiCmd)
 		app.Action = guiCmd.Action
 	}

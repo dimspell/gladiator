@@ -26,6 +26,7 @@ type Controller struct {
 	consoleStop console.GracefulFunc
 
 	app          fyne.App
+	version      string
 	consoleProbe *probe.Probe
 	backendProbe *probe.Probe
 
@@ -33,12 +34,14 @@ type Controller struct {
 	consoleRunning binding.Bool
 }
 
-func NewController(fyneApp fyne.App) *Controller {
+func NewController(fyneApp fyne.App, version string) *Controller {
 	return &Controller{
 		// TODO: Define the IP address used for proxy
 		myIPAddress: "127.0.0.1",
 
-		app:            fyneApp,
+		app:     fyneApp,
+		version: version,
+
 		consoleProbe:   probe.NewProbe(),
 		backendProbe:   probe.NewProbe(),
 		backendRunning: binding.NewBool(),

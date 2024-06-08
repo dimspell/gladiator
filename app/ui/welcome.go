@@ -30,14 +30,17 @@ func (c *Controller) WelcomeScreen(w fyne.Window) fyne.CanvasObject {
 
 	return container.NewBorder(
 		nil,
-		container.New(layout.NewHBoxLayout(),
-			layout.NewSpacer(),
-			widget.NewHyperlink("GitHub", parseURL("https://github.com/dispel-re/dispel-multi")),
-			widget.NewLabel("-"),
-			widget.NewHyperlink("Discord", parseURL("https://discord.gg/XCNrwvdV6R")),
-			widget.NewLabel("-"),
-			widget.NewHyperlink("Reddit", parseURL("https://www.reddit.com/r/DispelRPG")),
-			layout.NewSpacer(),
+		container.NewVBox(
+			container.NewHBox(
+				layout.NewSpacer(),
+				widget.NewHyperlink("GitHub", parseURL("https://github.com/dispel-re/dispel-multi")),
+				widget.NewLabel("-"),
+				widget.NewHyperlink("Discord", parseURL("https://discord.gg/XCNrwvdV6R")),
+				widget.NewLabel("-"),
+				widget.NewHyperlink("Reddit", parseURL("https://www.reddit.com/r/DispelRPG")),
+				layout.NewSpacer(),
+			),
+			widget.NewLabelWithStyle("Version: "+c.version, fyne.TextAlignCenter, fyne.TextStyle{}),
 		),
 		nil,
 		nil,

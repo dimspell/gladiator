@@ -32,7 +32,7 @@ func selfManage(a fyne.App, w fyne.Window, sourceURL string) {
 	}
 }
 
-func GUICommand() *cli.Command {
+func GUICommand(version string) *cli.Command {
 	cmd := &cli.Command{
 		Name:        "gui",
 		Description: "Start the GUI app",
@@ -44,7 +44,7 @@ func GUICommand() *cli.Command {
 
 		// selfManage(a, w, "http://localhost:8080/myapp-{{.OS}}-{{.Arch}}{{.Ext}}")
 
-		ctrl := ui.NewController(a)
+		ctrl := ui.NewController(a, version)
 		w.SetContent(ctrl.WelcomeScreen(w))
 		// w.SetContent(mainContent.MakeUI())
 

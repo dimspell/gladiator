@@ -6,6 +6,6 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
-func GUICommand() *cli.Command {
+func GUICommand(_ string) *cli.Command {
 	return nil
 }
