@@ -36,9 +36,6 @@ jobs:
     needs:
       - test
     steps:
-      - name: Get the build date
-        run: echo "BUILD_TIME=$(date +'%Y-%m-%dT%H:%M:%S')" >> $GITHUB_ENV
-
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -48,20 +45,22 @@ jobs:
         with:
           go-version: "1.21"
 
-      - name: Get short SHA
-        run: echo "BUILD_REVISION=${GITHUB_SHA::7}" >> $GITHUB_ENV
+      - name: Get build data
+        run: |
+          echo "BUILD_REVISION=${GITHUB_SHA::7}" >> $GITHUB_ENV
+          echo "BUILD_TIME=$(date +'%Y-%m-%dT%H:%M:%S')" >> $GITHUB_ENV
 
-      - name: Save short SHA as a version number
+      - name: Use short SHA as a version number
         if: ${{ !startsWith(github.ref, 'refs/tags/') }}
         run: |
           echo "BUILD_VERSION=${BUILD_REVISION}" >> $GITHUB_ENV
           echo "BUILD_FLAGS=-X main.commit=${BUILD_REVISION} -X main.date=${BUILD_TIME}" >> ${GITHUB_ENV}
 
-      - name: Extract version number from a tag
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Use tag as a version number
+        if: ${{ startsWith(github.ref, 'refs/tags/') }}
         run: |
           echo "BUILD_VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
-          echo "BUILD_FLAGS=-X main.version=${BUILD_VERSION} main.commit=${BUILD_REVISION} -X main.date=${BUILD_TIME}" >> ${GITHUB_ENV}
+          echo "BUILD_FLAGS=-X main.version=${BUILD_VERSION} -X main.commit=${BUILD_REVISION} -X main.date=${BUILD_TIME}" >> ${GITHUB_ENV}
 
       - name: Cache fyne-cross
         uses: actions/cache@v4
@@ -83,7 +82,7 @@ jobs:
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: windows-build-${{ env.BUILD_VERSION }}
+          name: windows-build
           path: |
             dist/DispelMulti.zip
 
