@@ -1,7 +1,6 @@
 package ui
 
 import (
-	"log"
 	"net"
 
 	"fyne.io/fyne/v2"
@@ -45,8 +44,7 @@ func (c *Controller) JoinDefineScreen(w fyne.Window) fyne.CanvasObject {
 
 	return container.NewBorder(
 		container.NewPadded(headerContainer(headerText, func() {
-			log.Println("Welcome")
-			w.SetContent(c.JoinOptionsScreen(w))
+			changePage(w, "JoinOptions", c.JoinOptionsScreen(w))
 		})),
 		nil,
 		nil,
@@ -87,7 +85,7 @@ func (c *Controller) JoinDefineScreen(w fyne.Window) fyne.CanvasObject {
 						}
 
 						loadingDialog.Hide()
-						w.SetContent(c.JoinedScreen(w))
+						changePage(w, "Joined", c.JoinedScreen(w))
 					}),
 				),
 			),

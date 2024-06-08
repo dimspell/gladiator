@@ -2,7 +2,6 @@ package ui
 
 import (
 	"fmt"
-	"log"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
@@ -43,7 +42,7 @@ func (c *Controller) AdminScreen(w fyne.Window) fyne.CanvasObject {
 			}
 
 			loadingDialog.Hide()
-			w.SetContent(c.JoinedScreen(w))
+			changePage(w, "Joined", c.JoinedScreen(w))
 		}),
 	)
 
@@ -71,8 +70,7 @@ func (c *Controller) AdminScreen(w fyne.Window) fyne.CanvasObject {
 			}
 		}
 
-		log.Println("Welcome")
-		w.SetContent(c.WelcomeScreen(w))
+		changePage(w, "Welcome", c.WelcomeScreen(w))
 	}
 
 	return container.NewStack(

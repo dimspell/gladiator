@@ -109,7 +109,7 @@ func (c *Controller) HostScreen(w fyne.Window) fyne.CanvasObject {
 		// 	log.Println(syscall.Kill(syscall.Getpid(), syscall.SIGINT))
 		// })
 
-		w.SetContent(c.AdminScreen(w))
+		changePage(w, "Admin", c.AdminScreen(w))
 	}
 
 	btn := widget.NewButtonWithIcon("Submit", theme.NavigateNextIcon(), onHost)
@@ -124,8 +124,7 @@ func (c *Controller) HostScreen(w fyne.Window) fyne.CanvasObject {
 		container.NewBorder(
 			container.NewPadded(
 				headerContainer(headerText, func() {
-					log.Println("Start")
-					w.SetContent(c.StartScreen(w, startOptionHost))
+					changePage(w, "Start", c.StartScreen(w, startOptionHost))
 				})),
 			nil,
 			nil,

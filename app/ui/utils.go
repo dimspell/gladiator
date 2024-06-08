@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"log/slog"
 	"net"
 	"os"
 	"sort"
@@ -110,4 +111,9 @@ func insertDatabasePath(list fyne.ListableURI, err error, setFn func(string)) er
 
 	setFn(list.Path() + string(os.PathSeparator) + "dispel-multi.sqlite")
 	return nil
+}
+
+func changePage(w fyne.Window, pageName string, content fyne.CanvasObject) {
+	slog.Debug("Changing page in the launcher", "page", pageName)
+	w.SetContent(content)
 }

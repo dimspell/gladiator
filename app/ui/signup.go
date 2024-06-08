@@ -2,7 +2,6 @@ package ui
 
 import (
 	"context"
-	"log"
 	"log/slog"
 
 	"fyne.io/fyne/v2"
@@ -16,8 +15,7 @@ import (
 func (c *Controller) SignUnScreen(w fyne.Window) fyne.CanvasObject {
 	return container.NewPadded(container.NewVBox(
 		headerContainer("Sign-up", func() {
-			log.Println("Join")
-			w.SetContent(c.JoinOptionsScreen(w))
+			changePage(w, "JoinOptions", c.JoinOptionsScreen(w))
 		}),
 		widget.NewLabel(""),
 		widget.NewLabel("Provide the credentials how do you want to sign-in."),

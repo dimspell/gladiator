@@ -2,7 +2,6 @@ package ui
 
 import (
 	"fmt"
-	"log"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
@@ -13,8 +12,7 @@ func (c *Controller) SignInScreen(w fyne.Window) fyne.CanvasObject {
 	return container.NewBorder(
 		container.NewPadded(
 			headerContainer("Sign-up", func() {
-				log.Println("Join")
-				w.SetContent(c.JoinOptionsScreen(w))
+				changePage(w, "JoinOptions", c.JoinOptionsScreen(w))
 			}),
 		),
 		nil,

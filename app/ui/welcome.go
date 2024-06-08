@@ -1,7 +1,6 @@
 package ui
 
 import (
-	"log"
 	"net/url"
 
 	"fyne.io/fyne/v2"
@@ -69,8 +68,7 @@ func (c *Controller) WelcomeScreen(w fyne.Window) fyne.CanvasObject {
 				container.NewHBox(
 					layout.NewSpacer(),
 					widget.NewButtonWithIcon("Start", theme.NavigateNextIcon(), func() {
-						log.Println("Start")
-						w.SetContent(c.StartScreen(w, startOptionNone))
+						changePage(w, "Start", c.StartScreen(w, startOptionNone))
 					}),
 					layout.NewSpacer()),
 			),

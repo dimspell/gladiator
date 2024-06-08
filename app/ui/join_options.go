@@ -27,8 +27,7 @@ func (c *Controller) JoinOptionsScreen(w fyne.Window) fyne.CanvasObject {
 	return container.NewBorder(
 		container.NewPadded(
 			headerContainer(headerText, func() {
-				log.Println("Start")
-				w.SetContent(c.StartScreen(w, startOptionJoin))
+				changePage(w, "Start", c.StartScreen(w, startOptionJoin))
 			}),
 		),
 		nil,
@@ -64,11 +63,12 @@ func (c *Controller) JoinOptionsScreen(w fyne.Window) fyne.CanvasObject {
 							}
 
 							loadingDialog.Hide()
-							w.SetContent(c.JoinedScreen(w))
+
+							changePage(w, "Joined", c.JoinedScreen(w))
 							return
 						}
 						if radioGroup.Selected == radioOptions["define"] {
-							w.SetContent(c.JoinDefineScreen(w))
+							changePage(w, "JoinedDefine", c.JoinDefineScreen(w))
 							return
 						}
 					}),

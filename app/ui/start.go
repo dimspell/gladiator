@@ -42,8 +42,7 @@ func (c *Controller) StartScreen(w fyne.Window, selectedOption startOption) fyne
 	return container.NewBorder(
 		container.NewPadded(
 			headerContainer(headerText, func() {
-				log.Println("Welcome")
-				w.SetContent(c.WelcomeScreen(w))
+				changePage(w, "Welcome", c.WelcomeScreen(w))
 			}),
 		),
 		nil,
@@ -61,20 +60,19 @@ func (c *Controller) StartScreen(w fyne.Window, selectedOption startOption) fyne
 					widget.NewButtonWithIcon("Next", theme.NavigateNextIcon(), func() {
 						log.Println(radioGroup.Selected)
 						if radioGroup.Selected == radioOptions[startOptionJoin] {
-							w.SetContent(c.JoinOptionsScreen(w))
+							changePage(w, "JoinOptions", c.JoinOptionsScreen(w))
 							return
 						}
 						if radioGroup.Selected == radioOptions[startOptionHost] {
-							w.SetContent(c.HostScreen(w))
+							changePage(w, "Host", c.HostScreen(w))
 							return
 						}
 						if radioGroup.Selected == radioOptions[startOptionPlay] {
-							w.SetContent(c.SinglePlayerScreen(w,
+							changePage(w, "SinglePlayer", c.SinglePlayerScreen(w,
 								&SinglePlayerScreenParameters{
 									// DatabaseType: HostDatabaseTypeSqlite,
 									DatabaseType: HostDatabaseTypeMemory,
-								}),
-							)
+								}))
 							return
 						}
 					}),

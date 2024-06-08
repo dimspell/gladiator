@@ -198,8 +198,7 @@ func (c *Controller) SinglePlayerScreen(w fyne.Window, initial *SinglePlayerScre
 							return
 						}
 
-						log.Println("Start")
-						w.SetContent(c.StartScreen(w, startOptionPlay))
+						changePage(w, "Start", c.StartScreen(w, startOptionPlay))
 					}, w)
 			}),
 		),
