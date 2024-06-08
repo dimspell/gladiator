@@ -52,15 +52,11 @@ jobs:
 
       - name: Use short SHA as a version number
         if: ${{ !startsWith(github.ref, 'refs/tags/') }}
-        run: |
-          echo "BUILD_VERSION=${BUILD_REVISION}" >> $GITHUB_ENV
-          echo "BUILD_FLAGS=-X main.commit=${BUILD_REVISION} -X main.date=${BUILD_TIME}" >> ${GITHUB_ENV}
+        run: echo "BUILD_VERSION=devel-${BUILD_REVISION}" >> $GITHUB_ENV
 
       - name: Use tag as a version number
         if: ${{ startsWith(github.ref, 'refs/tags/') }}
-        run: |
-          echo "BUILD_VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
-          echo "BUILD_FLAGS=-X main.version=${BUILD_VERSION} -X main.commit=${BUILD_REVISION} -X main.date=${BUILD_TIME}" >> ${GITHUB_ENV}
+        run: echo "BUILD_VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
 
       - name: Cache fyne-cross
         uses: actions/cache@v4
@@ -70,8 +66,13 @@ jobs:
           key: ${{ runner.os }}-fyne-cache-${{ hashFiles('**/go.sum') }}
 
       - name: Package for Windows
-#        run: go run -v github.com/fyne-io/fyne-cross@latest windows -debug -ldflags="${BUILD_FLAGS}" -tags=gui -arch=amd64
-        run: go run -v github.com/fyne-io/fyne-cross@latest windows -debug -ldflags="main.version=${BUILD_VERSION}" -tags=gui -arch=amd64
+        run: go run -v github.com/fyne-io/fyne-cross@latest windows \
+          -arch=amd64
+          -debug \
+          -ldflags="main.version=${BUILD_VERSION}" \
+          -ldflags="main.commit=${BUILD_REVISION}" \
+          -ldflags="main.date=${BUILD_TIME}" \
+          -tags=gui
 
       - name: Move Windows-amd64
         run: |
