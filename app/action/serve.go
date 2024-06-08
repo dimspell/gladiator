@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
 
 	"github.com/dispel-re/dispel-multi/backend"
+	"github.com/dispel-re/dispel-multi/backend/packetlogger"
 	"github.com/dispel-re/dispel-multi/console"
 	"github.com/dispel-re/dispel-multi/console/database"
 	"github.com/urfave/cli/v3"
@@ -85,6 +87,10 @@ func ServeCommand() *cli.Command {
 		}
 
 		bd := backend.NewBackend(backendAddr, consoleAddr, myIpAddr)
+		bd.PacketLogger = slog.New(packetlogger.New(os.Stderr, &packetlogger.Options{
+			Level: slog.LevelDebug,
+		}))
+
 		con := console.NewConsole(db, queries, consoleAddr)
 		startConsole, stopConsole := con.Handlers()
 

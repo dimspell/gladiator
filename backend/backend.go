@@ -9,12 +9,10 @@ import (
 	"math"
 	"net"
 	"net/http"
-	"os"
 	"time"
 
 	"connectrpc.com/connect"
 	"connectrpc.com/otelconnect"
-	"github.com/dispel-re/dispel-multi/backend/packetlogger"
 	"github.com/dispel-re/dispel-multi/backend/proxy"
 	"github.com/dispel-re/dispel-multi/gen/multi/v1/multiv1connect"
 	"github.com/dispel-re/dispel-multi/model"
@@ -62,12 +60,10 @@ func NewBackend(backendAddr, consoleAddr, myIPAddress string) *Backend {
 	consoleUri := fmt.Sprintf("%s://%s/grpc", "http", consoleAddr)
 
 	return &Backend{
-		Addr:         backendAddr,
-		MyIPAddress:  myIPAddress,
-		Sessions:     make(map[string]*model.Session),
-		PacketLogger: slog.New(packetlogger.New(os.Stderr, &packetlogger.Options{Level: slog.LevelDebug})),
-
-		Proxy: proxy.NewLAN(),
+		Addr:        backendAddr,
+		MyIPAddress: myIPAddress,
+		Sessions:    make(map[string]*model.Session),
+		Proxy:       proxy.NewLAN(),
 
 		characterClient: multiv1connect.NewCharacterServiceClient(httpClient, consoleUri, interceptor),
 		gameClient:      multiv1connect.NewGameServiceClient(httpClient, consoleUri, interceptor),

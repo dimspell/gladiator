@@ -2,8 +2,11 @@ package action
 
 import (
 	"context"
+	"log/slog"
+	"os"
 
 	"github.com/dispel-re/dispel-multi/backend"
+	"github.com/dispel-re/dispel-multi/backend/packetlogger"
 	"github.com/urfave/cli/v3"
 )
 
@@ -36,6 +39,9 @@ func BackendCommand() *cli.Command {
 		myIpAddr := c.String("my-ip-addr")
 
 		bd := backend.NewBackend(backendAddr, consoleAddr, myIpAddr)
+		bd.PacketLogger = slog.New(packetlogger.New(os.Stderr, &packetlogger.Options{
+			Level: slog.LevelDebug,
+		}))
 
 		if err := bd.Start(); err != nil {
 			return err

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	"fyne.io/fyne/v2/data/binding"
 	"github.com/dispel-re/dispel-multi/app/ui/probe"
 	"github.com/dispel-re/dispel-multi/backend"
+	"github.com/dispel-re/dispel-multi/backend/packetlogger"
 	"github.com/dispel-re/dispel-multi/console"
 	"github.com/dispel-re/dispel-multi/console/database"
 )
@@ -194,6 +196,13 @@ func (c *Controller) StartBackend(consoleAddr string) error {
 		return err
 	}
 
+	packetsLogFile, err := os.CreateTemp("", "dispel-multi-packets.txt")
+	if err == nil {
+		c.Backend.PacketLogger = slog.New(packetlogger.New(packetsLogFile, &packetlogger.Options{
+			Level: slog.LevelDebug,
+		}))
+	}
+
 	// Healthcheck
 	c.backendProbe.Signal(probe.StatusRunning)
 
@@ -202,6 +211,11 @@ func (c *Controller) StartBackend(consoleAddr string) error {
 		c.Backend.Listen()
 		c.backendProbe.Signal(probe.StatusNotRunning)
 		cancel()
+		if packetsLogFile != nil {
+			if err := packetsLogFile.Close(); err != nil {
+				slog.Warn("Failed to close packet log file", "error", err)
+			}
+		}
 	}()
 
 	return nil
