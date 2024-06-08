@@ -52,7 +52,7 @@ jobs:
         run: echo "BUILD_REVISION=${GITHUB_SHA::7}" >> $GITHUB_ENV
 
       - name: Save short SHA as a version number
-        if: !startsWith(github.ref, 'refs/tags/')
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
         run: |
           echo "BUILD_VERSION=${BUILD_REVISION}" >> $GITHUB_ENV
           echo "BUILD_FLAGS=-X main.commit=${BUILD_REVISION} -X main.date=${BUILD_TIME}" >> ${GITHUB_ENV}
