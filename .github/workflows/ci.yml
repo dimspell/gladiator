@@ -66,13 +66,14 @@ jobs:
           key: ${{ runner.os }}-fyne-cache-${{ hashFiles('**/go.sum') }}
 
       - name: Package for Windows
-        run: go run -v github.com/fyne-io/fyne-cross@latest windows \
-          -arch=amd64 \
-          -debug \
-          -ldflags="main.version=${BUILD_VERSION}" \
-          -ldflags="main.commit=${BUILD_REVISION}" \
-          -ldflags="main.date=${BUILD_TIME}" \
-          -tags=gui
+        run: |
+          go run -v github.com/fyne-io/fyne-cross@latest windows \
+            -arch=amd64 \
+            -debug \
+            -ldflags="main.version=${BUILD_VERSION}" \
+            -ldflags="main.commit=${BUILD_REVISION}" \
+            -ldflags="main.date=${BUILD_TIME}" \
+            -tags=gui
 
       - name: Move Windows-amd64
         run: |
