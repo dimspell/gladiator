@@ -24,6 +24,7 @@ import (
 
 type Console struct {
 	Addr               string
+	RunMode            string
 	DB                 *database.SQLite
 	Queries            *database.Queries
 	CORSAllowedOrigins []string
@@ -103,11 +104,7 @@ func (c *Console) HttpRouter() http.Handler {
 			MaxAge: 7200,
 		}).Handler)
 
-		wellKnown.Get("/dispel-multi.json", func(w http.ResponseWriter, r *http.Request) {
-			renderJSON(w, r, model.WellKnown{
-				Addr: c.Addr,
-			})
-		})
+		wellKnown.Get("/dispel-multi.json", c.WellKnownInfo())
 		mux.Mount("/.well-known/", wellKnown)
 	}
 
@@ -210,4 +207,16 @@ func (c *Console) Graceful(ctx context.Context, start GracefulFunc, shutdown Gra
 	}
 
 	return <-errChan
+}
+
+func (c *Console) WellKnownInfo() http.HandlerFunc {
+	if c.RunMode == "" {
+		c.RunMode = model.RunModeLAN
+	}
+	return func(w http.ResponseWriter, r *http.Request) {
+		renderJSON(w, r, model.WellKnown{
+			Addr:    c.Addr,
+			RunMode: c.RunMode,
+		})
+	}
 }
