@@ -1,13 +1,16 @@
 package ui
 
 import (
-	"fmt"
+	"context"
 	"log"
+	"log/slog"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/data/validation"
+	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
+	"github.com/dispel-re/dispel-multi/console/auth"
+	"github.com/dispel-re/dispel-multi/console/database"
 )
 
 func (c *Controller) SignUnScreen(w fyne.Window) fyne.CanvasObject {
@@ -18,32 +21,54 @@ func (c *Controller) SignUnScreen(w fyne.Window) fyne.CanvasObject {
 		}),
 		widget.NewLabel(""),
 		widget.NewLabel("Provide the credentials how do you want to sign-in."),
-		signUpForm(),
+		c.signUpForm(nil, nil, w),
 	))
 }
 
-func signUpForm() *widget.Form {
+func (c *Controller) signUpForm(onCancel func(), onCreate func(user database.User), w fyne.Window) *widget.Form {
 	name := widget.NewEntry()
-	name.Validator = validation.NewRegexp("[a-zA-Z0-9]{4,24}", "must be alphanumeric up to 24 chars - a-Z / 0-9")
+	name.Validator = usernameValidator
 	name.SetPlaceHolder("GumaTurbo2137")
 
 	password := widget.NewPasswordEntry()
-	password.Validator = func(s string) error {
-		if len(s) == 0 {
-			return fmt.Errorf("password cannot be empty")
-		}
-		return nil
-	}
+	password.Validator = passwordValidator
 	password.SetPlaceHolder("Password")
 
 	form := &widget.Form{
 		Items: []*widget.FormItem{
-			{Text: "Name", Widget: name, HintText: "Your login name"},
+			{Text: "Name", Widget: name, HintText: "Your login name - alphanumeric, no spaces or special chars"},
 			{Text: "Password", Widget: password, HintText: "Use something short and memorable"},
 		},
 		SubmitText: "Create a new account",
+		OnCancel:   onCancel,
 		OnSubmit: func() {
-			fmt.Println("Form submitted")
+			if c.Console == nil {
+				slog.Error("Console not initialized")
+				return
+			}
+
+			loadingDialog := dialog.NewCustomWithoutButtons("Submitting the form...", widget.NewProgressBarInfinite(), w)
+			loadingDialog.Show()
+			defer loadingDialog.Hide()
+
+			pwd, err := auth.NewPassword(password.Text)
+			if err != nil {
+				dialog.ShowError(err, w)
+				return
+			}
+			user, err := c.Console.Queries.CreateUser(context.TODO(), database.CreateUserParams{
+				Username: name.Text,
+				Password: pwd.String(),
+			})
+			if err != nil {
+				dialog.ShowError(err, w)
+				return
+			}
+
+			slog.Info("Created new user", "name", user.Username, "id", user.ID)
+			if onCreate != nil {
+				onCreate(user)
+			}
 		},
 	}
 

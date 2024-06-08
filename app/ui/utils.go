@@ -9,6 +9,7 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/data/validation"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
@@ -45,6 +46,15 @@ func headerContainer(headerText string, backCallback func()) *fyne.Container {
 		widget.NewLabelWithStyle(headerText, fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
 		layout.NewSpacer(),
 	)
+}
+
+var usernameValidator = validation.NewRegexp("[a-zA-Z0-9]{4,24}", "must be alphanumeric up to 24 chars - a-Z / 0-9")
+
+func passwordValidator(s string) error {
+	if len(s) == 0 {
+		return fmt.Errorf("password cannot be empty")
+	}
+	return nil
 }
 
 func ipValidator(s string) error {

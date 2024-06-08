@@ -14,6 +14,7 @@ import (
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	"github.com/dispel-re/dispel-multi/console/database"
 )
 
 type SinglePlayerScreenParameters struct {
@@ -115,6 +116,20 @@ func (c *Controller) SinglePlayerScreen(w fyne.Window, initial *SinglePlayerScre
 		c.StopBackend()
 	})
 
+	createUser := widget.NewButtonWithIcon("Create New User", theme.AccountIcon(), func() {
+		centered := container.NewCenter()
+		d := dialog.NewCustomWithoutButtons("Create New User", centered, w)
+		centered.Add(c.signUpForm(d.Hide, func(user database.User) {
+			d.Hide()
+
+			c.app.SendNotification(
+				fyne.NewNotification("Created New User",
+					fmt.Sprintf("You have successfully created a new user named %q.", user.Username),
+				))
+		}, w))
+		d.Show()
+	})
+
 	c.backendRunning.AddListener(binding.NewDataListener(func() {
 		if _, isRunning := c.backendProbe.Get(); isRunning {
 			backendStart.Disable()
@@ -133,19 +148,17 @@ func (c *Controller) SinglePlayerScreen(w fyne.Window, initial *SinglePlayerScre
 		if _, isRunning := c.consoleProbe.Get(); isRunning {
 			consoleStart.Disable()
 			consoleStop.Enable()
+			createUser.Enable()
 			consoleRunningLabel.Set("Console: Running")
 			consoleRunningCheck.TextStyle = fyne.TextStyle{Bold: true}
 		} else {
 			consoleStart.Enable()
 			consoleStop.Disable()
+			createUser.Disable()
 			consoleRunningLabel.Set("Console: Not Running")
 			consoleRunningCheck.TextStyle = fyne.TextStyle{Bold: false}
 		}
 	}))
-
-	createUser := widget.NewButtonWithIcon("Create New User", theme.AccountIcon(), func() {
-		dialog.ShowError(errors.New("not implemented"), w)
-	})
 
 	registryUpdatedText := widget.NewRichTextFromMarkdown("**1. Update the registry (e.g. with regedit)**\n\n" +
 		"Make sure the value of `HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\AbalonStudio\\Dispel\\Multi\\Server` key is set to `localhost`. " +
