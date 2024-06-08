@@ -81,9 +81,9 @@ func (c *Controller) StartConsole(databaseType, databasePath, consoleAddr string
 	}
 
 	// Update the database to the latest migration
-	// if err := database.Seed(queries); err != nil {
-	// 	return err
-	// }
+	if err := database.Seed(queries); err != nil {
+		slog.Warn("Seed queries failed", "error", err)
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 

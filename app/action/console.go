@@ -3,6 +3,7 @@ package action
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/dispel-re/dispel-multi/console"
 	"github.com/dispel-re/dispel-multi/console/database"
@@ -59,9 +60,9 @@ func ConsoleCommand() *cli.Command {
 			return err
 		}
 
-		// if err := database.Seed(queries); err != nil {
-		// 	return err
-		// }
+		if err := database.Seed(queries); err != nil {
+			slog.Warn("Seed queries failed", "error", err)
+		}
 
 		con := console.NewConsole(db, queries, consoleAddr)
 		start, stop := con.Handlers()
