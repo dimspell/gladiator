@@ -92,6 +92,15 @@ func (b *Backend) Shutdown() {
 
 	// Close all open connections
 	for _, session := range b.Sessions {
+		// TODO: Send a system message "(system) The server is going to close in less than 30 seconds"
+		_ = b.Send(session.Conn,
+			ReceiveMessage,
+			NewSystemMessage("system-info", "The server is going to close...", ""))
+
+		// TODO: Send a packet to trigger stats saving
+		// TODO: Send a system message "(system): Your stats were saving, your game client might close in the next 10 seconds"
+
+		// TODO: Send a packet to close the connection (malformed 255-21?)
 		if err := session.Conn.Close(); err != nil {
 			slog.Error("Could not close session", "err", err, "session", session.ID)
 		}
@@ -104,10 +113,6 @@ func (b *Backend) Shutdown() {
 		b.listener = nil
 	}
 
-	// TODO: Send a system message "(system) The server is going to close in less than 30 seconds"
-	// TODO: Send a packet to trigger stats saving
-	// TODO: Send a system message "(system): Your stats were saving, your game client might close in the next 10 seconds"
-	// TODO: Send a packet to close the connection (malformed 255-21?)
 	slog.Info("The backend is successfully shut down")
 }
 
