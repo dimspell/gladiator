@@ -7,22 +7,45 @@ import (
 )
 
 func TestGetCharacterInventoryRequest(t *testing.T) {
-	// Arrange
-	packet := []byte{
-		255, 68, // Command code
-		20, 0, // Packet length
-		117, 115, 101, 114, 0, // User name
-		99, 104, 97, 114, 97, 99, 116, 101, 114, 0, // Character name
-		0, // Unknown
-	}
-	req := GetCharacterInventoryRequest(packet[4:])
+	t.Run("Zero byte at the end", func(t *testing.T) {
+		// Arrange
+		packet := []byte{
+			255, 68, // Command code
+			20, 0, // Packet length
+			117, 115, 101, 114, 0, // User name
+			99, 104, 97, 114, 97, 99, 116, 101, 114, 0, // Character name
+			0, // Unknown
+		}
+		req := GetCharacterInventoryRequest(packet[4:])
 
-	// Act
-	data, err := req.Parse()
+		// Act
+		data, err := req.Parse()
 
-	// Assert
-	assert.NoError(t, err)
-	assert.Equal(t, "user", data.Username)
-	assert.Equal(t, "character", data.CharacterName)
-	assert.Equal(t, []byte{0}, data.Unknown)
+		// Assert
+		assert.NoError(t, err)
+		assert.Equal(t, "user", data.Username)
+		assert.Equal(t, "character", data.CharacterName)
+		assert.Equal(t, []byte{0}, data.Unknown)
+	})
+
+	t.Run("Non-zero byte at the end", func(t *testing.T) {
+		// Arrange
+		packet := []byte{
+			255, 68, // Command code
+			20, 0, // Packet length
+			117, 115, 101, 114, 0, // User name
+			99, 104, 97, 114, 97, 99, 116, 101, 114, 0, // Character name
+			3, // Unknown
+		}
+		req := GetCharacterInventoryRequest(packet[4:])
+
+		// Act
+		data, err := req.Parse()
+
+		// Assert
+		assert.NoError(t, err)
+		assert.Equal(t, "user", data.Username)
+		assert.Equal(t, "character", data.CharacterName)
+		assert.Equal(t, []byte{3}, data.Unknown)
+	})
 }

@@ -1,7 +1,6 @@
 package backend
 
 import (
-	"bytes"
 	"context"
 	"database/sql"
 	"errors"
@@ -54,14 +53,16 @@ type GetCharacterInventoryRequestData struct {
 }
 
 func (r GetCharacterInventoryRequest) Parse() (data GetCharacterInventoryRequestData, err error) {
-	if bytes.Count(r, []byte{0}) != 3 {
-		return data, fmt.Errorf("packet-61: malformed packet, not enough null-terminators")
+	rd := NewPacketReader(r)
+	data.Username, err = rd.ReadString()
+	if err != nil {
+		return data, fmt.Errorf("packet-68: malformed packet: %w", err)
 	}
-	split := bytes.SplitN(r, []byte{0}, 3)
-
-	data.Username = string(split[0])
-	data.CharacterName = string(split[1])
-	data.Unknown = split[2]
+	data.CharacterName, err = rd.ReadString()
+	if err != nil {
+		return data, fmt.Errorf("packet-68: malformed packet: %w", err)
+	}
+	data.Unknown, _ = rd.RestBytes()
 
 	return data, nil
 }
