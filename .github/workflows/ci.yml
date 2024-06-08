@@ -73,7 +73,7 @@ jobs:
       - name: Package for Windows
         run: go run -v github.com/fyne-io/fyne-cross@latest \
           windows \
-          -ldflags "${BUILD_FLAGS} -s -w"
+          -ldflags="${BUILD_FLAGS} -s -w"
           -tags=gui \
           -arch=amd64
 
