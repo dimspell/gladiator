@@ -1,23 +1,12 @@
 package ui
 
 import (
-	"net/url"
-
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 )
-
-func parseURL(urlStr string) *url.URL {
-	link, err := url.Parse(urlStr)
-	if err != nil {
-		fyne.LogError("Could not parse URL", err)
-	}
-
-	return link
-}
 
 func (c *Controller) WelcomeScreen(w fyne.Window) fyne.CanvasObject {
 	const (
