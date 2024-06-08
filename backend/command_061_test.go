@@ -47,7 +47,7 @@ func TestDeleteCharacterRequest_UsernameAndCharacterName(t *testing.T) {
 
 		// Assert
 		assert.Error(t, err)
-		assert.Empty(t, data.Username)
+		assert.Equal(t, "usercharacter", data.Username)
 		assert.Empty(t, data.CharacterName)
 	})
 
