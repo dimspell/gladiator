@@ -64,7 +64,9 @@ func (c *Controller) StartScreen(w fyne.Window, selectedOption startOption) fyne
 							return
 						}
 						if radioGroup.Selected == radioOptions[startOptionHost] {
-							changePage(w, "Host", c.HostScreen(w))
+							changePage(w, "Host", c.HostScreen(w, &HostScreenInputParams{
+								HostType: HostDatabaseTypeSqlite,
+							}))
 							return
 						}
 						if radioGroup.Selected == radioOptions[startOptionPlay] {

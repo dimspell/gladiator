@@ -87,6 +87,15 @@ func parseURL(urlStr string) *url.URL {
 	return link
 }
 
+func validateAll(validators ...func() error) error {
+	for _, validate := range validators {
+		if err := validate(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func defaultDirectory() (string, error) {
 	directoryPath, err := os.UserHomeDir()
 	if err != nil {

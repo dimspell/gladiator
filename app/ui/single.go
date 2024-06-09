@@ -18,7 +18,7 @@ import (
 )
 
 type SinglePlayerScreenParameters struct {
-	DatabaseType HostDatabaseType
+	DatabaseType HostDatabaseTypeLabel
 }
 
 func (c *Controller) SinglePlayerScreen(w fyne.Window, initial *SinglePlayerScreenParameters) fyne.CanvasObject {
@@ -50,16 +50,6 @@ func (c *Controller) SinglePlayerScreen(w fyne.Window, initial *SinglePlayerScre
 		pathLabel.Hide()
 		pathContainer.Hide()
 	}
-
-	advancedContainer := container.NewVBox(
-		container.New(
-			layout.NewFormLayout(),
-			widget.NewLabelWithStyle("Database Type:", fyne.TextAlignTrailing, fyne.TextStyle{Bold: true}),
-			comboGroup,
-			pathLabel,
-			pathContainer,
-		),
-	)
 
 	consoleRunningLabel := binding.NewString()
 	consoleRunningCheck := widget.NewLabelWithData(consoleRunningLabel)
@@ -94,7 +84,7 @@ func (c *Controller) SinglePlayerScreen(w fyne.Window, initial *SinglePlayerScre
 	backendRunningCheck := widget.NewLabelWithData(backendRunningLabel)
 	backendRunningCheck.Alignment = fyne.TextAlignCenter
 	backendStart := widget.NewButtonWithIcon("Start backend", theme.MediaPlayIcon(), func() {
-		if err := c.StartBackend(consoleAddr); err != nil {
+		if err := c.StartBackend(consoleAddr, "127.0.0.1"); err != nil {
 			dialog.ShowError(err, w)
 			return
 		}
@@ -147,25 +137,6 @@ func (c *Controller) SinglePlayerScreen(w fyne.Window, initial *SinglePlayerScre
 		}
 	}))
 
-	registryUpdatedText := widget.NewRichTextFromMarkdown("**1. Update the registry (e.g. with regedit)**\n\n" +
-		"Make sure the value of `HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\AbalonStudio\\Dispel\\Multi\\Server` key is set to `localhost`. " +
-		"If not, then please change it.")
-	registryUpdatedText.Wrapping = fyne.TextWrapWord
-
-	serversRunningText := widget.NewRichTextFromMarkdown("**2. Start the console and backend servers?**\n\n" +
-		"You must have both servers running on your computer before starting the game. " +
-		"Click on the buttons to start them:")
-	serversRunningText.Wrapping = fyne.TextWrapWord
-
-	createUserText := widget.NewRichTextFromMarkdown("**3. (Optional): Create new user**\n\n" +
-		"In the game interface, you will be asked to sign in. " +
-		"If you wish to create a brand new hero here, in the launcher interface, then please click on the Create New User button below.")
-	createUserText.Wrapping = fyne.TextWrapWord
-
-	startGameText := widget.NewRichTextFromMarkdown("**4. Start game**\n\n" +
-		"Start the Dispel Multi game from the shortcut on your desktop or the Menu Start.")
-	startGameText.Wrapping = fyne.TextWrapWord
-
 	return container.NewBorder(
 		container.NewPadded(
 			headerContainer(headerText, func() {
@@ -194,8 +165,8 @@ func (c *Controller) SinglePlayerScreen(w fyne.Window, initial *SinglePlayerScre
 		container.NewVScroll(
 			container.NewPadded(
 				container.NewVBox(
-					registryUpdatedText,
-					serversRunningText,
+					renderRegistryNotes(),
+					renderStartServersNotes(),
 					container.NewGridWithColumns(3,
 						consoleRunningCheck,
 						consoleStart,
@@ -204,16 +175,61 @@ func (c *Controller) SinglePlayerScreen(w fyne.Window, initial *SinglePlayerScre
 						backendStart,
 						backendStop,
 					),
-					widget.NewAccordion(widget.NewAccordionItem("Advanced", advancedContainer)),
-					createUserText,
+					widget.NewAccordion(
+						widget.NewAccordionItem("Advanced", container.NewVBox(
+							container.New(
+								layout.NewFormLayout(),
+								widget.NewLabelWithStyle("Database Type:", fyne.TextAlignTrailing, fyne.TextStyle{Bold: true}),
+								comboGroup,
+								pathLabel,
+								pathContainer,
+							),
+						)),
+					),
+					renderCreateUserNotes(),
 					container.NewHBox(
 						layout.NewSpacer(),
 						createUser,
 						layout.NewSpacer(),
 					),
-					startGameText,
+					renderStartGameNotes(),
 				),
 			),
 		),
 	)
+}
+
+func renderRegistryNotes() *widget.RichText {
+	registryUpdatedText := widget.NewRichTextFromMarkdown("**1. Update the registry (e.g. with regedit)**\n\n" +
+		"Make sure the value of `HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\AbalonStudio\\Dispel\\Multi\\Server` key is set to `localhost`. " +
+		"If not, then please change it.")
+	registryUpdatedText.Wrapping = fyne.TextWrapWord
+
+	return registryUpdatedText
+}
+
+func renderStartServersNotes() *widget.RichText {
+	serversRunningText := widget.NewRichTextFromMarkdown("**2. Start the console and backend servers?**\n\n" +
+		"You must have both servers running on your computer before starting the game. " +
+		"Click on the buttons to start them:")
+	serversRunningText.Wrapping = fyne.TextWrapWord
+
+	return serversRunningText
+}
+
+func renderCreateUserNotes() *widget.RichText {
+	createUserText := widget.NewRichTextFromMarkdown("**3. (Optional): Create new user**\n\n" +
+		"In the game interface, you will be asked to sign in. " +
+		"If you wish to create a brand new hero here, in the launcher interface, then please click on the Create New User button below.")
+	createUserText.Wrapping = fyne.TextWrapWord
+
+	return createUserText
+}
+
+func renderStartGameNotes() *widget.RichText {
+	startGameText := widget.NewRichTextFromMarkdown("**4. Start game**\n\n" +
+		"Start the Dispel Multi game from the shortcut on your desktop or the Menu Start.")
+	startGameText.Wrapping = fyne.TextWrapWord
+
+	return startGameText
 }

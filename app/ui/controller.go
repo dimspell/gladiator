@@ -17,9 +17,8 @@ import (
 )
 
 type Controller struct {
-	myIPAddress string
-	Console     *console.Console
-	Backend     *backend.Backend
+	Console *console.Console
+	Backend *backend.Backend
 
 	consoleStop console.GracefulFunc
 
@@ -34,9 +33,6 @@ type Controller struct {
 
 func NewController(fyneApp fyne.App, version string) *Controller {
 	return &Controller{
-		// TODO: Define the IP address used for proxy
-		myIPAddress: "127.0.0.1",
-
 		app:     fyneApp,
 		version: version,
 
@@ -167,7 +163,7 @@ func (c *Controller) ConsoleHandshake(consoleAddr string) error {
 	return nil
 }
 
-func (c *Controller) StartBackend(consoleAddr string) error {
+func (c *Controller) StartBackend(consoleAddr, myIPAddress string) error {
 	if c.Backend != nil {
 		slog.Warn("Backend is already running")
 		return nil
@@ -190,7 +186,7 @@ func (c *Controller) StartBackend(consoleAddr string) error {
 		}
 	}()
 
-	c.Backend = backend.NewBackend("127.0.0.1:6112", consoleAddr, c.myIPAddress)
+	c.Backend = backend.NewBackend("127.0.0.1:6112", consoleAddr, myIPAddress)
 	if err := c.Backend.Start(); err != nil {
 		cancel()
 		return err

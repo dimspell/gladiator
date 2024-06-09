@@ -71,21 +71,14 @@ func (c *Controller) JoinDefineScreen(w fyne.Window) fyne.CanvasObject {
 
 						loadingDialog := dialog.NewCustomWithoutButtons("Connecting to auth server...", widget.NewProgressBarInfinite(), w)
 						loadingDialog.Show()
+						defer loadingDialog.Hide()
 
 						if err := c.ConsoleHandshake(consoleAddr); err != nil {
-							loadingDialog.Hide()
 							dialog.ShowError(err, w)
 							return
 						}
 
-						if err := c.StartBackend(consoleAddr); err != nil {
-							loadingDialog.Hide()
-							dialog.ShowError(err, w)
-							return
-						}
-
-						loadingDialog.Hide()
-						changePage(w, "Joined", c.JoinedScreen(w))
+						changePage(w, "Joined", c.PlayScreen(w, consoleAddr))
 					}),
 				),
 			),

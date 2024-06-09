@@ -16,15 +16,15 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-type HostDatabaseType string
+type HostDatabaseTypeLabel string
 
 const (
-	HostDatabaseTypeSqlite HostDatabaseType = "1_sqlite"
-	HostDatabaseTypeMemory HostDatabaseType = "2_memory"
+	HostDatabaseTypeSqlite HostDatabaseTypeLabel = "1_sqlite"
+	HostDatabaseTypeMemory HostDatabaseTypeLabel = "2_memory"
 )
 
 var (
-	databaseTypeText = map[HostDatabaseType]string{
+	databaseTypeText = map[HostDatabaseTypeLabel]string{
 		HostDatabaseTypeSqlite: "Saved on disk (sqlite)",
 		HostDatabaseTypeMemory: "Stored in-memory (for testing)",
 	}
@@ -35,7 +35,11 @@ var (
 	}
 )
 
-func (c *Controller) HostScreen(w fyne.Window) fyne.CanvasObject {
+type HostScreenInputParams struct {
+	HostType HostDatabaseTypeLabel
+}
+
+func (c *Controller) HostScreen(w fyne.Window, params *HostScreenInputParams) fyne.CanvasObject {
 	headerText := "Host a server"
 
 	pathLabel := widget.NewLabelWithStyle("Database Path:", fyne.TextAlignTrailing, fyne.TextStyle{Bold: true})
@@ -55,14 +59,22 @@ func (c *Controller) HostScreen(w fyne.Window) fyne.CanvasObject {
 			pathContainer.Show()
 		}
 	})
-	comboGroup.SetSelected(databaseTypeText[HostDatabaseTypeMemory])
-	pathLabel.Hide()
-	pathContainer.Hide()
+
+	switch params.HostType {
+	case HostDatabaseTypeSqlite:
+		comboGroup.SetSelected(databaseTypeText[HostDatabaseTypeSqlite])
+		break
+	default:
+		comboGroup.SetSelected(databaseTypeText[HostDatabaseTypeMemory])
+		pathLabel.Hide()
+		pathContainer.Hide()
+		break
+	}
 
 	bindIP := widget.NewEntry()
 	bindIP.Validator = ipValidator
 	bindIP.PlaceHolder = "Example: 0.0.0.0"
-	bindIP.SetText("127.0.0.1")
+	bindIP.SetText("0.0.0.0")
 
 	bindPort := widget.NewEntry()
 	bindPort.Validator = portValidator
@@ -83,11 +95,7 @@ func (c *Controller) HostScreen(w fyne.Window) fyne.CanvasObject {
 	)
 
 	onHost := func() {
-		if err := bindIP.Validate(); err != nil {
-			dialog.NewError(err, w)
-			return
-		}
-		if err := bindPort.Validate(); err != nil {
+		if err := validateAll(bindIP.Validate, bindPort.Validate); err != nil {
 			dialog.NewError(err, w)
 			return
 		}
@@ -118,10 +126,14 @@ func (c *Controller) HostScreen(w fyne.Window) fyne.CanvasObject {
 
 		loadingDialog = nil
 
-		changePage(w, "Admin", c.AdminScreen(w))
+		changePage(w, "Admin", c.AdminScreen(w, &AdminScreenInputParams{
+			DatabasePath: databasePath,
+			DatabaseType: databaseType,
+			BindAddress:  net.JoinHostPort(bindIP.Text, bindPort.Text),
+		}))
 	}
 
-	btn := widget.NewButtonWithIcon("Submit", theme.NavigateNextIcon(), onHost)
+	btn := widget.NewButtonWithIcon("Start Console", theme.NavigateNextIcon(), onHost)
 	label := widget.NewRichTextFromMarkdown("**Auth server configuration**\n\nLet's get your game server up and running. Please fill out the following form to specify the configuration details.")
 	label.Wrapping = fyne.TextWrapWord
 	size := label.Size()
@@ -144,6 +156,7 @@ func (c *Controller) HostScreen(w fyne.Window) fyne.CanvasObject {
 					label,
 
 					container.NewPadded(formGrid),
+					widget.NewLabel(""),
 					container.NewCenter(btn),
 				),
 			),
