@@ -1,4 +1,4 @@
-// packetlogger is adapted based on code in slog guide (https://github.com/golang/example/blob/master/slog-handler-guide/guide.md)
+// Package packetlogger is adapted based on code in the slog guide (https://github.com/golang/example/blob/master/slog-handler-guide/guide.md)
 package packetlogger
 
 import (

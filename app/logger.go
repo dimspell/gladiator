@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"strings"
@@ -24,14 +25,12 @@ var LogLevels = map[string]slog.Level{
 	"fatal":   slog.LevelError,
 }
 
-// CleanupFunc is a function that can be deferred to cleanup resources.
-type CleanupFunc func()
+// CleanupFunc is a function that can be deferred to clean up resources.
+type CleanupFunc func() error
 
 // initDefaultLogger initializes the default logger.
 func initDefaultLogger(app *cli.Command) (CleanupFunc, error) {
-	deferred := func() {
-		// noop
-	}
+	deferred := io.NopCloser(nil).Close
 
 	logLevel, ok := LogLevels[strings.ToLower(app.String("log-level"))]
 	if !ok {
@@ -45,9 +44,9 @@ func initDefaultLogger(app *cli.Command) (CleanupFunc, error) {
 		if err != nil {
 			return deferred, err
 		}
-		deferred = func() {
+		deferred = func() error {
 			fmt.Println("Closing log file")
-			w.Close()
+			return w.Close()
 		}
 	}
 

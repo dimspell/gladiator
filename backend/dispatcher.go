@@ -215,7 +215,7 @@ func (b *Backend) Send(conn net.Conn, packetType PacketType, payload []byte) err
 		return fmt.Errorf("backend: invalid client connection")
 	}
 
-	data := b.EncodePacket(packetType, payload)
+	data := encodePacket(packetType, payload)
 
 	if b.PacketLogger != nil {
 		b.PacketLogger.Debug("Sent",
@@ -230,7 +230,7 @@ func (b *Backend) Send(conn net.Conn, packetType PacketType, payload []byte) err
 	return err
 }
 
-func (b *Backend) EncodePacket(packetType PacketType, payload []byte) []byte {
+func encodePacket(packetType PacketType, payload []byte) []byte {
 	length := len(payload) + 4
 	packet := make([]byte, length)
 
