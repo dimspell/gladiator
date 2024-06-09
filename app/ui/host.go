@@ -23,6 +23,18 @@ const (
 	HostDatabaseTypeMemory HostDatabaseType = "2_memory"
 )
 
+var (
+	databaseTypeText = map[HostDatabaseType]string{
+		HostDatabaseTypeSqlite: "Saved on disk (sqlite)",
+		HostDatabaseTypeMemory: "Stored in-memory (for testing)",
+	}
+
+	databaseTypes = map[string]string{
+		databaseTypeText[HostDatabaseTypeSqlite]: "sqlite",
+		databaseTypeText[HostDatabaseTypeMemory]: "memory",
+	}
+)
+
 func (c *Controller) HostScreen(w fyne.Window) fyne.CanvasObject {
 	headerText := "Host a server"
 
@@ -32,18 +44,10 @@ func (c *Controller) HostScreen(w fyne.Window) fyne.CanvasObject {
 	pathSelection := widget.NewButtonWithIcon("Select Folder", theme.FolderOpenIcon(), selectDatabasePath(w, pathEntry))
 	pathContainer := container.NewBorder(nil, nil, nil, pathSelection, pathEntry)
 
-	comboOptions := map[HostDatabaseType]string{
-		HostDatabaseTypeSqlite: "Saved on disk (sqlite)",
-		HostDatabaseTypeMemory: "Stored in-memory (for testing)",
-	}
-	databaseTypes := map[string]string{
-		comboOptions[HostDatabaseTypeSqlite]: "sqlite",
-		comboOptions[HostDatabaseTypeMemory]: "memory",
-	}
-	comboGroup := widget.NewSelect(Values(comboOptions), func(value string) {
+	comboGroup := widget.NewSelect(Values(databaseTypeText), func(value string) {
 		log.Println("Select set to", value)
 
-		if value == comboOptions[HostDatabaseTypeMemory] {
+		if value == databaseTypeText[HostDatabaseTypeMemory] {
 			pathLabel.Hide()
 			pathContainer.Hide()
 		} else {
@@ -51,7 +55,7 @@ func (c *Controller) HostScreen(w fyne.Window) fyne.CanvasObject {
 			pathContainer.Show()
 		}
 	})
-	comboGroup.SetSelected(comboOptions[HostDatabaseTypeMemory])
+	comboGroup.SetSelected(databaseTypeText[HostDatabaseTypeMemory])
 	pathLabel.Hide()
 	pathContainer.Hide()
 

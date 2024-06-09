@@ -34,18 +34,10 @@ func (c *Controller) SinglePlayerScreen(w fyne.Window, initial *SinglePlayerScre
 	pathSelection := widget.NewButtonWithIcon("Select folder", theme.FolderOpenIcon(), selectDatabasePath(w, pathEntry))
 	pathContainer := container.NewBorder(nil, nil, nil, pathSelection, pathEntry)
 
-	comboOptions := map[HostDatabaseType]string{
-		HostDatabaseTypeSqlite: "Saved on disk (sqlite)",
-		HostDatabaseTypeMemory: "Stored in-memory (for testing)",
-	}
-	databaseTypes := map[string]string{
-		comboOptions[HostDatabaseTypeSqlite]: "sqlite",
-		comboOptions[HostDatabaseTypeMemory]: "memory",
-	}
-	comboGroup := widget.NewSelect(Values(comboOptions), func(value string) {
+	comboGroup := widget.NewSelect(Values(databaseTypeText), func(value string) {
 		log.Println("Select set to", value)
 
-		if value == comboOptions[HostDatabaseTypeMemory] {
+		if value == databaseTypeText[HostDatabaseTypeMemory] {
 			pathLabel.Hide()
 			pathContainer.Hide()
 		} else {
@@ -53,7 +45,7 @@ func (c *Controller) SinglePlayerScreen(w fyne.Window, initial *SinglePlayerScre
 			pathContainer.Show()
 		}
 	})
-	comboGroup.SetSelected(comboOptions[initial.DatabaseType])
+	comboGroup.SetSelected(databaseTypeText[initial.DatabaseType])
 	if initial.DatabaseType == HostDatabaseTypeMemory {
 		pathLabel.Hide()
 		pathContainer.Hide()
