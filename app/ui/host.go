@@ -1,10 +1,12 @@
 package ui
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"net"
 	"os"
+	"path"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
@@ -88,21 +90,28 @@ func (c *Controller) HostScreen(w fyne.Window) fyne.CanvasObject {
 
 		loadingDialog := dialog.NewCustomWithoutButtons("Starting auth server...", widget.NewProgressBarInfinite(), w)
 		loadingDialog.Show()
+		defer loadingDialog.Hide()
 
 		databaseType, ok := databaseTypes[comboGroup.Selected]
 		if !ok {
 			dialog.ShowError(fmt.Errorf("unknown database type: %q", databaseType), w)
-			loadingDialog.Hide()
+
 			return
 		}
-		databasePath := pathEntry.Text + string(os.PathSeparator) + "dispel-multi.sqlite"
+
+		databasePath := pathEntry.Text
+		if err := os.MkdirAll(path.Dir(databasePath), 0755); err != nil {
+			if !errors.Is(err, os.ErrExist) {
+				dialog.ShowError(err, w)
+				return
+			}
+		}
 
 		if err := c.StartConsole(databaseType, databasePath, net.JoinHostPort(bindIP.Text, bindPort.Text)); err != nil {
 			dialog.ShowError(err, w)
 			return
 		}
 
-		loadingDialog.Hide()
 		loadingDialog = nil
 
 		// time.AfterFunc(5*time.Second, func() {

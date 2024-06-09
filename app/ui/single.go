@@ -73,13 +73,8 @@ func (c *Controller) SinglePlayerScreen(w fyne.Window, initial *SinglePlayerScre
 	consoleRunningCheck := widget.NewLabelWithData(consoleRunningLabel)
 	consoleRunningCheck.Alignment = fyne.TextAlignCenter
 	consoleStart := widget.NewButtonWithIcon("Start console", theme.MediaPlayIcon(), func() {
-		dispelDir, err := defaultDirectory()
-		if err != nil {
-			dialog.ShowError(err, w)
-			return
-		}
-
-		if err := os.MkdirAll(path.Dir(dispelDir), 0755); err != nil {
+		databasePath := pathEntry.Text
+		if err := os.MkdirAll(path.Dir(databasePath), 0755); err != nil {
 			if !errors.Is(err, os.ErrExist) {
 				dialog.ShowError(err, w)
 				return
@@ -91,7 +86,7 @@ func (c *Controller) SinglePlayerScreen(w fyne.Window, initial *SinglePlayerScre
 			dialog.ShowError(fmt.Errorf("unknown database type: %q", databaseType), w)
 			return
 		}
-		if err := c.StartConsole(databaseType, dispelDir, consoleAddr); err != nil {
+		if err := c.StartConsole(databaseType, databasePath, consoleAddr); err != nil {
 			dialog.ShowError(err, w)
 			return
 		}
