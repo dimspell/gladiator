@@ -118,10 +118,6 @@ func (c *Controller) HostScreen(w fyne.Window) fyne.CanvasObject {
 
 		loadingDialog = nil
 
-		// time.AfterFunc(5*time.Second, func() {
-		// 	log.Println(syscall.Kill(syscall.Getpid(), syscall.SIGINT))
-		// })
-
 		changePage(w, "Admin", c.AdminScreen(w))
 	}
 

@@ -159,8 +159,7 @@ func (c *Controller) SinglePlayerScreen(w fyne.Window, initial *SinglePlayerScre
 
 	createUserText := widget.NewRichTextFromMarkdown("**3. (Optional): Create new user**\n\n" +
 		"In the game interface, you will be asked to sign in. " +
-		"You can use `\"player\"` account with any password you want (e.g. \"test\"). " +
-		"However, if you wish to create a brand new hero here, in the launcher interface, then please click on the Create New User button below.")
+		"If you wish to create a brand new hero here, in the launcher interface, then please click on the Create New User button below.")
 	createUserText.Wrapping = fyne.TextWrapWord
 
 	startGameText := widget.NewRichTextFromMarkdown("**4. Start game**\n\n" +
