@@ -70,8 +70,7 @@ func (c *Controller) StartScreen(w fyne.Window, selectedOption startOption) fyne
 						if radioGroup.Selected == radioOptions[startOptionPlay] {
 							changePage(w, "SinglePlayer", c.SinglePlayerScreen(w,
 								&SinglePlayerScreenParameters{
-									// DatabaseType: HostDatabaseTypeSqlite,
-									DatabaseType: HostDatabaseTypeMemory,
+									DatabaseType: HostDatabaseTypeSqlite,
 								}))
 							return
 						}
