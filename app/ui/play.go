@@ -16,7 +16,7 @@ import (
 func (c *Controller) PlayScreen(w fyne.Window, consoleAddr string) fyne.CanvasObject {
 	return container.NewBorder(
 		container.NewPadded(
-			headerContainer("Sign-up", func() {
+			headerContainer("Join & Play Multiplayer", func() {
 				changePage(w, "JoinOptions", c.JoinOptionsScreen(w))
 			}),
 		),
