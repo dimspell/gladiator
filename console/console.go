@@ -18,6 +18,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/rs/cors"
+	slogchi "github.com/samber/slog-chi"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 )
@@ -79,7 +80,7 @@ func (c *Console) HttpRouter() http.Handler {
 
 	{ // Setup routes used by the launcher
 		wellKnown := chi.NewRouter()
-		wellKnown.Use(middleware.DefaultLogger)
+		wellKnown.Use(slogchi.New(slog.Default()))
 		wellKnown.Use(cors.New(cors.Options{
 			AllowedOrigins:   c.CORSAllowedOrigins,
 			AllowCredentials: false,
@@ -110,7 +111,7 @@ func (c *Console) HttpRouter() http.Handler {
 
 	{ // Setup gRPC routes for the backend
 		api := chi.NewRouter()
-		api.Use(middleware.DefaultLogger)
+		api.Use(slogchi.New(slog.Default()))
 		api.Use(cors.New(cors.Options{
 			AllowedOrigins:   c.CORSAllowedOrigins,
 			AllowCredentials: false,
