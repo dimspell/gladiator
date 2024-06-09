@@ -2,7 +2,6 @@ package ui
 
 import (
 	"fmt"
-	"log/slog"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
@@ -24,15 +23,7 @@ func (c *Controller) PlayScreen(w fyne.Window, consoleAddr string) fyne.CanvasOb
 		nil,
 		nil,
 		nil,
-		container.NewPadded(
-			widget.NewButtonWithIcon("Stop backend", theme.HomeIcon(), func() {
-				c.StopBackend()
-
-				slog.Debug("Changing page in the launcher", "page", "Welcome")
-				changePage(w, "Welcome", c.WelcomeScreen(w))
-			}),
-			c.playView(w, consoleAddr),
-		),
+		c.playView(w, consoleAddr),
 	)
 }
 
