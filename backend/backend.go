@@ -2,6 +2,7 @@ package backend
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -16,6 +17,7 @@ import (
 	"github.com/dispel-re/dispel-multi/backend/proxy"
 	"github.com/dispel-re/dispel-multi/gen/multi/v1/multiv1connect"
 	"github.com/dispel-re/dispel-multi/model"
+	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
 
@@ -72,8 +74,51 @@ func NewBackend(backendAddr, consoleAddr, myIPAddress string) *Backend {
 	}
 }
 
+type CustomPacket struct {
+	PacketID uint8  `json:"packet_id"`
+	Data     []byte `json:"data"`
+}
+
+func (b *Backend) CommandServerSideChannel() {
+	go func() {
+		mux := chi.NewRouter()
+		mux.Get("/health", func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		})
+		mux.Post("/send", func(w http.ResponseWriter, r *http.Request) {
+			defer r.Body.Close()
+			body, err := io.ReadAll(r.Body)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+
+			var packet CustomPacket
+			if err := json.Unmarshal(body, &packet); err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+
+			// session, ok := srv.Sessions[r.Header.Get("session-id")]
+			for _, session := range b.Sessions {
+				// if session.Conn.RemoteAddr().String() == r.Header.Get("session-id") {
+				// 	break
+				// }
+				if err := b.Send(session.Conn, PacketType(packet.PacketID), packet.Data); err != nil {
+					slog.Warn("Could not send packet to client", "err", err)
+				}
+			}
+
+			w.WriteHeader(http.StatusOK)
+		})
+
+		http.ListenAndServe("127.0.0.1:6110", mux)
+	}()
+}
+
 func (b *Backend) Start() error {
 	slog.Info("Starting backend")
+	// b.CommandServerSideChannel()
 
 	// Listen for incoming connections.
 	listener, err := net.Listen("tcp4", b.Addr)
