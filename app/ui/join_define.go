@@ -69,9 +69,9 @@ func (c *Controller) JoinDefineScreen(w fyne.Window) fyne.CanvasObject {
 						}
 						consoleAddr := net.JoinHostPort(bindIP.Text, bindPort.Text)
 
-						loadingDialog := dialog.NewCustomWithoutButtons("Connecting to auth server...", widget.NewProgressBarInfinite(), w)
-						loadingDialog.Show()
-						defer loadingDialog.Hide()
+						// loadingDialog := dialog.NewCustomWithoutButtons("Connecting to auth server...", widget.NewProgressBarInfinite(), w)
+						// loadingDialog.Show()
+						// defer loadingDialog.Hide()
 
 						if err := c.ConsoleHandshake(consoleAddr); err != nil {
 							dialog.ShowError(err, w)

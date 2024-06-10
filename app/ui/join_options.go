@@ -47,9 +47,9 @@ func (c *Controller) JoinOptionsScreen(w fyne.Window) fyne.CanvasObject {
 						if radioGroup.Selected == radioOptions["loopback"] {
 							consoleAddr := "127.0.0.1:2137"
 
-							loadingDialog := dialog.NewCustomWithoutButtons("Connecting to auth server...", widget.NewProgressBarInfinite(), w)
-							loadingDialog.Show()
-							defer loadingDialog.Hide()
+							// loadingDialog := dialog.NewCustomWithoutButtons("Connecting to auth server...", widget.NewProgressBarInfinite(), w)
+							// loadingDialog.Show()
+							// defer loadingDialog.Hide()
 
 							if err := c.ConsoleHandshake(consoleAddr); err != nil {
 								dialog.ShowError(err, w)
