@@ -26,7 +26,8 @@ func RemoveCharacterFromLobby(characterName string) []byte {
 	return buf
 }
 
-func NewLobbyMessage(user, text string) []byte {
+// NewGlobalMessage creates a new chat message that will be sent to all users, not just the ones in the lobby.
+func NewGlobalMessage(user, text string) []byte {
 	buf := make([]byte, 4+4+4+len(user)+1+len(text)+1)
 
 	buf[0] = 4                       // Message type

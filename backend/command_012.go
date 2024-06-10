@@ -9,7 +9,7 @@ import (
 func (b *Backend) HandleSelectChannel(session *model.Session, req SelectChannelRequest) error {
 	channelName, _ := req.Parse()
 	if channelName == "DISPEL" {
-		b.Send(session.Conn, ReceiveMessage, NewLobbyMessage("admin", "hello"))
+		b.Send(session.Conn, ReceiveMessage, NewGlobalMessage("admin", "hello"))
 	}
 
 	b.Proxy.Close()
