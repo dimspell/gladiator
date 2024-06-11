@@ -10,10 +10,10 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/data/binding"
-	"github.com/dispel-re/dispel-multi/app/ui/probe"
 	"github.com/dispel-re/dispel-multi/backend"
 	"github.com/dispel-re/dispel-multi/console"
 	"github.com/dispel-re/dispel-multi/console/database"
+	"github.com/dispel-re/dispel-multi/probe"
 )
 
 type Controller struct {
