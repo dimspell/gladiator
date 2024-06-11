@@ -1,14 +1,14 @@
 package probe
 
 import (
-	"fmt"
 	"log/slog"
-	"net/http"
 	"sync"
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
 )
+
+const DefaultTimeout = 3 * time.Second
 
 const (
 	StatusNotRunning int32 = iota
@@ -52,7 +52,11 @@ func (p *Probe) Signal(signalCode int32) {
 	p.SignalChange <- signalCode
 }
 
-func (p *Probe) StartupProbe(operation func() error) {
+type StatusChecker interface {
+	Check() error
+}
+
+func (p *Probe) Check(operation func() error) {
 	// TODO: replace it with the context
 	p.cancel = make(chan struct{})
 
@@ -107,23 +111,4 @@ func retryUntil(operation func() error, maxElapsedTime time.Duration) error {
 				"error", err)
 		},
 	)
-}
-
-func HttpGet(httpURL string) func() error {
-	httpClient := &http.Client{Timeout: 3 * time.Second}
-
-	return func() error {
-		resp, err := httpClient.Get(httpURL)
-		if err != nil {
-			return err
-		}
-		if resp == nil {
-			return fmt.Errorf("response is nil")
-		}
-		defer resp.Body.Close()
-		if resp.StatusCode != http.StatusOK {
-			return fmt.Errorf("bad status: %s (%d)", resp.Status, resp.StatusCode)
-		}
-		return nil
-	}
 }
