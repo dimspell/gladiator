@@ -11,10 +11,10 @@ import (
 	"time"
 )
 
+// gameServerIP defines IP address of the game server (DispelMulti.exe process)
 const gameServerIP = "192.168.121.212"
 
-// const gameServerIP = "192.168.121.169"
-// const gameServerIP = "127.0.1.28"
+// clientIP defines IP address of the client (this application)
 const clientIP = "192.168.121.212"
 
 // [26 0 2 0]
@@ -23,7 +23,7 @@ const clientIP = "192.168.121.212"
 func firstHelloPacket() []byte {
 	// buf := bytes.NewBuffer([]byte{35, 35}) // header
 	buf := bytes.NewBuffer([]byte{'#', '#'}) // header
-	buf.WriteString("admin")                 // user name (used in login)
+	buf.WriteString("admin")                 // username (used in login)
 	buf.WriteByte(0)
 
 	return buf.Bytes()
@@ -90,7 +90,7 @@ func main() {
 				break
 			}
 
-			fmt.Println("TCP", string(buf[:n]))
+			log.Println("TCP", string(buf[:n]))
 		}
 	}()
 
@@ -98,10 +98,10 @@ func main() {
 		buf := make([]byte, 1024)
 		n, _, err := udpConn.ReadFrom(buf)
 		if err != nil {
-			fmt.Println("UDP", err)
+			log.Println("UDP", err)
 			break
 		}
-		fmt.Println("UDP", buf[:n])
+		log.Println("UDP", buf[:n])
 
 		if buf[0] == 27 {
 			udpConn.Write([]byte{13, 0, 2, 0})
@@ -227,7 +227,7 @@ func (p *Proxy) listenUDP(ctx context.Context, connHost, connPort string) {
 
 			// handle UDP packet
 			log.Printf("Received %d bytes from %s", n, addr.String())
-			fmt.Println(buf[:n])
+			log.Println(buf[:n])
 		}
 	}()
 }
@@ -236,7 +236,7 @@ func (p *Proxy) listenTCP(ctx context.Context, connHost, connPort string) {
 	// Listen for incoming connections.
 	l, err := net.Listen("tcp4", connHost+":"+connPort)
 	if err != nil {
-		fmt.Println("Error listening:", err.Error())
+		log.Println("Error listening:", err.Error())
 		os.Exit(1)
 	}
 
@@ -247,16 +247,16 @@ func (p *Proxy) listenTCP(ctx context.Context, connHost, connPort string) {
 			buf := make([]byte, 1024)
 			n, err := conn.Read(buf)
 			if err != nil {
-				fmt.Printf("error reading (%s): %s\n", connPort, err)
+				log.Printf("error reading (%s): %s\n", connPort, err)
 				return
 			}
-			fmt.Println(connPort, string(buf[:n]), n, buf[:n])
+			log.Println(connPort, string(buf[:n]), n, buf[:n])
 		}
 	}
 
 	// Close the listener when the application closes.
 	defer l.Close()
-	fmt.Println("Listening TCP on", l.Addr().String())
+	log.Println("Listening TCP on", l.Addr().String())
 	for {
 		if ctx.Err() != nil {
 			return
@@ -265,10 +265,10 @@ func (p *Proxy) listenTCP(ctx context.Context, connHost, connPort string) {
 		// Listen for an incoming connection.
 		conn, err := l.Accept()
 		if err != nil {
-			fmt.Println("Error accepting: ", err.Error())
+			log.Println("Error accepting: ", err.Error())
 			continue
 		}
-		fmt.Println("Accepted connection on port", connPort)
+		log.Println("Accepted connection on port", connPort)
 
 		go processPackets(conn)
 	}
