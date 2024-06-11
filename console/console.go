@@ -25,7 +25,7 @@ import (
 
 type Console struct {
 	Addr               string
-	RunMode            string
+	RunMode            model.RunMode
 	DB                 *database.SQLite
 	Queries            *database.Queries
 	CORSAllowedOrigins []string
@@ -217,7 +217,7 @@ func (c *Console) WellKnownInfo() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		renderJSON(w, r, model.WellKnown{
 			Addr:    c.Addr,
-			RunMode: c.RunMode,
+			RunMode: c.RunMode.String(),
 		})
 	}
 }

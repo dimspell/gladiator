@@ -5,8 +5,12 @@ type WellKnown struct {
 	RunMode string `json:"runMode"`
 }
 
+type RunMode string
+
+func (m RunMode) String() string { return string(m) }
+
 const (
-	RunModeSingle = "SINGLE_PLAYER"
-	RunModeLAN    = "LAN"
-	RunModeHosted = "HOSTED"
+	RunModeSingle RunMode = "SINGLE_PLAYER"
+	RunModeLAN    RunMode = "LAN"
+	RunModeHosted RunMode = "HOSTED"
 )
