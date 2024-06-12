@@ -8,7 +8,6 @@ import (
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
-	"github.com/dispel-re/dispel-multi/model"
 )
 
 type AdminScreenInputParams struct {
@@ -19,22 +18,53 @@ type AdminScreenInputParams struct {
 
 func (c *Controller) AdminScreen(w fyne.Window, params *AdminScreenInputParams) fyne.CanvasObject {
 	consoleScreen := func() fyne.CanvasObject {
-		return container.NewVScroll(container.NewPadded(
-			container.NewVBox(
-				container.NewPadded(
-					container.New(layout.NewFormLayout(),
-						widget.NewLabelWithStyle("Run Mode:", fyne.TextAlignTrailing, fyne.TextStyle{Bold: true}),
-						widget.NewLabel(model.RunModeLAN),
-						widget.NewLabelWithStyle("Bind Address:", fyne.TextAlignTrailing, fyne.TextStyle{Bold: true}),
-						widget.NewLabel(params.BindAddress),
-						widget.NewLabelWithStyle("Database Type:", fyne.TextAlignTrailing, fyne.TextStyle{Bold: true}),
-						widget.NewLabel(params.DatabaseType),
-						widget.NewLabelWithStyle("Database Path:", fyne.TextAlignTrailing, fyne.TextStyle{Bold: true}),
-						widget.NewLabel(params.DatabasePath),
-					),
-				),
-			),
-		))
+		pages := map[widget.ListItemID]string{
+			0: "Configuration",
+		}
+		list := widget.NewList(
+			func() int {
+				return len(pages)
+			},
+			func() fyne.CanvasObject {
+				return widget.NewLabel("")
+			},
+			func(id widget.ListItemID, object fyne.CanvasObject) {
+				p := pages[id]
+				object.(*widget.Label).SetText(p)
+			},
+		)
+		list.Select(0)
+
+		var paramsContainer fyne.CanvasObject
+		if c.Console != nil {
+			formContainer := container.New(layout.NewFormLayout())
+			paramsMap := map[string]string{
+				"Run Mode":      c.Console.RunMode.String(),
+				"Bind Address":  params.BindAddress,
+				"Database Type": params.DatabaseType,
+				"Database Path": params.DatabasePath,
+			}
+			for k, v := range paramsMap {
+				formContainer.Add(widget.NewLabelWithStyle(k+":", fyne.TextAlignTrailing, fyne.TextStyle{Bold: true}))
+				formContainer.Add(widget.NewLabel(v))
+			}
+
+			paramsContainer = container.NewVBox(container.NewPadded(formContainer))
+		} else {
+			paramsContainer = container.NewCenter(
+				widget.NewLabel("The console is not running"),
+			)
+		}
+
+		split := container.NewHSplit(
+			list,
+			container.NewVScroll(container.NewPadded(
+				paramsContainer,
+			)),
+		)
+		split.Offset = 0.25
+
+		return split
 	}
 
 	onGoBack := func() {
