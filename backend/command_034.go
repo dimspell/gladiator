@@ -77,7 +77,7 @@ func (b *Backend) HandleJoinGame(session *model.Session, req JoinGameRequest) er
 			return err
 		}
 		if bytes.Equal(proxyIP, []byte{0, 0, 0, 0}) {
-			return fmt.Errorf("incorrect proxy for %v", player.IpAddress)
+			return fmt.Errorf("packet-34: incorrect proxy for %v", player.IpAddress)
 		}
 
 		// TODO: make sure the host is the first one
@@ -100,10 +100,16 @@ type JoinGameRequestData struct {
 }
 
 func (r JoinGameRequest) Parse() (data JoinGameRequestData, err error) {
-	split := bytes.Split(r, []byte{0})
+	rd := NewPacketReader(r)
 
-	data.RoomName = string(split[0])
-	data.Password = string(bytes.TrimSuffix(split[1], []byte{0}))
+	data.RoomName, err = rd.ReadString()
+	if err != nil {
+		return data, fmt.Errorf("packet-34: could not read room name: %w", err)
+	}
+
+	// TODO: Read password if given
+
+	// TODO: 216 byte at the end of the packet
 
 	return data, nil
 }
