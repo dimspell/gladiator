@@ -219,3 +219,7 @@ func (c *Controller) StopBackend() {
 
 	c.backendProbe.Signal(probe.StatusNotRunning)
 }
+
+func (c *Controller) ConsoleRunning() bool {
+	return c.Console != nil
+}

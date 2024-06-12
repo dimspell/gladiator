@@ -21,31 +21,30 @@ type AdminScreenInputParams struct {
 }
 
 func (c *Controller) AdminScreen(w fyne.Window, params *AdminScreenInputParams) fyne.CanvasObject {
-	configurationScreen := func() fyne.CanvasObject {
-		var paramsContainer fyne.CanvasObject
-		if c.Console != nil {
-			formContainer := container.New(layout.NewFormLayout())
-			paramsMap := map[string]string{
-				"Run Mode":      c.Console.RunMode.String(),
-				"Bind Address":  params.BindAddress,
-				"Database Type": params.DatabaseType,
-				"Database Path": params.DatabasePath,
-			}
-			for k, v := range paramsMap {
-				formContainer.Add(widget.NewLabelWithStyle(k+":", fyne.TextAlignTrailing, fyne.TextStyle{Bold: true}))
-				formContainer.Add(widget.NewLabel(v))
-			}
-
-			paramsContainer = container.NewVBox(container.NewPadded(formContainer))
-		} else {
-			paramsContainer = container.NewCenter(
+	wrapConsoleRunning := func(children func() fyne.CanvasObject) fyne.CanvasObject {
+		if !c.ConsoleRunning() {
+			return container.NewCenter(
 				widget.NewLabel("The console is not running"),
 			)
 		}
-
-		return paramsContainer
+		return children()
 	}
 
+	configurationView := func() fyne.CanvasObject {
+		formContainer := container.New(layout.NewFormLayout())
+		paramsMap := map[string]string{
+			"Run Mode":      c.Console.RunMode.String(),
+			"Bind Address":  params.BindAddress,
+			"Database Type": params.DatabaseType,
+			"Database Path": params.DatabasePath,
+		}
+		for k, v := range paramsMap {
+			formContainer.Add(widget.NewLabelWithStyle(k+":", fyne.TextAlignTrailing, fyne.TextStyle{Bold: true}))
+			formContainer.Add(widget.NewLabel(v))
+		}
+
+		return container.NewVBox(container.NewPadded(formContainer))
+	}
 	actionView := func() fyne.CanvasObject {
 		return container.NewVBox(
 			widget.NewLabel("Actions"),
@@ -109,15 +108,15 @@ func (c *Controller) AdminScreen(w fyne.Window, params *AdminScreenInputParams) 
 		list.OnSelected = func(id widget.ListItemID) {
 			switch id {
 			case 0:
-				scrollPane.Add(configurationScreen())
+				scrollPane.Add(wrapConsoleRunning(configurationView))
 				break
 			case 1:
-				scrollPane.Add(actionView())
+				scrollPane.Add(wrapConsoleRunning(actionView))
 				break
 			}
 		}
 
-		scrollPane.Add(configurationScreen())
+		scrollPane.Add(wrapConsoleRunning(configurationView))
 
 		split := container.NewHSplit(list, container.NewVScroll(scrollPane))
 		split.Offset = 0.25
