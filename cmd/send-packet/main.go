@@ -11,11 +11,6 @@ import (
 	"github.com/dispel-re/dispel-multi/backend"
 )
 
-var packet struct {
-	PacketID uint8  `json:"packet_id"`
-	Data     []byte `json:"data"`
-}
-
 func main() {
 	client := &http.Client{
 		Timeout: 5 * time.Second,
