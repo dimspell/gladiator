@@ -235,6 +235,41 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 	return i, err
 }
 
+const deleteAllGameRoomPlayers = `-- name: DeleteAllGameRoomPlayers :exec
+
+
+DELETE
+FROM game_room_players
+WHERE TRUE
+`
+
+// -- name: RemovePlayerFromRoom :exec
+// DELETE
+// FROM game_room_players
+// WHERE game_room_id = ?
+//
+//	AND character_id = ?;
+//
+// -- name: DeleteGameRoom :exec
+// -- DELETE
+// -- FROM game_rooms
+// -- WHERE game_rooms.id = ?;
+func (q *Queries) DeleteAllGameRoomPlayers(ctx context.Context) error {
+	_, err := q.exec(ctx, q.deleteAllGameRoomPlayersStmt, deleteAllGameRoomPlayers)
+	return err
+}
+
+const deleteAllGameRooms = `-- name: DeleteAllGameRooms :exec
+DELETE
+FROM game_rooms
+WHERE TRUE
+`
+
+func (q *Queries) DeleteAllGameRooms(ctx context.Context) error {
+	_, err := q.exec(ctx, q.deleteAllGameRoomsStmt, deleteAllGameRooms)
+	return err
+}
+
 const deleteCharacter = `-- name: DeleteCharacter :exec
 DELETE
 FROM characters

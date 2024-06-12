@@ -1,6 +1,10 @@
 package ui
 
 import (
+	"context"
+	"errors"
+	"fmt"
+
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/data/binding"
@@ -17,24 +21,7 @@ type AdminScreenInputParams struct {
 }
 
 func (c *Controller) AdminScreen(w fyne.Window, params *AdminScreenInputParams) fyne.CanvasObject {
-	consoleScreen := func() fyne.CanvasObject {
-		pages := map[widget.ListItemID]string{
-			0: "Configuration",
-		}
-		list := widget.NewList(
-			func() int {
-				return len(pages)
-			},
-			func() fyne.CanvasObject {
-				return widget.NewLabel("")
-			},
-			func(id widget.ListItemID, object fyne.CanvasObject) {
-				p := pages[id]
-				object.(*widget.Label).SetText(p)
-			},
-		)
-		list.Select(0)
-
+	configurationScreen := func() fyne.CanvasObject {
 		var paramsContainer fyne.CanvasObject
 		if c.Console != nil {
 			formContainer := container.New(layout.NewFormLayout())
@@ -56,12 +43,83 @@ func (c *Controller) AdminScreen(w fyne.Window, params *AdminScreenInputParams) 
 			)
 		}
 
-		split := container.NewHSplit(
-			list,
-			container.NewVScroll(container.NewPadded(
-				paramsContainer,
-			)),
+		return paramsContainer
+	}
+
+	actionView := func() fyne.CanvasObject {
+		return container.NewVBox(
+			widget.NewLabel("Actions"),
+			widget.NewButton("Delete all game rooms", func() {
+				if c.Console == nil {
+					dialog.ShowError(fmt.Errorf("The console is not running"), w)
+					return
+				}
+
+				loadingDialog := dialog.NewCustomWithoutButtons("Deleting all games", widget.NewProgressBarInfinite(), w)
+				loadingDialog.Show()
+
+				err := errors.Join(
+					func() error {
+						if err := c.Console.Queries.DeleteAllGameRoomPlayers(context.TODO()); err != nil {
+							return fmt.Errorf("could not delete all game room players: %w", err)
+						}
+						return nil
+					}(),
+					func() error {
+						if err := c.Console.Queries.DeleteAllGameRooms(context.TODO()); err != nil {
+							return fmt.Errorf("could not delete all game rooms: %w", err)
+						}
+						return nil
+					}(),
+				)
+
+				loadingDialog.Hide()
+				if err != nil {
+					dialog.ShowError(err, w)
+					return
+				}
+				dialog.ShowInformation("All deleted", "All game rooms and players have been deleted", w)
+			}),
 		)
+	}
+
+	consoleScreen := func() fyne.CanvasObject {
+		scrollPane := container.NewPadded()
+
+		pages := map[widget.ListItemID]string{
+			0: "Configuration",
+			1: "Actions",
+		}
+		list := widget.NewList(
+			func() int {
+				return len(pages)
+			},
+			func() fyne.CanvasObject {
+				return widget.NewLabel("")
+			},
+			func(id widget.ListItemID, object fyne.CanvasObject) {
+				p := pages[id]
+				go object.(*widget.Label).SetText(p)
+			},
+		)
+		list.Select(0)
+		list.OnUnselected = func(id widget.ListItemID) {
+			scrollPane.RemoveAll()
+		}
+		list.OnSelected = func(id widget.ListItemID) {
+			switch id {
+			case 0:
+				scrollPane.Add(configurationScreen())
+				break
+			case 1:
+				scrollPane.Add(actionView())
+				break
+			}
+		}
+
+		scrollPane.Add(configurationScreen())
+
+		split := container.NewHSplit(list, container.NewVScroll(scrollPane))
 		split.Offset = 0.25
 
 		return split

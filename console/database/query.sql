@@ -184,3 +184,24 @@ WHERE game_room_id = ?
 -- name: AddPlayerToRoom :exec
 INSERT INTO game_room_players (game_room_id, character_id, ip_address)
 VALUES (?, ?, ?);
+
+-- -- name: RemovePlayerFromRoom :exec
+-- DELETE
+-- FROM game_room_players
+-- WHERE game_room_id = ?
+--   AND character_id = ?;
+
+-- -- name: DeleteGameRoom :exec
+-- -- DELETE
+-- -- FROM game_rooms
+-- -- WHERE game_rooms.id = ?;
+
+-- name: DeleteAllGameRoomPlayers :exec
+DELETE
+FROM game_room_players
+WHERE TRUE;
+
+-- name: DeleteAllGameRooms :exec
+DELETE
+FROM game_rooms
+WHERE TRUE;

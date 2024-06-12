@@ -36,6 +36,12 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.createUserStmt, err = db.PrepareContext(ctx, createUser); err != nil {
 		return nil, fmt.Errorf("error preparing query CreateUser: %w", err)
 	}
+	if q.deleteAllGameRoomPlayersStmt, err = db.PrepareContext(ctx, deleteAllGameRoomPlayers); err != nil {
+		return nil, fmt.Errorf("error preparing query DeleteAllGameRoomPlayers: %w", err)
+	}
+	if q.deleteAllGameRoomsStmt, err = db.PrepareContext(ctx, deleteAllGameRooms); err != nil {
+		return nil, fmt.Errorf("error preparing query DeleteAllGameRooms: %w", err)
+	}
 	if q.deleteCharacterStmt, err = db.PrepareContext(ctx, deleteCharacter); err != nil {
 		return nil, fmt.Errorf("error preparing query DeleteCharacter: %w", err)
 	}
@@ -101,6 +107,16 @@ func (q *Queries) Close() error {
 	if q.createUserStmt != nil {
 		if cerr := q.createUserStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing createUserStmt: %w", cerr)
+		}
+	}
+	if q.deleteAllGameRoomPlayersStmt != nil {
+		if cerr := q.deleteAllGameRoomPlayersStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing deleteAllGameRoomPlayersStmt: %w", cerr)
+		}
+	}
+	if q.deleteAllGameRoomsStmt != nil {
+		if cerr := q.deleteAllGameRoomsStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing deleteAllGameRoomsStmt: %w", cerr)
 		}
 	}
 	if q.deleteCharacterStmt != nil {
@@ -216,6 +232,8 @@ type Queries struct {
 	createCharacterStmt          *sql.Stmt
 	createGameRoomStmt           *sql.Stmt
 	createUserStmt               *sql.Stmt
+	deleteAllGameRoomPlayersStmt *sql.Stmt
+	deleteAllGameRoomsStmt       *sql.Stmt
 	deleteCharacterStmt          *sql.Stmt
 	existPlayerInRoomStmt        *sql.Stmt
 	findCharacterStmt            *sql.Stmt
@@ -240,6 +258,8 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		createCharacterStmt:          q.createCharacterStmt,
 		createGameRoomStmt:           q.createGameRoomStmt,
 		createUserStmt:               q.createUserStmt,
+		deleteAllGameRoomPlayersStmt: q.deleteAllGameRoomPlayersStmt,
+		deleteAllGameRoomsStmt:       q.deleteAllGameRoomsStmt,
 		deleteCharacterStmt:          q.deleteCharacterStmt,
 		existPlayerInRoomStmt:        q.existPlayerInRoomStmt,
 		findCharacterStmt:            q.findCharacterStmt,
