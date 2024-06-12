@@ -15,6 +15,7 @@ type rankingServiceServer struct {
 	DB *database.Queries
 }
 
+// GetRanking returns the ranking of the players.
 func (s *rankingServiceServer) GetRanking(ctx context.Context, req *connect.Request[multiv1.GetRankingRequest]) (*connect.Response[multiv1.GetRankingResponse], error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err

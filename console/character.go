@@ -18,6 +18,7 @@ type characterServiceServer struct {
 	DB *database.Queries
 }
 
+// ListCharacters returns a list of all characters of a user.
 func (s *characterServiceServer) ListCharacters(ctx context.Context, req *connect.Request[multiv1.ListCharactersRequest]) (*connect.Response[multiv1.ListCharactersResponse], error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -88,6 +89,7 @@ func (s *characterServiceServer) ListCharacters(ctx context.Context, req *connec
 	return resp, nil
 }
 
+// GetCharacter returns a character by its name and user id.
 func (s *characterServiceServer) GetCharacter(ctx context.Context, req *connect.Request[multiv1.GetCharacterRequest]) (*connect.Response[multiv1.GetCharacterResponse], error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -153,6 +155,7 @@ func (s *characterServiceServer) GetCharacter(ctx context.Context, req *connect.
 	return resp, nil
 }
 
+// CreateCharacter creates a new character for the user.
 func (s *characterServiceServer) CreateCharacter(ctx context.Context, req *connect.Request[multiv1.CreateCharacterRequest]) (*connect.Response[multiv1.CreateCharacterResponse], error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -213,6 +216,7 @@ func (s *characterServiceServer) CreateCharacter(ctx context.Context, req *conne
 	return resp, nil
 }
 
+// PutStats updates the character stats.
 func (s *characterServiceServer) PutStats(ctx context.Context, req *connect.Request[multiv1.PutStatsRequest]) (*connect.Response[multiv1.PutStatsResponse], error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -264,6 +268,7 @@ func (s *characterServiceServer) PutStats(ctx context.Context, req *connect.Requ
 	return resp, nil
 }
 
+// PutSpells update character spells.
 func (s *characterServiceServer) PutSpells(ctx context.Context, req *connect.Request[multiv1.PutSpellsRequest]) (*connect.Response[multiv1.PutSpellsResponse], error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -284,6 +289,7 @@ func (s *characterServiceServer) PutSpells(ctx context.Context, req *connect.Req
 	return resp, nil
 }
 
+// PutInventoryCharacter update character inventory.
 func (s *characterServiceServer) PutInventoryCharacter(ctx context.Context, req *connect.Request[multiv1.PutInventoryRequest]) (*connect.Response[multiv1.PutInventoryResponse], error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -304,6 +310,7 @@ func (s *characterServiceServer) PutInventoryCharacter(ctx context.Context, req 
 	return resp, nil
 }
 
+// DeleteCharacter deletes a character from the database.
 func (s *characterServiceServer) DeleteCharacter(ctx context.Context, req *connect.Request[multiv1.DeleteCharacterRequest]) (*connect.Response[multiv1.DeleteCharacterResponse], error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err

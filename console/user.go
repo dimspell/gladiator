@@ -18,6 +18,7 @@ type userServiceServer struct {
 	DB *database.Queries
 }
 
+// CreateUser creates a new user.
 func (s *userServiceServer) CreateUser(ctx context.Context, req *connect.Request[multiv1.CreateUserRequest]) (*connect.Response[multiv1.CreateUserResponse], error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -46,6 +47,7 @@ func (s *userServiceServer) CreateUser(ctx context.Context, req *connect.Request
 	return resp, nil
 }
 
+// AuthenticateUser authenticates a user.
 func (s *userServiceServer) AuthenticateUser(ctx context.Context, req *connect.Request[multiv1.AuthenticateUserRequest]) (*connect.Response[multiv1.AuthenticateUserResponse], error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -73,6 +75,7 @@ func (s *userServiceServer) AuthenticateUser(ctx context.Context, req *connect.R
 	return resp, nil
 }
 
+// GetUser gets a user by ID.
 func (s *userServiceServer) GetUser(ctx context.Context, req *connect.Request[multiv1.GetUserRequest]) (*connect.Response[multiv1.GetUserResponse], error) {
 	user, err := s.DB.GetUserByID(ctx, req.Msg.UserId)
 	if err != nil {

@@ -16,6 +16,7 @@ type gameServiceServer struct {
 	DB *database.Queries
 }
 
+// ListGames returns a list of all open games.
 func (s *gameServiceServer) ListGames(ctx context.Context, req *connect.Request[multiv1.ListGamesRequest]) (*connect.Response[multiv1.ListGamesResponse], error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -41,7 +42,8 @@ func (s *gameServiceServer) ListGames(ctx context.Context, req *connect.Request[
 	return resp, nil
 }
 
-func (s gameServiceServer) GetGame(ctx context.Context, req *connect.Request[multiv1.GetGameRequest]) (*connect.Response[multiv1.GetGameResponse], error) {
+// GetGame returns a game by name.
+func (s *gameServiceServer) GetGame(ctx context.Context, req *connect.Request[multiv1.GetGameRequest]) (*connect.Response[multiv1.GetGameResponse], error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -61,6 +63,7 @@ func (s gameServiceServer) GetGame(ctx context.Context, req *connect.Request[mul
 	return resp, nil
 }
 
+// CreateGame creates a new game.
 func (s *gameServiceServer) CreateGame(ctx context.Context, req *connect.Request[multiv1.CreateGameRequest]) (*connect.Response[multiv1.CreateGameResponse], error) {
 	input := req.Msg
 
@@ -86,7 +89,8 @@ func (s *gameServiceServer) CreateGame(ctx context.Context, req *connect.Request
 	return resp, nil
 }
 
-func (s gameServiceServer) JoinGame(ctx context.Context, req *connect.Request[multiv1.JoinGameRequest]) (*connect.Response[multiv1.JoinGameResponse], error) {
+// JoinGame tries to get the player to join a game.
+func (s *gameServiceServer) JoinGame(ctx context.Context, req *connect.Request[multiv1.JoinGameRequest]) (*connect.Response[multiv1.JoinGameResponse], error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -112,7 +116,8 @@ func (s gameServiceServer) JoinGame(ctx context.Context, req *connect.Request[mu
 	return resp, nil
 }
 
-func (s gameServiceServer) ListPlayers(ctx context.Context, req *connect.Request[multiv1.ListPlayersRequest]) (*connect.Response[multiv1.ListPlayersResponse], error) {
+// ListPlayers returns a list of all players in a game.
+func (s *gameServiceServer) ListPlayers(ctx context.Context, req *connect.Request[multiv1.ListPlayersRequest]) (*connect.Response[multiv1.ListPlayersResponse], error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
