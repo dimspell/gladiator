@@ -73,6 +73,7 @@ func (s *gameServiceServer) CreateGame(ctx context.Context, req *connect.Request
 		Password:      sql.NullString{String: input.Password, Valid: len(input.Password) > 0},
 		HostIpAddress: input.HostIpAddress,
 		MapID:         input.MapId,
+		CreatedBy:     req.Msg.UserId,
 	})
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)

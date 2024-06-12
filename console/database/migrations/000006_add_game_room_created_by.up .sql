@@ -1,0 +1,1 @@
+ALTER TABLE game_rooms ADD COLUMN created_by INTEGER NOT NULL DEFAULT 1;

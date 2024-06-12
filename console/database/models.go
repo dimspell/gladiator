@@ -55,6 +55,7 @@ type GameRoom struct {
 	Password      sql.NullString
 	HostIpAddress string
 	MapID         int64
+	CreatedBy     int64
 }
 
 type GameRoomPlayer struct {

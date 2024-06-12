@@ -193,9 +193,9 @@ func (q *Queries) CreateCharacter(ctx context.Context, arg CreateCharacterParams
 }
 
 const createGameRoom = `-- name: CreateGameRoom :one
-INSERT INTO game_rooms (name, password, host_ip_address, map_id)
-VALUES (?, ?, ?, ?)
-RETURNING id, name, password, host_ip_address, map_id
+INSERT INTO game_rooms (name, password, host_ip_address, map_id, created_by)
+VALUES (?, ?, ?, ?, ?)
+RETURNING id, name, password, host_ip_address, map_id, created_by
 `
 
 type CreateGameRoomParams struct {
@@ -203,6 +203,7 @@ type CreateGameRoomParams struct {
 	Password      sql.NullString
 	HostIpAddress string
 	MapID         int64
+	CreatedBy     int64
 }
 
 func (q *Queries) CreateGameRoom(ctx context.Context, arg CreateGameRoomParams) (GameRoom, error) {
@@ -211,6 +212,7 @@ func (q *Queries) CreateGameRoom(ctx context.Context, arg CreateGameRoomParams) 
 		arg.Password,
 		arg.HostIpAddress,
 		arg.MapID,
+		arg.CreatedBy,
 	)
 	var i GameRoom
 	err := row.Scan(
@@ -219,6 +221,7 @@ func (q *Queries) CreateGameRoom(ctx context.Context, arg CreateGameRoomParams) 
 		&i.Password,
 		&i.HostIpAddress,
 		&i.MapID,
+		&i.CreatedBy,
 	)
 	return i, err
 }
@@ -412,7 +415,8 @@ SELECT id,
        name,
        password,
        host_ip_address,
-       map_id
+       map_id,
+       created_by
 FROM game_rooms
 WHERE game_rooms.name = ?
 LIMIT 1
@@ -427,6 +431,7 @@ func (q *Queries) GetGameRoom(ctx context.Context, name string) (GameRoom, error
 		&i.Password,
 		&i.HostIpAddress,
 		&i.MapID,
+		&i.CreatedBy,
 	)
 	return i, err
 }
@@ -579,7 +584,7 @@ func (q *Queries) ListCharacters(ctx context.Context, userID int64) ([]Character
 }
 
 const listGameRooms = `-- name: ListGameRooms :many
-SELECT id, name, password, host_ip_address, map_id
+SELECT id, name, password, host_ip_address, map_id, created_by
 FROM game_rooms
 `
 
@@ -598,6 +603,7 @@ func (q *Queries) ListGameRooms(ctx context.Context) ([]GameRoom, error) {
 			&i.Password,
 			&i.HostIpAddress,
 			&i.MapID,
+			&i.CreatedBy,
 		); err != nil {
 			return nil, err
 		}

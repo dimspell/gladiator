@@ -153,14 +153,15 @@ SELECT id,
        name,
        password,
        host_ip_address,
-       map_id
+       map_id,
+       created_by
 FROM game_rooms
 WHERE game_rooms.name = ?
 LIMIT 1;
 
 -- name: CreateGameRoom :one
-INSERT INTO game_rooms (name, password, host_ip_address, map_id)
-VALUES (?, ?, ?, ?)
+INSERT INTO game_rooms (name, password, host_ip_address, map_id, created_by)
+VALUES (?, ?, ?, ?, ?)
 RETURNING *;
 
 -- name: GetGameRoomPlayers :many

@@ -55,7 +55,8 @@ CREATE TABLE game_rooms
     name            TEXT    NOT NULL,
     password        TEXT,
     host_ip_address TEXT    NOT NULL,
-    map_id          INTEGER NOT NULL
+    map_id          INTEGER NOT NULL,
+    created_by      INTEGER NOT NULL
 );
 
 CREATE TABLE game_room_players
