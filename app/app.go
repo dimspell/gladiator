@@ -11,6 +11,7 @@ import (
 
 const appName = "dispel-multi"
 
+// NewApp creates a new CLI app with the given version, commit and build date.
 func NewApp(version, commit, buildDate string) {
 	app := &cli.Command{
 		Name: appName,

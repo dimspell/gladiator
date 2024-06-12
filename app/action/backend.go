@@ -13,7 +13,7 @@ import (
 func BackendCommand() *cli.Command {
 	cmd := &cli.Command{
 		Name:        "backend",
-		Description: "Start backend server and join it to existing server",
+		Description: "Start backend server and join it to existing console server",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:  "console-addr",
