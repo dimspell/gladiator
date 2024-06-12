@@ -1,7 +1,6 @@
 package backend
 
 import (
-	"bytes"
 	"context"
 	"database/sql"
 	"encoding/binary"
@@ -99,9 +98,11 @@ type SelectGameRequestData struct {
 }
 
 func (r SelectGameRequest) Parse() (data SelectGameRequestData, err error) {
-	split := bytes.Split(r, []byte{0})
-	data.RoomName = string(bytes.TrimSuffix(split[0], []byte{0}))
-
+	rd := NewPacketReader(r)
+	data.RoomName, err = rd.ReadString()
+	if err != nil {
+		return data, fmt.Errorf("packet-69: cannot read room name: %w", err)
+	}
 	return data, nil
 }
 
