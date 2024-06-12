@@ -35,7 +35,7 @@ func (b *Backend) HandleJoinGame(session *model.Session, req JoinGameRequest) er
 		GameRoomId: respGame.Msg.Game.GameId,
 	}))
 	if err != nil {
-		slog.Error("Cannot list players", "err", err.Error())
+		slog.Error("Cannot list players", "error", err)
 		return nil
 	}
 
@@ -45,10 +45,25 @@ func (b *Backend) HandleJoinGame(session *model.Session, req JoinGameRequest) er
 		session.Username,
 		respGame.Msg.GetGame().HostIpAddress,
 	)
+	if err != nil {
+		slog.Error("Cannot get proxy address", "error", err)
+		return nil
+	}
+
+	_, err = b.gameClient.JoinGame(context.TODO(), connect.NewRequest(&multiv1.JoinGameRequest{
+		UserId:      session.UserID,
+		CharacterId: session.CharacterID,
+		GameRoomId:  respGame.Msg.Game.GetGameId(),
+		IpAddress:   session.LocalIpAddress,
+	}))
+	if err != nil {
+		slog.Error("Could not join game room", "error", err)
+		return nil
+	}
 
 	gameRoom := JoinGameResponse{
 		Lobby: model.LobbyRoom{
-			HostIPAddress: hostIP,
+			HostIPAddress: hostIP.To4(),
 			Name:          respGame.Msg.Game.Name,
 			Password:      "",
 		},
