@@ -113,7 +113,7 @@ func (c *Controller) StartConsole(databaseType, databasePath, consoleAddr string
 		return err
 	}
 
-	c.consoleProbe.Check(probe.NewHTTPHealthChecker("http://%s/_health").Check)
+	c.consoleProbe.Check(probe.NewHTTPHealthChecker(fmt.Sprintf("http://%s/_health", consoleAddr)).Check)
 	go func() {
 		if err := start(ctx); err != nil {
 			cancel()
