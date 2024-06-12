@@ -8,6 +8,8 @@ message Game {
   string password = 3;
   string host_ip_address = 4;
   int64 map_id = 5;
+  int64 created_by = 6;
+  int64 host_user_id = 7;
 }
 
 message Player {

@@ -56,10 +56,12 @@ type GameRoom struct {
 	HostIpAddress string
 	MapID         int64
 	CreatedBy     int64
+	HostUserID    int64
 }
 
 type GameRoomPlayer struct {
 	GameRoomID  int64
+	UserID      int64
 	CharacterID int64
 	IpAddress   string
 	AddedAt     int64

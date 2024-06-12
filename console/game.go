@@ -36,6 +36,8 @@ func (s *gameServiceServer) ListGames(ctx context.Context, req *connect.Request[
 			Password:      room.Password.String,
 			HostIpAddress: room.HostIpAddress,
 			MapId:         room.MapID,
+			CreatedBy:     room.CreatedBy,
+			HostUserId:    room.HostUserID,
 		}
 	}
 
@@ -60,6 +62,8 @@ func (s *gameServiceServer) GetGame(ctx context.Context, req *connect.Request[mu
 		Password:      room.Password.String,
 		HostIpAddress: room.HostIpAddress,
 		MapId:         room.MapID,
+		CreatedBy:     room.CreatedBy,
+		HostUserId:    room.HostUserID,
 	}})
 	return resp, nil
 }
@@ -74,6 +78,7 @@ func (s *gameServiceServer) CreateGame(ctx context.Context, req *connect.Request
 		HostIpAddress: input.HostIpAddress,
 		MapID:         input.MapId,
 		CreatedBy:     req.Msg.UserId,
+		HostUserID:    req.Msg.UserId,
 	})
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
@@ -86,6 +91,8 @@ func (s *gameServiceServer) CreateGame(ctx context.Context, req *connect.Request
 			Password:      game.Password.String,
 			HostIpAddress: game.HostIpAddress,
 			MapId:         game.MapID,
+			CreatedBy:     game.CreatedBy,
+			HostUserId:    game.HostUserID,
 		},
 	})
 	return resp, nil
@@ -107,6 +114,7 @@ func (s *gameServiceServer) JoinGame(ctx context.Context, req *connect.Request[m
 
 	err := s.DB.AddPlayerToRoom(ctx, database.AddPlayerToRoomParams{
 		GameRoomID:  req.Msg.GameRoomId,
+		UserID:      req.Msg.UserId,
 		CharacterID: req.Msg.CharacterId,
 		IpAddress:   req.Msg.IpAddress,
 		AddedAt:     time.Now().Unix(),

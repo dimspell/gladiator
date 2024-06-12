@@ -11,12 +11,13 @@ import (
 )
 
 const addPlayerToRoom = `-- name: AddPlayerToRoom :exec
-INSERT INTO game_room_players (game_room_id, character_id, ip_address, added_at)
-VALUES (?, ?, ?, ?)
+INSERT INTO game_room_players (game_room_id, user_id, character_id, ip_address, added_at)
+VALUES (?, ?, ?, ?, ?)
 `
 
 type AddPlayerToRoomParams struct {
 	GameRoomID  int64
+	UserID      int64
 	CharacterID int64
 	IpAddress   string
 	AddedAt     int64
@@ -25,6 +26,7 @@ type AddPlayerToRoomParams struct {
 func (q *Queries) AddPlayerToRoom(ctx context.Context, arg AddPlayerToRoomParams) error {
 	_, err := q.exec(ctx, q.addPlayerToRoomStmt, addPlayerToRoom,
 		arg.GameRoomID,
+		arg.UserID,
 		arg.CharacterID,
 		arg.IpAddress,
 		arg.AddedAt,
@@ -193,9 +195,9 @@ func (q *Queries) CreateCharacter(ctx context.Context, arg CreateCharacterParams
 }
 
 const createGameRoom = `-- name: CreateGameRoom :one
-INSERT INTO game_rooms (name, password, host_ip_address, map_id, created_by)
-VALUES (?, ?, ?, ?, ?)
-RETURNING id, name, password, host_ip_address, map_id, created_by
+INSERT INTO game_rooms (name, password, host_ip_address, map_id, created_by, host_user_id)
+VALUES (?, ?, ?, ?, ?, ?)
+RETURNING id, name, password, host_ip_address, map_id, created_by, host_user_id
 `
 
 type CreateGameRoomParams struct {
@@ -204,6 +206,7 @@ type CreateGameRoomParams struct {
 	HostIpAddress string
 	MapID         int64
 	CreatedBy     int64
+	HostUserID    int64
 }
 
 func (q *Queries) CreateGameRoom(ctx context.Context, arg CreateGameRoomParams) (GameRoom, error) {
@@ -213,6 +216,7 @@ func (q *Queries) CreateGameRoom(ctx context.Context, arg CreateGameRoomParams) 
 		arg.HostIpAddress,
 		arg.MapID,
 		arg.CreatedBy,
+		arg.HostUserID,
 	)
 	var i GameRoom
 	err := row.Scan(
@@ -222,6 +226,7 @@ func (q *Queries) CreateGameRoom(ctx context.Context, arg CreateGameRoomParams) 
 		&i.HostIpAddress,
 		&i.MapID,
 		&i.CreatedBy,
+		&i.HostUserID,
 	)
 	return i, err
 }
@@ -416,7 +421,8 @@ SELECT id,
        password,
        host_ip_address,
        map_id,
-       created_by
+       created_by,
+       host_user_id
 FROM game_rooms
 WHERE game_rooms.name = ?
 LIMIT 1
@@ -432,6 +438,7 @@ func (q *Queries) GetGameRoom(ctx context.Context, name string) (GameRoom, error
 		&i.HostIpAddress,
 		&i.MapID,
 		&i.CreatedBy,
+		&i.HostUserID,
 	)
 	return i, err
 }
@@ -441,7 +448,8 @@ SELECT DISTINCT characters.user_id,
                 username,
                 character_name,
                 class_type,
-                ip_address
+                ip_address,
+                game_rooms.host_user_id == game_room_players.ip_address as is_host
 FROM game_rooms
          JOIN game_room_players ON game_rooms.id = game_room_players.game_room_id
          JOIN characters ON game_room_players.character_id = characters.id
@@ -456,6 +464,7 @@ type GetGameRoomPlayersRow struct {
 	CharacterName string
 	ClassType     int64
 	IpAddress     string
+	IsHost        bool
 }
 
 func (q *Queries) GetGameRoomPlayers(ctx context.Context, id int64) ([]GetGameRoomPlayersRow, error) {
@@ -473,6 +482,7 @@ func (q *Queries) GetGameRoomPlayers(ctx context.Context, id int64) ([]GetGameRo
 			&i.CharacterName,
 			&i.ClassType,
 			&i.IpAddress,
+			&i.IsHost,
 		); err != nil {
 			return nil, err
 		}
@@ -584,7 +594,7 @@ func (q *Queries) ListCharacters(ctx context.Context, userID int64) ([]Character
 }
 
 const listGameRooms = `-- name: ListGameRooms :many
-SELECT id, name, password, host_ip_address, map_id, created_by
+SELECT id, name, password, host_ip_address, map_id, created_by, host_user_id
 FROM game_rooms
 `
 
@@ -604,6 +614,7 @@ func (q *Queries) ListGameRooms(ctx context.Context) ([]GameRoom, error) {
 			&i.HostIpAddress,
 			&i.MapID,
 			&i.CreatedBy,
+			&i.HostUserID,
 		); err != nil {
 			return nil, err
 		}

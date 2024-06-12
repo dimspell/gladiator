@@ -1,0 +1,1 @@
+ALTER TABLE game_room_players ADD COLUMN user_id INTEGER NOT NULL;

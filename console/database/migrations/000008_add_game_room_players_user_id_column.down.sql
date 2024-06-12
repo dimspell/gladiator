@@ -1,0 +1,1 @@
+ALTER TABLE game_room_players DROP COLUMN user_id;

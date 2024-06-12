@@ -56,12 +56,14 @@ CREATE TABLE game_rooms
     password        TEXT,
     host_ip_address TEXT    NOT NULL,
     map_id          INTEGER NOT NULL,
-    created_by      INTEGER NOT NULL
+    created_by      INTEGER NOT NULL,
+    host_user_id    INTEGER NOT NULL
 );
 
 CREATE TABLE game_room_players
 (
     game_room_id INTEGER NOT NULL,
+    user_id      INTEGER NOT NULL,
     character_id INTEGER NOT NULL,
     ip_address   TEXT    NOT NULL,
     added_at     INTEGER NOT NULL

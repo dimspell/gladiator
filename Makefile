@@ -1,7 +1,7 @@
 all: compile
 
 mig_db_url ?= sqlite://database.sqlite
-mig_dir ?= internal/database/migrations
+mig_dir ?= console/database/migrations
 mig_name ?= create_users_table
 mig_version ?= VERSION
 

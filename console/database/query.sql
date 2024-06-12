@@ -154,14 +154,15 @@ SELECT id,
        password,
        host_ip_address,
        map_id,
-       created_by
+       created_by,
+       host_user_id
 FROM game_rooms
 WHERE game_rooms.name = ?
 LIMIT 1;
 
 -- name: CreateGameRoom :one
-INSERT INTO game_rooms (name, password, host_ip_address, map_id, created_by)
-VALUES (?, ?, ?, ?, ?)
+INSERT INTO game_rooms (name, password, host_ip_address, map_id, created_by, host_user_id)
+VALUES (?, ?, ?, ?, ?, ?)
 RETURNING *;
 
 -- name: GetGameRoomPlayers :many
@@ -169,7 +170,8 @@ SELECT DISTINCT characters.user_id,
                 username,
                 character_name,
                 class_type,
-                ip_address
+                ip_address,
+                game_rooms.host_user_id == game_room_players.ip_address as is_host
 FROM game_rooms
          JOIN game_room_players ON game_rooms.id = game_room_players.game_room_id
          JOIN characters ON game_room_players.character_id = characters.id
@@ -184,8 +186,8 @@ WHERE game_room_id = ?
   AND character_id = ?;
 
 -- name: AddPlayerToRoom :exec
-INSERT INTO game_room_players (game_room_id, character_id, ip_address, added_at)
-VALUES (?, ?, ?, ?);
+INSERT INTO game_room_players (game_room_id, user_id, character_id, ip_address, added_at)
+VALUES (?, ?, ?, ?, ?);
 
 -- -- name: RemovePlayerFromRoom :exec
 -- DELETE
