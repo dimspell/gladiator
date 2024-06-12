@@ -28,7 +28,7 @@ func (c *Controller) JoinDefineScreen(w fyne.Window) fyne.CanvasObject {
 
 	bindGroup := container.NewGridWithColumns(2, bindIP, bindPort)
 
-	bindLabel := widget.NewLabelWithStyle("Server address (IP, Host)", fyne.TextAlignTrailing, fyne.TextStyle{Bold: true})
+	bindLabel := widget.NewLabelWithStyle("Server Address (IP, Port)", fyne.TextAlignTrailing, fyne.TextStyle{Bold: true})
 
 	formGrid := container.New(
 		layout.NewFormLayout(),
