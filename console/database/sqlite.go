@@ -89,6 +89,10 @@ func Migrate(conn *sql.DB) error {
 		}
 		return fmt.Errorf("migration: %w", err)
 	}
+
+	version, dirty, err := m.Version()
+	slog.Info("Migration complete", "version", version, "dirty", dirty, "error", err)
+
 	return nil
 }
 
