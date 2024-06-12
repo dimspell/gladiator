@@ -77,7 +77,7 @@ func (c *Controller) AdminScreen(w fyne.Window, params *AdminScreenInputParams) 
 					dialog.ShowError(err, w)
 					return
 				}
-				dialog.ShowInformation("All deleted", "All game rooms and players have been deleted", w)
+				dialog.ShowInformation("All deleted", "All game rooms have been deleted", w)
 			}),
 		)
 	}
