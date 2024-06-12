@@ -80,18 +80,20 @@ func Migrate(conn *sql.DB) error {
 		return err
 	}
 
-	// Migrate
-	// _ = m.Down()
-
+	{
+		version, dirty, err := m.Version()
+		slog.Info("Migration status", "version", version, "dirty", dirty, "error", err)
+	}
 	if err := m.Up(); err != nil {
 		if errors.Is(err, migrate.ErrNoChange) {
 			return nil
 		}
 		return fmt.Errorf("migration: %w", err)
 	}
-
-	version, dirty, err := m.Version()
-	slog.Info("Migration complete", "version", version, "dirty", dirty, "error", err)
+	{
+		version, dirty, err := m.Version()
+		slog.Info("Migration complete", "version", version, "dirty", dirty, "error", err)
+	}
 
 	return nil
 }
