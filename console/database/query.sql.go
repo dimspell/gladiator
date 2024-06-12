@@ -11,18 +11,24 @@ import (
 )
 
 const addPlayerToRoom = `-- name: AddPlayerToRoom :exec
-INSERT INTO game_room_players (game_room_id, character_id, ip_address)
-VALUES (?, ?, ?)
+INSERT INTO game_room_players (game_room_id, character_id, ip_address, added_at)
+VALUES (?, ?, ?, ?)
 `
 
 type AddPlayerToRoomParams struct {
 	GameRoomID  int64
 	CharacterID int64
 	IpAddress   string
+	AddedAt     int64
 }
 
 func (q *Queries) AddPlayerToRoom(ctx context.Context, arg AddPlayerToRoomParams) error {
-	_, err := q.exec(ctx, q.addPlayerToRoomStmt, addPlayerToRoom, arg.GameRoomID, arg.CharacterID, arg.IpAddress)
+	_, err := q.exec(ctx, q.addPlayerToRoomStmt, addPlayerToRoom,
+		arg.GameRoomID,
+		arg.CharacterID,
+		arg.IpAddress,
+		arg.AddedAt,
+	)
 	return err
 }
 
@@ -436,6 +442,7 @@ FROM game_rooms
          JOIN characters ON game_room_players.character_id = characters.id
          JOIN users on users.id = characters.user_id
 WHERE game_rooms.id = ?
+ORDER BY game_room_players.added_at ASC
 `
 
 type GetGameRoomPlayersRow struct {

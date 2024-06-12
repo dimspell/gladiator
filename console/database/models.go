@@ -61,6 +61,7 @@ type GameRoomPlayer struct {
 	GameRoomID  int64
 	CharacterID int64
 	IpAddress   string
+	AddedAt     int64
 }
 
 type User struct {

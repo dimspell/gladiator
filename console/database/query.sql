@@ -173,7 +173,8 @@ FROM game_rooms
          JOIN game_room_players ON game_rooms.id = game_room_players.game_room_id
          JOIN characters ON game_room_players.character_id = characters.id
          JOIN users on users.id = characters.user_id
-WHERE game_rooms.id = ?;
+WHERE game_rooms.id = ?
+ORDER BY game_room_players.added_at ASC;
 
 -- name: ExistPlayerInRoom :one
 SELECT 1 as exist
@@ -182,8 +183,8 @@ WHERE game_room_id = ?
   AND character_id = ?;
 
 -- name: AddPlayerToRoom :exec
-INSERT INTO game_room_players (game_room_id, character_id, ip_address)
-VALUES (?, ?, ?);
+INSERT INTO game_room_players (game_room_id, character_id, ip_address, added_at)
+VALUES (?, ?, ?, ?);
 
 -- -- name: RemovePlayerFromRoom :exec
 -- DELETE

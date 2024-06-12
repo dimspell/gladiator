@@ -3,6 +3,7 @@ package console
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"connectrpc.com/connect"
 	"github.com/dispel-re/dispel-multi/console/database"
@@ -107,6 +108,7 @@ func (s *gameServiceServer) JoinGame(ctx context.Context, req *connect.Request[m
 		GameRoomID:  req.Msg.GameRoomId,
 		CharacterID: req.Msg.CharacterId,
 		IpAddress:   req.Msg.IpAddress,
+		AddedAt:     time.Now().Unix(),
 	})
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
