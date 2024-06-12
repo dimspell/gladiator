@@ -101,9 +101,12 @@ func defaultDirectory() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	directoryPath += string(os.PathSeparator)
+	// directoryPath += string(os.PathSeparator)
+	directoryPath += "/"
 	directoryPath += "dispel-multi"
-	directoryPath += string(os.PathSeparator)
+	// directoryPath += string(os.PathSeparator)
+	directoryPath += "/"
+	// directoryPath += "dispel-multi.sqlite"
 	directoryPath += "dispel-multi.sql"
 	return directoryPath, nil
 }
