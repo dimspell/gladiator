@@ -4,15 +4,15 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/dispel-re/dispel-multi/console/auth"
 	"github.com/dispel-re/dispel-multi/model"
-	"golang.org/x/crypto/bcrypt"
 )
 
 func Seed(queries *Queries) error {
-	pwd, _ := bcrypt.GenerateFromPassword([]byte("test"), 14)
+	pwd, _ := auth.NewPassword("test")
 	user, err := queries.CreateUser(context.TODO(), CreateUserParams{
 		Username: "archer",
-		Password: string(pwd),
+		Password: pwd.String(),
 	})
 	if err != nil {
 		return err
@@ -157,7 +157,7 @@ func Seed(queries *Queries) error {
 
 	user2, err := queries.CreateUser(context.TODO(), CreateUserParams{
 		Username: "mage",
-		Password: string(pwd),
+		Password: pwd.String(),
 	})
 	if err != nil {
 		return err

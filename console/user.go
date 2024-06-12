@@ -6,10 +6,10 @@ import (
 	"log/slog"
 
 	"connectrpc.com/connect"
+	"github.com/dispel-re/dispel-multi/console/auth"
 	"github.com/dispel-re/dispel-multi/console/database"
 	multiv1 "github.com/dispel-re/dispel-multi/gen/multi/v1"
 	"github.com/dispel-re/dispel-multi/gen/multi/v1/multiv1connect"
-	"golang.org/x/crypto/bcrypt"
 )
 
 var _ multiv1connect.UserServiceHandler = (*userServiceServer)(nil)
@@ -23,15 +23,15 @@ func (s *userServiceServer) CreateUser(ctx context.Context, req *connect.Request
 		return nil, err
 	}
 
-	password, err := hashPassword(req.Msg.Password)
+	password, err := auth.NewPassword(req.Msg.Password)
 	if err != nil {
-		slog.Warn("packet-42: could not hash the password", "err", err)
+		slog.Warn("could not hash the password", "err", err)
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 
 	user, err := s.DB.CreateUser(ctx, database.CreateUserParams{
 		Username: req.Msg.Username,
-		Password: password,
+		Password: password.String(),
 	})
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
@@ -58,7 +58,7 @@ func (s *userServiceServer) AuthenticateUser(ctx context.Context, req *connect.R
 		// return b.Send(session.Conn, ClientAuthentication, []byte{0, 0, 0, 0})
 	}
 
-	if !checkPasswordHash(req.Msg.Password, user.Password) {
+	if !auth.CheckPassword(req.Msg.Password, user.Password) {
 		// slog.Debug("packet-41: incorrect password")
 		// return b.Send(session.Conn, ClientAuthentication, []byte{0, 0, 0, 0})
 		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("incorrect password"))
@@ -86,15 +86,4 @@ func (s *userServiceServer) GetUser(ctx context.Context, req *connect.Request[mu
 		}},
 	)
 	return resp, nil
-}
-
-// TODO: Use salt and pepper
-func hashPassword(password string) (string, error) {
-	bytes, err := bcrypt.GenerateFromPassword([]byte(password), 14)
-	return string(bytes), err
-}
-
-func checkPasswordHash(password, hash string) bool {
-	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
-	return err == nil
 }
