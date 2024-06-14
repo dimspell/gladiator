@@ -10,6 +10,7 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 	"github.com/dispel-re/dispel-multi/app/ui"
+	"github.com/dispel-re/dispel-multi/update"
 	"github.com/fynelabs/fyneselfupdate"
 	"github.com/fynelabs/selfupdate"
 	"github.com/urfave/cli/v3"
@@ -41,7 +42,7 @@ func GUICommand(version string) *cli.Command {
 		a := app.NewWithID("net.dispelmulti.app")
 		w := a.NewWindow("Dispel Multi")
 
-		// selfManage(a, w, "http://localhost:8080/myapp-{{.OS}}-{{.Arch}}{{.Ext}}")
+		// selfManage(a, w)
 
 		ctrl := ui.NewController(a, version)
 		w.SetContent(ctrl.WelcomeScreen(w))
