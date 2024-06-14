@@ -79,8 +79,12 @@ jobs:
         run: |
           mkdir dist
           mv \
+            "fyne-cross/dist/windows-amd64/Dispel Multi.exe" \
+            "dist/DispelMulti.exe"
+          mv \
             "fyne-cross/dist/windows-amd64/Dispel Multi.exe.zip" \
             "dist/DispelMulti.zip"
+          ls -l "fyne-cross/dist/windows-amd64/"
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
@@ -88,6 +92,7 @@ jobs:
           name: windows-build
           path: |
             dist/DispelMulti.zip
+            dist/DispelMulti.exe
 
       - name: Release
         uses: softprops/action-gh-release@v2
