@@ -30,3 +30,6 @@ go.work
 # Self-update
 *.pem
 *.key
+
+# Goland
+*.idea
