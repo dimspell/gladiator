@@ -22,7 +22,7 @@ func selfManage(a fyne.App, w fyne.Window) {
 	// Used `selfupdatectl create-keys` followed by `selfupdatectl print-key`
 	publicKey := ed25519.PublicKey{154, 136, 116, 223, 168, 77, 245, 149, 98, 81, 84, 4, 10, 79, 102, 226, 217, 174, 215, 192, 237, 41, 151, 252, 233, 39, 34, 99, 157, 166, 224, 148}
 	config := fyneselfupdate.NewConfigWithTimeout(a, w, time.Duration(1)*time.Minute,
-		update.NewGithubSource("dispel-re", "multi"),
+		update.NewGitHubSource(nil, "dispel-re", "multi"),
 		selfupdate.Schedule{FetchOnStart: true, Interval: time.Hour * time.Duration(24)}, // Checking for binary update on start and every 24 hours
 		publicKey)
 	_, err := selfupdate.Manage(config)
