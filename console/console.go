@@ -10,8 +10,6 @@ import (
 	"syscall"
 	"time"
 
-	"connectrpc.com/connect"
-	"connectrpc.com/otelconnect"
 	"github.com/dispel-re/dispel-multi/console/database"
 	"github.com/dispel-re/dispel-multi/gen/multi/v1/multiv1connect"
 	"github.com/dispel-re/dispel-multi/model"
@@ -58,7 +56,6 @@ func (c *Console) HttpRouter() http.Handler {
 	mux.Use(middleware.Recoverer)
 	mux.Use(middleware.Throttle(100))
 	mux.Use(middleware.Timeout(5 * time.Second))
-	// mux.Use(otelchi.Middleware("console", otelchi.WithChiRoutes(mux)))
 
 	{ // Setup meta routes (readiness, liveness, metrics etc.)
 		mux.Get("/_health", func(w http.ResponseWriter, r *http.Request) {
@@ -136,11 +133,10 @@ func (c *Console) HttpRouter() http.Handler {
 			MaxAge: 7200,
 		}).Handler)
 
-		interceptors := connect.WithInterceptors(otelconnect.NewInterceptor())
-		api.Mount(multiv1connect.NewCharacterServiceHandler(&characterServiceServer{DB: c.Queries}, interceptors))
-		api.Mount(multiv1connect.NewGameServiceHandler(&gameServiceServer{DB: c.Queries}, interceptors))
-		api.Mount(multiv1connect.NewUserServiceHandler(&userServiceServer{DB: c.Queries}, interceptors))
-		api.Mount(multiv1connect.NewRankingServiceHandler(&rankingServiceServer{DB: c.Queries}, interceptors))
+		api.Mount(multiv1connect.NewCharacterServiceHandler(&characterServiceServer{DB: c.Queries}))
+		api.Mount(multiv1connect.NewGameServiceHandler(&gameServiceServer{DB: c.Queries}))
+		api.Mount(multiv1connect.NewUserServiceHandler(&userServiceServer{DB: c.Queries}))
+		api.Mount(multiv1connect.NewRankingServiceHandler(&rankingServiceServer{DB: c.Queries}))
 		mux.Mount("/grpc/", http.StripPrefix("/grpc", api))
 	}
 
