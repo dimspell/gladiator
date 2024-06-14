@@ -102,30 +102,30 @@ func (c *Controller) HostScreen(w fyne.Window, params *HostScreenInputParams) fy
 
 		loadingDialog := dialog.NewCustomWithoutButtons("Starting auth server...", widget.NewProgressBarInfinite(), w)
 		loadingDialog.Show()
-		defer loadingDialog.Hide()
 
 		databaseType, ok := databaseTypes[comboGroup.Selected]
 		if !ok {
+			loadingDialog.Hide()
 			dialog.ShowError(fmt.Errorf("unknown database type: %q", databaseType), w)
-
 			return
 		}
 
 		databasePath := pathEntry.Text
 		if err := os.MkdirAll(path.Dir(databasePath), 0755); err != nil {
 			if !errors.Is(err, os.ErrExist) {
+				loadingDialog.Hide()
 				dialog.ShowError(err, w)
 				return
 			}
 		}
 
 		if err := c.StartConsole(databaseType, databasePath, net.JoinHostPort(bindIP.Text, bindPort.Text)); err != nil {
+			loadingDialog.Hide()
 			dialog.ShowError(err, w)
 			return
 		}
 
-		loadingDialog = nil
-
+		loadingDialog.Hide()
 		changePage(w, "Admin", c.AdminScreen(w, &AdminScreenInputParams{
 			DatabasePath: databasePath,
 			DatabaseType: databaseType,
