@@ -4,8 +4,8 @@ import (
 	"testing"
 
 	"connectrpc.com/connect"
-	v1 "github.com/dispel-re/dispel-multi/gen/multi/v1"
-	"github.com/dispel-re/dispel-multi/model"
+	v1 "github.com/dimspell/gladiator/gen/multi/v1"
+	"github.com/dimspell/gladiator/model"
 	"github.com/stretchr/testify/assert"
 )
 

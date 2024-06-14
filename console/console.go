@@ -10,9 +10,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/dispel-re/dispel-multi/console/database"
-	"github.com/dispel-re/dispel-multi/gen/multi/v1/multiv1connect"
-	"github.com/dispel-re/dispel-multi/model"
+	"github.com/dimspell/gladiator/console/database"
+	"github.com/dimspell/gladiator/gen/multi/v1/multiv1connect"
+	"github.com/dimspell/gladiator/model"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/rs/cors"
@@ -82,27 +82,12 @@ func (c *Console) HttpRouter() http.Handler {
 			AllowedOrigins:   c.CORSAllowedOrigins,
 			AllowCredentials: false,
 			Debug:            false,
-			AllowedMethods: []string{
-				http.MethodGet,
-				http.MethodPost,
-			},
-			AllowedHeaders: []string{
-				"Content-Type",
-				"Connect-Protocol-Version",
-				"Connect-Timeout-Ms",
-				"Grpc-Timeout",
-				"X-Grpc-Web",
-				"X-User-Agent",
-			},
-			ExposedHeaders: []string{
-				"Grpc-Status",
-				"Grpc-Message",
-				"Grpc-Status-Details-Bin",
-			},
-			MaxAge: 7200,
+			AllowedMethods:   []string{http.MethodGet},
+			AllowedHeaders:   []string{"Content-Type"},
+			MaxAge:           7200,
 		}).Handler)
 
-		wellKnown.Get("/dispel-multi.json", c.WellKnownInfo())
+		wellKnown.Get("/console.json", c.WellKnownInfo())
 		mux.Mount("/.well-known/", wellKnown)
 	}
 

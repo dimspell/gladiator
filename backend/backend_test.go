@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
-	v1 "github.com/dispel-re/dispel-multi/gen/multi/v1"
-	"github.com/dispel-re/dispel-multi/gen/multi/v1/multiv1connect"
+	v1 "github.com/dimspell/gladiator/gen/multi/v1"
+	"github.com/dimspell/gladiator/gen/multi/v1/multiv1connect"
 )
 
 type mockConn struct {

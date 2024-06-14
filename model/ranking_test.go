@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"testing"
 
-	multiv1 "github.com/dispel-re/dispel-multi/gen/multi/v1"
+	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/stretchr/testify/assert"
 )
 

@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/dispel-re/dispel-multi/model"
+	"github.com/dimspell/gladiator/model"
 )
 
 func (b *Backend) HandleSendLobbyMessage(session *model.Session, req SendLobbyMessageRequest) error {

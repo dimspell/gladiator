@@ -1,8 +1,8 @@
 package backend
 
 import (
-	"github.com/dispel-re/dispel-multi/console/database"
-	"github.com/dispel-re/dispel-multi/model"
+	"github.com/dimspell/gladiator/console/database"
+	"github.com/dimspell/gladiator/model"
 )
 
 // HandleListChannels handles 0xbff (255-11) command

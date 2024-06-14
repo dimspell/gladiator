@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/dispel-re/dispel-multi/backend"
+	"github.com/dimspell/gladiator/backend"
 )
 
 func main() {

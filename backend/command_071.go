@@ -1,6 +1,6 @@
 package backend
 
-import "github.com/dispel-re/dispel-multi/model"
+import "github.com/dimspell/gladiator/model"
 
 func (b *Backend) SendHostMigration(session *model.Session, isHost bool, newHostIP [4]byte) error {
 	payload := []byte{}

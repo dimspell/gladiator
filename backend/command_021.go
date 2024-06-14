@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/dispel-re/dispel-multi/model"
+	"github.com/dimspell/gladiator/model"
 )
 
 func (b *Backend) HandlePing(session *model.Session, req PingRequest) error {

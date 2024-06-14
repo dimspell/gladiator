@@ -4,9 +4,9 @@ import (
 	"context"
 
 	"connectrpc.com/connect"
-	"github.com/dispel-re/dispel-multi/console/database"
-	multiv1 "github.com/dispel-re/dispel-multi/gen/multi/v1"
-	"github.com/dispel-re/dispel-multi/gen/multi/v1/multiv1connect"
+	"github.com/dimspell/gladiator/console/database"
+	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
+	"github.com/dimspell/gladiator/gen/multi/v1/multiv1connect"
 )
 
 var _ multiv1connect.RankingServiceHandler = (*rankingServiceServer)(nil)

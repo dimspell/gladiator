@@ -3,7 +3,7 @@ package action
 import (
 	"context"
 
-	"github.com/dispel-re/dispel-multi/proxy"
+	"github.com/dimspell/gladiator/proxy"
 	"github.com/urfave/cli/v3"
 )
 

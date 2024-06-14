@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	"connectrpc.com/connect"
-	multiv1 "github.com/dispel-re/dispel-multi/gen/multi/v1"
-	"github.com/dispel-re/dispel-multi/model"
+	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
+	"github.com/dimspell/gladiator/model"
 )
 
 func (b *Backend) HandleDeleteCharacter(session *model.Session, req DeleteCharacterRequest) error {

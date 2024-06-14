@@ -5,8 +5,8 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/dispel-re/dispel-multi/backend"
-	"github.com/dispel-re/dispel-multi/backend/packetlogger"
+	"github.com/dimspell/gladiator/backend"
+	"github.com/dimspell/gladiator/backend/packetlogger"
 	"github.com/urfave/cli/v3"
 )
 

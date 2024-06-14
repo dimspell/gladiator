@@ -33,7 +33,7 @@ func (c *Controller) WelcomeScreen(w fyne.Window) fyne.CanvasObject {
 		container.NewVBox(
 			container.NewHBox(
 				layout.NewSpacer(),
-				widget.NewHyperlink("GitHub", parseURL("https://github.com/dispel-re/dispel-multi")),
+				widget.NewHyperlink("GitHub", parseURL("https://github.com/dimspell/gladiator")),
 				widget.NewLabel("-"),
 				widget.NewHyperlink("Discord", parseURL("https://discord.gg/XCNrwvdV6R")),
 				widget.NewLabel("-"),
@@ -46,7 +46,7 @@ func (c *Controller) WelcomeScreen(w fyne.Window) fyne.CanvasObject {
 		nil,
 		container.NewPadded(
 			container.NewVBox(
-				widget.NewRichTextFromMarkdown("# Dispel Multi"),
+				widget.NewRichTextFromMarkdown("# Gladiator Dispel Multi"),
 
 				container.NewVBox(
 					header1Label,

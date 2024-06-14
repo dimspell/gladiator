@@ -12,9 +12,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/dispel-re/dispel-multi/backend/proxy"
-	"github.com/dispel-re/dispel-multi/gen/multi/v1/multiv1connect"
-	"github.com/dispel-re/dispel-multi/model"
+	"github.com/dimspell/gladiator/backend/proxy"
+	"github.com/dimspell/gladiator/gen/multi/v1/multiv1connect"
+	"github.com/dimspell/gladiator/model"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )

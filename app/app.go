@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/dispel-re/dispel-multi/app/action"
+	"github.com/dimspell/gladiator/app/action"
 	"github.com/urfave/cli/v3"
 )
 

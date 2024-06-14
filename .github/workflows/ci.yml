@@ -79,7 +79,7 @@ jobs:
         run: |
           ls -l "fyne-cross/dist/windows-amd64"
           unzip \
-            "fyne-cross/dist/windows-amd64/Dispel Multi.exe.zip" \
+            "fyne-cross/dist/windows-amd64/Gladiator.exe.zip" \
             -d "dist"
 
       - name: Upload Artifact
@@ -87,7 +87,7 @@ jobs:
         with:
           name: windows-build
           path: |
-            dist/Dispel Multi.exe 
+            dist/Gladiator.exe 
 
       - name: Release
         uses: softprops/action-gh-release@v2
@@ -95,4 +95,4 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           files: |
-            "dist/Dispel Multi.exe"
+            dist/Gladiator.exe

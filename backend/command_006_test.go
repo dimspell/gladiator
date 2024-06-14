@@ -3,7 +3,7 @@ package backend
 import (
 	"testing"
 
-	"github.com/dispel-re/dispel-multi/model"
+	"github.com/dimspell/gladiator/model"
 	"github.com/stretchr/testify/assert"
 )
 

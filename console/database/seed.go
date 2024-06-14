@@ -4,8 +4,8 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/dispel-re/dispel-multi/console/auth"
-	"github.com/dispel-re/dispel-multi/model"
+	"github.com/dimspell/gladiator/console/auth"
+	"github.com/dimspell/gladiator/model"
 )
 
 func Seed(queries *Queries) error {

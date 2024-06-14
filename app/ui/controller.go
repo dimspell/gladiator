@@ -10,10 +10,10 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/data/binding"
-	"github.com/dispel-re/dispel-multi/backend"
-	"github.com/dispel-re/dispel-multi/console"
-	"github.com/dispel-re/dispel-multi/console/database"
-	"github.com/dispel-re/dispel-multi/probe"
+	"github.com/dimspell/gladiator/backend"
+	"github.com/dimspell/gladiator/console"
+	"github.com/dimspell/gladiator/console/database"
+	"github.com/dimspell/gladiator/probe"
 )
 
 type Controller struct {
@@ -143,7 +143,7 @@ func (c *Controller) ConsoleHandshake(consoleAddr string) error {
 	if !strings.Contains(consoleAddr, "://") {
 		consoleAddr = "http://" + consoleAddr
 	}
-	res, err := client.Get(fmt.Sprintf("%s/.well-known/dispel-multi.json", consoleAddr))
+	res, err := client.Get(fmt.Sprintf("%s/.well-known/console.json", consoleAddr))
 	if err != nil {
 		return err
 	}

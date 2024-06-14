@@ -8,7 +8,7 @@ import (
 	connect "connectrpc.com/connect"
 	context "context"
 	errors "errors"
-	v1 "github.com/dispel-re/dispel-multi/gen/multi/v1"
+	v1 "github.com/dimspell/gladiator/gen/multi/v1"
 	http "net/http"
 	strings "strings"
 )

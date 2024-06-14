@@ -1,8 +1,8 @@
-Website = "https://example.com"
+Website = "https://github.com/dimspell/gladiator"
 
 [Details]
 #Icon = "Icon.png"
-Name = "Dispel Multi"
-ID = "net.dispelmulti.app"
-Version = "1.0.0"
+Name = "Gladiator"
+ID = "com.github.dimspell.gladiator"
+Version = "0.1.0"
 Build = 1

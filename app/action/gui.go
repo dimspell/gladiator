@@ -4,13 +4,14 @@ package action
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
-	"github.com/dispel-re/dispel-multi/app/ui"
-	"github.com/dispel-re/dispel-multi/update"
+	"github.com/dimspell/gladiator/app/ui"
+	"github.com/dimspell/gladiator/update"
 	"github.com/fynelabs/fyneselfupdate"
 	"github.com/fynelabs/selfupdate"
 	"github.com/urfave/cli/v3"
@@ -39,10 +40,12 @@ func GUICommand(version string) *cli.Command {
 	}
 
 	cmd.Action = func(ctx context.Context, c *cli.Command) error {
-		a := app.NewWithID("net.dispelmulti.app")
-		w := a.NewWindow("Dispel Multi")
+		a := app.NewWithID("com.github.dimspell.gladiator")
+		w := a.NewWindow("Gladiator")
 
 		// selfManage(a, w)
+
+		fmt.Println(a.Metadata())
 
 		ctrl := ui.NewController(a, version)
 		w.SetContent(ctrl.WelcomeScreen(w))

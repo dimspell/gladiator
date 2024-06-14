@@ -9,8 +9,8 @@ import (
 	"log/slog"
 
 	"connectrpc.com/connect"
-	multiv1 "github.com/dispel-re/dispel-multi/gen/multi/v1"
-	"github.com/dispel-re/dispel-multi/model"
+	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
+	"github.com/dimspell/gladiator/model"
 )
 
 // HandleSelectGame handles 0x45ff (255-69) command

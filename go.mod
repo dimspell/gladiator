@@ -1,4 +1,4 @@
-module github.com/dispel-re/dispel-multi
+module github.com/dimspell/gladiator
 
 go 1.21
 

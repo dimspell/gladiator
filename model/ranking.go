@@ -3,7 +3,7 @@ package model
 import (
 	"encoding/binary"
 
-	multiv1 "github.com/dispel-re/dispel-multi/gen/multi/v1"
+	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
 )
 
 func RankingToBytes(ranking *multiv1.GetRankingResponse) []byte {

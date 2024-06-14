@@ -1,4 +1,4 @@
-# dispel-multi
+# Gladiator
 
 This repository is a monorepo that contains multiple projects that helps to play a Dispel Multiplayer game.
 

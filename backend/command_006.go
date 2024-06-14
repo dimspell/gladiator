@@ -4,7 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"github.com/dispel-re/dispel-multi/model"
+	"github.com/dimspell/gladiator/model"
 )
 
 // HandleAuthorizationHandshake handles 0x6ff (255-6) command.

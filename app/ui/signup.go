@@ -8,8 +8,8 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
-	"github.com/dispel-re/dispel-multi/console/auth"
-	"github.com/dispel-re/dispel-multi/console/database"
+	"github.com/dimspell/gladiator/console/auth"
+	"github.com/dimspell/gladiator/console/database"
 )
 
 func (c *Controller) SignUnScreen(w fyne.Window) fyne.CanvasObject {

@@ -14,7 +14,7 @@ import (
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
-	"github.com/dispel-re/dispel-multi/console/database"
+	"github.com/dimspell/gladiator/console/database"
 )
 
 type SinglePlayerScreenParameters struct {

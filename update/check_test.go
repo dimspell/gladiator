@@ -14,7 +14,7 @@ import (
 
 // func Test_fetchLatestRelease(t *testing.T) {
 // 	client := &http.Client{Timeout: 5 * time.Second}
-// 	_, err := fetchLatestRelease(client, "https://api.github.com", "dispel-re", "multi")
+// 	_, err := fetchLatestRelease(client, "https://api.github.com", "dimspell", "gladiator")
 // 	assert.NoError(t, err)
 // }
 

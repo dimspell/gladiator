@@ -3,7 +3,7 @@ package backend
 import (
 	"bytes"
 
-	"github.com/dispel-re/dispel-multi/model"
+	"github.com/dimspell/gladiator/model"
 )
 
 func (b *Backend) HandleSelectChannel(session *model.Session, req SelectChannelRequest) error {

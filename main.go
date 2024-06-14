@@ -3,7 +3,7 @@ package main
 import (
 	"time"
 
-	"github.com/dispel-re/dispel-multi/app"
+	"github.com/dimspell/gladiator/app"
 )
 
 // Version stores what is a current version and git revision of the build.

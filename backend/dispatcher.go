@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/dispel-re/dispel-multi/model"
+	"github.com/dimspell/gladiator/model"
 )
 
 type PacketType byte

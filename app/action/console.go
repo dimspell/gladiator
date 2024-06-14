@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/dispel-re/dispel-multi/console"
-	"github.com/dispel-re/dispel-multi/console/database"
+	"github.com/dimspell/gladiator/console"
+	"github.com/dimspell/gladiator/console/database"
 	"github.com/urfave/cli/v3"
 )
 
