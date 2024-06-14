@@ -4,6 +4,7 @@ package action
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"time"
 
@@ -41,6 +42,21 @@ func GUICommand(version string) *cli.Command {
 	cmd.Action = func(ctx context.Context, c *cli.Command) error {
 		a := app.NewWithID("net.dispelmulti.app")
 		w := a.NewWindow("Dispel Multi")
+		w.SetCloseIntercept(func() {
+			fmt.Println("Closing window")
+			defer func() {
+				r := recover()
+				fmt.Println(r)
+			}()
+			w.Close()
+		})
+		w.SetOnClosed(func() {
+			fmt.Println("Closed window")
+			defer func() {
+				r := recover()
+				fmt.Println(r)
+			}()
+		})
 
 		// selfManage(a, w, "http://localhost:8080/myapp-{{.OS}}-{{.Arch}}{{.Ext}}")
 
