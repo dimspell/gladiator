@@ -4,7 +4,6 @@ package action
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"time"
 
@@ -18,12 +17,11 @@ import (
 )
 
 // TODO: Set-up the self updates with S3-compatible server
-func selfManage(a fyne.App, w fyne.Window, sourceURL string) {
+func selfManage(a fyne.App, w fyne.Window) {
 	// Used `selfupdatectl create-keys` followed by `selfupdatectl print-key`
 	publicKey := ed25519.PublicKey{154, 136, 116, 223, 168, 77, 245, 149, 98, 81, 84, 4, 10, 79, 102, 226, 217, 174, 215, 192, 237, 41, 151, 252, 233, 39, 34, 99, 157, 166, 224, 148}
-	httpSource := selfupdate.NewHTTPSource(nil, sourceURL)
 	config := fyneselfupdate.NewConfigWithTimeout(a, w, time.Duration(1)*time.Minute,
-		httpSource,
+		update.NewGithubSource("dispel-re", "multi"),
 		selfupdate.Schedule{FetchOnStart: true, Interval: time.Hour * time.Duration(24)}, // Checking for binary update on start and every 24 hours
 		publicKey)
 	_, err := selfupdate.Manage(config)
@@ -42,21 +40,6 @@ func GUICommand(version string) *cli.Command {
 	cmd.Action = func(ctx context.Context, c *cli.Command) error {
 		a := app.NewWithID("net.dispelmulti.app")
 		w := a.NewWindow("Dispel Multi")
-		w.SetCloseIntercept(func() {
-			fmt.Println("Closing window")
-			defer func() {
-				r := recover()
-				fmt.Println(r)
-			}()
-			w.Close()
-		})
-		w.SetOnClosed(func() {
-			fmt.Println("Closed window")
-			defer func() {
-				r := recover()
-				fmt.Println(r)
-			}()
-		})
 
 		// selfManage(a, w, "http://localhost:8080/myapp-{{.OS}}-{{.Arch}}{{.Ext}}")
 
