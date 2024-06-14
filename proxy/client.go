@@ -8,6 +8,8 @@ import (
 	"log/slog"
 	"net"
 	"time"
+
+	"golang.org/x/sync/errgroup"
 )
 
 type ClientProxy struct {
@@ -28,12 +30,15 @@ func NewClientProxy(masterIP string) *ClientProxy {
 }
 
 func (p *ClientProxy) Start(ctx context.Context) error {
-	go p.tcpAsHost(ctx)
-	go p.udpAsHost(ctx)
-
-	ch := make(chan struct{})
-	<-ch
-	return nil
+	g, ctx := errgroup.WithContext(ctx)
+	g.Go(func() error {
+		p.tcpAsHost(ctx)
+		return fmt.Errorf("tcpAsHost stopped")
+	})
+	g.Go(func() error {
+		return p.udpAsHost(ctx)
+	})
+	return g.Wait()
 }
 
 func (p *ClientProxy) tcpAsHost(ctx context.Context) {
