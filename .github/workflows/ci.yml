@@ -87,7 +87,7 @@ jobs:
         with:
           name: windows-build
           path: |
-            "dist/Dispel Multi.exe"
+            dist/Dispel Multi.exe 
 
       - name: Release
         uses: softprops/action-gh-release@v2
