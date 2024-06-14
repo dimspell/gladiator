@@ -33,3 +33,6 @@ go.work
 
 # Goland
 *.idea
+
+# Releases
+*.zip
