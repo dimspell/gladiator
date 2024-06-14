@@ -75,24 +75,19 @@ jobs:
             -ldflags="main.date=${BUILD_TIME}" \
             -tags=gui
 
-      - name: Move Windows-amd64
+      - name: Extract packaged app
         run: |
-          mkdir dist
-          mv \
-            "fyne-cross/dist/windows-amd64/Dispel Multi.exe" \
-            "dist/DispelMulti.exe"
-          mv \
+          ls -l "fyne-cross/dist/windows-amd64"
+          unzip \
             "fyne-cross/dist/windows-amd64/Dispel Multi.exe.zip" \
-            "dist/DispelMulti.zip"
-          ls -l "fyne-cross/dist/windows-amd64/"
+            -d "dist"
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: windows-build
           path: |
-            dist/DispelMulti.zip
-            dist/DispelMulti.exe
+            "dist/Dispel Multi.exe"
 
       - name: Release
         uses: softprops/action-gh-release@v2
@@ -100,4 +95,4 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           files: |
-            dist/DispelMulti.zip
+            "dist/Dispel Multi.exe"
