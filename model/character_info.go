@@ -122,6 +122,21 @@ func (c *CharacterInfo) ToBytes() []byte {
 	return buf
 }
 
+func (c *CharacterInfo) EdgedWeaponsLevel() uint8 { return uint8(c.EdgedWeapons) }
+func (c *CharacterInfo) EdgedWeaponsKills() uint8 { return byte(c.EdgedWeapons >> 8) }
+
+func (c *CharacterInfo) BluntedWeaponsLevel() uint8 { return uint8(c.BluntedWeapons) }
+func (c *CharacterInfo) BluntedWeaponsKills() uint8 { return byte(c.BluntedWeapons >> 8) }
+
+func (c *CharacterInfo) ArcheryLevel() uint8 { return uint8(c.Archery) }
+func (c *CharacterInfo) ArcheryKills() uint8 { return byte(c.Archery >> 8) }
+
+func (c *CharacterInfo) PolearmsLevel() uint8 { return uint8(c.Polearms) }
+func (c *CharacterInfo) PolearmsKills() uint8 { return byte(c.Polearms >> 8) }
+
+func (c *CharacterInfo) WizardryLevel() uint8 { return uint8(c.Wizardry) }
+func (c *CharacterInfo) WizardryKills() uint8 { return byte(c.Wizardry >> 8) }
+
 type EquipmentSlot byte
 
 func (slot EquipmentSlot) IsEquipped() bool { return slot != 100 }
