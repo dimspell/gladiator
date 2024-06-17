@@ -1,12 +1,12 @@
 package backend
 
 import (
-	"bytes"
 	"context"
-	"encoding/base64"
 	"fmt"
+	"log/slog"
 
 	"connectrpc.com/connect"
+	"github.com/dimspell/gladiator/backend/packet"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/model"
 )
@@ -22,7 +22,8 @@ func (b *Backend) HandleUpdateCharacterStats(session *model.Session, req UpdateC
 
 	data, err := req.Parse()
 	if err != nil {
-		return fmt.Errorf("packet-108: could not parse request: %w", err)
+		slog.Warn("Invalid packet", "error", err)
+		return err
 	}
 
 	_, err = b.characterClient.PutStats(context.TODO(),
@@ -43,25 +44,29 @@ type UpdateCharacterStatsRequest []byte
 type UpdateCharacterStatsRequestData struct {
 	Info       []byte
 	ParsedInfo model.CharacterInfo
-	User       string
+	Username   string
 	Character  string
 	Unknown    []byte
 }
 
 func (r UpdateCharacterStatsRequest) Parse() (data UpdateCharacterStatsRequestData, err error) {
-	if len(r) < 56 {
-		return data, fmt.Errorf("packet is too short: %s", base64.StdEncoding.EncodeToString(r))
-	}
-	split := bytes.SplitN(r[56:], []byte{0}, 3)
-	if len(split) != 3 {
-		return data, fmt.Errorf("no enough arguments, malformed request payload: %s", base64.StdEncoding.EncodeToString(r))
-	}
+	rd := packet.NewReader(r)
 
-	data.Info = r[:56]
-	data.ParsedInfo = model.ParseCharacterInfo(r[:56])
-	data.User = string(split[0])
-	data.Character = string(split[1])
-	data.Unknown = split[2]
+	data.Info, err = rd.ReadNBytes(56)
+	if err != nil {
+		return data, fmt.Errorf("packet-108: could not read character info: %w", err)
+	}
+	data.ParsedInfo = model.ParseCharacterInfo(data.Info)
 
-	return data, err
+	data.Username, err = rd.ReadString()
+	if err != nil {
+		return data, fmt.Errorf("packet-108: could not read username: %w", err)
+	}
+	data.Character, err = rd.ReadString()
+	if err != nil {
+		return data, fmt.Errorf("packet-108: could not read character: %w", err)
+	}
+	data.Unknown, _ = rd.ReadRestBytes()
+
+	return data, rd.Close()
 }

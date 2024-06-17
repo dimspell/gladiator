@@ -8,6 +8,7 @@ import (
 	"log/slog"
 
 	"connectrpc.com/connect"
+	"github.com/dimspell/gladiator/backend/packet"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/model"
 )
@@ -20,7 +21,8 @@ func (b *Backend) HandleJoinGame(session *model.Session, req JoinGameRequest) er
 
 	data, err := req.Parse()
 	if err != nil {
-		return err
+		slog.Warn("Invalid packet", "error", err)
+		return nil
 	}
 
 	respGame, err := b.gameClient.GetGame(context.TODO(), connect.NewRequest(&multiv1.GetGameRequest{
@@ -100,7 +102,7 @@ type JoinGameRequestData struct {
 }
 
 func (r JoinGameRequest) Parse() (data JoinGameRequestData, err error) {
-	rd := NewPacketReader(r)
+	rd := packet.NewReader(r)
 
 	data.RoomName, err = rd.ReadString()
 	if err != nil {
@@ -111,7 +113,7 @@ func (r JoinGameRequest) Parse() (data JoinGameRequestData, err error) {
 
 	// TODO: 216 byte at the end of the packet
 
-	return data, nil
+	return data, rd.Close()
 }
 
 type JoinGameResponse struct {

@@ -8,6 +8,7 @@ import (
 	"log/slog"
 
 	"connectrpc.com/connect"
+	"github.com/dimspell/gladiator/backend/packet"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/model"
 )
@@ -19,7 +20,8 @@ func (b *Backend) HandleGetCharacterInventory(session *model.Session, req GetCha
 
 	data, err := req.Parse()
 	if err != nil {
-		return err
+		slog.Warn("Invalid packet", "error", err)
+		return nil
 	}
 
 	resp, err := b.characterClient.GetCharacter(context.TODO(),
@@ -53,7 +55,7 @@ type GetCharacterInventoryRequestData struct {
 }
 
 func (r GetCharacterInventoryRequest) Parse() (data GetCharacterInventoryRequestData, err error) {
-	rd := NewPacketReader(r)
+	rd := packet.NewReader(r)
 	data.Username, err = rd.ReadString()
 	if err != nil {
 		return data, fmt.Errorf("packet-68: malformed username: %w", err)
@@ -62,7 +64,6 @@ func (r GetCharacterInventoryRequest) Parse() (data GetCharacterInventoryRequest
 	if err != nil {
 		return data, fmt.Errorf("packet-68: malformed character name: %w", err)
 	}
-	data.Unknown, _ = rd.RestBytes()
-	rd = nil
-	return data, nil
+	data.Unknown, _ = rd.ReadRestBytes()
+	return data, rd.Close()
 }

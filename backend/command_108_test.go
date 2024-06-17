@@ -42,8 +42,8 @@ func TestUpdateCharacterStatsRequest(t *testing.T) {
 		1, 0, // Polearms
 		1, 0, // Wizardry
 		0, 0, 0, 0, 0, 0, // Unknown
-		117, 115, 101, 114, 0, // User name
-		99, 104, 97, 114, 97, 99, 116, 101, 114, 0, // Character name
+		'u', 's', 'e', 'r', 0, // User name
+		'c', 'h', 'a', 'r', 'a', 'c', 't', 'e', 'r', 0, // Character name
 		0, // Unknown
 	}
 
@@ -54,7 +54,7 @@ func TestUpdateCharacterStatsRequest(t *testing.T) {
 	// Assert
 	assert.NoError(t, err)
 	assert.Equal(t, packet[4:60], data.ParsedInfo.ToBytes())
-	assert.Equal(t, "user", data.User)
+	assert.Equal(t, "user", data.Username)
 	assert.Equal(t, "character", data.Character)
 	assert.Equal(t, []byte{0}, data.Unknown)
 }

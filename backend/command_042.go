@@ -1,12 +1,12 @@
 package backend
 
 import (
-	"bytes"
 	"context"
-	"encoding/binary"
+	"fmt"
 	"log/slog"
 
 	"connectrpc.com/connect"
+	"github.com/dimspell/gladiator/backend/packet"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/model"
 )
@@ -15,7 +15,8 @@ import (
 func (b *Backend) HandleCreateNewAccount(session *model.Session, req CreateNewAccountRequest) error {
 	data, err := req.Parse()
 	if err != nil {
-		return err
+		slog.Warn("Invalid packet", "error", err)
+		return nil
 	}
 
 	respUser, err := b.userClient.CreateUser(context.TODO(), connect.NewRequest(&multiv1.CreateUserRequest{
@@ -42,12 +43,23 @@ type CreateNewAccountRequestData struct {
 }
 
 func (r CreateNewAccountRequest) Parse() (data CreateNewAccountRequestData, err error) {
-	data.CDKey = binary.LittleEndian.Uint32(r[0:4])
-	split := bytes.SplitN(r[4:], []byte{0}, 3)
-	data.Password = string(split[0])
-	data.Username = string(split[1])
-	data.Unknown = split[2]
-	return data, err
+	rd := packet.NewReader(r)
+
+	data.CDKey, err = rd.ReadUint32()
+	if err != nil {
+		return data, fmt.Errorf("packet-42: malformed cdkey: %w", err)
+	}
+	data.Password, err = rd.ReadString()
+	if err != nil {
+		return data, fmt.Errorf("packet-42: malformed password: %w", err)
+	}
+	data.Username, err = rd.ReadString()
+	if err != nil {
+		return data, fmt.Errorf("packet-42: malformed username: %w", err)
+	}
+	data.Unknown, _ = rd.ReadRestBytes()
+
+	return data, rd.Close()
 }
 
 type CreateNewAccountResponse [4]byte

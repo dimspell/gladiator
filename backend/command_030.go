@@ -1,9 +1,9 @@
 package backend
 
 import (
-	"bytes"
 	"fmt"
 
+	"github.com/dimspell/gladiator/backend/packet"
 	"github.com/dimspell/gladiator/model"
 )
 
@@ -20,12 +20,16 @@ type ClientHostAndUsernameRequestData struct {
 }
 
 func (r ClientHostAndUsernameRequest) Parse() (data ClientHostAndUsernameRequestData, err error) {
-	if bytes.Count(r, []byte{0}) < 2 {
-		return data, fmt.Errorf("packet-30: not enough null terminators")
+	rd := packet.NewReader(r)
+
+	data.ComputerHostname, err = rd.ReadString()
+	if err != nil {
+		return data, fmt.Errorf("packet-30: malformed hostname: %w", err)
+	}
+	data.ComputerUsername, err = rd.ReadString()
+	if err != nil {
+		return data, fmt.Errorf("packet-30: malformed computer user: %w", err)
 	}
 
-	split := bytes.SplitN(r, []byte{0}, 3)
-	data.ComputerHostname = string(split[0])
-	data.ComputerUsername = string(split[1])
-	return data, nil
+	return data, rd.Close()
 }

@@ -3,8 +3,10 @@ package backend
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"connectrpc.com/connect"
+	"github.com/dimspell/gladiator/backend/packet"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/model"
 )
@@ -16,7 +18,8 @@ func (b *Backend) HandleDeleteCharacter(session *model.Session, req DeleteCharac
 
 	data, err := req.Parse()
 	if err != nil {
-		return err
+		slog.Warn("Invalid packet", "error", err)
+		return nil
 	}
 
 	if _, err := b.characterClient.DeleteCharacter(context.TODO(),
@@ -42,7 +45,7 @@ type DeleteCharacterRequestData struct {
 }
 
 func (r DeleteCharacterRequest) Parse() (data DeleteCharacterRequestData, err error) {
-	rd := NewPacketReader(r)
+	rd := packet.NewReader(r)
 
 	data.Username, err = rd.ReadString()
 	if err != nil {
@@ -53,6 +56,5 @@ func (r DeleteCharacterRequest) Parse() (data DeleteCharacterRequestData, err er
 		return data, fmt.Errorf("packet-61: malformed character name: %w", err)
 	}
 
-	rd = nil
-	return data, nil
+	return data, rd.Close()
 }

@@ -1,12 +1,13 @@
 package backend
 
 import (
-	"bytes"
 	"context"
 	"encoding/binary"
 	"fmt"
+	"log/slog"
 
 	"connectrpc.com/connect"
+	"github.com/dimspell/gladiator/backend/packet"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/model"
 )
@@ -19,7 +20,8 @@ func (b *Backend) HandleShowRanking(session *model.Session, req RankingRequest) 
 
 	data, err := req.Parse()
 	if err != nil {
-		return err
+		slog.Warn("Invalid packet", "error", err)
+		return nil
 	}
 
 	respRanking, err := b.rankingClient.GetRanking(context.TODO(),
@@ -70,12 +72,27 @@ func NewRankingRequest(data RankingRequestData) RankingRequest {
 }
 
 func (r RankingRequest) Parse() (data RankingRequestData, err error) {
-	data.ClassType = model.ClassType(r[0])
-	data.Offset = binary.LittleEndian.Uint32(r[4:8])
+	rd := packet.NewReader(r)
 
-	split := bytes.Split(r[8:], []byte{0})
-	data.Username = string(split[0])
-	data.CharacterName = string(split[1])
+	classType, err := rd.ReadUint32()
+	if err != nil {
+		return data, fmt.Errorf("packet-70: malformed class type: %w", err)
+	}
+	data.ClassType = model.ClassType(classType)
 
-	return data, nil
+	data.Offset, err = rd.ReadUint32()
+	if err != nil {
+		return data, fmt.Errorf("packet-70: malformed offset: %w", err)
+	}
+
+	data.Username, err = rd.ReadString()
+	if err != nil {
+		return data, fmt.Errorf("packet-70: malformed username: %w", err)
+	}
+	data.CharacterName, err = rd.ReadString()
+	if err != nil {
+		return data, fmt.Errorf("packet-70: malformed character name: %w", err)
+	}
+
+	return data, rd.Close()
 }

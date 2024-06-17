@@ -1,13 +1,13 @@
 package backend
 
 import (
-	"bytes"
 	"context"
 	"encoding/binary"
 	"fmt"
 	"log/slog"
 
 	"connectrpc.com/connect"
+	"github.com/dimspell/gladiator/backend/packet"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/model"
 )
@@ -77,11 +77,27 @@ type CreateGameRequestData struct {
 }
 
 func (r CreateGameRequest) Parse() (data CreateGameRequestData, err error) {
-	data.State = binary.LittleEndian.Uint32(r[0:4])
-	data.MapID = binary.LittleEndian.Uint32(r[4:8])
+	rd := packet.NewReader(r)
 
-	split := bytes.Split(r[8:], []byte{0})
-	data.RoomName = string(split[0])
-	data.Password = string(split[1])
-	return data, nil
+	data.State, err = rd.ReadUint32()
+	if err != nil {
+		return data, fmt.Errorf("packet-28: malformed state %w", err)
+	}
+	data.MapID, err = rd.ReadUint32()
+	if err != nil {
+		return data, fmt.Errorf("packet-28: malformed map id %w", err)
+	}
+	if data.MapID > 5 {
+		return data, fmt.Errorf("packet-28: incorrect map id %w", err)
+	}
+	data.RoomName, err = rd.ReadString()
+	if err != nil {
+		return data, fmt.Errorf("packet-28: malformed room name %w", err)
+	}
+	data.Password, err = rd.ReadString()
+	if err != nil {
+		return data, fmt.Errorf("packet-28: malformed password %w", err)
+	}
+
+	return data, rd.Close()
 }

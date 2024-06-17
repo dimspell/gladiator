@@ -9,6 +9,7 @@ import (
 	"log/slog"
 
 	"connectrpc.com/connect"
+	"github.com/dimspell/gladiator/backend/packet"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/model"
 )
@@ -21,7 +22,8 @@ func (b *Backend) HandleSelectGame(session *model.Session, req SelectGameRequest
 
 	data, err := req.Parse()
 	if err != nil {
-		return err
+		slog.Warn("Invalid packet", "error", err)
+		return nil
 	}
 
 	respGame, err := b.gameClient.GetGame(context.TODO(),
@@ -98,12 +100,12 @@ type SelectGameRequestData struct {
 }
 
 func (r SelectGameRequest) Parse() (data SelectGameRequestData, err error) {
-	rd := NewPacketReader(r)
+	rd := packet.NewReader(r)
 	data.RoomName, err = rd.ReadString()
 	if err != nil {
 		return data, fmt.Errorf("packet-69: cannot read room name: %w", err)
 	}
-	return data, nil
+	return data, rd.Close()
 }
 
 type SelectGameResponse struct {

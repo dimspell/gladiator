@@ -1,6 +1,7 @@
 package backend
 
 import (
+	"io"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -55,14 +56,12 @@ func TestUpdateCharacterSpellsRequest_Parse(t *testing.T) {
 
 		// Act
 		req := UpdateCharacterSpellsRequest(input)
-		data, err := req.Parse()
+		_, err := req.Parse()
 
 		// Assert
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid length")
-		assert.Empty(t, data.Username)
-		assert.Empty(t, data.CharacterName)
-		assert.Empty(t, data.Spells)
+		assert.ErrorIs(t, err, io.EOF)
+		assert.ErrorContains(t, err, "malformed spells")
 	})
 
 	t.Run("missing null byte", func(t *testing.T) {
@@ -71,12 +70,11 @@ func TestUpdateCharacterSpellsRequest_Parse(t *testing.T) {
 
 		// Act
 		req := UpdateCharacterSpellsRequest(input)
-		data, err := req.Parse()
+		_, err := req.Parse()
 
 		// Assert
 		assert.Error(t, err)
-		assert.Empty(t, data.Username)
-		assert.Empty(t, data.CharacterName)
-		assert.Empty(t, data.Spells)
+		assert.ErrorIs(t, err, io.EOF)
+		assert.ErrorContains(t, err, "malformed character name")
 	})
 }

@@ -1,11 +1,12 @@
 package backend
 
 import (
-	"bytes"
 	"context"
 	"fmt"
+	"log/slog"
 
 	"connectrpc.com/connect"
+	"github.com/dimspell/gladiator/backend/packet"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/model"
 )
@@ -16,7 +17,8 @@ func (b *Backend) HandleUpdateCharacterInventory(session *model.Session, req Upd
 	}
 	data, err := req.Parse()
 	if err != nil {
-		return err
+		slog.Warn("Invalid packet", "error", err)
+		return nil
 	}
 
 	_, err = b.characterClient.PutInventoryCharacter(context.TODO(),
@@ -41,18 +43,20 @@ type UpdateCharacterInventoryRequestData struct {
 }
 
 func (r UpdateCharacterInventoryRequest) Parse() (data UpdateCharacterInventoryRequestData, err error) {
-	if bytes.Count(r, []byte{0}) != 3 {
-		return data, fmt.Errorf("packet-44: malformed payload: %v", r)
+	rd := packet.NewReader(r)
+
+	data.Username, err = rd.ReadString()
+	if err != nil {
+		return data, fmt.Errorf("packet-44: malformed username: %w", err)
+	}
+	data.CharacterName, err = rd.ReadString()
+	if err != nil {
+		return data, fmt.Errorf("packet-44: malformed character name: %w", err)
+	}
+	data.Inventory, err = rd.ReadNBytes(207)
+	if err != nil {
+		return data, fmt.Errorf("packet-44: malformed inventory: %w", err)
 	}
 
-	split := bytes.SplitN(r, []byte{0}, 4)
-	if len(split[2]) != 207 {
-		return data, fmt.Errorf("packet-44: invalid length of inventory array")
-	}
-
-	data.Username = string(split[0])
-	data.CharacterName = string(split[1])
-	data.Inventory = split[2]
-
-	return data, err
+	return data, rd.Close()
 }

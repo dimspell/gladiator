@@ -36,7 +36,7 @@ func TestBackend_HandleAuthorizationHandshake(t *testing.T) {
 		err := b.HandleAuthorizationHandshake(session, req)
 
 		// Assert
-		assert.Contains(t, err.Error(), "packet-6: malformed packet")
+		assert.NoError(t, err, nil)
 		assert.Len(t, conn.Written, 0) // No response
 	})
 
@@ -73,6 +73,6 @@ func TestAuthorizationHandshakeRequest(t *testing.T) {
 
 	// Assert
 	assert.NoError(t, err)
-	assert.Equal(t, "68XIPSID", data.AuthKey)
+	assert.Equal(t, "68XIPSID", string(data.AuthKey))
 	assert.Equal(t, uint32(3), data.VersionNumber)
 }

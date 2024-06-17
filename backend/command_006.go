@@ -1,9 +1,10 @@
 package backend
 
 import (
-	"encoding/binary"
 	"fmt"
+	"log/slog"
 
+	"github.com/dimspell/gladiator/backend/packet"
 	"github.com/dimspell/gladiator/model"
 )
 
@@ -23,9 +24,10 @@ import (
 func (b *Backend) HandleAuthorizationHandshake(session *model.Session, req AuthorizationHandshakeRequest) error {
 	data, err := req.Parse()
 	if err != nil {
-		return fmt.Errorf("packet-6: %w", err)
+		slog.Warn("Invalid packet", "error", err)
+		return nil
 	}
-	if data.AuthKey != "68XIPSID" {
+	if string(data.AuthKey) != "68XIPSID" {
 		if err := b.Send(session.Conn, AuthorizationHandshake, []byte{0, 0, 0, 0}); err != nil {
 			return err
 		}
@@ -41,7 +43,7 @@ type AuthorizationHandshakeRequest []byte
 
 type AuthorizationHandshakeRequestData struct {
 	// Authorization key. Normally it should be equal to "68XIPSID".
-	AuthKey string
+	AuthKey []byte
 
 	// It seems to be always equal to 3.
 	VersionNumber uint32
@@ -50,10 +52,17 @@ type AuthorizationHandshakeRequestData struct {
 // Parse extract data from the command packet.
 func (r AuthorizationHandshakeRequest) Parse() (data AuthorizationHandshakeRequestData, err error) {
 	if len(r) < 12 {
-		return data, fmt.Errorf("malformed packet")
+		return data, fmt.Errorf("packet-6: invalid length: %d", len(r))
 	}
 
-	data.AuthKey = string(r[:8])
-	data.VersionNumber = binary.LittleEndian.Uint32(r[8:12])
-	return data, err
+	rd := packet.NewReader(r)
+	data.AuthKey, err = rd.ReadNBytes(8)
+	if err != nil {
+		return data, fmt.Errorf("packet-6: malformed auth key: %w", err)
+	}
+	data.VersionNumber, err = rd.ReadUint32()
+	if err != nil {
+		return data, fmt.Errorf("packet-6: malformed version number: %w", err)
+	}
+	return data, rd.Close()
 }

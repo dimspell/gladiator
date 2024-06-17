@@ -1,13 +1,14 @@
 package backend
 
 import (
-	"bytes"
 	"context"
 	"database/sql"
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"connectrpc.com/connect"
+	"github.com/dimspell/gladiator/backend/packet"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/model"
 )
@@ -19,7 +20,8 @@ func (b *Backend) HandleSelectCharacter(session *model.Session, req SelectCharac
 
 	data, err := req.Parse()
 	if err != nil {
-		return err
+		slog.Warn("Invalid packet", "error", err)
+		return nil
 	}
 
 	respChar, err := b.characterClient.GetCharacter(context.TODO(),
@@ -51,11 +53,16 @@ type SelectCharacterRequestData struct {
 }
 
 func (r SelectCharacterRequest) Parse() (data SelectCharacterRequestData, err error) {
-	split := bytes.SplitN(r, []byte{0}, 3)
-	if len(split) != 3 {
-		return data, fmt.Errorf("packet-76: no enough arguments, malformed request payload: %v", r)
+	rd := packet.NewReader(r)
+
+	data.Username, err = rd.ReadString()
+	if err != nil {
+		return data, fmt.Errorf("packet-76: malformed username: %w", err)
 	}
-	data.Username = string(split[0])
-	data.CharacterName = string(split[1])
-	return data, nil
+	data.CharacterName, err = rd.ReadString()
+	if err != nil {
+		return data, fmt.Errorf("packet-76: malformed character name: %w", err)
+	}
+
+	return data, rd.Close()
 }

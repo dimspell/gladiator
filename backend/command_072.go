@@ -1,12 +1,12 @@
 package backend
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"log/slog"
 
 	"connectrpc.com/connect"
+	"github.com/dimspell/gladiator/backend/packet"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/model"
 )
@@ -18,7 +18,8 @@ func (b *Backend) HandleGetCharacterSpells(session *model.Session, req GetCharac
 
 	data, err := req.Parse()
 	if err != nil {
-		return err
+		slog.Warn("Invalid packet", "error", err)
+		return nil
 	}
 
 	respChar, err := b.characterClient.GetCharacter(context.TODO(), connect.NewRequest(&multiv1.GetCharacterRequest{
@@ -52,12 +53,16 @@ type GetCharacterSpellsRequestData struct {
 }
 
 func (r GetCharacterSpellsRequest) Parse() (data GetCharacterSpellsRequestData, err error) {
-	if bytes.Count(r, []byte{0}) < 2 {
-		return data, fmt.Errorf("packet-72: malformed packet, not enough null-terminators")
-	}
-	split := bytes.SplitN(r, []byte{0}, 3)
-	data.Username = string(split[0])
-	data.CharacterName = string(split[1])
+	rd := packet.NewReader(r)
 
-	return data, nil
+	data.Username, err = rd.ReadString()
+	if err != nil {
+		return data, fmt.Errorf("packet-72: malformed username: %w", err)
+	}
+	data.CharacterName, err = rd.ReadString()
+	if err != nil {
+		return data, fmt.Errorf("packet-72: malformed character name: %w", err)
+	}
+
+	return data, rd.Close()
 }

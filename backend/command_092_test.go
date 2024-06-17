@@ -42,8 +42,8 @@ func TestCreateCharacterRequest(t *testing.T) {
 		1, 0, // Polearms
 		1, 0, // Wizardry
 		0, 0, 0, 0, 0, 0, // Unknown
-		117, 115, 101, 114, 0, // Username
-		99, 104, 97, 114, 97, 99, 116, 101, 114, 0, // Character name
+		'u', 's', 'e', 'r', 0, // User name
+		'c', 'h', 'a', 'r', 'a', 'c', 't', 'e', 'r', 0, // Character name
 	}
 
 	// Act

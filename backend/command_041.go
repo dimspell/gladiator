@@ -1,13 +1,12 @@
 package backend
 
 import (
-	"bytes"
 	"context"
-	"encoding/binary"
 	"fmt"
 	"log/slog"
 
 	"connectrpc.com/connect"
+	"github.com/dimspell/gladiator/backend/packet"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/model"
 )
@@ -19,7 +18,8 @@ func (b *Backend) HandleClientAuthentication(session *model.Session, req ClientA
 
 	data, err := req.Parse()
 	if err != nil {
-		return err
+		slog.Warn("Invalid packet", "error", err)
+		return nil
 	}
 
 	user, err := b.userClient.AuthenticateUser(context.TODO(), connect.NewRequest(&multiv1.AuthenticateUserRequest{
@@ -47,11 +47,20 @@ type ClientAuthenticationRequestData struct {
 }
 
 func (r ClientAuthenticationRequest) Parse() (data ClientAuthenticationRequestData, err error) {
-	data.Unknown = binary.LittleEndian.Uint32(r[0:4])
+	rd := packet.NewReader(r)
 
-	split := bytes.SplitN(r[4:], []byte{0}, 3)
-	data.Password = string(split[0])
-	data.Username = string(split[1])
+	data.Unknown, err = rd.ReadUint32()
+	if err != nil {
+		return data, fmt.Errorf("packet-41: malformed unknown: %w", err)
+	}
+	data.Password, err = rd.ReadString()
+	if err != nil {
+		return data, fmt.Errorf("packet-41: malformed password: %w", err)
+	}
+	data.Username, err = rd.ReadString()
+	if err != nil {
+		return data, fmt.Errorf("packet-41: malformed username: %w", err)
+	}
 
-	return data, nil
+	return data, rd.Close()
 }
