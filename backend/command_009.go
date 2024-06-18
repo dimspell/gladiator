@@ -32,7 +32,14 @@ func (b *Backend) HandleListGames(session *model.Session, req ListGamesRequest) 
 			Password:      room.Password,
 			HostIPAddress: b.Proxy.GetHostIP(room.HostIpAddress).To4(),
 		}
-		response = append(response, lobby.ToBytes()...)
+
+		//response = append(response, lobby.ToBytes()...)
+
+		response = append(response, lobby.HostIPAddress[:]...) // Host IP Address (4 bytes)
+		response = append(response, lobby.Name...)             // Room name (null terminated string)
+		response = append(response, byte(0))                   // Null byte
+		response = append(response, lobby.Password...)         // Room password (null terminated string)
+		response = append(response, byte(0))                   // Null byte
 	}
 
 	return b.Send(session.Conn, ListGames, response)

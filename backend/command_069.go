@@ -67,6 +67,9 @@ func (b *Backend) HandleSelectGame(session *model.Session, req SelectGameRequest
 		Players: []model.LobbyPlayer{},
 	}
 
+	response := []byte{}
+	response = binary.LittleEndian.AppendUint32(response, gameRoom.MapID)
+
 	for _, player := range respPlayers.Msg.GetPlayers() {
 		if player.UserId == session.UserID {
 			continue
@@ -82,15 +85,20 @@ func (b *Backend) HandleSelectGame(session *model.Session, req SelectGameRequest
 		}
 
 		// TODO: make sure the host is the first one
-		lobbyPlayer := model.LobbyPlayer{
-			ClassType: model.ClassType(player.ClassType),
-			Name:      player.Username,
-			IPAddress: proxyIP.To4(),
-		}
-		gameRoom.Players = append(gameRoom.Players, lobbyPlayer)
+		//lobbyPlayer := model.LobbyPlayer{
+		//	ClassType: model.ClassType(player.ClassType),
+		//	Name:      player.Username,
+		//	IPAddress: proxyIP.To4(),
+		//}
+		//gameRoom.Players = append(gameRoom.Players, lobbyPlayer)
+
+		response = append(response, byte(player.ClassType), 0, 0, 0) // Class type (4 bytes)
+		response = append(response, proxyIP.To4()[:]...)             // IP Address (4 bytes)
+		response = append(response, player.Username...)              // Player name (null terminated string)
+		response = append(response, byte(0))                         // Null byte
 	}
 
-	return b.Send(session.Conn, SelectGame, gameRoom.Details())
+	return b.Send(session.Conn, SelectGame, response)
 }
 
 type SelectGameRequest []byte
@@ -112,13 +120,4 @@ type SelectGameResponse struct {
 	Lobby   model.LobbyRoom
 	MapID   uint32
 	Players []model.LobbyPlayer
-}
-
-func (r *SelectGameResponse) Details() []byte {
-	buf := []byte{}
-	buf = binary.LittleEndian.AppendUint32(buf, r.MapID)
-	for _, player := range r.Players {
-		buf = append(buf, player.ToBytes()...)
-	}
-	return buf
 }

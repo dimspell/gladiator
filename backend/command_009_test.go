@@ -38,6 +38,29 @@ func TestBackend_HandleListGames(t *testing.T) {
 		assert.Equal(t, []byte{0, 0, 0, 0}, conn.Written[4:8])   // Number of games
 	})
 
+	t.Run("with one game", func(t *testing.T) {
+		b := &Backend{
+			Proxy: proxy.NewLAN(),
+			gameClient: &mockGameClient{
+				ListGamesResponse: connect.NewResponse(&v1.ListGamesResponse{Games: []*v1.Game{
+					{
+						GameId:        1,
+						Name:          "retreat",
+						Password:      "",
+						HostIpAddress: "127.0.21.37",
+						MapId:         2,
+					},
+				}}),
+			}}
+		conn := &mockConn{}
+		session := &model.Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP", LocalIpAddress: "127.0.100.1"}
+
+		assert.NoError(t, b.HandleListGames(session, ListGamesRequest{}))
+		assert.Len(t, conn.Written, 21)
+
+		t.Log(conn.Written)
+	})
+
 	t.Run("with games", func(t *testing.T) {
 		b := &Backend{
 			Proxy: proxy.NewLAN(),
@@ -47,20 +70,20 @@ func TestBackend_HandleListGames(t *testing.T) {
 						GameId:        1,
 						Name:          "RoomName",
 						Password:      "secret",
-						HostIpAddress: "127.0.0.1",
+						HostIpAddress: "127.0.21.37",
 						MapId:         2,
 					},
 					{
 						GameId:        1,
 						Name:          "Other",
 						Password:      "",
-						HostIpAddress: "127.0.0.1",
+						HostIpAddress: "127.0.13.37",
 						MapId:         5,
 					},
 				}}),
 			}}
 		conn := &mockConn{}
-		session := &model.Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
+		session := &model.Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP", LocalIpAddress: "127.0.100.1"}
 
 		// 255 9 33 0
 		// 2 0 0 0
@@ -75,10 +98,10 @@ func TestBackend_HandleListGames(t *testing.T) {
 		assert.Len(t, conn.Written, 39)
 		assert.Equal(t, []byte{255, 9, 39, 0}, conn.Written[0:4])    // Header
 		assert.Equal(t, []byte{2, 0, 0, 0}, conn.Written[4:8])       // Number of games
-		assert.Equal(t, []byte{127, 0, 0, 1}, conn.Written[8:12])    // Host IP Address
+		assert.Equal(t, []byte{127, 0, 21, 37}, conn.Written[8:12])  // Host IP Address
 		assert.Equal(t, []byte("RoomName\x00"), conn.Written[12:21]) // Room name
 		assert.Equal(t, []byte("secret\x00"), conn.Written[21:28])   // Password
-		assert.Equal(t, []byte{127, 0, 0, 1}, conn.Written[28:32])   // Host IP Address
+		assert.Equal(t, []byte{127, 0, 13, 37}, conn.Written[28:32]) // Host IP Address
 		assert.Equal(t, []byte("Other\x00"), conn.Written[32:38])    // Room name
 		assert.Equal(t, []byte("\x00"), conn.Written[38:39])         // Password
 	})
