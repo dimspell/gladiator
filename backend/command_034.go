@@ -74,6 +74,7 @@ func (b *Backend) HandleJoinGame(session *model.Session, req JoinGameRequest) er
 	}
 
 	response := []byte{}
+	response = append(response, 2, 0) // game state?
 	response = binary.LittleEndian.AppendUint16(response, gameRoom.MapID)
 
 	for _, player := range respPlayers.Msg.GetPlayers() {
@@ -86,12 +87,12 @@ func (b *Backend) HandleJoinGame(session *model.Session, req JoinGameRequest) er
 		}
 
 		// TODO: make sure the host is the first one
-		//lobbyPlayer := model.LobbyPlayer{
+		// lobbyPlayer := model.LobbyPlayer{
 		//	ClassType: model.ClassType(player.ClassType),
 		//	Name:      player.Username,
 		//	IPAddress: proxyIP.To4(),
-		//}
-		//gameRoom.Players = append(gameRoom.Players, lobbyPlayer)
+		// }
+		// gameRoom.Players = append(gameRoom.Players, lobbyPlayer)
 
 		response = append(response, byte(player.ClassType), 0, 0, 0) // Class type (4 bytes)
 		response = append(response, proxyIP.To4()[:]...)             // IP Address (4 bytes)

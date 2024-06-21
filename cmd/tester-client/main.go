@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"fmt"
 	"log"
 	"net"
@@ -104,23 +103,22 @@ func main() {
 		log.Println("UDP", buf[:n])
 
 		if buf[0] == 27 {
-			udpConn.Write([]byte{13, 0, 2, 0})
+			_, _ = udpConn.Write([]byte{13, 0, 2, 0})
 		}
 		if buf[0] == 14 {
-			b, _ := base64.StdEncoding.DecodeString("CNwCAAFmcQD/Dw7//////0ltYWdlAAAAAAAAAAAAAABtYWdlAAAAAAAAAAAAAAAA")
-			udpConn.Write(b)
+			_, _ = udpConn.Write([]byte{8, 220, 2, 0, 1, 102, 113, 0, 255, 15, 14, 255, 255, 255, 255, 255, 73, 'm', 'a', 'g', 'e', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 'm', 'a', 'g', 'e', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0})
 		}
 		if buf[0] == 9 {
-			udpConn.Write([]byte{53, 0, 2, 0, 0, 0})
-			udpConn.Write([]byte{2, 39, 2, 0, 0, 39})
+			_, _ = udpConn.Write([]byte{53, 0, 2, 0, 0, 0})
+			_, _ = udpConn.Write([]byte{2, 39, 2, 0, 0, 39})
 		}
 	}
 
 	// => 26 0 2 0
 	// <= 27 0 2 0
 	// => 13 0 2 0
-	// <= DgACAAAAAAAAZnEAAAAAAAcCDP///3H/QmFyY2hlcgAAAAAAAAAAAAAAAAA= // 14 0 2 0 ...
-	// => CNwCAAFmcQD/Dw7//////0ltYWdlAAAAAAAAAAAAAABtYWdlAAAAAAAAAAAAAAAA // 8 220 2 0 1 ...
+	// <= [14 0 2 0 0 0 0 0 0 102 113 0 0 0 0 0 7 2 12 255 255 255 113 255 66 97 114 99 104 101 114 0 0 0 0 0 0 0 0 0 0 0 0 0] archer
+	// => [8 220 2 0 1 102 113 0 255 15 14 255 255 255 255 255 73 109 97 103 101 0 0 0 0 0 0 0 0 0 0 0 109 97 103 101 0 0 0 0 0 0 0 0 0 0 0 0] mage (109 97 103 101
 	// => 9 0 2 0
 	// <= 53 28 2 0 0 28
 	// <= 2 39 2 0 0 39
