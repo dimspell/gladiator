@@ -58,7 +58,11 @@ func TestBackend_HandleListGames(t *testing.T) {
 		assert.NoError(t, b.HandleListGames(session, ListGamesRequest{}))
 		assert.Len(t, conn.Written, 21)
 
-		t.Log(conn.Written)
+		assert.Equal(t, []byte{255, 9, 21, 0}, conn.Written[0:4])                           // Header
+		assert.Equal(t, []byte{1, 0, 0, 0}, conn.Written[4:8])                              // Number of games
+		assert.Equal(t, []byte{127, 0, 21, 37}, conn.Written[8:12])                         // Host IP address
+		assert.Equal(t, []byte{'r', 'e', 't', 'r', 'e', 'a', 't', 0, 0}, conn.Written[12:]) // Room name & no password
+
 	})
 
 	t.Run("with games", func(t *testing.T) {
@@ -84,15 +88,6 @@ func TestBackend_HandleListGames(t *testing.T) {
 			}}
 		conn := &mockConn{}
 		session := &model.Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP", LocalIpAddress: "127.0.100.1"}
-
-		// 255 9 33 0
-		// 2 0 0 0
-		// 127 0 0 1
-		// 82 111 111 109 78 97 109 101 0
-		// 0
-		// 127 0 0 1
-		// 79 116 104 101 114 0
-		// 0
 
 		assert.NoError(t, b.HandleListGames(session, ListGamesRequest{}))
 		assert.Len(t, conn.Written, 39)

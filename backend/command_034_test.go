@@ -19,7 +19,7 @@ func TestBackend_HandleJoinGame(t *testing.T) {
 					GameId:        100,
 					Name:          "retreat",
 					Password:      "",
-					HostIpAddress: "127.0.0.28",
+					HostIpAddress: "192.168.121.212",
 					MapId:         2,
 				},
 			}),
@@ -29,13 +29,13 @@ func TestBackend_HandleJoinGame(t *testing.T) {
 					{
 						CharacterName: "archer",
 						ClassType:     int64(model.ClassTypeArcher),
-						IpAddress:     "127.0.0.28",
+						IpAddress:     "192.168.121.212",
 						Username:      "archer",
 					},
 					{
 						CharacterName: "mage",
 						ClassType:     int64(model.ClassTypeMage),
-						IpAddress:     "127.0.1.100",
+						IpAddress:     "192.168.121.169",
 						Username:      "mage",
 					},
 				},
@@ -50,21 +50,17 @@ func TestBackend_HandleJoinGame(t *testing.T) {
 		0, // Password
 	}))
 
-	t.Log(conn.Written)
+	assert.Equal(t, []byte{255, 34, 34, 0}, conn.Written[0:4]) // Header
+	assert.Equal(t, []byte{2, 0}, conn.Written[4:6])           // Game State
 
-	assert.Len(t, conn.Written, 34)
-	assert.Equal(t, []byte{255, 34}, conn.Written[0:2]) // Command code
-	assert.Equal(t, []byte{34, 0}, conn.Written[2:4])   // Packet length
-	//
-	//assert.Equal(t, []byte{2, 0}, conn.Written[4:6]) // Map ID
-	//
-	//// First Player
-	//assert.Equal(t, []byte{3, 0, 0, 0}, conn.Written[6:10])     // Class = Magician
-	//assert.Equal(t, []byte{127, 0, 0, 28}, conn.Written[10:14]) // IP Address
-	//assert.Equal(t, []byte("archer\x00"), conn.Written[14:22])  // Character name
-	//
-	//// Second Player
-	//assert.Equal(t, []byte{1, 0, 0, 0}, conn.Written[22:26])    // Class = Warrior
-	//assert.Equal(t, []byte{127, 0, 0, 34}, conn.Written[26:30]) // IP Address
-	//assert.Equal(t, []byte("mage\x00"), conn.Written[30:38])    // Character name
+	firstPlayer := []byte{'a', 'r', 'c', 'h', 'e', 'r', 0}
+	assert.Equal(t, []byte{2, 0, 0, 0}, conn.Written[6:10])            // Class type (archer)
+	assert.Equal(t, []byte{192, 168, 121, 212}, conn.Written[10:14])   // IP Address
+	assert.Equal(t, firstPlayer, conn.Written[14:14+len(firstPlayer)]) // Player name
+
+	start := 14 + len(firstPlayer)
+	secondPlayer := []byte{'m', 'a', 'g', 'e', 0}
+	assert.Equal(t, []byte{3, 0, 0, 0}, conn.Written[start:start+4])           // Class type (mage)
+	assert.Equal(t, []byte{192, 168, 121, 169}, conn.Written[start+4:start+8]) // IP Address
+	assert.Equal(t, secondPlayer, conn.Written[start+8:])                      // Player name
 }

@@ -33,17 +33,6 @@ func (b *Backend) HandleJoinGame(session *model.Session, req JoinGameRequest) er
 		return err
 	}
 
-	hostIP, err := b.Proxy.Join(
-		respGame.Msg.GetGame().GetName(),
-		session.Username,
-		session.Username,
-		respGame.Msg.GetGame().HostIpAddress,
-	)
-	if err != nil {
-		slog.Error("Cannot get proxy address", "error", err)
-		return nil
-	}
-
 	_, err = b.gameClient.JoinGame(context.TODO(), connect.NewRequest(&multiv1.JoinGameRequest{
 		UserId:      session.UserID,
 		CharacterId: session.CharacterID,
@@ -63,20 +52,7 @@ func (b *Backend) HandleJoinGame(session *model.Session, req JoinGameRequest) er
 		return nil
 	}
 
-	gameRoom := JoinGameResponse{
-		Lobby: model.LobbyRoom{
-			HostIPAddress: hostIP.To4(),
-			Name:          respGame.Msg.Game.Name,
-			Password:      "",
-		},
-		MapID:   uint16(respGame.Msg.Game.GetMapId()),
-		Players: []model.LobbyPlayer{},
-	}
-
-	response := []byte{}
-	response = append(response, 2, 0) // game state?
-	response = binary.LittleEndian.AppendUint16(response, gameRoom.MapID)
-
+	response := []byte{2, 0}
 	for _, player := range respPlayers.Msg.GetPlayers() {
 		proxyIP, err := b.Proxy.Exchange(respGame.Msg.GetGame().GetName(), player.Username, player.IpAddress)
 		if err != nil {
@@ -126,14 +102,14 @@ func (r JoinGameRequest) Parse() (data JoinGameRequestData, err error) {
 }
 
 type JoinGameResponse struct {
-	Lobby   model.LobbyRoom
-	MapID   uint16
-	Players []model.LobbyPlayer
+	Lobby     model.LobbyRoom
+	GameState uint16
+	Players   []model.LobbyPlayer
 }
 
 func (r *JoinGameResponse) Details() []byte {
 	buf := []byte{}
-	buf = binary.LittleEndian.AppendUint16(buf, r.MapID)
+	buf = binary.LittleEndian.AppendUint16(buf, r.GameState)
 	for _, player := range r.Players {
 		buf = append(buf, player.ToBytes()...)
 	}

@@ -1,17 +1,14 @@
 package backend
 
 import (
-	"context"
-	"database/sql"
-	"encoding/binary"
-	"errors"
-	"fmt"
-	"log/slog"
-
 	"connectrpc.com/connect"
+	"context"
+	"encoding/binary"
+	"fmt"
 	"github.com/dimspell/gladiator/backend/packet"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/model"
+	"log/slog"
 )
 
 // HandleSelectGame handles 0x45ff (255-69) command
@@ -32,11 +29,8 @@ func (b *Backend) HandleSelectGame(session *model.Session, req SelectGameRequest
 			GameName: data.RoomName,
 		}))
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			fmt.Println("packet-69: game room does not exist")
-			return nil
-		}
-		return err
+		slog.Warn("No game found", "room", data.RoomName, "error", err)
+		return nil
 	}
 
 	respPlayers, err := b.gameClient.ListPlayers(context.TODO(), connect.NewRequest(&multiv1.ListPlayersRequest{

@@ -19,10 +19,8 @@ func TestBackend_HandleSelectGame(t *testing.T) {
 						GameId:        100,
 						Name:          "retreat",
 						Password:      "",
-						HostIpAddress: "127.0.0.28",
+						HostIpAddress: "192.168.121.212",
 						MapId:         2,
-						CreatedBy:     10,
-						HostUserId:    10,
 					},
 				}),
 				ListPlayersResponse: connect.NewResponse(&v1.ListPlayersResponse{
@@ -30,16 +28,21 @@ func TestBackend_HandleSelectGame(t *testing.T) {
 						{
 							CharacterName: "archer",
 							ClassType:     int64(model.ClassTypeArcher),
-							IpAddress:     "127.0.1.28",
+							IpAddress:     "192.168.121.212",
 							Username:      "archer",
-							UserId:        10,
 						},
+						//{
+						//	CharacterName: "mage",
+						//	ClassType:     int64(model.ClassTypeMage),
+						//	IpAddress:     "192.168.121.169",
+						//	Username:      "mage",
+						//},
 					},
 				}),
 			},
 		}
 		conn := &mockConn{}
-		session := &model.Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "playerB", LocalIpAddress: "127.0.100.1"}
+		session := &model.Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "mage", LocalIpAddress: "127.0.100.1"}
 
 		assert.NoError(t, b.HandleSelectGame(session, SelectGameRequest{
 			'r', 'e', 't', 'r', 'e', 'a', 'a', 't', 0, // Game name
@@ -47,6 +50,12 @@ func TestBackend_HandleSelectGame(t *testing.T) {
 		}))
 
 		t.Log(conn.Written, string(conn.Written))
+
+		assert.Equal(t, []byte{255, 69, 23, 0}, conn.Written[0:4])                  // Header
+		assert.Equal(t, []byte{2, 0, 0, 0}, conn.Written[4:8])                      // Map ID
+		assert.Equal(t, []byte{2, 0, 0, 0}, conn.Written[8:12])                     // Class type
+		assert.Equal(t, []byte{192, 168, 121, 212}, conn.Written[12:16])            // IP Address
+		assert.Equal(t, []byte{'a', 'r', 'c', 'h', 'e', 'r', 0}, conn.Written[16:]) // Player name
 	})
 
 	t.Run("Host only", func(t *testing.T) {
