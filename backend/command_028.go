@@ -33,10 +33,9 @@ func (b *Backend) HandleCreateGame(session *model.Session, req CreateGameRequest
 	switch data.State {
 	case uint32(0):
 		respGame, err := b.gameClient.CreateGame(context.TODO(), connect.NewRequest(&multiv1.CreateGameRequest{
-			UserId:   session.UserID,
-			GameName: data.RoomName,
-			// Password:      data.Password,
-			Password:      "",
+			UserId:        session.UserID,
+			GameName:      data.RoomName,
+			Password:      data.Password,
 			HostIpAddress: hostIPAddress.String(),
 			MapId:         int64(data.MapID),
 		}))
@@ -56,11 +55,11 @@ func (b *Backend) HandleCreateGame(session *model.Session, req CreateGameRequest
 		if err != nil {
 			return err
 		}
-		binary.LittleEndian.PutUint32(response[0:4], 1)
+		binary.LittleEndian.PutUint32(response[0:4], uint32(model.GameStateCreating)) // Game state
 		break
 	case uint32(1):
 		// b.EventChan <- EventHostGame
-		binary.LittleEndian.PutUint32(response[0:4], 2)
+		binary.LittleEndian.PutUint32(response[0:4], uint32(model.GameStateStarted)) // Game state
 		break
 	}
 
