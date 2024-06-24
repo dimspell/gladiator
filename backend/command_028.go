@@ -31,7 +31,7 @@ func (b *Backend) HandleCreateGame(session *model.Session, req CreateGameRequest
 	}
 
 	switch data.State {
-	case uint32(0):
+	case uint32(model.GameStateNone):
 		respGame, err := b.gameClient.CreateGame(context.TODO(), connect.NewRequest(&multiv1.CreateGameRequest{
 			UserId:        session.UserID,
 			GameName:      data.RoomName,
@@ -57,7 +57,7 @@ func (b *Backend) HandleCreateGame(session *model.Session, req CreateGameRequest
 		}
 		binary.LittleEndian.PutUint32(response[0:4], uint32(model.GameStateCreating)) // Game state
 		break
-	case uint32(1):
+	case uint32(model.GameStateCreating):
 		// b.EventChan <- EventHostGame
 		binary.LittleEndian.PutUint32(response[0:4], uint32(model.GameStateStarted)) // Game state
 		break
