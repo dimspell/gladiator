@@ -42,9 +42,7 @@ func (b *Backend) HandleCreateGame(session *model.Session, req CreateGameRequest
 		if err != nil {
 			return err
 		}
-		slog.Info("packet-28: created game room",
-			"id", respGame.Msg.Game.GameId,
-			"name", respGame.Msg.Game.Name)
+		slog.Info("packet-28: created game room", "id", respGame.Msg.Game.GameId, "name", respGame.Msg.Game.Name)
 
 		_, err = b.gameClient.JoinGame(context.TODO(), connect.NewRequest(&multiv1.JoinGameRequest{
 			UserId:      session.UserID,
