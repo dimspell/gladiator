@@ -2,7 +2,6 @@ package backend
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -31,10 +30,15 @@ func (b *Backend) HandleGetCharacterInventory(session *model.Session, req GetCha
 		}))
 
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return b.Send(session.Conn, SelectCharacter, []byte{0, 0, 0, 0})
+		_ = b.Send(session.Conn, ReceiveMessage, NewGlobalMessage("system", "Inventory fetch failed, please try sign-in again"))
+
+		var connectError *connect.Error
+		if errors.As(err, &connectError) {
+			if connectError.Code() == connect.CodeNotFound {
+				return nil
+			}
 		}
-		return fmt.Errorf("packet-68: no characters found owned by player: %s", err)
+		return fmt.Errorf("packet-68: could not fetch character %s: %s", data.CharacterName, err)
 	}
 
 	inventory := resp.Msg.GetCharacter().GetInventory()

@@ -2,7 +2,6 @@ package backend
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -30,14 +29,17 @@ func (b *Backend) HandleSelectCharacter(session *model.Session, req SelectCharac
 			CharacterName: data.CharacterName,
 		}))
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return b.Send(session.Conn, SelectCharacter, []byte{0, 0, 0, 0})
+		var connectError *connect.Error
+		if errors.As(err, &connectError) {
+			if connectError.Code() == connect.CodeNotFound {
+				return b.Send(session.Conn, SelectCharacter, []byte{0, 0, 0, 0})
+			}
 		}
 		return fmt.Errorf("packet-76: no characters found owned by player: %s", err)
 	}
 
 	response := make([]byte, 60)
-	response[0] = 1
+	response[0] = 1 // Exist, flag - first 4 bytes
 	copy(response[4:], respChar.Msg.Character.Stats)
 
 	session.CharacterID = respChar.Msg.Character.CharacterId

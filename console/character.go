@@ -105,7 +105,7 @@ func (s *characterServiceServer) GetCharacter(ctx context.Context, req *connect.
 		CharacterName: req.Msg.CharacterName,
 	})
 	if err != nil {
-		return nil, err
+		return nil, connect.NewError(connect.CodeNotFound, err)
 	}
 
 	info := model.CharacterInfo{
