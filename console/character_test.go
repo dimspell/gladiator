@@ -57,7 +57,7 @@ func TestCharacterServiceServer_ListCharacters(t *testing.T) {
 		defer db.Conn.Close()
 		defer queries.Close()
 
-		if _, err := db.Conn.Exec("INSERT INTO users (id, username, password) VALUES (404, 'test', '<PASSWORD>')"); err != nil {
+		if _, err := db.Conn.Exec("INSERT INTO users (id, username, password) VALUES (15, 'test', '<PASSWORD>')"); err != nil {
 			t.Fatalf("could not insert user: %v", err)
 		}
 
@@ -67,7 +67,7 @@ func TestCharacterServiceServer_ListCharacters(t *testing.T) {
 			Queries: queries,
 		}).ListCharacters(context.Background(), &connect.Request[multiv1.ListCharactersRequest]{
 			Msg: &multiv1.ListCharactersRequest{
-				UserId: 404,
+				UserId: 15,
 			},
 		})
 
@@ -75,7 +75,7 @@ func TestCharacterServiceServer_ListCharacters(t *testing.T) {
 		assert.NotNil(t, resp.Msg)
 	})
 
-	t.Run("One character", func(t *testing.T) {
+	t.Run("Two characters", func(t *testing.T) {
 		// Arrange
 		db, queries := setupDatabase()
 		defer db.Conn.Close()
