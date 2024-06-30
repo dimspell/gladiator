@@ -108,3 +108,11 @@ func (db *SQLite) Ping() error {
 func (db *SQLite) Queries() (*Queries, error) {
 	return Prepare(context.Background(), db.Conn)
 }
+
+func (db *SQLite) WithTx(ctx context.Context, queries *Queries) (*sql.Tx, *Queries, error) {
+	tx, err := db.Conn.BeginTx(ctx, &sql.TxOptions{})
+	if err != nil {
+		return nil, nil, err
+	}
+	return tx, queries.WithTx(tx), nil
+}

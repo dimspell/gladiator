@@ -2,6 +2,7 @@ package console
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 
@@ -31,12 +32,20 @@ func (s *userServiceServer) CreateUser(ctx context.Context, req *connect.Request
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 
-	user, err := s.Queries.CreateUser(ctx, database.CreateUserParams{
+	tx, queries, err := s.DB.WithTx(ctx, s.Queries)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+
+	user, err := queries.CreateUser(ctx, database.CreateUserParams{
 		Username: req.Msg.Username,
 		Password: password.String(),
 	})
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, connect.NewError(connect.CodeAborted, errors.Join(err, tx.Rollback()))
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, connect.NewError(connect.CodeAborted, err)
 	}
 
 	resp := connect.NewResponse(&multiv1.CreateUserResponse{

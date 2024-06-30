@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"log/slog"
 
@@ -165,8 +166,13 @@ func (s *characterServiceServer) CreateCharacter(ctx context.Context, req *conne
 		return nil, err
 	}
 
+	tx, queries, err := s.DB.WithTx(ctx, s.Queries)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+
 	info := model.ParseCharacterInfo(req.Msg.Stats)
-	character, err := s.Queries.CreateCharacter(ctx, database.CreateCharacterParams{
+	character, err := queries.CreateCharacter(ctx, database.CreateCharacterParams{
 		Strength:             int64(info.Strength),
 		Agility:              int64(info.Agility),
 		Wisdom:               int64(info.Wisdom),
@@ -204,7 +210,10 @@ func (s *characterServiceServer) CreateCharacter(ctx context.Context, req *conne
 		UserID:               req.Msg.UserId,
 	})
 	if err != nil {
-		return nil, err
+		return nil, connect.NewError(connect.CodeAborted, errors.Join(err, tx.Rollback()))
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, connect.NewError(connect.CodeAborted, err)
 	}
 
 	resp := connect.NewResponse(&multiv1.CreateCharacterResponse{
@@ -226,8 +235,13 @@ func (s *characterServiceServer) PutStats(ctx context.Context, req *connect.Requ
 		return nil, err
 	}
 
+	tx, queries, err := s.DB.WithTx(ctx, s.Queries)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+
 	info := model.ParseCharacterInfo(req.Msg.Stats)
-	err := s.Queries.UpdateCharacterStats(ctx, database.UpdateCharacterStatsParams{
+	if err := queries.UpdateCharacterStats(ctx, database.UpdateCharacterStatsParams{
 		Strength:             int64(info.Strength),
 		Agility:              int64(info.Agility),
 		Wisdom:               int64(info.Wisdom),
@@ -263,9 +277,11 @@ func (s *characterServiceServer) PutStats(ctx context.Context, req *connect.Requ
 		BonusPoints:          int64(info.BonusPoints),
 		CharacterName:        req.Msg.CharacterName,
 		UserID:               req.Msg.UserId,
-	})
-	if err != nil {
-		return nil, err
+	}); err != nil {
+		return nil, connect.NewError(connect.CodeAborted, errors.Join(err, tx.Rollback()))
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, connect.NewError(connect.CodeAborted, err)
 	}
 
 	resp := connect.NewResponse(&multiv1.PutStatsResponse{})
@@ -280,13 +296,20 @@ func (s *characterServiceServer) PutSpells(ctx context.Context, req *connect.Req
 
 	spells := base64.StdEncoding.EncodeToString(req.Msg.Spells)
 
-	err := s.Queries.UpdateCharacterSpells(ctx, database.UpdateCharacterSpellsParams{
+	tx, queries, err := s.DB.WithTx(ctx, s.Queries)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+
+	if err := queries.UpdateCharacterSpells(ctx, database.UpdateCharacterSpellsParams{
 		Spells:        sql.NullString{String: spells, Valid: len(req.Msg.Spells) > 0},
 		CharacterName: req.Msg.CharacterName,
 		UserID:        req.Msg.UserId,
-	})
-	if err != nil {
-		return nil, err
+	}); err != nil {
+		return nil, connect.NewError(connect.CodeAborted, errors.Join(err, tx.Rollback()))
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, connect.NewError(connect.CodeAborted, err)
 	}
 
 	resp := connect.NewResponse(&multiv1.PutSpellsResponse{})
@@ -301,13 +324,20 @@ func (s *characterServiceServer) PutInventoryCharacter(ctx context.Context, req 
 
 	inventory := base64.StdEncoding.EncodeToString(req.Msg.Inventory)
 
-	err := s.Queries.UpdateCharacterInventory(ctx, database.UpdateCharacterInventoryParams{
+	tx, queries, err := s.DB.WithTx(ctx, s.Queries)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+
+	if err := queries.UpdateCharacterInventory(ctx, database.UpdateCharacterInventoryParams{
 		Inventory:     sql.NullString{String: inventory, Valid: len(req.Msg.Inventory) > 0},
 		CharacterName: req.Msg.CharacterName,
 		UserID:        req.Msg.UserId,
-	})
-	if err != nil {
-		return nil, err
+	}); err != nil {
+		return nil, connect.NewError(connect.CodeAborted, errors.Join(err, tx.Rollback()))
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, connect.NewError(connect.CodeAborted, err)
 	}
 
 	resp := connect.NewResponse(&multiv1.PutInventoryResponse{})
@@ -320,12 +350,19 @@ func (s *characterServiceServer) DeleteCharacter(ctx context.Context, req *conne
 		return nil, err
 	}
 
-	err := s.Queries.DeleteCharacter(ctx, database.DeleteCharacterParams{
+	tx, queries, err := s.DB.WithTx(ctx, s.Queries)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+
+	if err := queries.DeleteCharacter(ctx, database.DeleteCharacterParams{
 		CharacterName: req.Msg.CharacterName,
 		UserID:        req.Msg.UserId,
-	})
-	if err != nil {
-		return nil, err
+	}); err != nil {
+		return nil, connect.NewError(connect.CodeAborted, errors.Join(err, tx.Rollback()))
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, connect.NewError(connect.CodeAborted, err)
 	}
 
 	resp := connect.NewResponse(&multiv1.DeleteCharacterResponse{})
