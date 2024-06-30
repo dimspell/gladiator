@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"encoding/base64"
+	"fmt"
+	"log/slog"
 
 	"connectrpc.com/connect"
 	"github.com/dimspell/gladiator/console/database"
@@ -15,7 +17,8 @@ import (
 var _ multiv1connect.CharacterServiceHandler = (*characterServiceServer)(nil)
 
 type characterServiceServer struct {
-	DB *database.Queries
+	DB      *database.SQLite
+	Queries *database.Queries
 }
 
 // ListCharacters returns a list of all characters of a user.
@@ -24,12 +27,13 @@ func (s *characterServiceServer) ListCharacters(ctx context.Context, req *connec
 		return nil, err
 	}
 
-	user, err := s.DB.GetUserByID(ctx, req.Msg.UserId)
+	user, err := s.Queries.GetUserByID(ctx, req.Msg.UserId)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		slog.Warn("could not get user", "err", err, "user_id", req.Msg.GetUserId())
+		return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("user not found"))
 	}
 
-	characters, err := s.DB.ListCharacters(ctx, user.ID)
+	characters, err := s.Queries.ListCharacters(ctx, user.ID)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
@@ -95,7 +99,7 @@ func (s *characterServiceServer) GetCharacter(ctx context.Context, req *connect.
 		return nil, err
 	}
 
-	character, err := s.DB.FindCharacter(ctx, database.FindCharacterParams{
+	character, err := s.Queries.FindCharacter(ctx, database.FindCharacterParams{
 		UserID:        req.Msg.UserId,
 		CharacterName: req.Msg.CharacterName,
 	})
@@ -162,7 +166,7 @@ func (s *characterServiceServer) CreateCharacter(ctx context.Context, req *conne
 	}
 
 	info := model.ParseCharacterInfo(req.Msg.Stats)
-	character, err := s.DB.CreateCharacter(ctx, database.CreateCharacterParams{
+	character, err := s.Queries.CreateCharacter(ctx, database.CreateCharacterParams{
 		Strength:             int64(info.Strength),
 		Agility:              int64(info.Agility),
 		Wisdom:               int64(info.Wisdom),
@@ -223,7 +227,7 @@ func (s *characterServiceServer) PutStats(ctx context.Context, req *connect.Requ
 	}
 
 	info := model.ParseCharacterInfo(req.Msg.Stats)
-	err := s.DB.UpdateCharacterStats(ctx, database.UpdateCharacterStatsParams{
+	err := s.Queries.UpdateCharacterStats(ctx, database.UpdateCharacterStatsParams{
 		Strength:             int64(info.Strength),
 		Agility:              int64(info.Agility),
 		Wisdom:               int64(info.Wisdom),
@@ -276,7 +280,7 @@ func (s *characterServiceServer) PutSpells(ctx context.Context, req *connect.Req
 
 	spells := base64.StdEncoding.EncodeToString(req.Msg.Spells)
 
-	err := s.DB.UpdateCharacterSpells(ctx, database.UpdateCharacterSpellsParams{
+	err := s.Queries.UpdateCharacterSpells(ctx, database.UpdateCharacterSpellsParams{
 		Spells:        sql.NullString{String: spells, Valid: len(req.Msg.Spells) > 0},
 		CharacterName: req.Msg.CharacterName,
 		UserID:        req.Msg.UserId,
@@ -297,7 +301,7 @@ func (s *characterServiceServer) PutInventoryCharacter(ctx context.Context, req 
 
 	inventory := base64.StdEncoding.EncodeToString(req.Msg.Inventory)
 
-	err := s.DB.UpdateCharacterInventory(ctx, database.UpdateCharacterInventoryParams{
+	err := s.Queries.UpdateCharacterInventory(ctx, database.UpdateCharacterInventoryParams{
 		Inventory:     sql.NullString{String: inventory, Valid: len(req.Msg.Inventory) > 0},
 		CharacterName: req.Msg.CharacterName,
 		UserID:        req.Msg.UserId,
@@ -316,7 +320,7 @@ func (s *characterServiceServer) DeleteCharacter(ctx context.Context, req *conne
 		return nil, err
 	}
 
-	err := s.DB.DeleteCharacter(ctx, database.DeleteCharacterParams{
+	err := s.Queries.DeleteCharacter(ctx, database.DeleteCharacterParams{
 		CharacterName: req.Msg.CharacterName,
 		UserID:        req.Msg.UserId,
 	})

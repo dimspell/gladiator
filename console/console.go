@@ -27,8 +27,6 @@ type Console struct {
 	DB                 *database.SQLite
 	Queries            *database.Queries
 	CORSAllowedOrigins []string
-
-	StartupProbe func()
 }
 
 func NewConsole(db *database.SQLite, queries *database.Queries, addr string) *Console {
@@ -118,10 +116,10 @@ func (c *Console) HttpRouter() http.Handler {
 			MaxAge: 7200,
 		}).Handler)
 
-		api.Mount(multiv1connect.NewCharacterServiceHandler(&characterServiceServer{DB: c.Queries}))
-		api.Mount(multiv1connect.NewGameServiceHandler(&gameServiceServer{DB: c.Queries}))
-		api.Mount(multiv1connect.NewUserServiceHandler(&userServiceServer{DB: c.Queries}))
-		api.Mount(multiv1connect.NewRankingServiceHandler(&rankingServiceServer{DB: c.Queries}))
+		api.Mount(multiv1connect.NewCharacterServiceHandler(&characterServiceServer{c.DB, c.Queries}))
+		api.Mount(multiv1connect.NewGameServiceHandler(&gameServiceServer{c.DB, c.Queries}))
+		api.Mount(multiv1connect.NewUserServiceHandler(&userServiceServer{c.DB, c.Queries}))
+		api.Mount(multiv1connect.NewRankingServiceHandler(&rankingServiceServer{c.DB, c.Queries}))
 		mux.Mount("/grpc/", http.StripPrefix("/grpc", api))
 	}
 

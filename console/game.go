@@ -14,7 +14,8 @@ import (
 var _ multiv1connect.GameServiceHandler = (*gameServiceServer)(nil)
 
 type gameServiceServer struct {
-	DB *database.Queries
+	DB      *database.SQLite
+	Queries *database.Queries
 }
 
 // ListGames returns a list of all open games.
@@ -23,7 +24,7 @@ func (s *gameServiceServer) ListGames(ctx context.Context, req *connect.Request[
 		return nil, err
 	}
 
-	gameRooms, err := s.DB.ListGameRooms(ctx)
+	gameRooms, err := s.Queries.ListGameRooms(ctx)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
@@ -51,7 +52,7 @@ func (s *gameServiceServer) GetGame(ctx context.Context, req *connect.Request[mu
 		return nil, err
 	}
 
-	room, err := s.DB.GetGameRoom(ctx, req.Msg.GameName)
+	room, err := s.Queries.GetGameRoom(ctx, req.Msg.GameName)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
@@ -72,7 +73,7 @@ func (s *gameServiceServer) GetGame(ctx context.Context, req *connect.Request[mu
 func (s *gameServiceServer) CreateGame(ctx context.Context, req *connect.Request[multiv1.CreateGameRequest]) (*connect.Response[multiv1.CreateGameResponse], error) {
 	input := req.Msg
 
-	game, err := s.DB.CreateGameRoom(ctx, database.CreateGameRoomParams{
+	game, err := s.Queries.CreateGameRoom(ctx, database.CreateGameRoomParams{
 		Name:          input.GameName,
 		Password:      sql.NullString{String: input.Password, Valid: len(input.Password) > 0},
 		HostIpAddress: input.HostIpAddress,
@@ -104,7 +105,7 @@ func (s *gameServiceServer) JoinGame(ctx context.Context, req *connect.Request[m
 		return nil, err
 	}
 
-	exist, _ := s.DB.ExistPlayerInRoom(ctx, database.ExistPlayerInRoomParams{
+	exist, _ := s.Queries.ExistPlayerInRoom(ctx, database.ExistPlayerInRoomParams{
 		GameRoomID:  req.Msg.GameRoomId,
 		CharacterID: req.Msg.CharacterId,
 	})
@@ -112,7 +113,7 @@ func (s *gameServiceServer) JoinGame(ctx context.Context, req *connect.Request[m
 		return connect.NewResponse(&multiv1.JoinGameResponse{}), nil
 	}
 
-	err := s.DB.AddPlayerToRoom(ctx, database.AddPlayerToRoomParams{
+	err := s.Queries.AddPlayerToRoom(ctx, database.AddPlayerToRoomParams{
 		GameRoomID:  req.Msg.GameRoomId,
 		UserID:      req.Msg.UserId,
 		CharacterID: req.Msg.CharacterId,
@@ -133,7 +134,7 @@ func (s *gameServiceServer) ListPlayers(ctx context.Context, req *connect.Reques
 		return nil, err
 	}
 
-	roomPlayers, err := s.DB.GetGameRoomPlayers(ctx, req.Msg.GameRoomId)
+	roomPlayers, err := s.Queries.GetGameRoomPlayers(ctx, req.Msg.GameRoomId)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}

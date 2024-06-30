@@ -15,7 +15,8 @@ import (
 var _ multiv1connect.UserServiceHandler = (*userServiceServer)(nil)
 
 type userServiceServer struct {
-	DB *database.Queries
+	DB      *database.SQLite
+	Queries *database.Queries
 }
 
 // CreateUser creates a new user.
@@ -30,7 +31,7 @@ func (s *userServiceServer) CreateUser(ctx context.Context, req *connect.Request
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 
-	user, err := s.DB.CreateUser(ctx, database.CreateUserParams{
+	user, err := s.Queries.CreateUser(ctx, database.CreateUserParams{
 		Username: req.Msg.Username,
 		Password: password.String(),
 	})
@@ -53,7 +54,7 @@ func (s *userServiceServer) AuthenticateUser(ctx context.Context, req *connect.R
 		return nil, err
 	}
 
-	user, err := s.DB.GetUserByName(ctx, req.Msg.Username)
+	user, err := s.Queries.GetUserByName(ctx, req.Msg.Username)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeNotFound, err)
 		// slog.Debug("packet-41: could not find a user", "username", data.Username)
@@ -77,7 +78,7 @@ func (s *userServiceServer) AuthenticateUser(ctx context.Context, req *connect.R
 
 // GetUser gets a user by ID.
 func (s *userServiceServer) GetUser(ctx context.Context, req *connect.Request[multiv1.GetUserRequest]) (*connect.Response[multiv1.GetUserResponse], error) {
-	user, err := s.DB.GetUserByID(ctx, req.Msg.UserId)
+	user, err := s.Queries.GetUserByID(ctx, req.Msg.UserId)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeNotFound, err)
 	}
