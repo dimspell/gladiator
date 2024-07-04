@@ -33,7 +33,7 @@ func NewProbe() *Probe {
 	}
 }
 
-func (p *Probe) Get() (int32, bool) {
+func (p *Probe) Status() (int32, bool) {
 	if p == nil {
 		return StatusNotRunning, false
 	}

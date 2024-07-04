@@ -108,7 +108,7 @@ func (c *Controller) SinglePlayerScreen(w fyne.Window, initial *SinglePlayerScre
 	})
 
 	c.backendRunning.AddListener(binding.NewDataListener(func() {
-		if _, isRunning := c.backendProbe.Get(); isRunning {
+		if _, isRunning := c.backendProbe.Status(); isRunning {
 			backendStart.Disable()
 			backendStop.Enable()
 			backendRunningLabel.Set("Backend: Running")
@@ -122,7 +122,7 @@ func (c *Controller) SinglePlayerScreen(w fyne.Window, initial *SinglePlayerScre
 	}))
 
 	c.consoleRunning.AddListener(binding.NewDataListener(func() {
-		if _, isRunning := c.consoleProbe.Get(); isRunning {
+		if _, isRunning := c.consoleProbe.Status(); isRunning {
 			consoleStart.Disable()
 			consoleStop.Enable()
 			createUser.Enable()

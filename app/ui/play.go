@@ -65,7 +65,7 @@ func (c *Controller) playView(w fyne.Window, consoleAddr string) fyne.CanvasObje
 	})
 
 	c.backendRunning.AddListener(binding.NewDataListener(func() {
-		if _, isRunning := c.backendProbe.Get(); isRunning {
+		if _, isRunning := c.backendProbe.Status(); isRunning {
 			backendStart.Disable()
 			backendStop.Enable()
 			backendRunningLabel.Set("Backend: Running")

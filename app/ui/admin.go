@@ -156,7 +156,7 @@ func (c *Controller) AdminScreen(w fyne.Window, params *AdminScreenInputParams) 
 	consoleRunningCheck := widget.NewLabelWithData(consoleRunningLabel)
 	consoleRunningCheck.Alignment = fyne.TextAlignCenter
 	c.consoleRunning.AddListener(binding.NewDataListener(func() {
-		if _, isRunning := c.consoleProbe.Get(); isRunning {
+		if _, isRunning := c.consoleProbe.Status(); isRunning {
 			// consoleStart.Disable()
 			// consoleStop.Enable()
 			// createUser.Enable()
