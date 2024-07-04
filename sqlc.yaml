@@ -1,10 +1,15 @@
 version: "2"
 sql:
   - engine: "sqlite"
-    queries: "console/database/query.sql"
+    queries:
+      - "console/database/queries.sql"
     schema: "console/database/schema.sql"
     gen:
       go:
-        emit_prepared_queries: true
         package: "database"
         out: "console/database"
+        emit_prepared_queries: true
+        emit_params_struct_pointers: false
+        emit_empty_slices: false
+        emit_json_tags: false
+        emit_db_tags: false

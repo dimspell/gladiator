@@ -18,8 +18,7 @@ import (
 var _ multiv1connect.CharacterServiceHandler = (*characterServiceServer)(nil)
 
 type characterServiceServer struct {
-	DB      *database.SQLite
-	Queries *database.Queries
+	DB *database.SQLite
 }
 
 // ListCharacters returns a list of all characters of a user.
@@ -28,13 +27,13 @@ func (s *characterServiceServer) ListCharacters(ctx context.Context, req *connec
 		return nil, err
 	}
 
-	user, err := s.Queries.GetUserByID(ctx, req.Msg.UserId)
+	user, err := s.DB.Read.GetUserByID(ctx, req.Msg.UserId)
 	if err != nil {
 		slog.Warn("could not get user", "err", err, "user_id", req.Msg.GetUserId())
 		return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("user not found"))
 	}
 
-	characters, err := s.Queries.ListCharacters(ctx, user.ID)
+	characters, err := s.DB.Read.ListCharacters(ctx, user.ID)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
@@ -100,7 +99,7 @@ func (s *characterServiceServer) GetCharacter(ctx context.Context, req *connect.
 		return nil, err
 	}
 
-	character, err := s.Queries.FindCharacter(ctx, database.FindCharacterParams{
+	character, err := s.DB.Read.FindCharacter(ctx, database.FindCharacterParams{
 		UserID:        req.Msg.UserId,
 		CharacterName: req.Msg.CharacterName,
 	})
@@ -166,7 +165,7 @@ func (s *characterServiceServer) CreateCharacter(ctx context.Context, req *conne
 		return nil, err
 	}
 
-	tx, queries, err := s.DB.WithTx(ctx, s.Queries)
+	tx, queries, err := s.DB.WithTx(ctx)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
@@ -235,7 +234,7 @@ func (s *characterServiceServer) PutStats(ctx context.Context, req *connect.Requ
 		return nil, err
 	}
 
-	tx, queries, err := s.DB.WithTx(ctx, s.Queries)
+	tx, queries, err := s.DB.WithTx(ctx)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
@@ -296,7 +295,7 @@ func (s *characterServiceServer) PutSpells(ctx context.Context, req *connect.Req
 
 	spells := base64.StdEncoding.EncodeToString(req.Msg.Spells)
 
-	tx, queries, err := s.DB.WithTx(ctx, s.Queries)
+	tx, queries, err := s.DB.WithTx(ctx)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
@@ -324,7 +323,7 @@ func (s *characterServiceServer) PutInventoryCharacter(ctx context.Context, req 
 
 	inventory := base64.StdEncoding.EncodeToString(req.Msg.Inventory)
 
-	tx, queries, err := s.DB.WithTx(ctx, s.Queries)
+	tx, queries, err := s.DB.WithTx(ctx)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
@@ -350,7 +349,7 @@ func (s *characterServiceServer) DeleteCharacter(ctx context.Context, req *conne
 		return nil, err
 	}
 
-	tx, queries, err := s.DB.WithTx(ctx, s.Queries)
+	tx, queries, err := s.DB.WithTx(ctx)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}

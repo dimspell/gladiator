@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"runtime"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/sqlite"
@@ -20,7 +21,10 @@ import (
 var migrations embed.FS
 
 type SQLite struct {
-	Conn *sql.DB
+	Writer *sql.DB
+	Reader *sql.DB
+	Read   *Queries
+	Write  *Queries
 }
 
 func NewMemory() (*SQLite, error) {
@@ -30,6 +34,10 @@ func NewMemory() (*SQLite, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// Set max open connections to 1 to prevent concurrent writes
+	conn.SetMaxOpenConns(1)
+
 	if err := conn.Ping(); err != nil {
 		return nil, err
 	}
@@ -37,7 +45,22 @@ func NewMemory() (*SQLite, error) {
 		return nil, err
 	}
 
-	return &SQLite{Conn: conn}, nil
+	queriesRead, err := Prepare(context.Background(), conn)
+	if err != nil {
+		return nil, err
+	}
+
+	queriesWrite, err := Prepare(context.Background(), conn)
+	if err != nil {
+		return nil, err
+	}
+
+	return &SQLite{
+		Reader: conn,
+		Read:   queriesRead,
+		Writer: conn,
+		Write:  queriesWrite,
+	}, nil
 }
 
 func NewLocal(pathToDatabase string) (*SQLite, error) {
@@ -51,18 +74,46 @@ func NewLocal(pathToDatabase string) (*SQLite, error) {
 	uri := fmt.Sprintf("%s?%s", pathToDatabase, pragmas)
 	slog.Debug("Connecting to local SQLite database", "uri", uri)
 
-	conn, err := sql.Open("sqlite", uri)
+	writer, err := sql.Open("sqlite", uri)
 	if err != nil {
 		return nil, err
 	}
-	if err := conn.Ping(); err != nil {
+
+	writer.SetMaxOpenConns(1)
+
+	if err := writer.Ping(); err != nil {
 		return nil, err
 	}
-	if err := Migrate(conn); err != nil {
+	if err := Migrate(writer); err != nil {
 		return nil, err
 	}
 
-	return &SQLite{Conn: conn}, nil
+	reader, err := sql.Open("sqlite", uri)
+	if err != nil {
+		return nil, err
+	}
+
+	reader.SetMaxOpenConns(min(runtime.NumCPU(), 4))
+	if err := reader.Ping(); err != nil {
+		return nil, err
+	}
+
+	queriesRead, err := Prepare(context.Background(), reader)
+	if err != nil {
+		return nil, err
+	}
+
+	queriesWrite, err := Prepare(context.Background(), writer)
+	if err != nil {
+		return nil, err
+	}
+
+	return &SQLite{
+		Reader: reader,
+		Read:   queriesRead,
+		Writer: writer,
+		Write:  queriesWrite,
+	}, nil
 }
 
 func Migrate(conn *sql.DB) error {
@@ -99,20 +150,25 @@ func Migrate(conn *sql.DB) error {
 }
 
 func (db *SQLite) Ping() error {
-	if err := db.Conn.Ping(); err != nil {
+	if err := db.Reader.Ping(); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (db *SQLite) Queries() (*Queries, error) {
-	return Prepare(context.Background(), db.Conn)
-}
-
-func (db *SQLite) WithTx(ctx context.Context, queries *Queries) (*sql.Tx, *Queries, error) {
-	tx, err := db.Conn.BeginTx(ctx, &sql.TxOptions{})
+func (db *SQLite) WithTx(ctx context.Context) (*sql.Tx, *Queries, error) {
+	tx, err := db.Writer.BeginTx(ctx, &sql.TxOptions{})
 	if err != nil {
 		return nil, nil, err
 	}
-	return tx, queries.WithTx(tx), nil
+	return tx, db.Write.WithTx(tx), nil
+}
+
+func (db *SQLite) Close() error {
+	return errors.Join(
+		db.Write.Close(),
+		db.Read.Close(),
+		db.Writer.Close(),
+		db.Reader.Close(),
+	)
 }

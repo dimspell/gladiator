@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func setupDatabase() (*database.SQLite, *database.Queries) {
+func setupDatabase() *database.SQLite {
 	db, err := database.NewMemory()
 	if err != nil {
 		panic(err)
@@ -20,24 +20,18 @@ func setupDatabase() (*database.SQLite, *database.Queries) {
 	if err := db.Ping(); err != nil {
 		panic(err)
 	}
-	queries, err := db.Queries()
-	if err != nil {
-		panic(err)
-	}
-	return db, queries
+	return db
 }
 
 func TestCharacterServiceServer_ListCharacters(t *testing.T) {
 	t.Run("No user", func(t *testing.T) {
 		// Arrange
-		db, queries := setupDatabase()
-		defer db.Conn.Close()
-		defer queries.Close()
+		db := setupDatabase()
+		defer db.Close()
 
 		// Act
 		resp, err := (&characterServiceServer{
-			DB:      db,
-			Queries: queries,
+			DB: db,
 		}).ListCharacters(context.Background(), &connect.Request[multiv1.ListCharactersRequest]{
 			Msg: &multiv1.ListCharactersRequest{
 				UserId: 404,
@@ -53,18 +47,16 @@ func TestCharacterServiceServer_ListCharacters(t *testing.T) {
 
 	t.Run("No characters", func(t *testing.T) {
 		// Arrange
-		db, queries := setupDatabase()
-		defer db.Conn.Close()
-		defer queries.Close()
+		db := setupDatabase()
+		defer db.Close()
 
-		if _, err := db.Conn.Exec("INSERT INTO users (id, username, password) VALUES (15, 'test', '<PASSWORD>')"); err != nil {
+		if _, err := db.Writer.Exec("INSERT INTO users (id, username, password) VALUES (15, 'test', '<PASSWORD>')"); err != nil {
 			t.Fatalf("could not insert user: %v", err)
 		}
 
 		// Act
 		resp, err := (&characterServiceServer{
-			DB:      db,
-			Queries: queries,
+			DB: db,
 		}).ListCharacters(context.Background(), &connect.Request[multiv1.ListCharactersRequest]{
 			Msg: &multiv1.ListCharactersRequest{
 				UserId: 15,
@@ -73,18 +65,18 @@ func TestCharacterServiceServer_ListCharacters(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.NotNil(t, resp.Msg)
+		assert.Empty(t, resp.Msg.GetCharacters())
 	})
 
 	t.Run("Two characters", func(t *testing.T) {
 		// Arrange
-		db, queries := setupDatabase()
-		defer db.Conn.Close()
-		defer queries.Close()
+		db := setupDatabase()
+		defer db.Close()
 
-		if _, err := db.Conn.Exec("INSERT INTO users (id, username, password) VALUES (10, 'test', '<PASSWORD>')"); err != nil {
+		if _, err := db.Writer.Exec("INSERT INTO users (id, username, password) VALUES (10, 'test', '<PASSWORD>')"); err != nil {
 			t.Fatalf("could not insert user: %v", err)
 		}
-		if _, err := db.Conn.Exec(`INSERT INTO characters (id, user_id, character_name, strength, agility, wisdom, constitution, health_points,
+		if _, err := db.Writer.Exec(`INSERT INTO characters (id, user_id, character_name, strength, agility, wisdom, constitution, health_points,
                         magic_points, experience_points, money, score_points, class_type, skin_carnation, hair_style,
                         light_armour_legs, light_armour_torso, light_armour_hands, light_armour_boots, full_armour,
                         armour_emblem, helmet, secondary_weapon, primary_weapon, shield, unknown_equipment_slot, gender,
@@ -93,7 +85,7 @@ func TestCharacterServiceServer_ListCharacters(t *testing.T) {
 						VALUES (100, 10, 'archer', 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, NULL, NULL);`); err != nil {
 			t.Fatalf("could not insert character: %v", err)
 		}
-		if _, err := db.Conn.Exec(`INSERT INTO characters (id, user_id, character_name, strength, agility, wisdom, constitution, health_points,
+		if _, err := db.Writer.Exec(`INSERT INTO characters (id, user_id, character_name, strength, agility, wisdom, constitution, health_points,
                         magic_points, experience_points, money, score_points, class_type, skin_carnation, hair_style,
                         light_armour_legs, light_armour_torso, light_armour_hands, light_armour_boots, full_armour,
                         armour_emblem, helmet, secondary_weapon, primary_weapon, shield, unknown_equipment_slot, gender,
@@ -105,8 +97,7 @@ func TestCharacterServiceServer_ListCharacters(t *testing.T) {
 
 		// Act
 		resp, err := (&characterServiceServer{
-			DB:      db,
-			Queries: queries,
+			DB: db,
 		}).ListCharacters(context.Background(), &connect.Request[multiv1.ListCharactersRequest]{
 			Msg: &multiv1.ListCharactersRequest{
 				UserId: 10,

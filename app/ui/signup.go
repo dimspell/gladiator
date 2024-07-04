@@ -54,7 +54,7 @@ func (c *Controller) signUpForm(onCancel func(), onCreate func(user database.Use
 				dialog.ShowError(err, w)
 				return
 			}
-			user, err := c.Console.Queries.CreateUser(context.TODO(), database.CreateUserParams{
+			user, err := c.Console.DB.Write.CreateUser(context.TODO(), database.CreateUserParams{
 				Username: name.Text,
 				Password: pwd.String(),
 			})

@@ -12,8 +12,7 @@ import (
 var _ multiv1connect.RankingServiceHandler = (*rankingServiceServer)(nil)
 
 type rankingServiceServer struct {
-	DB      *database.SQLite
-	Queries *database.Queries
+	DB *database.SQLite
 }
 
 // GetRanking returns the ranking of the players.
@@ -22,14 +21,14 @@ func (s *rankingServiceServer) GetRanking(ctx context.Context, req *connect.Requ
 		return nil, err
 	}
 
-	positions, err := s.Queries.SelectRanking(ctx, database.SelectRankingParams{
+	positions, err := s.DB.Read.SelectRanking(ctx, database.SelectRankingParams{
 		ClassType: int64(req.Msg.GetClassType()),
 		Offset:    int64(req.Msg.GetOffset()),
 	})
 	if err != nil {
 		return nil, err
 	}
-	currentPlayer, err := s.Queries.GetCurrentUser(ctx, database.GetCurrentUserParams{
+	currentPlayer, err := s.DB.Read.GetCurrentUser(ctx, database.GetCurrentUserParams{
 		ID:            req.Msg.GetUserId(),
 		CharacterName: req.Msg.GetCharacterName(),
 	})

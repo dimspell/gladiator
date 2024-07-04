@@ -74,13 +74,8 @@ func (c *Controller) StartConsole(databaseType, databasePath, consoleAddr string
 		return fmt.Errorf("unknown database type")
 	}
 
-	queries, err := db.Queries()
-	if err != nil {
-		return err
-	}
-
 	// Update the database to the latest migration
-	if err := database.Seed(queries); err != nil {
+	if err := database.Seed(db.Write); err != nil {
 		slog.Warn("Seed queries failed, likely it was run already", "error", err)
 	}
 
@@ -100,7 +95,8 @@ func (c *Controller) StartConsole(databaseType, databasePath, consoleAddr string
 		}
 	}()
 
-	c.Console = console.NewConsole(db, queries, consoleAddr)
+	c.Console = console.NewConsole(db, consoleAddr)
+
 	start, stop := c.Console.Handlers()
 	c.consoleStop = func(ctx context.Context) error {
 		if c.Console == nil {

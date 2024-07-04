@@ -77,12 +77,7 @@ func ServeCommand() *cli.Command {
 			return fmt.Errorf("unknown database type: %q", c.String("database-type"))
 		}
 
-		queries, err := db.Queries()
-		if err != nil {
-			return err
-		}
-
-		if err := database.Seed(queries); err != nil {
+		if err := database.Seed(db.Write); err != nil {
 			slog.Warn("Seed queries failed", "error", err)
 		}
 
@@ -91,7 +86,8 @@ func ServeCommand() *cli.Command {
 			Level: slog.LevelDebug,
 		}))
 
-		con := console.NewConsole(db, queries, consoleAddr)
+		con := console.NewConsole(db, consoleAddr)
+
 		startConsole, stopConsole := con.Handlers()
 
 		group, groupContext := errgroup.WithContext(ctx)

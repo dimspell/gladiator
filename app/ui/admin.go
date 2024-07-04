@@ -59,13 +59,13 @@ func (c *Controller) AdminScreen(w fyne.Window, params *AdminScreenInputParams) 
 
 				err := errors.Join(
 					func() error {
-						if err := c.Console.Queries.DeleteAllGameRoomPlayers(context.TODO()); err != nil {
+						if err := c.Console.DB.Write.DeleteAllGameRoomPlayers(context.TODO()); err != nil {
 							return fmt.Errorf("could not delete all game room players: %w", err)
 						}
 						return nil
 					}(),
 					func() error {
-						if err := c.Console.Queries.DeleteAllGameRooms(context.TODO()); err != nil {
+						if err := c.Console.DB.Write.DeleteAllGameRooms(context.TODO()); err != nil {
 							return fmt.Errorf("could not delete all game rooms: %w", err)
 						}
 						return nil
