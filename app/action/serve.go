@@ -76,6 +76,11 @@ func ServeCommand() *cli.Command {
 		default:
 			return fmt.Errorf("unknown database type: %q", c.String("database-type"))
 		}
+		defer func() {
+			if err := db.Close(); err != nil {
+				slog.Error("Failed to close database", "error", err)
+			}
+		}()
 
 		if err := database.Seed(db.Write); err != nil {
 			slog.Warn("Seed queries failed", "error", err)

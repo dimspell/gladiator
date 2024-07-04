@@ -104,6 +104,7 @@ func (c *Controller) StartConsole(databaseType, databasePath, consoleAddr string
 		}
 		c.consoleProbe.StopStartupProbe()
 		err := stop(ctx)
+		db.Close()
 		c.Console = nil
 		cancel()
 		return err

@@ -58,6 +58,11 @@ func ConsoleCommand() *cli.Command {
 		if err := database.Seed(db.Write); err != nil {
 			slog.Warn("Seed queries failed", "error", err)
 		}
+		defer func() {
+			if err := db.Close(); err != nil {
+				slog.Error("Failed to close database", "error", err)
+			}
+		}()
 
 		con := console.NewConsole(db, consoleAddr)
 		start, stop := con.Handlers()
