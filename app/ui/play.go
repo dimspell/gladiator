@@ -58,6 +58,7 @@ func (c *Controller) playView(w fyne.Window, consoleAddr string) fyne.CanvasObje
 			loadingDialog.Hide()
 			return
 		}
+		loadingDialog.Hide()
 	})
 	backendStop := widget.NewButtonWithIcon("Stop backend", theme.MediaStopIcon(), func() {
 		c.StopBackend()
