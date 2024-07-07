@@ -192,9 +192,16 @@ func (c *Console) WellKnownInfo() http.HandlerFunc {
 		c.RunMode = model.RunModeLAN
 	}
 	return func(w http.ResponseWriter, r *http.Request) {
+		slog.Info("Serving well-known info", "caller_ip", r.RemoteAddr, "caller_agent", r.UserAgent())
+
 		renderJSON(w, r, model.WellKnown{
-			Addr:    c.Addr,
-			RunMode: c.RunMode.String(),
+			Version:  "dev",
+			Protocol: "http",
+			Addr:     c.Addr,
+			RunMode:  c.RunMode.String(),
+			CallerInfo: model.WellKnownCallerInfo{
+				CallerIP: r.RemoteAddr,
+			},
 		})
 	}
 }

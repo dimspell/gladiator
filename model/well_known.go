@@ -1,8 +1,16 @@
 package model
 
 type WellKnown struct {
-	Addr    string `json:"addr"`
-	RunMode string `json:"runMode"`
+	Version  string `json:"version"`
+	Protocol string `json:"protocol"`
+	Addr     string `json:"addr"`
+	RunMode  string `json:"runMode"`
+
+	CallerInfo WellKnownCallerInfo `json:"callerInfo,omitempty"`
+}
+
+type WellKnownCallerInfo struct {
+	CallerIP string `json:"callerIP"`
 }
 
 type RunMode string
