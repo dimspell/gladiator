@@ -2,13 +2,6 @@ package ui
 
 import (
 	"fmt"
-	"log/slog"
-	"net"
-	"net/url"
-	"os"
-	"sort"
-	"strconv"
-
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/data/validation"
@@ -16,6 +9,15 @@ import (
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	"golang.org/x/sys/windows/registry"
+	"log/slog"
+	"net"
+	"net/url"
+	"os"
+	"os/exec"
+	"sort"
+	"strconv"
+	"strings"
 )
 
 func Keys[K comparable, V any](m map[K]V) []K {
@@ -138,4 +140,76 @@ func insertDatabasePath(list fyne.ListableURI, err error, setFn func(string)) er
 func changePage(w fyne.Window, pageName string, content fyne.CanvasObject) {
 	slog.Debug("Changing page in the launcher", "page", pageName)
 	w.SetContent(content)
+}
+
+func listAllIPs() ([]net.IP, error) {
+	interfaces, err := net.Interfaces()
+	if err != nil {
+		return nil, fmt.Errorf("could not list all interfaces (are there any?): %w", err)
+	}
+
+	var ips []net.IP
+	for _, iface := range interfaces {
+		address, err := iface.Addrs()
+		if err != nil {
+			continue
+		}
+
+		for _, addr := range address {
+			ipNet, ok := addr.(*net.IPNet)
+			if !ok {
+				continue
+			}
+			if ipNet.IP.IsLoopback() || !ipNet.IP.IsGlobalUnicast() {
+				continue
+			}
+
+			ips = append(ips, ipNet.IP)
+		}
+	}
+
+	return ips, nil
+}
+
+const (
+	registryPath = `SOFTWARE\WOW6432Node\AbalonStudio\Dispel\Multi`
+	registryKey  = "Server"
+)
+
+func readRegistryKey() (string, error) {
+	key, err := registry.OpenKey(registry.LOCAL_MACHINE, registryPath, registry.QUERY_VALUE)
+	if err != nil {
+		return "", fmt.Errorf("could not find the registry key (is the game installed?): %w", err)
+	}
+	defer key.Close()
+
+	s, _, err := key.GetStringValue(registryKey)
+	if err != nil {
+		return "", fmt.Errorf("could not read from the %q registry key: %w", registryKey, err)
+	}
+	return s, nil
+}
+
+func changeRegistryKey() (likelyChanged bool) {
+	cmd := "reg.exe"
+	newValue := "localhost"
+	args := strings.Join([]string{
+		"ADD",
+		fmt.Sprintf(`HKEY_LOCAL_MACHINE\%s`, registryPath),
+		"/v", "Server",
+		"/t", "REG_SZ",
+		"/f",
+		"/d", newValue,
+	}, " ")
+
+	r := exec.Command("powershell.exe", "Start-Process", cmd, "-Verb", "runAs", "-ArgumentList", `"`+args+`"`)
+
+	// TODO: On any failure (like cancel on UAC propmpt), the powershell will print out the reason to the STDERR. Log it.
+	//r.Stdout = os.Stdout
+	//r.Stderr = os.Stderr
+
+	// When the user has cancelled the UAC prompt, then the process will have the exit-code=1, so also non-nil error.
+	// On this step, it is not possible to detect if the reg.exe has successfully replaced the registry key with new value.
+	likelyChanged = r.Run() == nil
+	return
 }

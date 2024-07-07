@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path"
+	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
@@ -137,6 +138,33 @@ func (c *Controller) SinglePlayerScreen(w fyne.Window, initial *SinglePlayerScre
 		}
 	}))
 
+	checkButton := widget.NewButton("Check registry", func() {
+		s, err := readRegistryKey()
+		if err != nil {
+			dialog.ShowError(err, w)
+			return
+		}
+
+		dialog.ShowInformation("Registry value", s, w)
+	})
+
+	patchButton := widget.NewButton("Patch registry", func() {
+		if !changeRegistryKey() {
+			dialog.ShowError(fmt.Errorf("cannot change registry key"), w)
+			return
+		}
+
+		time.Sleep(1 * time.Second)
+
+		s, err := readRegistryKey()
+		if err != nil {
+			dialog.ShowError(err, w)
+			return
+		}
+
+		dialog.ShowInformation("Registry value", s, w)
+	})
+
 	return container.NewBorder(
 		container.NewPadded(
 			headerContainer(headerText, func() {
@@ -166,6 +194,10 @@ func (c *Controller) SinglePlayerScreen(w fyne.Window, initial *SinglePlayerScre
 			container.NewPadded(
 				container.NewVBox(
 					renderRegistryNotes(),
+					container.NewGridWithColumns(3,
+						checkButton,
+						patchButton,
+					),
 					renderStartServersNotes(),
 					container.NewGridWithColumns(3,
 						consoleRunningCheck,
