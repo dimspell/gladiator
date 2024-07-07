@@ -2,6 +2,13 @@ package ui
 
 import (
 	"fmt"
+	"log/slog"
+	"net"
+	"net/url"
+	"os"
+	"sort"
+	"strconv"
+
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/data/validation"
@@ -9,12 +16,6 @@ import (
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
-	"log/slog"
-	"net"
-	"net/url"
-	"os"
-	"sort"
-	"strconv"
 )
 
 func Keys[K comparable, V any](m map[K]V) []K {
@@ -139,13 +140,13 @@ func changePage(w fyne.Window, pageName string, content fyne.CanvasObject) {
 	w.SetContent(content)
 }
 
-func listAllIPs() ([]net.IP, error) {
+func listAllIPs() ([]string, error) {
 	interfaces, err := net.Interfaces()
 	if err != nil {
 		return nil, fmt.Errorf("could not list all interfaces (are there any?): %w", err)
 	}
 
-	var ips []net.IP
+	var ips []string
 	for _, iface := range interfaces {
 		address, err := iface.Addrs()
 		if err != nil {
@@ -157,11 +158,17 @@ func listAllIPs() ([]net.IP, error) {
 			if !ok {
 				continue
 			}
-			if ipNet.IP.IsLoopback() || !ipNet.IP.IsGlobalUnicast() {
+			if ipNet.IP.IsLoopback() {
+				continue
+			}
+			if !ipNet.IP.IsGlobalUnicast() {
+				continue
+			}
+			if ipNet.IP.To4() == nil {
 				continue
 			}
 
-			ips = append(ips, ipNet.IP)
+			ips = append(ips, ipNet.IP.To4().String())
 		}
 	}
 

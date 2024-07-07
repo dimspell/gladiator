@@ -71,7 +71,10 @@ func (c *Controller) HostScreen(w fyne.Window, params *HostScreenInputParams) fy
 		break
 	}
 
-	bindIP := widget.NewEntry()
+	ips, _ := listAllIPs()
+	ips = append(ips, "127.0.0.1", "0.0.0.0")
+
+	bindIP := widget.NewSelectEntry(ips)
 	bindIP.Validator = ipValidator
 	bindIP.PlaceHolder = "Example: 0.0.0.0"
 	bindIP.SetText("0.0.0.0")

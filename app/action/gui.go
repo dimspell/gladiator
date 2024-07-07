@@ -46,7 +46,6 @@ func GUICommand(version string) *cli.Command {
 
 		ctrl := ui.NewController(a, version)
 		w.SetContent(ctrl.WelcomeScreen(w))
-		// w.SetContent(mainContent.MakeUI())
 
 		w.Resize(fyne.NewSize(600, 500))
 		w.ShowAndRun()

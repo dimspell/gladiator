@@ -27,9 +27,15 @@ func (c *Controller) PlayScreen(w fyne.Window, consoleAddr string, myIpAddress s
 }
 
 func (c *Controller) playView(w fyne.Window, consoleAddr, myIpAddress string) fyne.CanvasObject {
-	myIPEntry := widget.NewEntry()
+	ips, _ := listAllIPs()
+	myIPEntry := widget.NewSelectEntry(ips)
 	myIPEntry.Validator = ipValidator
 	myIPEntry.PlaceHolder = "Example: 192.168.100.1"
+	if myIpAddress == "" {
+		if len(ips) > 0 {
+			myIpAddress = ips[0]
+		}
+	}
 	myIPEntry.SetText(myIpAddress)
 
 	settingsAccordion := widget.NewAccordionItem("Settings",
