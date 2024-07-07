@@ -2,28 +2,22 @@ package ui
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
+	"net/http"
+	"strings"
+	"time"
 
+	"connectrpc.com/connect"
 	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
 	"github.com/dimspell/gladiator/console/auth"
-	"github.com/dimspell/gladiator/console/database"
+	v1 "github.com/dimspell/gladiator/gen/multi/v1"
+	"github.com/dimspell/gladiator/gen/multi/v1/multiv1connect"
 )
 
-func (c *Controller) SignUnScreen(w fyne.Window) fyne.CanvasObject {
-	return container.NewPadded(container.NewVBox(
-		headerContainer("Sign-up", func() {
-			changePage(w, "JoinOptions", c.JoinOptionsScreen(w))
-		}),
-		widget.NewLabel(""),
-		widget.NewLabel("Provide the credentials how do you want to sign-in."),
-		c.signUpForm(nil, nil, w),
-	))
-}
-
-func (c *Controller) signUpForm(onCancel func(), onCreate func(user database.User), w fyne.Window) *widget.Form {
+func (c *Controller) signUpForm(consoleUri string, onCancel func(), onCreate func(user string), w fyne.Window) *widget.Form {
 	name := widget.NewEntry()
 	name.Validator = usernameValidator
 	name.SetPlaceHolder("GumaTurbo2137")
@@ -31,6 +25,11 @@ func (c *Controller) signUpForm(onCancel func(), onCreate func(user database.Use
 	password := widget.NewPasswordEntry()
 	password.Validator = passwordValidator
 	password.SetPlaceHolder("Password")
+
+	if !strings.Contains(consoleUri, "//") {
+		consoleUri = fmt.Sprintf("%s://%s/grpc", "http", consoleUri)
+	}
+	client := multiv1connect.NewUserServiceClient(&http.Client{Timeout: 5 * time.Second}, consoleUri)
 
 	form := &widget.Form{
 		Items: []*widget.FormItem{
@@ -40,11 +39,6 @@ func (c *Controller) signUpForm(onCancel func(), onCreate func(user database.Use
 		SubmitText: "Create a new account",
 		OnCancel:   onCancel,
 		OnSubmit: func() {
-			if c.Console == nil {
-				slog.Error("Console not initialized")
-				return
-			}
-
 			loadingDialog := dialog.NewCustomWithoutButtons("Submitting the form...", widget.NewProgressBarInfinite(), w)
 			loadingDialog.Show()
 
@@ -54,10 +48,11 @@ func (c *Controller) signUpForm(onCancel func(), onCreate func(user database.Use
 				dialog.ShowError(err, w)
 				return
 			}
-			user, err := c.Console.DB.Write.CreateUser(context.TODO(), database.CreateUserParams{
+
+			user, err := client.CreateUser(context.TODO(), connect.NewRequest(&v1.CreateUserRequest{
 				Username: name.Text,
 				Password: pwd.String(),
-			})
+			}))
 			if err != nil {
 				loadingDialog.Hide()
 				dialog.ShowError(err, w)
@@ -65,9 +60,9 @@ func (c *Controller) signUpForm(onCancel func(), onCreate func(user database.Use
 			}
 
 			loadingDialog.Hide()
-			slog.Info("Created new user", "name", user.Username, "id", user.ID)
+			slog.Info("Created new user", "name", user.Msg.GetUser().Username, "id", user.Msg.GetUser().UserId)
 			if onCreate != nil {
-				onCreate(user)
+				onCreate(user.Msg.GetUser().Username)
 			}
 		},
 	}

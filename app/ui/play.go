@@ -10,7 +10,6 @@ import (
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
-	"github.com/dimspell/gladiator/console/database"
 )
 
 func (c *Controller) PlayScreen(w fyne.Window, consoleAddr string) fyne.CanvasObject {
@@ -83,12 +82,12 @@ func (c *Controller) playView(w fyne.Window, consoleAddr string) fyne.CanvasObje
 	createUser := widget.NewButtonWithIcon("Create New User", theme.AccountIcon(), func() {
 		centered := container.NewCenter()
 		d := dialog.NewCustomWithoutButtons("Create New User", centered, w)
-		centered.Add(c.signUpForm(d.Hide, func(user database.User) {
+		centered.Add(c.signUpForm(consoleAddr, d.Hide, func(username string) {
 			d.Hide()
 
 			c.app.SendNotification(
 				fyne.NewNotification("Created New User",
-					fmt.Sprintf("You have successfully created a new user named %q.", user.Username),
+					fmt.Sprintf("You have successfully created a new user named %q.", username),
 				))
 		}, w))
 		d.Show()
