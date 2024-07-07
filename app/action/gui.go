@@ -4,7 +4,6 @@ package action
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"time"
 
@@ -44,8 +43,6 @@ func GUICommand(version string) *cli.Command {
 		w := a.NewWindow("Gladiator")
 
 		// selfManage(a, w)
-
-		fmt.Println(a.Metadata())
 
 		ctrl := ui.NewController(a, version)
 		w.SetContent(ctrl.WelcomeScreen(w))
