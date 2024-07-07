@@ -15,13 +15,11 @@ func (c *Controller) JoinDefineScreen(w fyne.Window) fyne.CanvasObject {
 	headerText := "Join a server - connect to custom auth server"
 
 	bindIP := widget.NewEntry()
-
 	bindIP.Validator = ipValidator
 	bindIP.PlaceHolder = "Example: 0.0.0.0"
 	bindIP.SetText("127.0.0.1")
 
 	bindPort := widget.NewEntry()
-
 	bindPort.Validator = portValidator
 	bindPort.PlaceHolder = "Example: 2137"
 	bindPort.SetText("2137")
