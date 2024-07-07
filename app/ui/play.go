@@ -53,7 +53,6 @@ func (c *Controller) playView(w fyne.Window, consoleAddr string) fyne.CanvasObje
 
 		loadingDialog := dialog.NewCustomWithoutButtons("Starting backend...", widget.NewProgressBarInfinite(), w)
 		loadingDialog.Show()
-		defer loadingDialog.Hide()
 
 		if err := c.StartBackend(consoleAddr, myIPEntry.Text); err != nil {
 			loadingDialog.Hide()

@@ -47,10 +47,10 @@ func (c *Controller) signUpForm(onCancel func(), onCreate func(user database.Use
 
 			loadingDialog := dialog.NewCustomWithoutButtons("Submitting the form...", widget.NewProgressBarInfinite(), w)
 			loadingDialog.Show()
-			defer loadingDialog.Hide()
 
 			pwd, err := auth.NewPassword(password.Text)
 			if err != nil {
+				loadingDialog.Hide()
 				dialog.ShowError(err, w)
 				return
 			}
@@ -59,10 +59,12 @@ func (c *Controller) signUpForm(onCancel func(), onCreate func(user database.Use
 				Password: pwd.String(),
 			})
 			if err != nil {
+				loadingDialog.Hide()
 				dialog.ShowError(err, w)
 				return
 			}
 
+			loadingDialog.Hide()
 			slog.Info("Created new user", "name", user.Username, "id", user.ID)
 			if onCreate != nil {
 				onCreate(user)
