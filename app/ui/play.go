@@ -12,7 +12,7 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-func (c *Controller) PlayScreen(w fyne.Window, consoleAddr string) fyne.CanvasObject {
+func (c *Controller) PlayScreen(w fyne.Window, consoleAddr string, myIpAddress string) fyne.CanvasObject {
 	return container.NewBorder(
 		container.NewPadded(
 			headerContainer("Join & Play Multiplayer", func() {
@@ -22,14 +22,15 @@ func (c *Controller) PlayScreen(w fyne.Window, consoleAddr string) fyne.CanvasOb
 		nil,
 		nil,
 		nil,
-		c.playView(w, consoleAddr),
+		c.playView(w, consoleAddr, myIpAddress),
 	)
 }
 
-func (c *Controller) playView(w fyne.Window, consoleAddr string) fyne.CanvasObject {
+func (c *Controller) playView(w fyne.Window, consoleAddr, myIpAddress string) fyne.CanvasObject {
 	myIPEntry := widget.NewEntry()
 	myIPEntry.Validator = ipValidator
-	myIPEntry.SetText("192.168.0.1")
+	myIPEntry.PlaceHolder = "Example: 192.168.100.1"
+	myIPEntry.SetText(myIpAddress)
 
 	settingsAccordion := widget.NewAccordionItem("Settings",
 		container.New(

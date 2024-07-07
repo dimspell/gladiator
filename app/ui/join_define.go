@@ -71,12 +71,14 @@ func (c *Controller) JoinDefineScreen(w fyne.Window) fyne.CanvasObject {
 						// loadingDialog.Show()
 						// defer loadingDialog.Hide()
 
-						if err := c.ConsoleHandshake(consoleAddr); err != nil {
+						wk, err := c.ConsoleHandshake(consoleAddr)
+						if err != nil {
 							dialog.ShowError(err, w)
 							return
 						}
+						myIpAddress, _ := wk.Caller.IPString("")
 
-						changePage(w, "Joined", c.PlayScreen(w, consoleAddr))
+						changePage(w, "Joined", c.PlayScreen(w, consoleAddr, myIpAddress))
 					}),
 				),
 			),

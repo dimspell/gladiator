@@ -2,6 +2,7 @@ package ui
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -13,6 +14,7 @@ import (
 	"github.com/dimspell/gladiator/backend"
 	"github.com/dimspell/gladiator/console"
 	"github.com/dimspell/gladiator/console/database"
+	"github.com/dimspell/gladiator/model"
 	"github.com/dimspell/gladiator/probe"
 )
 
@@ -134,7 +136,7 @@ func (c *Controller) StopConsole() error {
 	return nil
 }
 
-func (c *Controller) ConsoleHandshake(consoleAddr string) error {
+func (c *Controller) ConsoleHandshake(consoleAddr string) (*model.WellKnown, error) {
 	client := &http.Client{Timeout: 3 * time.Second}
 
 	if !strings.Contains(consoleAddr, "://") {
@@ -142,20 +144,20 @@ func (c *Controller) ConsoleHandshake(consoleAddr string) error {
 	}
 	res, err := client.Get(fmt.Sprintf("%s/.well-known/console.json", consoleAddr))
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if res.StatusCode != http.StatusOK {
-		return fmt.Errorf("incorrect http-status code: %d", res.StatusCode)
+		return nil, fmt.Errorf("incorrect http-status code: %d", res.StatusCode)
 	}
 
 	// TODO: Read configuration parameters
-	// var resp struct{}
-	// if err := json.NewDecoder(res.Body).Decode(&resp); err != nil {
-	// 	log.Println(err)
-	// 	return
-	// }
-	// log.Println(resp)
-	return nil
+	var resp model.WellKnown
+	if err := json.NewDecoder(res.Body).Decode(&resp); err != nil {
+		return nil, err
+	}
+
+	slog.Info("Console handshake", "info", resp)
+	return &resp, nil
 }
 
 func (c *Controller) StartBackend(consoleAddr, myIPAddress string) error {

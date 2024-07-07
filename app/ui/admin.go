@@ -185,7 +185,7 @@ func (c *Controller) AdminScreen(w fyne.Window, params *AdminScreenInputParams) 
 			nil,
 			container.NewAppTabs(
 				container.NewTabItemWithIcon("Host", theme.HomeIcon(), consoleScreen()),
-				container.NewTabItemWithIcon("Play", theme.MediaPlayIcon(), c.playView(w, params.BindAddress)),
+				container.NewTabItemWithIcon("Play", theme.MediaPlayIcon(), c.playView(w, params.BindAddress, "")),
 			),
 		),
 	)

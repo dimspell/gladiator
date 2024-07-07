@@ -199,8 +199,8 @@ func (c *Console) WellKnownInfo() http.HandlerFunc {
 			Protocol: "http",
 			Addr:     c.Addr,
 			RunMode:  c.RunMode.String(),
-			CallerInfo: model.WellKnownCallerInfo{
-				CallerIP: r.RemoteAddr,
+			Caller: model.WellKnownCaller{
+				Addr: r.RemoteAddr,
 			},
 		})
 	}
