@@ -138,33 +138,6 @@ func (c *Controller) SinglePlayerScreen(w fyne.Window, initial *SinglePlayerScre
 		}
 	}))
 
-	checkButton := widget.NewButton("Check registry", func() {
-		s, err := readRegistryKey()
-		if err != nil {
-			dialog.ShowError(err, w)
-			return
-		}
-
-		dialog.ShowInformation("Registry value", s, w)
-	})
-
-	patchButton := widget.NewButton("Patch registry", func() {
-		if !changeRegistryKey() {
-			dialog.ShowError(fmt.Errorf("cannot change registry key"), w)
-			return
-		}
-
-		time.Sleep(1 * time.Second)
-
-		s, err := readRegistryKey()
-		if err != nil {
-			dialog.ShowError(err, w)
-			return
-		}
-
-		dialog.ShowInformation("Registry value", s, w)
-	})
-
 	return container.NewBorder(
 		container.NewPadded(
 			headerContainer(headerText, func() {
@@ -194,10 +167,7 @@ func (c *Controller) SinglePlayerScreen(w fyne.Window, initial *SinglePlayerScre
 			container.NewPadded(
 				container.NewVBox(
 					renderRegistryNotes(),
-					container.NewGridWithColumns(3,
-						checkButton,
-						patchButton,
-					),
+					renderRegistryPatchContainer(w),
 					renderStartServersNotes(),
 					container.NewGridWithColumns(3,
 						consoleRunningCheck,
@@ -238,6 +208,61 @@ func renderRegistryNotes() *widget.RichText {
 	registryUpdatedText.Wrapping = fyne.TextWrapWord
 
 	return registryUpdatedText
+}
+
+func renderRegistryPatchContainer(w fyne.Window) fyne.CanvasObject {
+	registryValueBinding := binding.NewString()
+	changeRegistryValue := func(registryValue string) {
+		if registryValue == "" {
+			registryValue = "<unknown>"
+		}
+		registryValueBinding.Set(fmt.Sprintf("Value: %q", registryValue))
+	}
+
+	registryValue, _ := readRegistryKey()
+	changeRegistryValue(registryValue)
+
+	checkButton := widget.NewButton("Check registry", func() {
+		s, err := readRegistryKey()
+		if err != nil {
+			dialog.ShowError(err, w)
+			return
+		}
+		changeRegistryValue(s)
+		dialog.ShowInformation("Registry value", fmt.Sprintf("Current value: %q", s), w)
+	})
+
+	patchButton := widget.NewButton("Patch registry", func() {
+		before, err := readRegistryKey()
+		if err != nil {
+			dialog.ShowError(err, w)
+			return
+		}
+
+		if !patchRegistryKey() {
+			dialog.ShowError(fmt.Errorf("cannot change registry key"), w)
+			return
+		}
+
+		time.Sleep(1 * time.Second)
+
+		after, err := readRegistryKey()
+		if err != nil {
+			dialog.ShowError(err, w)
+			return
+		}
+		changeRegistryValue(after)
+		dialog.ShowInformation("Changed Windows Registry", fmt.Sprintf("From %q to %q", before, after), w)
+	})
+
+	statusLabel := widget.NewLabelWithData(registryValueBinding)
+	statusLabel.Alignment = fyne.TextAlignCenter
+
+	return container.NewGridWithColumns(3,
+		statusLabel,
+		checkButton,
+		patchButton,
+	)
 }
 
 func renderStartServersNotes() *widget.RichText {

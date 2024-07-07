@@ -6,6 +6,6 @@ func readRegistryKey() (string, error) {
 	return "", nil
 }
 
-func changeRegistryKey() (likelyChanged bool) {
+func patchRegistryKey() (likelyChanged bool) {
 	return false
 }

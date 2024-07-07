@@ -106,6 +106,7 @@ func (c *Controller) playView(w fyne.Window, consoleAddr string) fyne.CanvasObje
 	return container.NewVScroll(container.NewPadded(
 		container.NewVBox(
 			renderRegistryNotes(),
+			renderRegistryPatchContainer(w),
 			renderStartBackendServer(),
 			startBackendCard,
 			renderCreateUserNotes(),

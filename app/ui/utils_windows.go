@@ -4,9 +4,10 @@ package ui
 
 import (
 	"fmt"
-	"golang.org/x/sys/windows/registry"
 	"os/exec"
 	"strings"
+
+	"golang.org/x/sys/windows/registry"
 )
 
 const (
@@ -28,7 +29,7 @@ func readRegistryKey() (string, error) {
 	return s, nil
 }
 
-func changeRegistryKey() (likelyChanged bool) {
+func patchRegistryKey() (likelyChanged bool) {
 	cmd := "reg.exe"
 	newValue := "localhost"
 	args := strings.Join([]string{
@@ -43,8 +44,8 @@ func changeRegistryKey() (likelyChanged bool) {
 	r := exec.Command("powershell.exe", "Start-Process", cmd, "-Verb", "runAs", "-ArgumentList", `"`+args+`"`)
 
 	// TODO: On any failure (like cancel on UAC propmpt), the powershell will print out the reason to the STDERR. Log it.
-	//r.Stdout = os.Stdout
-	//r.Stderr = os.Stderr
+	// r.Stdout = os.Stdout
+	// r.Stderr = os.Stderr
 
 	// When the user has cancelled the UAC prompt, then the process will have the exit-code=1, so also non-nil error.
 	// On this step, it is not possible to detect if the reg.exe has successfully replaced the registry key with new value.
