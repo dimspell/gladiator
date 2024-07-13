@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"log"
 	"log/slog"
 	"net/http"
 	"os"
@@ -92,6 +94,10 @@ func (c *Console) HttpRouter() http.Handler {
 		mux.Mount("/.well-known/", wellKnown)
 	}
 
+	{ // Setup WebSocket routes for P2P communication (signaling)
+		mux.Handle("/ws", websocket.Handler(c.WebSocketHandler))
+	}
+
 	{ // Setup gRPC routes for the backend
 		api := chi.NewRouter()
 		api.Use(slogchi.New(slog.Default()))
@@ -124,10 +130,6 @@ func (c *Console) HttpRouter() http.Handler {
 		api.Mount(multiv1connect.NewUserServiceHandler(&userServiceServer{c.DB}))
 		api.Mount(multiv1connect.NewRankingServiceHandler(&rankingServiceServer{c.DB}))
 		mux.Mount("/grpc/", http.StripPrefix("/grpc", api))
-	}
-
-	{ // Setup WebSocket routes for P2P communication (signaling)
-		mux.Mount("/ws/", websocket.Handler(c.WebSocketHandler))
 	}
 
 	return mux
@@ -215,8 +217,22 @@ func (c *Console) Graceful(ctx context.Context, start GracefulFunc, shutdown Gra
 }
 
 func (c *Console) WebSocketHandler(ws *websocket.Conn) {
+	// Prepare the configuration
+	config := webrtc.Configuration{
+		ICEServers: []webrtc.ICEServer{
+			// {
+			// 	URLs: []string{"stun:stun.l.google.com:19302"},
+			// },
+			{
+				URLs:       []string{"turn:127.0.0.1:3478"},
+				Username:   "username1",
+				Credential: "password1",
+			},
+		},
+	}
+
 	// Create a new RTCPeerConnection
-	peerConnection, err := webrtc.NewPeerConnection(webrtc.Configuration{})
+	peerConnection, err := webrtc.NewPeerConnection(config)
 	if err != nil {
 		panic(err)
 	}
@@ -248,12 +264,20 @@ func (c *Console) WebSocketHandler(ws *websocket.Conn) {
 
 	// Send the current time via a DataChannel to the remote peer every 3 seconds
 	peerConnection.OnDataChannel(func(d *webrtc.DataChannel) {
+		d.OnMessage(func(msg webrtc.DataChannelMessage) {
+			slog.Info("Received message", "message", string(msg.Data))
+		})
+
 		d.OnOpen(func() {
 			for range time.Tick(time.Second * 3) {
 				if err = d.SendText(time.Now().String()); err != nil {
 					panic(err)
 				}
 			}
+		})
+
+		d.OnClose(func() {
+			slog.Info("Connection closed")
 		})
 	})
 
@@ -262,6 +286,10 @@ func (c *Console) WebSocketHandler(ws *websocket.Conn) {
 		// Read each inbound WebSocket Message
 		n, err := ws.Read(buf)
 		if err != nil {
+			if err == io.EOF {
+				peerConnection.Close()
+				return
+			}
 			panic(err)
 		}
 
@@ -271,10 +299,14 @@ func (c *Console) WebSocketHandler(ws *websocket.Conn) {
 			offer     webrtc.SessionDescription
 		)
 
+		log.Println(string(buf[:n]))
+
 		switch {
 		// Attempt to unmarshal as a SessionDescription. If the SDP field is empty
 		// assume it is not one.
 		case json.Unmarshal(buf[:n], &offer) == nil && offer.SDP != "":
+			slog.Info("Received Offer", "offer", offer)
+
 			if err = peerConnection.SetRemoteDescription(offer); err != nil {
 				panic(err)
 			}
@@ -299,6 +331,8 @@ func (c *Console) WebSocketHandler(ws *websocket.Conn) {
 		// Attempt to unmarshal as a ICECandidateInit. If the candidate field is empty
 		// assume it is not one.
 		case json.Unmarshal(buf[:n], &candidate) == nil && candidate.Candidate != "":
+			slog.Info("Received ICE Candidate", "candidate", candidate)
+
 			if err = peerConnection.AddICECandidate(candidate); err != nil {
 				panic(err)
 			}
