@@ -16,6 +16,9 @@ require (
 	github.com/mattn/go-colorable v0.1.13
 	github.com/mattn/go-isatty v0.0.20
 	github.com/pion/ice/v3 v3.0.7
+	github.com/pion/randutil v0.1.0
+	github.com/pion/stun/v2 v2.0.0
+	github.com/pion/turn/v3 v3.0.3
 	github.com/pion/webrtc/v4 v4.0.0-beta.21
 	github.com/rs/cors v1.11.0
 	github.com/samber/slog-chi v1.11.0
@@ -55,16 +58,13 @@ require (
 	github.com/pion/interceptor v0.1.29 // indirect
 	github.com/pion/logging v0.2.2 // indirect
 	github.com/pion/mdns/v2 v2.0.7 // indirect
-	github.com/pion/randutil v0.1.0 // indirect
 	github.com/pion/rtcp v1.2.14 // indirect
 	github.com/pion/rtp v1.8.6 // indirect
 	github.com/pion/sctp v1.8.16 // indirect
 	github.com/pion/sdp/v3 v3.0.9 // indirect
 	github.com/pion/srtp/v3 v3.0.1 // indirect
-	github.com/pion/stun/v2 v2.0.0 // indirect
 	github.com/pion/transport/v2 v2.2.4 // indirect
 	github.com/pion/transport/v3 v3.0.2 // indirect
-	github.com/pion/turn/v3 v3.0.3 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/rogpeppe/go-internal v1.10.0 // indirect
