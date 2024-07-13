@@ -216,111 +216,38 @@ func (c *Console) Graceful(ctx context.Context, start GracefulFunc, shutdown Gra
 	return <-errChan
 }
 
-func (c *Console) WebSocketHandler(ws *websocket.Conn) {
-	// Prepare the configuration
-	config := webrtc.Configuration{
-		ICEServers: []webrtc.ICEServer{
-			// {
-			// 	URLs: []string{"stun:stun.l.google.com:19302"},
-			// },
-			{
-				URLs:       []string{"turn:127.0.0.1:3478"},
-				Username:   "username1",
-				Credential: "password1",
+func (c *Console) WebSocketHandler() func(ws *websocket.Conn) {
+	return func(ws *websocket.Conn) {
+		// Prepare the configuration
+		config := webrtc.Configuration{
+			ICEServers: []webrtc.ICEServer{
+				// {
+				// 	URLs: []string{"stun:stun.l.google.com:19302"},
+				// },
+				{
+					URLs:       []string{"turn:127.0.0.1:3478"},
+					Username:   "username1",
+					Credential: "password1",
+				},
 			},
-		},
-	}
-
-	// Create a new RTCPeerConnection
-	peerConnection, err := webrtc.NewPeerConnection(config)
-	if err != nil {
-		panic(err)
-	}
-
-	// When Pion gathers a new ICE Candidate send it to the client. This is how
-	// ice trickle is implemented. Everytime we have a new candidate available we send
-	// it as soon as it is ready. We don't wait to emit an Offer/Answer until they are
-	// all available
-	peerConnection.OnICECandidate(func(c *webrtc.ICECandidate) {
-		if c == nil {
-			return
 		}
 
-		outbound, marshalErr := json.Marshal(c.ToJSON())
-		if marshalErr != nil {
-			panic(marshalErr)
-		}
-
-		if _, err = ws.Write(outbound); err != nil {
+		// Create a new RTCPeerConnection
+		peerConnection, err := webrtc.NewPeerConnection(config)
+		if err != nil {
 			panic(err)
 		}
-	})
 
-	// Set the handler for ICE connection state
-	// This will notify you when the peer has connected/disconnected
-	peerConnection.OnICEConnectionStateChange(func(connectionState webrtc.ICEConnectionState) {
-		fmt.Printf("ICE Connection State has changed: %s\n", connectionState.String())
-	})
-
-	// Send the current time via a DataChannel to the remote peer every 3 seconds
-	peerConnection.OnDataChannel(func(d *webrtc.DataChannel) {
-		d.OnMessage(func(msg webrtc.DataChannelMessage) {
-			slog.Info("Received message", "message", string(msg.Data))
-		})
-
-		d.OnOpen(func() {
-			for range time.Tick(time.Second * 3) {
-				if err = d.SendText(time.Now().String()); err != nil {
-					panic(err)
-				}
-			}
-		})
-
-		d.OnClose(func() {
-			slog.Info("Connection closed")
-		})
-	})
-
-	buf := make([]byte, 1500)
-	for {
-		// Read each inbound WebSocket Message
-		n, err := ws.Read(buf)
-		if err != nil {
-			if err == io.EOF {
-				peerConnection.Close()
+		// When Pion gathers a new ICE Candidate send it to the client. This is how
+		// ice trickle is implemented. Everytime we have a new candidate available we send
+		// it as soon as it is ready. We don't wait to emit an Offer/Answer until they are
+		// all available
+		peerConnection.OnICECandidate(func(c *webrtc.ICECandidate) {
+			if c == nil {
 				return
 			}
-			panic(err)
-		}
 
-		// Unmarshal each inbound WebSocket message
-		var (
-			candidate webrtc.ICECandidateInit
-			offer     webrtc.SessionDescription
-		)
-
-		log.Println(string(buf[:n]))
-
-		switch {
-		// Attempt to unmarshal as a SessionDescription. If the SDP field is empty
-		// assume it is not one.
-		case json.Unmarshal(buf[:n], &offer) == nil && offer.SDP != "":
-			slog.Info("Received Offer", "offer", offer)
-
-			if err = peerConnection.SetRemoteDescription(offer); err != nil {
-				panic(err)
-			}
-
-			answer, answerErr := peerConnection.CreateAnswer(nil)
-			if answerErr != nil {
-				panic(answerErr)
-			}
-
-			if err = peerConnection.SetLocalDescription(answer); err != nil {
-				panic(err)
-			}
-
-			outbound, marshalErr := json.Marshal(answer)
+			outbound, marshalErr := json.Marshal(c.ToJSON())
 			if marshalErr != nil {
 				panic(marshalErr)
 			}
@@ -328,16 +255,103 @@ func (c *Console) WebSocketHandler(ws *websocket.Conn) {
 			if _, err = ws.Write(outbound); err != nil {
 				panic(err)
 			}
-		// Attempt to unmarshal as a ICECandidateInit. If the candidate field is empty
-		// assume it is not one.
-		case json.Unmarshal(buf[:n], &candidate) == nil && candidate.Candidate != "":
-			slog.Info("Received ICE Candidate", "candidate", candidate)
+		})
 
-			if err = peerConnection.AddICECandidate(candidate); err != nil {
+		// Set the handler for ICE connection state
+		// This will notify you when the peer has connected/disconnected
+		peerConnection.OnICEConnectionStateChange(func(connectionState webrtc.ICEConnectionState) {
+			fmt.Printf("ICE Connection State has changed: %s\n", connectionState.String())
+		})
+
+		dataChannel, err := peerConnection.CreateDataChannel("ping", nil)
+		if err != nil {
+			log.Println(dataChannel, err)
+		}
+
+		// Send the current time via a DataChannel to the remote peer every 3 seconds
+		peerConnection.OnDataChannel(func(d *webrtc.DataChannel) {
+			d.OnMessage(func(msg webrtc.DataChannelMessage) {
+				slog.Info("Received message", "message", string(msg.Data))
+			})
+
+			d.OnOpen(func() {
+				fmt.Println("Opened data channel")
+
+				for range time.Tick(time.Second * 3) {
+					if err = d.SendText(time.Now().String()); err != nil {
+						if errors.Is(io.ErrClosedPipe, err) {
+							// TODO: Close the peer connection
+							slog.Info("Connection closed")
+							return
+						}
+
+						panic(err)
+					}
+				}
+			})
+
+			d.OnClose(func() {
+				slog.Info("Connection closed")
+			})
+		})
+
+		buf := make([]byte, 1500)
+		for {
+			// Read each inbound WebSocket Message
+			n, err := ws.Read(buf)
+			if err != nil {
+				if err == io.EOF {
+					peerConnection.Close()
+					return
+				}
 				panic(err)
 			}
-		default:
-			panic("Unknown message")
+
+			// Unmarshal each inbound WebSocket message
+			var (
+				candidate webrtc.ICECandidateInit
+				offer     webrtc.SessionDescription
+			)
+
+			switch {
+			// Attempt to unmarshal as a SessionDescription. If the SDP field is empty
+			// assume it is not one.
+			case json.Unmarshal(buf[:n], &offer) == nil && offer.SDP != "":
+				slog.Info("Received Offer", "offer", offer)
+
+				if err = peerConnection.SetRemoteDescription(offer); err != nil {
+					panic(err)
+				}
+
+				answer, answerErr := peerConnection.CreateAnswer(nil)
+				if answerErr != nil {
+					panic(answerErr)
+				}
+
+				if err = peerConnection.SetLocalDescription(answer); err != nil {
+					panic(err)
+				}
+
+				outbound, marshalErr := json.Marshal(answer)
+				if marshalErr != nil {
+					panic(marshalErr)
+				}
+
+				if _, err = ws.Write(outbound); err != nil {
+					panic(err)
+				}
+			// Attempt to unmarshal as a ICECandidateInit. If the candidate field is empty
+			// assume it is not one.
+			case json.Unmarshal(buf[:n], &candidate) == nil && candidate.Candidate != "":
+				slog.Info("Received ICE Candidate", "candidate", candidate)
+
+				if err = peerConnection.AddICECandidate(candidate); err != nil {
+					panic(err)
+				}
+			default:
+				log.Println(string(buf[:n]))
+				panic("Unknown message")
+			}
 		}
 	}
 }

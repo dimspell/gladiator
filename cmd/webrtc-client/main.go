@@ -10,23 +10,35 @@ import (
 	"os"
 	"time"
 
+	"github.com/lmittmann/tint"
+	"github.com/mattn/go-colorable"
 	"github.com/pion/randutil"
 	"github.com/pion/webrtc/v4"
 	"golang.org/x/net/websocket"
 )
 
 func main() {
+	slog.SetDefault(slog.New(
+		tint.NewHandler(
+			colorable.NewColorable(os.Stderr),
+			&tint.Options{
+				Level:      slog.LevelDebug,
+				TimeFormat: time.TimeOnly,
+			},
+		),
+	))
+
 	// Prepare the configuration
 	config := webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{
 			// {
 			// 	URLs: []string{"stun:stun.l.google.com:19302"},
 			// },
-			{
-				URLs:       []string{"turn:127.0.0.1:3478"},
-				Username:   "username2",
-				Credential: "password2",
-			},
+			// {
+			// 	URLs:       []string{"turn:127.0.0.1:3478"},
+			// 	Username:   "username2",
+			// 	Credential: "password2",
+			// },
 		},
 	}
 
@@ -85,26 +97,30 @@ func main() {
 		}
 	})
 
+	// dataChannel.OnMessage(func(msg webrtc.DataChannelMessage) {
+	// 	slog.Info("Message from DataChannel", dataChannel.Label(), string(msg.Data))
+	// })
+
 	// Register data channel creation handling
 	peerConnection.OnDataChannel(func(d *webrtc.DataChannel) {
 		fmt.Printf("New DataChannel %s %d\n", d.Label(), d.ID())
 
 		// Register channel opening handling
 		d.OnOpen(func() {
-			fmt.Printf("Data channel '%s'-'%d' open. Random messages will now be sent to any connected DataChannels every 5 seconds\n", d.Label(), d.ID())
+			fmt.Printf("Data channel '%s'-'%d' open\n", d.Label(), d.ID())
 
-			for range time.NewTicker(5 * time.Second).C {
-				message, sendErr := randutil.GenerateCryptoRandomString(15, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
-				if sendErr != nil {
-					panic(sendErr)
-				}
-
-				// Send the message as text
-				fmt.Printf("Sending '%s'\n", message)
-				if sendErr = d.SendText(message); sendErr != nil {
-					panic(sendErr)
-				}
-			}
+			// for range time.NewTicker(5 * time.Second).C {
+			// 	message, sendErr := randutil.GenerateCryptoRandomString(15, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+			// 	if sendErr != nil {
+			// 		panic(sendErr)
+			// 	}
+			//
+			// 	// Send the message as text
+			// 	fmt.Printf("Sending '%s'\n", message)
+			// 	if sendErr = d.SendText(message); sendErr != nil {
+			// 		panic(sendErr)
+			// 	}
+			// }
 		})
 
 		// Register text message handling
@@ -175,8 +191,6 @@ func main() {
 				answer    webrtc.SessionDescription
 			)
 
-			log.Println(string(buf[:n]))
-
 			switch {
 			// Attempt to unmarshal as a SessionDescription. If the SDP field is empty
 			// assume it is not one.
@@ -207,6 +221,7 @@ func main() {
 					panic(err)
 				}
 			default:
+				log.Println(string(buf[:n]))
 				panic("Unknown message")
 			}
 		}
