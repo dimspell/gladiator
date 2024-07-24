@@ -1,4 +1,4 @@
-package proxy
+package client
 
 import (
 	"context"
@@ -7,35 +7,36 @@ import (
 	"log/slog"
 	"net"
 	"sync"
-	"time"
 )
 
-type ExternalClientProxy struct {
-	ExposedOnIP       string
-	Destination       Destination
-	ConnectionTimeout time.Duration
+type GuestProxy struct {
+	ExposedOnIP string
+
+	OnUDPMessage func(ctx context.Context, handler func(msg []byte)) error
+	OnTCPMessage func(ctx context.Context, handler func(msg []byte)) error
+
+	WriteUDPMessage func(ctx context.Context, msg []byte) error
+	WriteTCPMessage func(ctx context.Context, msg []byte) error
 }
 
-func NewExternalClientProxy(destination Destination) *ExternalClientProxy {
-	p := ExternalClientProxy{
-		ExposedOnIP:       "127.0.1.28",
-		Destination:       destination,
-		ConnectionTimeout: DefaultConnectionTimeout,
-	}
+func NewGuestProxy(exposedIP string) *GuestProxy {
+	p := GuestProxy{ExposedOnIP: exposedIP}
 	slog.Info("Configured proxy", "proxyIP", p.ExposedOnIP)
 	return &p
 }
 
-func (p *ExternalClientProxy) Start(ctx context.Context) error {
+func (p *GuestProxy) Start(ctx context.Context) {
 	go p.tcpAsHost(ctx)
 	go p.udpAsHost(ctx)
 
-	ch := make(chan struct{})
-	<-ch
-	return nil
+	select {
+	case <-ctx.Done():
+		// p.Close()
+		break
+	}
 }
 
-func (p *ExternalClientProxy) tcpAsHost(ctx context.Context) {
+func (p *GuestProxy) tcpAsHost(ctx context.Context) {
 	slog.Info("Starting proxy for TCP")
 
 	tcpListener, err := net.Listen("tcp", net.JoinHostPort(p.ExposedOnIP, "6114"))
@@ -47,7 +48,7 @@ func (p *ExternalClientProxy) tcpAsHost(ctx context.Context) {
 	fmt.Println("Listening TCP on", tcpListener.Addr().String())
 
 	processPackets := func(ctx context.Context, clientConn net.Conn) {
-		go p.Destination.OnTCPMessage(ctx, func(msg []byte) {
+		go p.OnTCPMessage(ctx, func(msg []byte) {
 			_, err = clientConn.Write(msg)
 			if err != nil {
 				fmt.Println("(tcp): Error writing to client: ", err.Error())
@@ -69,7 +70,7 @@ func (p *ExternalClientProxy) tcpAsHost(ctx context.Context) {
 				fmt.Println("(tcp): Error reading from client: ", err.Error())
 				return
 			}
-			p.Destination.WriteTCPMessage(ctx, buf[:n])
+			p.WriteTCPMessage(ctx, buf[:n])
 		}
 	}
 
@@ -90,7 +91,7 @@ func (p *ExternalClientProxy) tcpAsHost(ctx context.Context) {
 	}
 }
 
-func (p *ExternalClientProxy) udpAsHost(ctx context.Context) error {
+func (p *GuestProxy) udpAsHost(ctx context.Context) error {
 	slog.Info("Starting proxy for UDP")
 
 	srcAddr, err := net.ResolveUDPAddr("udp", net.JoinHostPort(p.ExposedOnIP, "6113"))
@@ -113,8 +114,7 @@ func (p *ExternalClientProxy) udpAsHost(ctx context.Context) error {
 		return func() { clientDestAddr = addr }
 	}
 
-	defer p.Destination.Close()
-	go p.Destination.OnUDPMessage(ctx, func(msg []byte) {
+	go p.OnUDPMessage(ctx, func(msg []byte) {
 		fmt.Println("(udp): (server): Received ", msg, " from ")
 
 		if clientDestAddr != nil {
@@ -135,7 +135,7 @@ func (p *ExternalClientProxy) udpAsHost(ctx context.Context) error {
 
 		fmt.Println("(udp): (client): Received ", (buf[0:n]), " from ", addr)
 
-		err = p.Destination.WriteUDPMessage(ctx, buf[0:n])
+		err = p.WriteUDPMessage(ctx, buf[0:n])
 		if err != nil {
 			fmt.Println("(udp): Error writing to server: ", err)
 			return err

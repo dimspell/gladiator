@@ -2,11 +2,7 @@ package console
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"fmt"
-	"io"
-	"log"
 	"log/slog"
 	"net/http"
 	"os"
@@ -19,13 +15,10 @@ import (
 	"github.com/dimspell/gladiator/model"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/pion/turn/v3"
-	"github.com/pion/webrtc/v4"
 	"github.com/rs/cors"
 	slogchi "github.com/samber/slog-chi"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
-	"golang.org/x/net/websocket"
 )
 
 type Console struct {
@@ -94,10 +87,6 @@ func (c *Console) HttpRouter() http.Handler {
 		mux.Mount("/.well-known/", wellKnown)
 	}
 
-	{ // Setup WebSocket routes for P2P communication (signaling)
-		mux.Handle("/ws", websocket.Handler(c.WebSocketHandler))
-	}
-
 	{ // Setup gRPC routes for the backend
 		api := chi.NewRouter()
 		api.Use(slogchi.New(slog.Default()))
@@ -144,30 +133,13 @@ func (c *Console) Handlers() (start GracefulFunc, shutdown GracefulFunc) {
 		IdleTimeout:  120 * time.Second,
 	}
 
-	var turnServer *turn.Server
-
 	start = func(ctx context.Context) error {
-		publicIP := "127.0.0.1"                            // IP Address that TURN can be contacted by
-		port := 3478                                       // Listening port
-		users := `username1=password1,username2=password2` // List of username and password (e.g. "user=pass,user=pass")
-		realm := "dispelmulti.net"                         // Realm
-
-		var err error
-		turnServer, err = startTURNServer(&publicIP, &port, &users, &realm)
-		if err != nil {
-			return err
-		}
-
 		slog.Info("Configured console server", "addr", c.Addr)
 		return httpServer.ListenAndServe()
 	}
 
 	shutdown = func(ctx context.Context) error {
 		slog.Info("Started shutting down the console server")
-
-		if turnServer != nil {
-			turnServer.Close()
-		}
 
 		if err := httpServer.Shutdown(ctx); err != nil {
 			slog.Error("Failed shutting down the console server", "error", err)
@@ -214,146 +186,6 @@ func (c *Console) Graceful(ctx context.Context, start GracefulFunc, shutdown Gra
 	}
 
 	return <-errChan
-}
-
-func (c *Console) WebSocketHandler() func(ws *websocket.Conn) {
-	return func(ws *websocket.Conn) {
-		// Prepare the configuration
-		config := webrtc.Configuration{
-			ICEServers: []webrtc.ICEServer{
-				// {
-				// 	URLs: []string{"stun:stun.l.google.com:19302"},
-				// },
-				{
-					URLs:       []string{"turn:127.0.0.1:3478"},
-					Username:   "username1",
-					Credential: "password1",
-				},
-			},
-		}
-
-		// Create a new RTCPeerConnection
-		peerConnection, err := webrtc.NewPeerConnection(config)
-		if err != nil {
-			panic(err)
-		}
-
-		// When Pion gathers a new ICE Candidate send it to the client. This is how
-		// ice trickle is implemented. Everytime we have a new candidate available we send
-		// it as soon as it is ready. We don't wait to emit an Offer/Answer until they are
-		// all available
-		peerConnection.OnICECandidate(func(c *webrtc.ICECandidate) {
-			if c == nil {
-				return
-			}
-
-			outbound, marshalErr := json.Marshal(c.ToJSON())
-			if marshalErr != nil {
-				panic(marshalErr)
-			}
-
-			if _, err = ws.Write(outbound); err != nil {
-				panic(err)
-			}
-		})
-
-		// Set the handler for ICE connection state
-		// This will notify you when the peer has connected/disconnected
-		peerConnection.OnICEConnectionStateChange(func(connectionState webrtc.ICEConnectionState) {
-			fmt.Printf("ICE Connection State has changed: %s\n", connectionState.String())
-		})
-
-		dataChannel, err := peerConnection.CreateDataChannel("ping", nil)
-		if err != nil {
-			log.Println(dataChannel, err)
-		}
-
-		// Send the current time via a DataChannel to the remote peer every 3 seconds
-		peerConnection.OnDataChannel(func(d *webrtc.DataChannel) {
-			d.OnMessage(func(msg webrtc.DataChannelMessage) {
-				slog.Info("Received message", "message", string(msg.Data))
-			})
-
-			d.OnOpen(func() {
-				fmt.Println("Opened data channel")
-
-				for range time.Tick(time.Second * 3) {
-					if err = d.SendText(time.Now().String()); err != nil {
-						if errors.Is(io.ErrClosedPipe, err) {
-							// TODO: Close the peer connection
-							slog.Info("Connection closed")
-							return
-						}
-
-						panic(err)
-					}
-				}
-			})
-
-			d.OnClose(func() {
-				slog.Info("Connection closed")
-			})
-		})
-
-		buf := make([]byte, 1500)
-		for {
-			// Read each inbound WebSocket Message
-			n, err := ws.Read(buf)
-			if err != nil {
-				if err == io.EOF {
-					peerConnection.Close()
-					return
-				}
-				panic(err)
-			}
-
-			// Unmarshal each inbound WebSocket message
-			var (
-				candidate webrtc.ICECandidateInit
-				offer     webrtc.SessionDescription
-			)
-
-			switch {
-			// Attempt to unmarshal as a SessionDescription. If the SDP field is empty
-			// assume it is not one.
-			case json.Unmarshal(buf[:n], &offer) == nil && offer.SDP != "":
-				slog.Info("Received Offer", "offer", offer)
-
-				if err = peerConnection.SetRemoteDescription(offer); err != nil {
-					panic(err)
-				}
-
-				answer, answerErr := peerConnection.CreateAnswer(nil)
-				if answerErr != nil {
-					panic(answerErr)
-				}
-
-				if err = peerConnection.SetLocalDescription(answer); err != nil {
-					panic(err)
-				}
-
-				outbound, marshalErr := json.Marshal(answer)
-				if marshalErr != nil {
-					panic(marshalErr)
-				}
-
-				if _, err = ws.Write(outbound); err != nil {
-					panic(err)
-				}
-			// Attempt to unmarshal as a ICECandidateInit. If the candidate field is empty
-			// assume it is not one.
-			case json.Unmarshal(buf[:n], &candidate) == nil && candidate.Candidate != "":
-				slog.Info("Received ICE Candidate", "candidate", candidate)
-
-				if err = peerConnection.AddICECandidate(candidate); err != nil {
-					panic(err)
-				}
-			default:
-				log.Println(string(buf[:n]))
-				panic("Unknown message")
-			}
-		}
-	}
 }
 
 func (c *Console) WellKnownInfo() http.HandlerFunc {

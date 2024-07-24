@@ -8,18 +8,23 @@ import (
 var _ Proxy = (*LAN)(nil)
 
 type LAN struct {
+	// myIPAddress string
 }
 
 func NewLAN() *LAN {
 	return &LAN{}
 }
 
-func (p *LAN) Create(localIPAddress string, _ string) (net.IP, error) {
+func (p *LAN) Create(localIPAddress string, hostUser string) (net.IP, error) {
 	ip := net.ParseIP(localIPAddress)
 	if ip == nil {
 		return net.IP{}, fmt.Errorf("incorrect host IP address: %s", localIPAddress)
 	}
 	return ip, nil
+}
+
+func (p *LAN) HostGame(gameRoom GameRoom, user User) error {
+	return nil
 }
 
 func (p *LAN) Join(_ string, _ string, _ string, ipAddress string) (net.IP, error) {

@@ -73,7 +73,9 @@ func NewApp(version, commit, buildDate string) {
 		action.ConsoleCommand(),
 		action.BackendCommand(),
 		action.ServeCommand(),
-		action.ProxyCommand(),
+		action.RedirectCommand(),
+		action.TurnCommand(),
+		action.P2PCommand(),
 	)
 	if guiCmd := action.GUICommand(app.Version); guiCmd != nil {
 		app.Commands = append(app.Commands, guiCmd)

@@ -8,6 +8,7 @@ import (
 
 	"connectrpc.com/connect"
 	"github.com/dimspell/gladiator/backend/packet"
+	"github.com/dimspell/gladiator/backend/proxy"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/model"
 )
@@ -25,13 +26,14 @@ func (b *Backend) HandleCreateGame(session *model.Session, req CreateGameRequest
 
 	response := make([]byte, 4)
 
-	hostIPAddress, err := b.Proxy.Create(session.LocalIpAddress, session.Username)
-	if err != nil {
-		return fmt.Errorf("packet-28: incorrect host address %w", err)
-	}
-
 	switch data.State {
 	case uint32(model.GameStateNone):
+		// b.Proxy.Close()
+		hostIPAddress, err := b.Proxy.Create(session.LocalIpAddress, session.Username)
+		if err != nil {
+			return fmt.Errorf("packet-28: incorrect host address %w", err)
+		}
+
 		respGame, err := b.gameClient.CreateGame(context.TODO(), connect.NewRequest(&multiv1.CreateGameRequest{
 			UserId:        session.UserID,
 			GameName:      data.RoomName,
@@ -56,7 +58,16 @@ func (b *Backend) HandleCreateGame(session *model.Session, req CreateGameRequest
 		binary.LittleEndian.PutUint32(response[0:4], uint32(model.GameStateCreating)) // Game state
 		break
 	case uint32(model.GameStateCreating):
-		// b.EventChan <- EventHostGame
+		respGame, err := b.gameClient.GetGame(context.TODO(), connect.NewRequest(&multiv1.GetGameRequest{
+			GameName: data.RoomName,
+		}))
+		if err != nil {
+			return err
+		}
+
+		if err := b.Proxy.HostGame(proxy.GameRoom(respGame.Msg.Game.Name), proxy.User(session.Username)); err != nil {
+			return err
+		}
 		binary.LittleEndian.PutUint32(response[0:4], uint32(model.GameStateStarted)) // Game state
 		break
 	}

@@ -1,14 +1,15 @@
 package backend
 
 import (
-	"connectrpc.com/connect"
 	"context"
 	"encoding/binary"
 	"fmt"
+	"log/slog"
+
+	"connectrpc.com/connect"
 	"github.com/dimspell/gladiator/backend/packet"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/model"
-	"log/slog"
 )
 
 // HandleSelectGame handles 0x45ff (255-69) command
@@ -23,11 +24,9 @@ func (b *Backend) HandleSelectGame(session *model.Session, req SelectGameRequest
 		return nil
 	}
 
-	respGame, err := b.gameClient.GetGame(context.TODO(),
-		connect.NewRequest(&multiv1.GetGameRequest{
-			UserId:   session.UserID,
-			GameName: data.RoomName,
-		}))
+	respGame, err := b.gameClient.GetGame(context.TODO(), connect.NewRequest(&multiv1.GetGameRequest{
+		GameName: data.RoomName,
+	}))
 	if err != nil {
 		slog.Warn("No game found", "room", data.RoomName, "error", err)
 		return nil
@@ -79,12 +78,12 @@ func (b *Backend) HandleSelectGame(session *model.Session, req SelectGameRequest
 		}
 
 		// TODO: make sure the host is the first one
-		//lobbyPlayer := model.LobbyPlayer{
+		// lobbyPlayer := model.LobbyPlayer{
 		//	ClassType: model.ClassType(player.ClassType),
 		//	Name:      player.Username,
 		//	IPAddress: proxyIP.To4(),
-		//}
-		//gameRoom.Players = append(gameRoom.Players, lobbyPlayer)
+		// }
+		// gameRoom.Players = append(gameRoom.Players, lobbyPlayer)
 
 		response = append(response, byte(player.ClassType), 0, 0, 0) // Class type (4 bytes)
 		response = append(response, proxyIP.To4()[:]...)             // IP Address (4 bytes)

@@ -3,14 +3,14 @@ package action
 import (
 	"context"
 
-	"github.com/dimspell/gladiator/proxy"
+	"github.com/dimspell/gladiator/proxy/redirect"
 	"github.com/urfave/cli/v3"
 )
 
-func ProxyCommand() *cli.Command {
+func RedirectCommand() *cli.Command {
 	cmd := &cli.Command{
-		Name:        "proxy",
-		Description: "Start proxy server",
+		Name:        "redirect",
+		Description: "Connect as a player and read all packets send by game server",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:  "game-addr",
@@ -28,7 +28,7 @@ func ProxyCommand() *cli.Command {
 		// 	Connections:      make(map[string]*proxy.Client),
 		// }
 		// return p.Run(bindIP)
-		return proxy.NewClientProxy(c.String("game-addr")).Start(ctx)
+		return redirect.NewClientProxy(c.String("game-addr")).Start(ctx)
 	}
 
 	return cmd

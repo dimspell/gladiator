@@ -17,7 +17,7 @@ message CreateGameResponse {
 }
 
 message GetGameRequest {
-  int64 user_id = 1;
+  int64 user_id = 1 [deprecated = true]; // Not used
   string game_name = 2;
 }
 

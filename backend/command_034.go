@@ -26,7 +26,6 @@ func (b *Backend) HandleJoinGame(session *model.Session, req JoinGameRequest) er
 	}
 
 	respGame, err := b.gameClient.GetGame(context.TODO(), connect.NewRequest(&multiv1.GetGameRequest{
-		UserId:   session.UserID,
 		GameName: data.RoomName,
 	}))
 	if err != nil {

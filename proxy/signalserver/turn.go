@@ -1,39 +1,15 @@
-package console
+package signalserver
 
 import (
 	"fmt"
 	"log"
 	"net"
-	"os"
-	"os/signal"
 	"regexp"
 	"strconv"
-	"syscall"
 
 	"github.com/pion/stun/v2"
 	"github.com/pion/turn/v3"
 )
-
-func StartTURNServer() {
-	publicIP := "127.0.0.1"                            // IP Address that TURN can be contacted by
-	port := 3478                                       // Listening port
-	users := `username1=password1,username2=password2` // List of username and password (e.g. "user=pass,user=pass")
-	realm := "dispelmulti.net"                         // Realm
-
-	s, err := startTURNServer(&publicIP, &port, &users, &realm)
-	if err != nil {
-		log.Panicf("Could not start TURN server: %s", err)
-	}
-
-	// Block until user sends SIGINT or SIGTERM
-	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
-	<-sigs
-
-	if err := s.Close(); err != nil {
-		log.Panic(err)
-	}
-}
 
 func startTURNServer(publicIP *string, port *int, users *string, realm *string) (*turn.Server, error) {
 	// Create a UDP listener to pass into pion/turn

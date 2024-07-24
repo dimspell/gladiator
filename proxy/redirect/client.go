@@ -1,4 +1,4 @@
-package proxy
+package redirect
 
 import (
 	"context"
