@@ -23,7 +23,7 @@ func NewClientProxy(masterIP string) *ClientProxy {
 	p := ClientProxy{
 		HostIP:            "127.0.1.28",
 		MasterIP:          masterIP,
-		ConnectionTimeout: DefaultConnectionTimeout,
+		ConnectionTimeout: 3 * time.Second,
 	}
 	slog.Info("Configured proxy", "masterIP", p.MasterIP, "proxyIP", p.HostIP)
 	return &p

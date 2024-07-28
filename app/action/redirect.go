@@ -21,13 +21,6 @@ func RedirectCommand() *cli.Command {
 	}
 
 	cmd.Action = func(ctx context.Context, c *cli.Command) error {
-		// bindIP := "127.0.0.1"
-		// p := proxy.GlobalProxy{
-		// 	MaxActiveClients: 32,
-		// 	Games:            make(map[string]*proxy.Game),
-		// 	Connections:      make(map[string]*proxy.Client),
-		// }
-		// return p.Run(bindIP)
 		return redirect.NewClientProxy(c.String("game-addr")).Start(ctx)
 	}
 
