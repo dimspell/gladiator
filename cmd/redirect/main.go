@@ -1,4 +1,4 @@
-package redirect
+package main
 
 import (
 	"context"
@@ -7,10 +7,35 @@ import (
 	"log"
 	"log/slog"
 	"net"
+	"os"
 	"time"
 
+	"github.com/urfave/cli/v3"
 	"golang.org/x/sync/errgroup"
 )
+
+func main() {
+	cmd := &cli.Command{
+		Name: "redirect",
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:  "game-addr",
+				Value: "192.168.121.169",
+				Usage: "IP address of the game server hosting a game",
+			},
+		},
+	}
+
+	cmd.Action = func(ctx context.Context, c *cli.Command) error {
+		return NewClientProxy(c.String("game-addr")).Start(ctx)
+	}
+
+	// Start the app
+	if err := cmd.Run(context.Background(), os.Args); err != nil {
+		_, _ = fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
 
 type ClientProxy struct {
 	HostIP   string

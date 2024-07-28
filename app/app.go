@@ -73,7 +73,6 @@ func NewApp(version, commit, buildDate string) {
 		action.ConsoleCommand(),
 		action.BackendCommand(),
 		action.ServeCommand(),
-		action.RedirectCommand(),
 		action.TurnCommand(),
 		action.P2PCommand(),
 	)
