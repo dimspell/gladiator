@@ -1,7 +1,6 @@
 package proxy
 
 import (
-	"container/ring"
 	"context"
 	"net"
 
@@ -9,35 +8,15 @@ import (
 	"github.com/pion/webrtc/v4"
 )
 
-type IpRing struct {
-	*ring.Ring
-}
-
-func NewIpRing() IpRing {
-	r := ring.New(100)
-	n := r.Len()
-	for i := 0; i < n; i++ {
-		r.Value = i + 2
-		r = r.Next()
-	}
-	return IpRing{r}
-}
-
-func (r *IpRing) IP() net.IP {
-	d := byte(r.Value.(int))
-	defer r.Next()
-	return net.IPv4(127, 0, 1, d)
-}
-
 var _ Proxy = (*PeerToPeer)(nil)
 
 type PeerToPeer struct {
-	ipRing IpRing
+	ipRing client.IpRing
 }
 
 func NewPeerToPeer() *PeerToPeer {
 	return &PeerToPeer{
-		ipRing: NewIpRing(),
+		ipRing: client.NewIpRing(),
 	}
 }
 

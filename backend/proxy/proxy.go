@@ -13,6 +13,8 @@ type Proxy interface {
 	// Create is used to start serving the traffic to the game host
 	Create(localIPAddress string, hostUser string) (net.IP, error)
 
+	HostGame(gameRoom GameRoom, user User) error
+
 	// Join is used to connect to TCP game host
 	Join(gameName string, hostUser string, currentPlayer string, ipAddress string) (net.IP, error)
 
@@ -21,8 +23,6 @@ type Proxy interface {
 
 	GetHostIP(hostIpAddress string) net.IP
 	Close()
-
-	HostGame(gameRoom GameRoom, user User) error
 }
 
 type GameRoom string
