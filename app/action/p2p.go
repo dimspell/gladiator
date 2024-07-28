@@ -6,7 +6,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/dimspell/gladiator/proxy/client"
+	"github.com/dimspell/gladiator/backend/proxy/client"
 	"github.com/google/uuid"
 	"github.com/pion/webrtc/v4"
 	"github.com/urfave/cli/v3"

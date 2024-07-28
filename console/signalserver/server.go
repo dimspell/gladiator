@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/dimspell/gladiator/proxy/message"
+	"github.com/dimspell/gladiator/console/signalserver/message"
 	"github.com/fxamacker/cbor/v2"
 	"github.com/gorilla/websocket"
 )

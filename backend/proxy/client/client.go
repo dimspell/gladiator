@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"net/url"
 
-	"github.com/dimspell/gladiator/proxy/message"
+	"github.com/dimspell/gladiator/console/signalserver/message"
 	"github.com/pion/webrtc/v4"
 	"golang.org/x/net/websocket"
 )

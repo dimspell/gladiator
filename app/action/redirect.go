@@ -3,7 +3,7 @@ package action
 import (
 	"context"
 
-	"github.com/dimspell/gladiator/proxy/redirect"
+	"github.com/dimspell/gladiator/redirect"
 	"github.com/urfave/cli/v3"
 )
 

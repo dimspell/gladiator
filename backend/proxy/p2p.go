@@ -5,7 +5,7 @@ import (
 	"context"
 	"net"
 
-	"github.com/dimspell/gladiator/proxy/client"
+	"github.com/dimspell/gladiator/backend/proxy/client"
 	"github.com/pion/webrtc/v4"
 )
 

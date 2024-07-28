@@ -58,6 +58,8 @@ func NewBackend(backendAddr, consoleAddr, myIPAddress string) *Backend {
 	// TODO: Name the schema as parameter
 	consoleUri := fmt.Sprintf("%s://%s/grpc", "http", consoleAddr)
 
+	// proxy.NewPeerToPeer(ctx)
+
 	return &Backend{
 		Addr:        backendAddr,
 		MyIPAddress: myIPAddress,

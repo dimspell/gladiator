@@ -3,7 +3,7 @@ package action
 import (
 	"context"
 
-	"github.com/dimspell/gladiator/proxy/signalserver"
+	"github.com/dimspell/gladiator/console/signalserver"
 	"github.com/urfave/cli/v3"
 )
 
