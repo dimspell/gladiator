@@ -18,6 +18,14 @@ func NewPeers() *Peers {
 		Members: make(map[string]*Peer),
 	}
 }
+
+func (p *Peers) Exist(id string) bool {
+	p.RLock()
+	_, ok := p.Members[id]
+	p.RUnlock()
+	return ok
+}
+
 func (p *Peers) Get(id string) (*Peer, bool) {
 	p.RLock()
 	member, ok := p.Members[id]
@@ -36,6 +44,11 @@ func (p *Peers) Set(id string, member *Peer) {
 
 func (p *Peers) Delete(id string) {
 	p.Lock()
+	// peer, ok := p.Members[id]
+	// if ok {
+	// peer.ChannelUDP.Close()
+	// peer.ChannelTCP.Close()
+	// }
 	delete(p.Members, id)
 	p.Unlock()
 }

@@ -30,8 +30,9 @@ func TurnCommand() *cli.Command {
 		if err != nil {
 			return err
 		}
-		s.Run()
-		return nil
+		start, stop := s.Run()
+		defer stop(ctx)
+		return start(ctx)
 	}
 
 	return cmd

@@ -1,10 +1,12 @@
 package signalserver
 
 import (
+	"context"
 	"log"
 	"log/slog"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/dimspell/gladiator/console/signalserver/message"
 	"github.com/fxamacker/cbor/v2"
@@ -70,6 +72,11 @@ func (h *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			log.Println("read:", err)
 			break
 		}
+		if len(rawSignal) == 0 && rawSignal[0] == 0x00 {
+			if err := conn.WriteMessage(websocket.BinaryMessage, []byte{0x00}); err != nil {
+				return
+			}
+		}
 
 		var m message.Message
 		if err := cbor.Unmarshal(rawSignal, &m); err != nil {
@@ -120,7 +127,7 @@ func (c *Channel) Run() {
 			if member, ok := c.Members.Get(msg.From); ok {
 				SendMessage(member, message.Message{
 					Type:    message.HandshakeResponse,
-					Content: "Hello",
+					Content: msg.From,
 				})
 			}
 			c.Broadcast(
@@ -161,7 +168,15 @@ func SendMessage(ws *websocket.Conn, msg message.Message) {
 	}
 }
 
-func (h *Server) Run() {
+func (h *Server) Run() (start func(context.Context) error, shutdown func(context.Context) error) {
+	httpServer := &http.Server{
+		Addr:         ":5050",
+		Handler:      h,
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  120 * time.Second,
+	}
+
 	publicIP := "127.0.0.1"                            // IP Address that TURN can be contacted by
 	port := 3478                                       // Listening port
 	users := `username1=password1,username2=password2` // List of username and password (e.g. "user=pass,user=pass")
@@ -171,8 +186,21 @@ func (h *Server) Run() {
 	if err != nil {
 		log.Panicf("Could not start TURN server: %s", err)
 	}
-	defer turnServer.Close()
 
-	http.Handle("/", h)
-	log.Fatal(http.ListenAndServe(":5050", nil))
+	start = func(ctx context.Context) error {
+		return httpServer.ListenAndServe()
+	}
+
+	shutdown = func(ctx context.Context) error {
+		if err := httpServer.Shutdown(ctx); err != nil {
+			slog.Error("Failed shutting down the console server", "error", err)
+			return err
+		}
+		if err := turnServer.Close(); err != nil {
+			return err
+		}
+		return nil
+	}
+
+	return start, shutdown
 }

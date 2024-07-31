@@ -6,9 +6,8 @@ import (
 	"log"
 	"os"
 
-	"github.com/dimspell/gladiator/backend/proxy/client"
+	"github.com/dimspell/gladiator/backend/proxy"
 	"github.com/google/uuid"
-	"github.com/pion/webrtc/v4"
 	"github.com/urfave/cli/v3"
 )
 
@@ -33,25 +32,25 @@ func P2PCommand() *cli.Command {
 	cmd.Action = func(ctx context.Context, c *cli.Command) error {
 		id := uuid.New().String()[:6]
 
-		p2p, err := client.Dial(&client.DialParams{
-			SignalingURL: "ws://localhost:5050",
-			RoomName:     "test",
-			ID:           id,
-			Name:         id,
-		})
-		if err != nil {
+		p2p := proxy.NewPeerToPeer("ws://localhost:5050")
+
+		if _, err := p2p.Create("", id); err != nil {
 			return err
 		}
-		defer p2p.Close()
+		if err := p2p.HostGame("test", proxy.User(id)); err != nil {
+			return err
+		}
 
-		go p2p.Run(
-			func(peer *client.Peer, packet webrtc.DataChannelMessage) {
-				log.Printf("Received UDP message from %s: %s", peer.ID, string(packet.Data))
-			},
-			func(peer *client.Peer, packet webrtc.DataChannelMessage) {
-				log.Printf("Received TCP message from %s: %s", peer.ID, string(packet.Data))
-			},
-		)
+		select {}
+
+		// go p2p.Run(
+		// 	func(peer *client.Peer, packet webrtc.DataChannelMessage) {
+		// 		log.Printf("Received UDP message from %s: %s", peer.ID, string(packet.Data))
+		// 	},
+		// 	func(peer *client.Peer, packet webrtc.DataChannelMessage) {
+		// 		log.Printf("Received TCP message from %s: %s", peer.ID, string(packet.Data))
+		// 	},
+		// )
 
 		rd := bufio.NewReader(os.Stdin)
 		for {
@@ -61,8 +60,8 @@ func P2PCommand() *cli.Command {
 				return err
 			}
 
-			p2p.BroadcastUDP(line)
-			p2p.BroadcastTCP(line)
+			p2p.TodoBroadcast(line)
+			// p2p.BroadcastTCP(line)
 		}
 
 		return nil
