@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/dimspell/gladiator/backend/proxy/client"
-	"github.com/dimspell/gladiator/console/signalserver/message"
+	"github.com/dimspell/gladiator/console/signalserver"
 	"github.com/fxamacker/cbor/v2"
 	"github.com/pion/webrtc/v4"
 	"golang.org/x/net/websocket"
@@ -70,9 +70,9 @@ func (p *PeerToPeer) dialSignalServer(userId, roomName string) error {
 	}
 
 	// Send "hello" message to the signaling server
-	req := &message.Message{
+	req := &signalserver.Message{
 		From:    userId,
-		Type:    message.HandshakeRequest,
+		Type:    signalserver.HandshakeRequest,
 		Content: roomName,
 	}
 	if _, err := ws.Write(req.ToCBOR()); err != nil {
@@ -87,11 +87,11 @@ func (p *PeerToPeer) dialSignalServer(userId, roomName string) error {
 		return err
 	}
 	// Check that the response is a handshake response
-	if n == 0 || buf[0] != byte(message.HandshakeResponse) {
+	if n == 0 || buf[0] != byte(signalserver.HandshakeResponse) {
 		return fmt.Errorf("unexpected handshake response: %v", buf[:n])
 	}
 	// TODO: Check that the response contains the same room name as the request
-	resp, err := decodeCBOR[message.MessageContent[string]](buf[1:n])
+	resp, err := decodeCBOR[signalserver.MessageContent[string]](buf[1:n])
 	if err != nil {
 		return err
 	}
@@ -236,11 +236,11 @@ func (p *PeerToPeer) runWebRTC(mode int, user User, gameRoom GameRoom) {
 
 func (p PeerToPeer) handlePackets(mode int, user User, room GameRoom) func([]byte) error {
 	return func(buf []byte) error {
-		switch message.EventType(buf[0]) {
-		case message.Join:
-			return decodeAndRun[message.MessageContent[message.Member]](
+		switch signalserver.EventType(buf[0]) {
+		case signalserver.Join:
+			return decodeAndRun[signalserver.MessageContent[signalserver.Member]](
 				buf[1:],
-				func(m message.MessageContent[message.Member]) error {
+				func(m signalserver.MessageContent[signalserver.Member]) error {
 					// Validate the message
 					if m.Content.ID == user.String() {
 						return fmt.Errorf("peer %q is the same as the host, ignoring join", m.Content.ID)
@@ -277,8 +277,8 @@ func (p PeerToPeer) handlePackets(mode int, user User, room GameRoom) func([]byt
 
 					return nil
 				})
-		case message.Leave:
-			return decodeAndRun[message.MessageContent[any]](buf[1:], func(m message.MessageContent[any]) error {
+		case signalserver.Leave:
+			return decodeAndRun[signalserver.MessageContent[any]](buf[1:], func(m signalserver.MessageContent[any]) error {
 				peer, ok := p.Peers.Get(m.From)
 				if !ok {
 					return fmt.Errorf("could not find peer %q", m.From)
@@ -291,9 +291,9 @@ func (p PeerToPeer) handlePackets(mode int, user User, room GameRoom) func([]byt
 				p.Peers.Delete(peer.ID)
 				return nil
 			})
-		case message.RTCOffer:
-			return decodeAndRun[message.MessageContent[message.Offer]](buf[1:], func(m message.MessageContent[message.Offer]) error {
-				peer := p.addPeer(message.Member{ID: m.From, Name: m.Content.Name}, user, false)
+		case signalserver.RTCOffer:
+			return decodeAndRun[signalserver.MessageContent[signalserver.Offer]](buf[1:], func(m signalserver.MessageContent[signalserver.Offer]) error {
+				peer := p.addPeer(signalserver.Member{ID: m.From, Name: m.Content.Name}, user, false)
 
 				if err := peer.Connection.SetRemoteDescription(m.Content.Offer); err != nil {
 					return fmt.Errorf("could not set remote description: %v", err)
@@ -308,19 +308,19 @@ func (p PeerToPeer) handlePackets(mode int, user User, room GameRoom) func([]byt
 					return fmt.Errorf("could not set local description: %v", err)
 				}
 
-				response := &message.Message{
+				response := &signalserver.Message{
 					From:    user.String(),
 					To:      m.From,
-					Type:    message.RTCAnswer,
-					Content: message.Offer{Name: peer.Name, Offer: answer},
+					Type:    signalserver.RTCAnswer,
+					Content: signalserver.Offer{Name: peer.Name, Offer: answer},
 				}
 				if err := p.SendSignal(response.ToCBOR()); err != nil {
 					return fmt.Errorf("could not send answer: %v", err)
 				}
 				return nil
 			})
-		case message.RTCAnswer:
-			return decodeAndRun[message.MessageContent[message.Offer]](buf[1:], func(m message.MessageContent[message.Offer]) error {
+		case signalserver.RTCAnswer:
+			return decodeAndRun[signalserver.MessageContent[signalserver.Offer]](buf[1:], func(m signalserver.MessageContent[signalserver.Offer]) error {
 				answer := webrtc.SessionDescription{
 					Type: webrtc.SDPTypeAnswer,
 					SDP:  m.Content.Offer.SDP,
@@ -336,8 +336,8 @@ func (p PeerToPeer) handlePackets(mode int, user User, room GameRoom) func([]byt
 				}
 				return nil
 			})
-		case message.RTCICECandidate:
-			return decodeAndRun[message.MessageContent[webrtc.ICECandidateInit]](buf[1:], func(m message.MessageContent[webrtc.ICECandidateInit]) error {
+		case signalserver.RTCICECandidate:
+			return decodeAndRun[signalserver.MessageContent[webrtc.ICECandidateInit]](buf[1:], func(m signalserver.MessageContent[webrtc.ICECandidateInit]) error {
 				peer, ok := p.Peers.Get(m.From)
 				if !ok {
 					return fmt.Errorf("could not find peer %q", m.From)
@@ -391,7 +391,7 @@ func (p PeerToPeer) handlePackets(mode int, user User, room GameRoom) func([]byt
 	// go guest.Start(ctx)
 }
 
-func (p *PeerToPeer) addPeer(member message.Member, user User, isJoinNotRTCOffer bool) *client.Peer {
+func (p *PeerToPeer) addPeer(member signalserver.Member, user User, isJoinNotRTCOffer bool) *client.Peer {
 	config := webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{
 			// {
@@ -426,10 +426,10 @@ func (p *PeerToPeer) addPeer(member message.Member, user User, isJoinNotRTCOffer
 			return
 		}
 
-		reply := &message.Message{
+		reply := &signalserver.Message{
 			From:    user.String(),
 			To:      member.ID,
-			Type:    message.RTCICECandidate,
+			Type:    signalserver.RTCICECandidate,
 			Content: candidate.ToJSON(),
 		}
 
@@ -454,11 +454,11 @@ func (p *PeerToPeer) addPeer(member message.Member, user User, isJoinNotRTCOffer
 			return
 		}
 
-		reply := &message.Message{
+		reply := &signalserver.Message{
 			From: user.String(),
 			To:   member.ID,
-			Type: message.RTCOffer,
-			Content: message.Offer{
+			Type: signalserver.RTCOffer,
+			Content: signalserver.Offer{
 				Name:  peer.Name,
 				Offer: offer,
 			},

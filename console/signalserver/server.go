@@ -8,7 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dimspell/gladiator/console/signalserver/message"
 	"github.com/fxamacker/cbor/v2"
 	"github.com/gorilla/websocket"
 )
@@ -78,7 +77,7 @@ func (h *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		var m message.Message
+		var m Message
 		if err := cbor.Unmarshal(rawSignal, &m); err != nil {
 			continue
 		}
@@ -92,7 +91,7 @@ func (h *Server) Join(channelName string) *Channel {
 	c := &Channel{
 		Name:     channelName,
 		Members:  &Members{ws: make(map[string]*websocket.Conn)},
-		Messages: make(chan message.Message),
+		Messages: make(chan Message),
 	}
 	if existing, ok := h.Get(channelName); !ok {
 		go c.Run()
@@ -105,7 +104,7 @@ func (h *Server) Join(channelName string) *Channel {
 
 func (h *Server) Leave(channelName string, userID string) {
 	if c, ok := h.Get(channelName); ok {
-		c.Broadcast(message.Message{Type: message.Leave, From: userID})
+		c.Broadcast(Message{Type: Leave, From: userID})
 		c.Members.Delete(userID)
 		if c.Members.Count() == 0 {
 			close(c.Messages)
@@ -117,29 +116,29 @@ func (h *Server) Leave(channelName string, userID string) {
 type Channel struct {
 	Name     string
 	Members  *Members
-	Messages chan message.Message
+	Messages chan Message
 }
 
 func (c *Channel) Run() {
 	for msg := range c.Messages {
 		switch msg.Type {
-		case message.HandshakeRequest:
+		case HandshakeRequest:
 			if member, ok := c.Members.Get(msg.From); ok {
-				SendMessage(member, message.Message{
-					Type:    message.HandshakeResponse,
+				SendMessage(member, Message{
+					Type:    HandshakeResponse,
 					Content: msg.From,
 				})
 			}
 			c.Broadcast(
-				message.Message{
-					Type: message.Join,
-					Content: message.Member{
+				Message{
+					Type: Join,
+					Content: Member{
 						ID:   msg.From,
 						Name: msg.Content.(string),
 						// Channel: c.Name,
 					},
 				})
-		case message.RTCOffer, message.RTCAnswer, message.RTCICECandidate:
+		case RTCOffer, RTCAnswer, RTCICECandidate:
 			if member, ok := c.Members.Get(msg.To); ok {
 				SendMessage(member, msg)
 			}
@@ -149,7 +148,7 @@ func (c *Channel) Run() {
 	}
 }
 
-func (c *Channel) Broadcast(msg message.Message) {
+func (c *Channel) Broadcast(msg Message) {
 	payload, _ := cbor.Marshal(msg)
 	payload = append([]byte{byte(msg.Type)}, payload...)
 	c.Members.Range(func(ws *websocket.Conn) bool {
@@ -160,7 +159,7 @@ func (c *Channel) Broadcast(msg message.Message) {
 	})
 }
 
-func SendMessage(ws *websocket.Conn, msg message.Message) {
+func SendMessage(ws *websocket.Conn, msg Message) {
 	payload, _ := cbor.Marshal(msg)
 	payload = append([]byte{byte(msg.Type)}, payload...)
 	if err := ws.WriteMessage(websocket.TextMessage, payload); err != nil {

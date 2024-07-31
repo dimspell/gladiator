@@ -1,4 +1,4 @@
-package message
+package signalserver
 
 import (
 	"github.com/fxamacker/cbor/v2"
