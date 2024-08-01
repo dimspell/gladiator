@@ -15,7 +15,7 @@ type Pipe struct {
 	data chan webrtc.DataChannelMessage
 }
 
-func NewPipe(dc *webrtc.DataChannel) *Pipe {
+func NewPipe(dc *webrtc.DataChannel, guest *GuestProxy) *Pipe {
 	pipe := &Pipe{
 		dc:   dc,
 		data: make(chan webrtc.DataChannelMessage),
@@ -23,7 +23,21 @@ func NewPipe(dc *webrtc.DataChannel) *Pipe {
 
 	slog.Debug("Registered DataChannel.onMessage handler", "label", dc.Label())
 
+	go func() {
+		for {
+			select {
+			case msg := <-pipe.data:
+				log.Println("channel", pipe.dc.Label(), "msg", msg.Data)
+				// guest.connUDP.Write(msg.Data)
+				// log.Println("Pipe.OnMessage", msg.Data, pipe.dc.Label())
+				// case guest.
+			}
+		}
+	}()
+
 	dc.OnMessage(func(msg webrtc.DataChannelMessage) {
+		log.Println("Pipe.OnMessage", msg.Data, pipe.dc.Label())
+
 		if pipe.data == nil {
 			return
 		}

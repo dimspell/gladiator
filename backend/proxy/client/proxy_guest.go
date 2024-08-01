@@ -133,13 +133,11 @@ func (p *GuestProxy) RunUDP(ctx context.Context, rw io.ReadWriteCloser) error {
 			}
 			clientDestOnce.Do(setClientAddr(addr))
 
-			slog.Debug("Received from UDP", "payload", buf[0:n], "addr", addr, "protocol", "udp")
-
 			if _, err := rw.Write(buf[:n]); err != nil {
-				log.Println("(udp): Error writing to server: ", err)
+				slog.Warn("Error writing to RW", "error", err, "protocol", "udp", "from", addr, "payload", buf[0:n])
 				return err
 			}
-			slog.Debug("Wrote", "payload", buf[0:n], "addr", addr, "protocol", "udp")
+			slog.Debug("Redirected to RW", "payload", buf[0:n], "addr", addr, "protocol", "udp")
 		}
 	})
 

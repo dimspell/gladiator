@@ -475,7 +475,7 @@ func (p *PeerToPeer) addPeer(member signalserver.Member, room GameRoom, user Use
 			slog.Debug("Opened WebRTC channel", "label", dc.Label(), "peer", member.ID)
 
 			ctx, cancel := context.WithCancel(context.TODO())
-			pipe := client.NewPipe(dc)
+			pipe := client.NewPipe(dc, guest)
 
 			switch dc.Label() {
 			case fmt.Sprintf("%s/tcp", room):
@@ -508,7 +508,7 @@ func (p *PeerToPeer) createChannels(ctx context.Context, peer *client.Peer, gues
 	if err != nil {
 		return fmt.Errorf("could not create data channel %q: %v", room, err)
 	}
-	pipeUDP := client.NewPipe(dcUDP)
+	pipeUDP := client.NewPipe(dcUDP, guest)
 
 	dcUDP.OnError(func(err error) {
 		slog.Warn("Data channel error", "error", err)
@@ -531,7 +531,7 @@ func (p *PeerToPeer) createChannels(ctx context.Context, peer *client.Peer, gues
 	if err != nil {
 		return fmt.Errorf("could not create data channel %q: %v", room, err)
 	}
-	pipeTCP := client.NewPipe(dcTCP)
+	pipeTCP := client.NewPipe(dcTCP, guest)
 
 	dcTCP.OnError(func(err error) {
 		slog.Warn("Data channel error", "error", err)

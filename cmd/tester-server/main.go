@@ -14,8 +14,8 @@ func main() {
 	ctx := context.TODO()
 
 	p := Proxy{}
-	go p.listenTCP(ctx, "127.0.1.28", "6114")
-	go p.listenUDP(ctx, "127.0.1.28", "6113")
+	go p.listenTCP(ctx, "127.0.0.1", "6114")
+	go p.listenUDP(ctx, "127.0.0.1", "6113")
 
 	fmt.Println("Waiting...")
 	<-ctx.Done()
@@ -35,10 +35,9 @@ func (p *Proxy) listenUDP(ctx context.Context, connHost, connPort string) {
 	}
 	defer udpConn.Close()
 
-	fmt.Println("Listening UDP on", udpAddr.String())
+	log.Println("Listening UDP on", udpAddr.String())
 
 	for {
-		fmt.Println("udp - waiting for read")
 		if ctx.Err() != nil {
 			fmt.Println("context err")
 			return
@@ -49,6 +48,8 @@ func (p *Proxy) listenUDP(ctx context.Context, connHost, connPort string) {
 		if err != nil {
 			break
 		}
+
+		fmt.Println("Accepted UDP connection", addr.String())
 
 		fmt.Println(connPort, addr.String(), string(buf[:n]), buf[:n])
 
@@ -69,29 +70,29 @@ func (p *Proxy) listenTCP(ctx context.Context, connHost, connPort string) {
 		fmt.Println("Error listening:", err.Error())
 		os.Exit(1)
 	}
+	log.Println("Listening TCP on", l.Addr().String())
 
 	processPackets := func(conn net.Conn) {
 		defer conn.Close()
 
 		for {
-			fmt.Println("waiting for read")
-
 			buf := make([]byte, 1024)
 			n, err := conn.Read(buf)
 			if err != nil {
 				fmt.Printf("error reading (%s): %s\n", connPort, err)
 				return
 			}
-			fmt.Println(connPort, string(buf[:n]), n, buf[:n])
+			log.Println(connPort, string(buf[:n]), n, buf[:n])
 
-			conn.Write([]byte{35, 35, 116, 101, 115, 116, 0})
+			if _, err := conn.Write([]byte{35, 35, 116, 101, 115, 116, 0}); err != nil {
+				log.Println(err)
+			}
 			// conn.Write(buf[:n])
 		}
 	}
 
 	// Close the listener when the application closes.
 	defer l.Close()
-	fmt.Println("Listening TCP on", l.Addr().String())
 	for {
 		if ctx.Err() != nil {
 			return
@@ -100,12 +101,11 @@ func (p *Proxy) listenTCP(ctx context.Context, connHost, connPort string) {
 		// Listen for an incoming connection.
 		conn, err := l.Accept()
 		if err != nil {
-			fmt.Println("Error accepting: ", err.Error())
+			log.Println("Error accepting: ", err.Error())
 			continue
 		}
-		fmt.Println("Accepted connection on port", connPort)
+		log.Println("Accepted TCP connection", conn.RemoteAddr().String())
 
 		go processPackets(conn)
 	}
-	fmt.Println("DONE")
 }
