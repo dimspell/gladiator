@@ -26,6 +26,10 @@ func P2PCommand() *cli.Command {
 				Value: "dispel-multi",
 				Usage: "Realm to use for TURN server",
 			},
+			&cli.StringFlag{
+				Name:  "mode",
+				Value: "host",
+			},
 		},
 	}
 
@@ -37,11 +41,18 @@ func P2PCommand() *cli.Command {
 		if _, err := p2p.Create("", id); err != nil {
 			return err
 		}
-		if err := p2p.HostGame("test", proxy.User(id)); err != nil {
-			return err
-		}
 
-		select {}
+		if c.String("mode") == "host" {
+			if err := p2p.HostGame("test", proxy.User(id)); err != nil {
+				return err
+			}
+		} else {
+			if ip, err := p2p.Join("test", id, id, ""); err != nil {
+				return err
+			} else {
+				log.Printf("Joined game at %s", ip)
+			}
+		}
 
 		// go p2p.Run(
 		// 	func(peer *client.Peer, packet webrtc.DataChannelMessage) {

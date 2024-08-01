@@ -1,7 +1,6 @@
 package client
 
 import (
-	"log/slog"
 	"sync"
 
 	"github.com/pion/webrtc/v4"
@@ -30,7 +29,7 @@ func (p *Peers) Get(id string) (*Peer, bool) {
 	p.RLock()
 	member, ok := p.Members[id]
 	if !ok {
-		slog.Error("not exist")
+		return nil, false
 	}
 	p.RUnlock()
 	return member, ok
@@ -64,6 +63,9 @@ func (p *Peers) Range(f func(string, *Peer)) {
 type Peer struct {
 	ID   string
 	Name string
+
+	Host  *HostListener
+	Proxy *GuestProxy
 
 	Connection *webrtc.PeerConnection
 	ChannelTCP *webrtc.DataChannel

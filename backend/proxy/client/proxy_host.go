@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -10,21 +11,24 @@ import (
 )
 
 type HostListener struct {
-	tcpConn net.Conn
-	udpConn *net.UDPConn
+	connTCP net.Conn
+	connUDP *net.UDPConn
 }
 
-func ListenHost(masterIP string) (*HostListener, error) {
-	tcpConn, err := net.DialTimeout("tcp", net.JoinHostPort(masterIP, "6114"), 3*time.Second)
+// ListenHost establishes the connection to the real game server exposed by the
+// DispelMulti.exe process. Do not forget to set up the writer and reader.
+// Do not forget to close the connection when done.
+func ListenHost(gameServerIP string) (*HostListener, error) {
+	// tcp:6114
+	tcpConn, err := net.DialTimeout("tcp", net.JoinHostPort(gameServerIP, "6114"), 3*time.Second)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not connect to game server on 6114: %s", err.Error())
 	}
-	fmt.Println("(tcp): connected to ", tcpConn.RemoteAddr())
 
-	udpAddr, err := net.ResolveUDPAddr("udp", net.JoinHostPort(masterIP, "6113"))
+	// udp:6113
+	udpAddr, err := net.ResolveUDPAddr("udp", net.JoinHostPort(gameServerIP, "6113"))
 	if err != nil {
-		fmt.Println("Error resolving UDP address: ", err.Error())
-		return nil, err
+		return nil, fmt.Errorf("could not resolve UDP address on 6113 as a host: %s", err.Error())
 	}
 	udpConn, err := net.DialUDP("udp", nil, udpAddr)
 	if err != nil {
@@ -32,25 +36,24 @@ func ListenHost(masterIP string) (*HostListener, error) {
 	}
 
 	return &HostListener{
-		tcpConn: tcpConn,
-		udpConn: udpConn,
+		connTCP: tcpConn,
+		connUDP: udpConn,
 	}, nil
 }
 
-func (d *HostListener) OnUDPMessage(ctx context.Context, onPacket func(msg []byte)) error {
+func (d *HostListener) RunReaderUDP(ctx context.Context, onPacket func(msg []byte)) error {
 	for {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		if d.udpConn == nil {
+		if d.connUDP == nil {
 			return io.EOF
 		}
 
 		buf := make([]byte, 1024)
-		n, _, err := d.udpConn.ReadFromUDP(buf)
+		n, _, err := d.connUDP.ReadFromUDP(buf)
 		if err != nil {
-			fmt.Println("(udp): Error reading from server: ", err)
-			return err
+			return fmt.Errorf("could not read UDP message: %s", err.Error())
 		}
 
 		fmt.Println("(udp): (server): Received ", buf[0:n])
@@ -58,17 +61,17 @@ func (d *HostListener) OnUDPMessage(ctx context.Context, onPacket func(msg []byt
 	}
 }
 
-func (d *HostListener) OnTCPMessage(ctx context.Context, onPacket func(msg []byte)) error {
+func (d *HostListener) RunReaderTCP(ctx context.Context, onPacket func(msg []byte)) error {
 	for {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		if d.tcpConn == nil {
+		if d.connTCP == nil {
 			return io.EOF
 		}
 
 		buf := make([]byte, 1024)
-		n, err := d.tcpConn.Read(buf)
+		n, err := d.connTCP.Read(buf)
 		if err != nil {
 			fmt.Println("(tcp): Error reading from server: ", err)
 			return err
@@ -79,18 +82,17 @@ func (d *HostListener) OnTCPMessage(ctx context.Context, onPacket func(msg []byt
 	}
 }
 
-func (d *HostListener) WriteUDPMessage(ctx context.Context, msg []byte) error {
-	_, err := d.udpConn.Write(msg)
+func (d *HostListener) WriteUDPMessage(msg []byte) error {
+	_, err := d.connUDP.Write(msg)
 	if err != nil {
-		fmt.Println("(udp): Error writing to server: ", err)
-		return nil
+		return fmt.Errorf("could not write UDP message: %s", err.Error())
 	}
 	fmt.Println("(udp): wrote to server", msg)
 	return nil
 }
 
-func (d *HostListener) WriteTCPMessage(ctx context.Context, msg []byte) error {
-	_, err := d.tcpConn.Write(msg)
+func (d *HostListener) WriteTCPMessage(msg []byte) error {
+	_, err := d.connTCP.Write(msg)
 	if err != nil {
 		fmt.Println("(tcp): Error writing to server: ", err)
 		return nil
@@ -100,14 +102,6 @@ func (d *HostListener) WriteTCPMessage(ctx context.Context, msg []byte) error {
 	return nil
 }
 
-func (d *HostListener) Close() {
-	// TODO: Use multierr and return an error
-	if d.tcpConn != nil {
-		d.tcpConn.Close()
-		d.tcpConn = nil
-	}
-	if d.udpConn != nil {
-		d.udpConn.Close()
-		d.udpConn = nil
-	}
+func (d *HostListener) Close() error {
+	return errors.Join(d.connTCP.Close(), d.connUDP.Close())
 }
