@@ -2,6 +2,8 @@ package client
 
 import (
 	"io"
+	"log"
+	"log/slog"
 
 	"github.com/pion/webrtc/v4"
 )
@@ -19,7 +21,12 @@ func NewPipe(dc *webrtc.DataChannel) *Pipe {
 		data: make(chan webrtc.DataChannelMessage),
 	}
 
+	slog.Debug("Registered DataChannel.onMessage handler", "label", dc.Label())
+
 	dc.OnMessage(func(msg webrtc.DataChannelMessage) {
+		if pipe.data == nil {
+			return
+		}
 		pipe.data <- msg
 	})
 
@@ -35,6 +42,7 @@ func (pipe *Pipe) Read(p []byte) (n int, err error) {
 	select {
 	case msg := <-pipe.data:
 		if len(msg.Data) == 0 {
+			log.Println("Pipe.Read", (msg.Data), pipe.dc.Label())
 			return 0, io.EOF
 		}
 
@@ -44,6 +52,8 @@ func (pipe *Pipe) Read(p []byte) (n int, err error) {
 }
 
 func (pipe *Pipe) Write(p []byte) (n int, err error) {
+	log.Println("Pipe.Write", (p), len(p), pipe.dc.Label())
+
 	if err := pipe.dc.Send(p); err != nil {
 		return 0, err
 	}
@@ -51,6 +61,8 @@ func (pipe *Pipe) Write(p []byte) (n int, err error) {
 }
 
 func (pipe *Pipe) Close() error {
-	close(pipe.data)
+	if pipe.data != nil {
+		close(pipe.data)
+	}
 	return pipe.dc.Close()
 }

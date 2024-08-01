@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/dimspell/gladiator/backend/proxy"
+	"github.com/dimspell/gladiator/backend/proxy/client"
 	"github.com/google/uuid"
 	"github.com/urfave/cli/v3"
 )
@@ -38,11 +39,21 @@ func P2PCommand() *cli.Command {
 
 		p2p := proxy.NewPeerToPeer("ws://localhost:5050")
 
-		if _, err := p2p.Create("", id); err != nil {
-			return err
-		}
+		// ch := make(chan string)
+		//
+		// go func() {
+		// 	for {
+		// 		select {
+		// 		case <-ch:
+		// 			// nothing
+		// 		}
+		// 	}
+		// }()
 
 		if c.String("mode") == "host" {
+			if _, err := p2p.Create("", id); err != nil {
+				return err
+			}
 			if err := p2p.HostGame("test", proxy.User(id)); err != nil {
 				return err
 			}
@@ -65,14 +76,16 @@ func P2PCommand() *cli.Command {
 
 		rd := bufio.NewReader(os.Stdin)
 		for {
-			line, _, err := rd.ReadLine()
+			_, _, err := rd.ReadLine()
 			if err != nil {
 				log.Printf("Error reading message: %v", err)
 				return err
 			}
 
-			p2p.TodoBroadcast(line)
-			// p2p.BroadcastTCP(line)
+			p2p.Peers.Range(func(s string, peer *client.Peer) {
+				log.Println(s, peer.Proxy.Addr())
+			})
+			// ch <- string(line)
 		}
 
 		return nil

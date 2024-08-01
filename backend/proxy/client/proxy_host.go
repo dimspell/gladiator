@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"log/slog"
 	"net"
 	"time"
 )
@@ -51,12 +52,12 @@ func (d *HostListener) RunReaderUDP(ctx context.Context, onPacket func(msg []byt
 		}
 
 		buf := make([]byte, 1024)
-		n, _, err := d.connUDP.ReadFromUDP(buf)
+		n, addr, err := d.connUDP.ReadFromUDP(buf)
 		if err != nil {
 			return fmt.Errorf("could not read UDP message: %s", err.Error())
 		}
 
-		fmt.Println("(udp): (server): Received ", buf[0:n])
+		slog.Debug("Received UDP message", "message", buf[0:n], "length", n, "fromAddr", addr.String())
 		onPacket(buf[0:n])
 	}
 }
@@ -73,11 +74,11 @@ func (d *HostListener) RunReaderTCP(ctx context.Context, onPacket func(msg []byt
 		buf := make([]byte, 1024)
 		n, err := d.connTCP.Read(buf)
 		if err != nil {
-			fmt.Println("(tcp): Error reading from server: ", err)
+			log.Println("(tcp): Error reading from server: ", err)
 			return err
 		}
 
-		fmt.Println("(tcp): (server): Received ", buf[0:n])
+		log.Println("(tcp): (server): Received ", buf[0:n])
 		onPacket(buf[0:n])
 	}
 }
@@ -87,17 +88,17 @@ func (d *HostListener) WriteUDPMessage(msg []byte) error {
 	if err != nil {
 		return fmt.Errorf("could not write UDP message: %s", err.Error())
 	}
-	fmt.Println("(udp): wrote to server", msg)
+	log.Println("(udp): wrote to server", msg)
 	return nil
 }
 
 func (d *HostListener) WriteTCPMessage(msg []byte) error {
 	_, err := d.connTCP.Write(msg)
 	if err != nil {
-		fmt.Println("(tcp): Error writing to server: ", err)
+		log.Println("(tcp): Error writing to server: ", err)
 		return nil
 	}
-	fmt.Println("(tcp): wrote to server", msg)
+	log.Println("(tcp): wrote to server", msg)
 
 	return nil
 }

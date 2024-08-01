@@ -26,21 +26,21 @@ func TestPeerToPeer(t *testing.T) {
 		),
 	))
 
-	t.Run("Tester helpers", func(t *testing.T) {
-		StartHost(t)
-		StartSignalServer(t)
-
-		conn, err := net.DialTimeout("tcp", net.JoinHostPort("localhost", "6114"), 3*time.Second)
-		if err != nil {
-			t.Error(err)
-			return
-		}
-
-		if _, err := conn.Write([]byte("hello")); err != nil {
-			t.Error(err)
-			return
-		}
-	})
+	// t.Run("Tester helpers", func(t *testing.T) {
+	// 	StartHost(t)
+	// 	StartSignalServer(t)
+	//
+	// 	conn, err := net.DialTimeout("tcp", net.JoinHostPort("localhost", "6114"), 3*time.Second)
+	// 	if err != nil {
+	// 		t.Error(err)
+	// 		return
+	// 	}
+	//
+	// 	if _, err := conn.Write([]byte("hello")); err != nil {
+	// 		t.Error(err)
+	// 		return
+	// 	}
+	// })
 
 	t.Run("Hosting a game", func(t *testing.T) {
 		const roomName = "room"

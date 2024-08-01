@@ -64,10 +64,10 @@ type Peer struct {
 	ID   string
 	Name string
 
+	IP string
+
 	Host  *HostListener
 	Proxy *GuestProxy
 
 	Connection *webrtc.PeerConnection
-	ChannelTCP *webrtc.DataChannel
-	ChannelUDP *webrtc.DataChannel
 }

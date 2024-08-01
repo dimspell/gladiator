@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net"
 	"net/url"
+	"sync"
 	"time"
 
 	"github.com/dimspell/gladiator/backend/proxy/client"
@@ -19,7 +20,7 @@ import (
 )
 
 // TODO: Remove me and refactor me.
-const todoRoomNameDefault = "room"
+const todoRoomNameDefault = "test"
 
 const (
 	ModeNone = iota
@@ -33,12 +34,11 @@ type PeerToPeer struct {
 	SignalServerURL string
 	IpRing          *IpRing
 
-	mode  int
+	Self  *client.Peer
 	Peers *client.Peers
-	ws    *websocket.Conn
 
-	host   *client.HostListener
-	guests [3]*client.GuestProxy
+	ws   *websocket.Conn
+	mode int
 }
 
 func NewPeerToPeer(signalServerURL string) *PeerToPeer {
@@ -133,17 +133,25 @@ func (p *PeerToPeer) HostGame(gameRoom GameRoom, currentUser User) error {
 	if err != nil {
 		return err
 	}
-	go p.runWebRTC(ModeHost, User(currentUser), GameRoom(gameRoom), ip, host)
+	p.Self = &client.Peer{
+		IP:   ip.String(),
+		Host: host,
+	}
+	go p.runWebRTC(ModeHost, User(currentUser), GameRoom(gameRoom), ip)
 	return nil
 }
 
 func (p *PeerToPeer) Join(gameId string, hostUser string, currentPlayer string, ipAddress string) (net.IP, error) {
-	ip := p.IpRing.IP()
-	guest, err := client.NewGuestProxy(ip.To4().String())
-	if err != nil {
+	if err := p.dialSignalServer(hostUser, GameRoom(gameId).String()); err != nil {
 		return nil, err
 	}
-	go p.runWebRTC(ModeGuest, User(currentPlayer), GameRoom(gameId), ip, guest)
+
+	ip := p.IpRing.IP()
+	// guest, err := client.NewGuestProxy(ip.To4().String())
+	// if err != nil {
+	// 	return nil, err
+	// }
+	go p.runWebRTC(ModeGuest, User(currentPlayer), GameRoom(gameId), ip)
 	return ip, nil
 }
 
@@ -163,7 +171,7 @@ func (p *PeerToPeer) Close() {
 	}
 }
 
-func (p *PeerToPeer) runWebRTC(mode int, user User, gameRoom GameRoom, ip net.IP, proxy any) {
+func (p *PeerToPeer) runWebRTC(mode int, user User, gameRoom GameRoom, ip net.IP) {
 	if p.ws == nil {
 		panic("Not implemented")
 	}
@@ -171,7 +179,7 @@ func (p *PeerToPeer) runWebRTC(mode int, user User, gameRoom GameRoom, ip net.IP
 	signalMessages := make(chan []byte)
 	g, ctx := errgroup.WithContext(context.TODO())
 
-	handlePacket := p.handlePackets(mode, user, gameRoom, ip)
+	handlePacket := p.handlePackets(mode, user, gameRoom)
 
 	g.Go(func() error {
 		resetTimer := func(t *time.Timer, d time.Duration) {
@@ -184,6 +192,10 @@ func (p *PeerToPeer) runWebRTC(mode int, user User, gameRoom GameRoom, ip net.IP
 			t.Reset(d)
 		}
 		defer func() {
+			if mode == ModeHost {
+				// p.host.Close()
+				p.Self.Host.Close()
+			}
 			close(signalMessages)
 		}()
 
@@ -236,11 +248,37 @@ func (p *PeerToPeer) runWebRTC(mode int, user User, gameRoom GameRoom, ip net.IP
 	}
 }
 
-func (p *PeerToPeer) handlePackets(mode int, user User, room GameRoom, ip net.IP) func(context.Context, []byte) error {
+func (p *PeerToPeer) handlePackets(mode int, user User, room GameRoom) func(context.Context, []byte) error {
+	var (
+		portIndex int
+		mtx       sync.Mutex
+	)
+
+	createGuest := func(i int) (*client.GuestProxy, error) {
+		defer mtx.Unlock()
+		mtx.Lock()
+		portIndex++
+
+		tcpPort := 7000 + i*2
+		udpPort := 7000 + i*2 + 1
+
+		if mode == ModeHost {
+			tcpPort += 1000
+			udpPort += 1000
+		}
+
+		return client.NewGuestProxy(
+			net.JoinHostPort("127.0.0.1", fmt.Sprintf("%d", tcpPort)),
+			net.JoinHostPort("127.0.0.1", fmt.Sprintf("%d", udpPort)),
+		)
+	}
+
 	return func(ctx context.Context, buf []byte) error {
 		switch signalserver.EventType(buf[0]) {
 		case signalserver.Join:
 			return decodeAndRun(buf[1:], func(m signalserver.MessageContent[signalserver.Member]) error {
+				slog.Debug("JOIN", "id", m.Content.ID)
+
 				// Validate the message
 				if m.Content.ID == user.String() {
 					// return fmt.Errorf("peer %q is the same as the host, ignoring join", m.Content.ID)
@@ -250,16 +288,17 @@ func (p *PeerToPeer) handlePackets(mode int, user User, room GameRoom, ip net.IP
 					return fmt.Errorf("peer %q already exists, ignoring join", m.Content.ID)
 				}
 
-				log.Println("Joining peer", m.Content.ID, "with IP", ip)
-
 				// Create a fake endpoint that could be listened and redirect the packets
-				guest, err := client.NewGuestProxy(ip.To4().String())
+				guest, err := createGuest(portIndex)
 				if err != nil {
-					return fmt.Errorf("could not create guest proxy: %v", err)
+					return fmt.Errorf("could not create guest proxy for %s: %v", user, err)
 				}
 
+				log.Println("Joining peer", m.Content.ID)
+
 				// Add the peer to the list of peers, and start the WebRTC connection
-				peer := p.addPeer(m.Content, room, user, guest, true)
+				member := m.Content
+				peer := p.addPeer(member, room, user, guest, true)
 
 				// Create the data channels over the WebRTC connection
 				if err := p.createChannels(ctx, peer, guest, room); err != nil {
@@ -269,6 +308,8 @@ func (p *PeerToPeer) handlePackets(mode int, user User, room GameRoom, ip net.IP
 			})
 		case signalserver.Leave:
 			return decodeAndRun(buf[1:], func(m signalserver.MessageContent[any]) error {
+				slog.Debug("LEAVE", "from", m.From, "to", m.To)
+
 				peer, ok := p.Peers.Get(m.From)
 				if !ok {
 					return fmt.Errorf("could not find peer %q", m.From)
@@ -283,7 +324,16 @@ func (p *PeerToPeer) handlePackets(mode int, user User, room GameRoom, ip net.IP
 			})
 		case signalserver.RTCOffer:
 			return decodeAndRun(buf[1:], func(m signalserver.MessageContent[signalserver.Offer]) error {
-				peer := p.addPeer(signalserver.Member{ID: m.From, Name: m.Content.Name}, room, user, nil, false)
+				slog.Debug("RTC_OFFER", "from", m.From, "to", m.To)
+
+				member := signalserver.Member{ID: m.From, Name: m.Content.Name}
+
+				guest, err := createGuest(portIndex)
+				if err != nil {
+					return fmt.Errorf("could not create guest proxy for %s: %v", user, err)
+				}
+
+				peer := p.addPeer(member, room, user, guest, false)
 
 				if err := peer.Connection.SetRemoteDescription(m.Content.Offer); err != nil {
 					return fmt.Errorf("could not set remote description: %v", err)
@@ -311,6 +361,8 @@ func (p *PeerToPeer) handlePackets(mode int, user User, room GameRoom, ip net.IP
 			})
 		case signalserver.RTCAnswer:
 			return decodeAndRun(buf[1:], func(m signalserver.MessageContent[signalserver.Offer]) error {
+				slog.Debug("RTC_ANSWER", "from", m.From, "to", m.To)
+
 				answer := webrtc.SessionDescription{
 					Type: webrtc.SDPTypeAnswer,
 					SDP:  m.Content.Offer.SDP,
@@ -365,6 +417,7 @@ func (p *PeerToPeer) addPeer(member signalserver.Member, room GameRoom, user Use
 		Name:       member.Name,
 		Connection: peerConnection,
 		Proxy:      guest,
+		// IP:         guest.Addr(),
 	}
 	p.Peers.Set(member.ID, peer)
 
@@ -497,12 +550,6 @@ func (p *PeerToPeer) createChannels(ctx context.Context, peer *client.Peer, gues
 	})
 
 	return nil
-}
-
-func (p *PeerToPeer) TodoBroadcast(line []byte) {
-	p.Peers.Range(func(s string, peer *client.Peer) {
-		peer.ChannelUDP.SendText(string(line))
-	})
 }
 
 func decodeAndRun[T any](data []byte, f func(T) error) error {
