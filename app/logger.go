@@ -59,6 +59,7 @@ func initDefaultLogger(app *cli.Command) (CleanupFunc, error) {
 					Level:      logLevel,
 					TimeFormat: time.TimeOnly,
 					NoColor:    !isatty.IsTerminal(w.Fd()) || os.Getenv("NO_COLOR") != "" || app.Bool("no-color"),
+					AddSource:  true,
 				},
 			),
 		))
