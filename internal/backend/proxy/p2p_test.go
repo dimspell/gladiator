@@ -22,25 +22,10 @@ func TestPeerToPeer(t *testing.T) {
 			&tint.Options{
 				Level:      slog.LevelDebug,
 				TimeFormat: time.TimeOnly,
+				AddSource:  true,
 			},
 		),
 	))
-
-	// t.Run("Tester helpers", func(t *testing.T) {
-	// 	StartHost(t)
-	// 	StartSignalServer(t)
-	//
-	// 	conn, err := net.DialTimeout("tcp", net.JoinHostPort("localhost", "6114"), 3*time.Second)
-	// 	if err != nil {
-	// 		t.Error(err)
-	// 		return
-	// 	}
-	//
-	// 	if _, err := conn.Write([]byte("hello")); err != nil {
-	// 		t.Error(err)
-	// 		return
-	// 	}
-	// })
 
 	t.Run("Hosting a game", func(t *testing.T) {
 		const roomName = "room"
@@ -49,26 +34,45 @@ func TestPeerToPeer(t *testing.T) {
 		websocketURL := StartSignalServer(t)
 
 		a := NewPeerToPeer(websocketURL)
-		if err := a.dialSignalServer("user1", roomName); err != nil {
+		if _, err := a.Create(CreateParams{
+			HostUserIP: "",
+			HostUserID: "user1",
+		}); err != nil {
 			t.Error(err)
 			return
 		}
-		if err := a.Host(GameRoom(roomName), User("user1")); err != nil {
+		if err := a.Host(HostParams{
+			GameID:     roomName,
+			HostUserID: "user1",
+		}); err != nil {
 			t.Error(err)
 			return
 		}
 
 		b := NewPeerToPeer(websocketURL)
-		if err := b.dialSignalServer("user2", roomName); err != nil {
-			t.Error(err)
-			return
-		}
-		if _, err := b.Join(roomName, "user", "user2", ""); err != nil {
+		if _, err := b.Join(JoinParams{
+			HostUserID:    "user1",
+			GameID:        roomName,
+			CurrentUserIP: "",
+			CurrentUserID: "user2",
+		}); err != nil {
 			t.Error(err)
 			return
 		}
 
 		time.Sleep(2 * time.Second)
+
+		fmt.Println(a.Peers)
+		fmt.Println(b.Peers)
+
+		if _, err := b.Exchange(ExchangeParams{
+			GameID:    roomName,
+			UserID:    "user1",
+			IPAddress: "127.0.0.1",
+		}); err != nil {
+			t.Error(err)
+			return
+		}
 	})
 
 	// t.Run("Joining a game", func(t *testing.T) {
@@ -118,7 +122,7 @@ func StartHost(t testing.TB) {
 			if buf[0] == 26 {
 				{
 					_, err = udpConn.WriteToUDP([]byte{27, 0, 2, 0}, udpAddr)
-					fmt.Println(err)
+					log.Println(err)
 				}
 				fmt.Println("Responded with 27")
 			}

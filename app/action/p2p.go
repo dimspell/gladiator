@@ -53,20 +53,20 @@ func P2PCommand() *cli.Command {
 		if c.String("mode") == "host" {
 			if _, err := p2p.Create(proxy.CreateParams{
 				HostUserIP: "",
-				HostUserID: id,
+				HostUserID: "host1",
 			}); err != nil {
 				return err
 			}
 			if err := p2p.Host(proxy.HostParams{
 				GameID:     "test",
-				HostUserID: id,
+				HostUserID: "host1",
 			}); err != nil {
 				return err
 			}
 		} else {
 			if ip, err := p2p.Join(proxy.JoinParams{
-				HostUserID:    "id",
-				CurrentUserID: "id",
+				HostUserID:    "host1",
+				CurrentUserID: id,
 				GameID:        "test",
 				CurrentUserIP: "",
 			}); err != nil {
@@ -75,15 +75,6 @@ func P2PCommand() *cli.Command {
 				log.Printf("Joined game at %s", ip)
 			}
 		}
-
-		// go p2p.Run(
-		// 	func(peer *client.Peer, packet webrtc.DataChannelMessage) {
-		// 		log.Printf("Received UDP message from %s: %s", peer.ID, string(packet.Data))
-		// 	},
-		// 	func(peer *client.Peer, packet webrtc.DataChannelMessage) {
-		// 		log.Printf("Received TCP message from %s: %s", peer.ID, string(packet.Data))
-		// 	},
-		// )
 
 		rd := bufio.NewReader(os.Stdin)
 		for {

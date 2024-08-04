@@ -24,7 +24,7 @@ import (
 const todoRoomNameDefault = "test"
 
 const (
-	ModeNone = iota
+	_ = iota
 	ModeHost
 	ModeGuest
 )
@@ -42,8 +42,8 @@ type PeerToPeer struct {
 func NewPeerToPeer(signalServerURL string) *PeerToPeer {
 	return &PeerToPeer{
 		SignalServerURL: signalServerURL,
+		Peers:           client.NewPeers(),
 		// IpRing:          NewIpRing(),
-		Peers: client.NewPeers(),
 	}
 }
 
@@ -54,13 +54,12 @@ func (p *PeerToPeer) GetHostIP(hostIpAddress string) net.IP {
 
 func (p *PeerToPeer) Create(params CreateParams) (net.IP, error) {
 	if p.ws != nil {
-		panic("Not implemented")
+		return nil, fmt.Errorf("already connected to the signal server")
 	}
 	if err := p.dialSignalServer(params.HostUserID, todoRoomNameDefault); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to connect to the signal server: %w", err)
 	}
-
-	return p.GetHostIP(""), nil
+	return net.IPv4(127, 0, 0, 1), nil
 }
 
 func (p *PeerToPeer) Host(params HostParams) error {
@@ -70,29 +69,37 @@ func (p *PeerToPeer) Host(params HostParams) error {
 
 func (p *PeerToPeer) Join(params JoinParams) (net.IP, error) {
 	if err := p.dialSignalServer(params.CurrentUserID, params.GameID); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to connect to the signal server: %w", err)
 	}
 
-	// ip := p.IpRing.IP()
 	ip := net.IPv4(127, 0, 1, 2)
 	go p.runWebRTC(ModeGuest, params.CurrentUserID, params.GameID)
+
+	// select {
+	// case <-time.After(5 * time.Second):
+	// 	return nil, fmt.Errorf("timeout")
+	// 	// case ip := <-p.chanMyIP:
+	// 	// 	return ip, nil
+	// }
+
 	return ip, nil
 }
 
 func (p *PeerToPeer) Exchange(params ExchangeParams) (net.IP, error) {
-	// TODO implement me
-	panic("implement me")
+	peer, ok := p.Peers.Get(params.UserID)
+	if !ok {
+		return nil, fmt.Errorf("user %s not found", params.UserID)
+	}
+	return peer.IP, nil
 }
 
 func (p *PeerToPeer) Close() {
-	if p == nil {
-		return
-	}
 	if p.ws != nil {
 		if err := p.ws.Close(); err != nil {
 			slog.Warn("Could not close websocket connection", "error", err)
 		}
 	}
+	p.Peers.Reset()
 }
 
 func (p *PeerToPeer) dialSignalServer(userId, roomName string) error {
@@ -157,14 +164,10 @@ func (p *PeerToPeer) sendSignal(message []byte) (err error) {
 }
 
 func (p *PeerToPeer) runWebRTC(mode int, user string, gameRoom string) {
-	if p.ws == nil {
-		panic("Not implemented")
-	}
-
 	signalMessages := make(chan []byte)
 	g, ctx := errgroup.WithContext(context.TODO())
 
-	handlePacket := p.handlePackets(mode, user, gameRoom)
+	handleSignalMessage := p.handlePackets(mode, user, gameRoom)
 
 	g.Go(func() error {
 		resetTimer := func(t *time.Timer, d time.Duration) {
@@ -189,8 +192,8 @@ func (p *PeerToPeer) runWebRTC(mode int, user string, gameRoom string) {
 				// if err := p.ws.SetWriteDeadline(time.Now().Add(10 * time.Second)); err != nil {
 				// 	return err
 				// }
-				if err := handlePacket(ctx, msg); err != nil {
-					log.Println("handle packet", err)
+				if err := handleSignalMessage(ctx, msg); err != nil {
+					slog.Error("could not handle signal message", "error", err)
 				}
 			case <-timer.C:
 				// if err := p.ws.SetWriteDeadline(time.Now().Add(10 * time.Second)); err != nil {
@@ -207,6 +210,7 @@ func (p *PeerToPeer) runWebRTC(mode int, user string, gameRoom string) {
 	g.Go(func() error {
 		for {
 			if ctx.Err() != nil {
+				slog.Warn("Closing websocket connection", "error", ctx.Err())
 				return ctx.Err()
 			}
 
@@ -219,7 +223,6 @@ func (p *PeerToPeer) runWebRTC(mode int, user string, gameRoom string) {
 			if err != nil {
 				return fmt.Errorf("error reading message: %v", err)
 			}
-
 			signalMessages <- buf[:n]
 		}
 	})
@@ -286,10 +289,10 @@ func (p *PeerToPeer) handlePackets(mode int, user string, room string) func(cont
 
 				// Add the peer to the list of peers, and start the WebRTC connection
 				member := m.Content
-				peer := p.addPeer(member, room, user, guest, true)
+				peer := p.addPeer(ctx, member, room, user, guest, true)
 
 				// Create the data channels over the WebRTC connection
-				if err := p.createChannels(peer, guest, room); err != nil {
+				if err := p.createChannels(ctx, peer, guest, room); err != nil {
 					return fmt.Errorf("could not create data channels: %v", err)
 				}
 				return nil
@@ -300,7 +303,8 @@ func (p *PeerToPeer) handlePackets(mode int, user string, room string) func(cont
 
 				peer, ok := p.Peers.Get(m.From)
 				if !ok {
-					return fmt.Errorf("could not find peer %q", m.From)
+					// fmt.Errorf("could not find peer %q", m.From)
+					return nil
 				}
 				if peer.ID == user {
 					return fmt.Errorf("peer %q is the same as the host, ignoring leave", m.From)
@@ -321,7 +325,7 @@ func (p *PeerToPeer) handlePackets(mode int, user string, room string) func(cont
 					return fmt.Errorf("could not create guest proxy for %s: %v", user, err)
 				}
 
-				peer := p.addPeer(member, room, user, guest, false)
+				peer := p.addPeer(ctx, member, room, user, guest, false)
 
 				if err := peer.Connection.SetRemoteDescription(m.Content.Offer); err != nil {
 					return fmt.Errorf("could not set remote description: %v", err)
@@ -381,7 +385,7 @@ func (p *PeerToPeer) handlePackets(mode int, user string, room string) func(cont
 	}
 }
 
-func (p *PeerToPeer) addPeer(member signalserver.Member, room string, user string, guest client.Proxer, isJoinNotRTCOffer bool) *client.Peer {
+func (p *PeerToPeer) addPeer(ctx context.Context, member signalserver.Member, room string, user string, guest client.Proxer, isJoinNotRTCOffer bool) *client.Peer {
 	config := webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{
 			// {
@@ -460,20 +464,20 @@ func (p *PeerToPeer) addPeer(member signalserver.Member, room string, user strin
 	peerConnection.OnDataChannel(func(dc *webrtc.DataChannel) {
 		dc.OnOpen(func() {
 			slog.Debug("Opened WebRTC channel", "label", dc.Label(), "peer", member.ID)
-			client.NewPipe(dc, room, guest)
+			client.NewPipe(ctx, dc, room, guest)
 		})
 	})
 
 	return peer
 }
 
-func (p *PeerToPeer) createChannels(peer *client.Peer, other client.Proxer, room string) error {
+func (p *PeerToPeer) createChannels(ctx context.Context, peer *client.Peer, other client.Proxer, room string) error {
 	// UDP
 	dcUDP, err := peer.Connection.CreateDataChannel(fmt.Sprintf("%s/udp", room), nil)
 	if err != nil {
 		return fmt.Errorf("could not create data channel %q: %v", room, err)
 	}
-	client.NewPipe(dcUDP, room, other)
+	client.NewPipe(ctx, dcUDP, room, other)
 
 	// dcUDP.OnClose(func() {
 	//	log.Printf("dataChannel for %s has closed", peer.ID)
@@ -486,7 +490,7 @@ func (p *PeerToPeer) createChannels(peer *client.Peer, other client.Proxer, room
 	if err != nil {
 		return fmt.Errorf("could not create data channel %q: %v", room, err)
 	}
-	client.NewPipe(dcTCP, room, other)
+	client.NewPipe(ctx, dcTCP, room, other)
 
 	// dcTCP.OnClose(func() {
 	//	log.Printf("dataChannel for %s has closed", peer.ID)

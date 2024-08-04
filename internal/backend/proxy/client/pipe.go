@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"log/slog"
+	"net"
 
 	"github.com/pion/webrtc/v4"
 	"golang.org/x/sync/errgroup"
@@ -14,7 +15,7 @@ import (
 type Peer struct {
 	ID   string
 	Name string
-	IP   string
+	IP   net.IP
 
 	Proxer     Proxer
 	Connection *webrtc.PeerConnection
@@ -28,7 +29,7 @@ type Pipe struct {
 	dcData chan webrtc.DataChannelMessage
 }
 
-func NewPipe(dc *webrtc.DataChannel, room string, proxy Proxer) *Pipe {
+func NewPipe(parentCtx context.Context, dc *webrtc.DataChannel, room string, proxy Proxer) *Pipe {
 	pipe := &Pipe{
 		dc:     dc,
 		done:   make(chan struct{}, 1),
@@ -37,11 +38,10 @@ func NewPipe(dc *webrtc.DataChannel, room string, proxy Proxer) *Pipe {
 
 	slog.Debug("Registered DataChannel.onMessage handler", "label", dc.Label())
 
-	ctx, cancel := context.WithCancel(context.TODO())
-
 	isTCP := dc.Label() == fmt.Sprintf("%s/tcp", room)
 	isUDP := dc.Label() == fmt.Sprintf("%s/udp", room)
 
+	ctx, cancel := context.WithCancel(context.TODO())
 	g, ctx := errgroup.WithContext(ctx)
 	g.Go(func() error {
 		if isTCP {
@@ -56,6 +56,7 @@ func NewPipe(dc *webrtc.DataChannel, room string, proxy Proxer) *Pipe {
 		for {
 			select {
 			case <-ctx.Done():
+				slog.Debug("context done", "error", ctx.Err())
 				return ctx.Err()
 			case <-pipe.done:
 				return nil
@@ -84,6 +85,7 @@ func NewPipe(dc *webrtc.DataChannel, room string, proxy Proxer) *Pipe {
 	go func() {
 		if err := g.Wait(); err != nil {
 			slog.Warn("Error running proxy", "error", err)
+			cancel()
 		}
 	}()
 

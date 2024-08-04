@@ -29,7 +29,7 @@ func DialHost(gameServerIP string) (*HostProxy, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not connect to game server on 6114: %s", err.Error())
 	}
-	log.Println("Host: Connected TCP", tcpConn.LocalAddr().String(), tcpConn.RemoteAddr().String())
+	slog.Info("Host: Connected TCP", "local", tcpConn.LocalAddr().String(), "remote", tcpConn.RemoteAddr().String())
 
 	// udp:6113
 	udpAddr, err := net.ResolveUDPAddr("udp", net.JoinHostPort(gameServerIP, "6113"))
@@ -40,7 +40,7 @@ func DialHost(gameServerIP string) (*HostProxy, error) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Println("Host: Connected UDP", udpConn.LocalAddr().String(), udpConn.RemoteAddr().String())
+	slog.Info("Host: Connected UDP", "local", udpConn.LocalAddr().String(), "remote", udpConn.RemoteAddr().String())
 
 	return &HostProxy{
 		tcpConn: tcpConn,
@@ -54,6 +54,7 @@ type Proxer interface {
 	RunTCP(ctx context.Context, rw io.ReadWriteCloser) error
 	WriteUDPMessage(msg []byte) error
 	WriteTCPMessage(msg []byte) error
+	// Close()
 }
 
 func (p *HostProxy) RunUDP(ctx context.Context, rw io.ReadWriteCloser) error {

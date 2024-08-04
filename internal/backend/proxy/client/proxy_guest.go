@@ -29,7 +29,7 @@ func ListenGuest(tcpAddr, udpAddr string) (*GuestProxy, error) {
 	if err != nil {
 		return nil, err
 	}
-	log.Println("Guest: Listening TCP", tcpListener.Addr().String())
+	slog.Info("Guest: Listening TCP", "addr", tcpListener.Addr().String())
 
 	srcAddr, err := net.ResolveUDPAddr("udp", udpAddr)
 	if err != nil {
@@ -39,7 +39,7 @@ func ListenGuest(tcpAddr, udpAddr string) (*GuestProxy, error) {
 	if err != nil {
 		return nil, err
 	}
-	log.Println("Guest: Listening UDP", srcConn.LocalAddr(), srcConn.RemoteAddr())
+	slog.Info("Guest: Listening UDP", "local", srcConn.LocalAddr(), "remote", srcConn.RemoteAddr())
 
 	p := GuestProxy{
 		writeUDP: make(chan []byte),
