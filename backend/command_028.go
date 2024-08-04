@@ -55,7 +55,7 @@ func (b *Backend) HandleCreateGame(session *model.Session, req CreateGameRequest
 		if err != nil {
 			return err
 		}
-		binary.LittleEndian.PutUint32(response[0:4], uint32(model.GameStateCreating)) // Game state
+		binary.LittleEndian.PutUint32(response[0:4], uint32(model.GameStateCreating))
 		break
 	case uint32(model.GameStateCreating):
 		respGame, err := b.gameClient.GetGame(context.TODO(), connect.NewRequest(&multiv1.GetGameRequest{
@@ -68,7 +68,7 @@ func (b *Backend) HandleCreateGame(session *model.Session, req CreateGameRequest
 		if err := b.Proxy.HostGame(proxy.GameRoom(respGame.Msg.Game.Name), proxy.User(session.Username)); err != nil {
 			return err
 		}
-		binary.LittleEndian.PutUint32(response[0:4], uint32(model.GameStateStarted)) // Game state
+		binary.LittleEndian.PutUint32(response[0:4], uint32(model.GameStateStarted))
 		break
 	}
 
