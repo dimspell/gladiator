@@ -1,12 +1,27 @@
 package client
 
 import (
+	"context"
+	"fmt"
 	"io"
 	"log"
 	"log/slog"
 
 	"github.com/pion/webrtc/v4"
 )
+
+type Peer struct {
+	ID   string
+	Name string
+
+	IP string
+
+	Host   *HostListener
+	Guest  *GuestProxy
+	Proxer Proxer
+
+	Connection *webrtc.PeerConnection
+}
 
 var _ io.ReadWriteCloser = (*Pipe)(nil)
 
@@ -16,7 +31,7 @@ type Pipe struct {
 	dcData chan webrtc.DataChannelMessage
 }
 
-func NewPipe(dc *webrtc.DataChannel, guest *GuestProxy) *Pipe {
+func NewPipe(dc *webrtc.DataChannel, room string, proxy Proxer) *Pipe {
 	pipe := &Pipe{
 		dc:     dc,
 		done:   make(chan struct{}, 1),
@@ -24,6 +39,28 @@ func NewPipe(dc *webrtc.DataChannel, guest *GuestProxy) *Pipe {
 	}
 
 	slog.Debug("Registered DataChannel.onMessage handler", "label", dc.Label())
+
+	ctx, cancel := context.WithCancel(context.TODO())
+
+	switch dc.Label() {
+	case fmt.Sprintf("%s/tcp", room):
+		go func() {
+			if err := proxy.RunUDP(ctx, pipe); err != nil {
+				panic(err)
+			}
+		}()
+	case fmt.Sprintf("%s/udp", room):
+		go func() {
+			if err := proxy.RunUDP(ctx, pipe); err != nil {
+				panic(err)
+			}
+		}()
+	}
+
+	dc.OnClose(func() {
+		pipe.Close()
+		cancel()
+	})
 
 	go func() {
 		for {
@@ -49,6 +86,10 @@ func NewPipe(dc *webrtc.DataChannel, guest *GuestProxy) *Pipe {
 			return
 		}
 		pipe.dcData <- msg
+	})
+
+	dc.OnError(func(err error) {
+		slog.Warn("Data channel error", "error", err)
 	})
 
 	return pipe

@@ -83,7 +83,7 @@ func P2PCommand() *cli.Command {
 			}
 
 			p2p.Peers.Range(func(s string, peer *client.Peer) {
-				log.Println(s, peer.Proxy.Addr())
+				log.Println(s, peer.Guest.Addr())
 			})
 			// ch <- string(line)
 		}

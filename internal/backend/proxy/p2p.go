@@ -4,7 +4,7 @@ import (
 	"container/ring"
 	"context"
 	"fmt"
-	client2 "github.com/dimspell/gladiator/internal/backend/proxy/client"
+	"github.com/dimspell/gladiator/internal/backend/proxy/client"
 	"log"
 	"log/slog"
 	"net"
@@ -34,18 +34,15 @@ type PeerToPeer struct {
 	SignalServerURL string
 	IpRing          *IpRing
 
-	Self  *client2.Peer
-	Peers *client2.Peers
-
-	ws   *websocket.Conn
-	mode int
+	ws    *websocket.Conn
+	Peers *client.Peers
 }
 
 func NewPeerToPeer(signalServerURL string) *PeerToPeer {
 	return &PeerToPeer{
 		SignalServerURL: signalServerURL,
 		IpRing:          NewIpRing(),
-		Peers:           client2.NewPeers(),
+		Peers:           client.NewPeers(),
 	}
 }
 
@@ -129,15 +126,15 @@ func (p *PeerToPeer) Create(localIPAddress string, hostUser string) (net.IP, err
 // network. The game host is expected to be running on the same machine.
 func (p *PeerToPeer) HostGame(gameRoom GameRoom, currentUser User) error {
 	ip := p.GetHostIP("")
-	host, err := client2.ListenHost(ip.To4().String())
+	host, err := client.ListenHost(ip.To4().String())
 	if err != nil {
 		return err
 	}
-	p.Self = &client2.Peer{
+	me := &client.Peer{
 		IP:   ip.String(),
 		Host: host,
 	}
-	go p.runWebRTC(ModeHost, User(currentUser), GameRoom(gameRoom), ip)
+	go p.runWebRTC(ModeHost, User(currentUser), GameRoom(gameRoom), me)
 	return nil
 }
 
@@ -147,11 +144,15 @@ func (p *PeerToPeer) Join(gameId string, hostUser string, currentPlayer string, 
 	}
 
 	ip := p.IpRing.IP()
-	// guest, err := client.NewGuestProxy(ip.To4().String())
-	// if err != nil {
-	// 	return nil, err
-	// }
-	go p.runWebRTC(ModeGuest, User(currentPlayer), GameRoom(gameId), ip)
+	guest, err := client.NewGuestProxyIP(net.IPv4(127, 0, 0, 1))
+	if err != nil {
+		return nil, err
+	}
+	me := &client.Peer{
+		IP:    ip.String(),
+		Guest: guest,
+	}
+	go p.runWebRTC(ModeGuest, User(currentPlayer), GameRoom(gameId), me)
 	return ip, nil
 }
 
@@ -171,7 +172,7 @@ func (p *PeerToPeer) Close() {
 	}
 }
 
-func (p *PeerToPeer) runWebRTC(mode int, user User, gameRoom GameRoom, ip net.IP) {
+func (p *PeerToPeer) runWebRTC(mode int, user User, gameRoom GameRoom, me *client.Peer) {
 	if p.ws == nil {
 		panic("Not implemented")
 	}
@@ -179,7 +180,7 @@ func (p *PeerToPeer) runWebRTC(mode int, user User, gameRoom GameRoom, ip net.IP
 	signalMessages := make(chan []byte)
 	g, ctx := errgroup.WithContext(context.TODO())
 
-	handlePacket := p.handlePackets(mode, user, gameRoom)
+	handlePacket := p.handlePackets(mode, user, gameRoom, me)
 
 	g.Go(func() error {
 		resetTimer := func(t *time.Timer, d time.Duration) {
@@ -193,8 +194,12 @@ func (p *PeerToPeer) runWebRTC(mode int, user User, gameRoom GameRoom, ip net.IP
 		}
 		defer func() {
 			if mode == ModeHost {
-				// p.host.Close()
-				p.Self.Host.Close()
+				// TODO: Close the connection to the game server process
+				//if mode == ModeHost {
+				//	me.Host.Close()
+				//} else {
+				//	me.Proxy.Close()
+				//}
 			}
 			close(signalMessages)
 		}()
@@ -248,13 +253,13 @@ func (p *PeerToPeer) runWebRTC(mode int, user User, gameRoom GameRoom, ip net.IP
 	}
 }
 
-func (p *PeerToPeer) handlePackets(mode int, user User, room GameRoom) func(context.Context, []byte) error {
+func (p *PeerToPeer) handlePackets(mode int, user User, room GameRoom, me *client.Peer) func(context.Context, []byte) error {
 	var (
 		portIndex int
 		mtx       sync.Mutex
 	)
 
-	createGuest := func(i int) (*client2.GuestProxy, error) {
+	addProxyClient := func(i int) (client.Proxer, error) {
 		defer mtx.Unlock()
 		mtx.Lock()
 		portIndex++
@@ -267,10 +272,17 @@ func (p *PeerToPeer) handlePackets(mode int, user User, room GameRoom) func(cont
 			udpPort += 1000
 		}
 
-		return client2.NewGuestProxy(
-			net.JoinHostPort("127.0.0.1", fmt.Sprintf("%d", tcpPort)),
-			net.JoinHostPort("127.0.0.1", fmt.Sprintf("%d", udpPort)),
-		)
+		if mode == ModeGuest {
+			return client.NewGuestProxy(
+				net.JoinHostPort("127.0.0.1", fmt.Sprintf("%d", tcpPort)),
+				net.JoinHostPort("127.0.0.1", fmt.Sprintf("%d", udpPort)),
+			)
+		}
+		if mode == ModeHost {
+			return client.ListenHost("127.0.0.1")
+		}
+
+		panic("Not implemented")
 	}
 
 	return func(ctx context.Context, buf []byte) error {
@@ -289,7 +301,7 @@ func (p *PeerToPeer) handlePackets(mode int, user User, room GameRoom) func(cont
 				}
 
 				// Create a fake endpoint that could be listened and redirect the packets
-				guest, err := createGuest(portIndex)
+				guest, err := addProxyClient(portIndex)
 				if err != nil {
 					return fmt.Errorf("could not create guest proxy for %s: %v", user, err)
 				}
@@ -301,7 +313,7 @@ func (p *PeerToPeer) handlePackets(mode int, user User, room GameRoom) func(cont
 				peer := p.addPeer(member, room, user, guest, true)
 
 				// Create the data channels over the WebRTC connection
-				if err := p.createChannels(ctx, peer, guest, room); err != nil {
+				if err := p.createChannels(peer, guest, room); err != nil {
 					return fmt.Errorf("could not create data channels: %v", err)
 				}
 				return nil
@@ -328,7 +340,7 @@ func (p *PeerToPeer) handlePackets(mode int, user User, room GameRoom) func(cont
 
 				member := signalserver.Member{ID: m.From, Name: m.Content.Name}
 
-				guest, err := createGuest(portIndex)
+				guest, err := addProxyClient(portIndex)
 				if err != nil {
 					return fmt.Errorf("could not create guest proxy for %s: %v", user, err)
 				}
@@ -393,7 +405,7 @@ func (p *PeerToPeer) handlePackets(mode int, user User, room GameRoom) func(cont
 	}
 }
 
-func (p *PeerToPeer) addPeer(member signalserver.Member, room GameRoom, user User, guest *client2.GuestProxy, isJoinNotRTCOffer bool) *client2.Peer {
+func (p *PeerToPeer) addPeer(member signalserver.Member, room GameRoom, user User, guest client.Proxer, isJoinNotRTCOffer bool) *client.Peer {
 	config := webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{
 			// {
@@ -412,11 +424,12 @@ func (p *PeerToPeer) addPeer(member signalserver.Member, room GameRoom, user Use
 		panic(err)
 	}
 
-	peer := &client2.Peer{
+	peer := &client.Peer{
 		ID:         member.ID,
 		Name:       member.Name,
 		Connection: peerConnection,
-		Proxy:      guest,
+		//Guest:      guest,
+		Proxer: guest,
 		// IP:         guest.Addr(),
 	}
 	p.Peers.Set(member.ID, peer)
@@ -473,81 +486,39 @@ func (p *PeerToPeer) addPeer(member signalserver.Member, room GameRoom, user Use
 	peerConnection.OnDataChannel(func(dc *webrtc.DataChannel) {
 		dc.OnOpen(func() {
 			slog.Debug("Opened WebRTC channel", "label", dc.Label(), "peer", member.ID)
-
-			ctx, cancel := context.WithCancel(context.TODO())
-			pipe := client2.NewPipe(dc, guest)
-
-			switch dc.Label() {
-			case fmt.Sprintf("%s/tcp", room):
-				go func() {
-					if err := guest.RunUDP(ctx, pipe); err != nil {
-						panic(err)
-					}
-				}()
-			case fmt.Sprintf("%s/udp", room):
-				go func() {
-					if err := guest.RunUDP(ctx, pipe); err != nil {
-						panic(err)
-					}
-				}()
-			}
-
-			dc.OnClose(func() {
-				pipe.Close()
-				cancel()
-			})
+			client.NewPipe(dc, room.String(), guest)
 		})
 	})
 
 	return peer
 }
 
-func (p *PeerToPeer) createChannels(ctx context.Context, peer *client2.Peer, guest *client2.GuestProxy, room GameRoom) error {
+func (p *PeerToPeer) createChannels(peer *client.Peer, other client.Proxer, room GameRoom) error {
 	// UDP
 	dcUDP, err := peer.Connection.CreateDataChannel(fmt.Sprintf("%s/udp", room), nil)
 	if err != nil {
 		return fmt.Errorf("could not create data channel %q: %v", room, err)
 	}
-	pipeUDP := client2.NewPipe(dcUDP, guest)
+	client.NewPipe(dcUDP, room.String(), other)
 
-	dcUDP.OnError(func(err error) {
-		slog.Warn("Data channel error", "error", err)
-	})
-	dcUDP.OnOpen(func() {
-		go func() {
-			if err := guest.RunUDP(ctx, pipeUDP); err != nil {
-				panic(err)
-			}
-		}()
-	})
-	dcUDP.OnClose(func() {
-		log.Printf("dataChannel for %s has closed", peer.ID)
-		p.Peers.Delete(peer.ID)
-		pipeUDP.Close()
-	})
+	//dcUDP.OnClose(func() {
+	//	log.Printf("dataChannel for %s has closed", peer.ID)
+	//	p.Peers.Delete(peer.ID)
+	//	pipeUDP.Close()
+	//})
 
 	// TCP
 	dcTCP, err := peer.Connection.CreateDataChannel(fmt.Sprintf("%s/tcp", room), nil)
 	if err != nil {
 		return fmt.Errorf("could not create data channel %q: %v", room, err)
 	}
-	pipeTCP := client2.NewPipe(dcTCP, guest)
+	client.NewPipe(dcTCP, room.String(), other)
 
-	dcTCP.OnError(func(err error) {
-		slog.Warn("Data channel error", "error", err)
-	})
-	dcTCP.OnOpen(func() {
-		go func() {
-			if err := guest.RunTCP(ctx, pipeTCP); err != nil {
-				panic(err)
-			}
-		}()
-	})
-	dcTCP.OnClose(func() {
-		log.Printf("dataChannel for %s has closed", peer.ID)
-		p.Peers.Delete(peer.ID)
-		pipeTCP.Close()
-	})
+	//dcTCP.OnClose(func() {
+	//	log.Printf("dataChannel for %s has closed", peer.ID)
+	//	p.Peers.Delete(peer.ID)
+	//	pipeTCP.Close()
+	//})
 
 	return nil
 }
