@@ -52,23 +52,23 @@ func P2PCommand() *cli.Command {
 
 		if c.String("mode") == "host" {
 			if _, err := p2p.Create(proxy.CreateParams{
-				LocalIP:  "",
-				HostUser: id,
+				HostUserIP: "",
+				HostUserID: id,
 			}); err != nil {
 				return err
 			}
 			if err := p2p.Host(proxy.HostParams{
-				GameRoom: "test",
-				User:     id,
+				GameID:     "test",
+				HostUserID: id,
 			}); err != nil {
 				return err
 			}
 		} else {
 			if ip, err := p2p.Join(proxy.JoinParams{
-				HostUser:    "id",
-				CurrentUser: "id",
-				GameName:    "test",
-				IPAddress:   "",
+				HostUserID:    "id",
+				CurrentUserID: "id",
+				GameID:        "test",
+				CurrentUserIP: "",
 			}); err != nil {
 				return err
 			} else {

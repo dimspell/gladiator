@@ -22,25 +22,24 @@ type Proxy interface {
 }
 
 type CreateParams struct {
-	LocalIP  string
-	HostUser string
-	// GameRoom string
+	HostUserIP string
+	HostUserID string
 }
 
 type HostParams struct {
-	GameRoom string
-	User     string
+	GameID     string
+	HostUserID string
 }
 
 type JoinParams struct {
-	HostUser    string
-	CurrentUser string
-	GameName    string
-	IPAddress   string
+	HostUserID    string
+	GameID        string
+	CurrentUserIP string
+	CurrentUserID string
 }
 
 type ExchangeParams struct {
-	GameId    string
-	UserId    string
+	GameID    string
+	UserID    string
 	IPAddress string
 }

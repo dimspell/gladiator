@@ -55,8 +55,8 @@ func (b *Backend) HandleJoinGame(session *model.Session, req JoinGameRequest) er
 	response := []byte{model.GameStateStarted, 0}
 	for _, player := range respPlayers.Msg.GetPlayers() {
 		proxyIP, err := b.Proxy.Exchange(proxy.ExchangeParams{
-			GameId:    respGame.Msg.GetGame().GetName(),
-			UserId:    player.Username,
+			GameID:    respGame.Msg.GetGame().GetName(),
+			UserID:    player.Username,
 			IPAddress: player.IpAddress,
 		})
 		if err != nil {

@@ -16,9 +16,9 @@ func NewLAN() *LAN {
 }
 
 func (p *LAN) Create(params CreateParams) (net.IP, error) {
-	ip := net.ParseIP(params.LocalIP)
+	ip := net.ParseIP(params.HostUserIP)
 	if ip == nil {
-		return net.IP{}, fmt.Errorf("incorrect host IP address: %s", params.LocalIP)
+		return net.IP{}, fmt.Errorf("incorrect host IP address: %s", params.HostUserIP)
 	}
 	return ip, nil
 }
@@ -28,9 +28,9 @@ func (p *LAN) Host(_ HostParams) error {
 }
 
 func (p *LAN) Join(params JoinParams) (net.IP, error) {
-	ip := net.ParseIP(params.IPAddress)
+	ip := net.ParseIP(params.CurrentUserIP)
 	if ip == nil {
-		return net.IP{}, fmt.Errorf("incorrect join IP address: %s", params.IPAddress)
+		return net.IP{}, fmt.Errorf("incorrect join IP address: %s", params.CurrentUserIP)
 	}
 	return ip, nil
 }

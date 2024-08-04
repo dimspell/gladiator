@@ -52,6 +52,49 @@ func (p *PeerToPeer) GetHostIP(hostIpAddress string) net.IP {
 	return net.IPv4(127, 0, 0, 1)
 }
 
+func (p *PeerToPeer) Create(params CreateParams) (net.IP, error) {
+	if p.ws != nil {
+		panic("Not implemented")
+	}
+	if err := p.dialSignalServer(params.HostUserID, todoRoomNameDefault); err != nil {
+		return nil, err
+	}
+
+	return p.GetHostIP(""), nil
+}
+
+func (p *PeerToPeer) Host(params HostParams) error {
+	go p.runWebRTC(ModeHost, params.HostUserID, params.GameID)
+	return nil
+}
+
+func (p *PeerToPeer) Join(params JoinParams) (net.IP, error) {
+	if err := p.dialSignalServer(params.CurrentUserID, params.GameID); err != nil {
+		return nil, err
+	}
+
+	// ip := p.IpRing.IP()
+	ip := net.IPv4(127, 0, 1, 2)
+	go p.runWebRTC(ModeGuest, params.CurrentUserID, params.GameID)
+	return ip, nil
+}
+
+func (p *PeerToPeer) Exchange(params ExchangeParams) (net.IP, error) {
+	// TODO implement me
+	panic("implement me")
+}
+
+func (p *PeerToPeer) Close() {
+	if p == nil {
+		return
+	}
+	if p.ws != nil {
+		if err := p.ws.Close(); err != nil {
+			slog.Warn("Could not close websocket connection", "error", err)
+		}
+	}
+}
+
 func (p *PeerToPeer) dialSignalServer(userId, roomName string) error {
 	// Parse the signaling URL provided from the parameters (command flags)
 	u, err := url.Parse(p.SignalServerURL)
@@ -111,53 +154,6 @@ func (p *PeerToPeer) sendSignal(message []byte) (err error) {
 	}
 	_, err = p.ws.Write(message)
 	return
-}
-
-func (p *PeerToPeer) Create(params CreateParams) (net.IP, error) {
-	if p.ws != nil {
-		panic("Not implemented")
-	}
-	if err := p.dialSignalServer(params.HostUser, todoRoomNameDefault); err != nil {
-		return nil, err
-	}
-
-	return p.GetHostIP(""), nil
-}
-
-// HostGame connects to the game host and redirects the traffic to the P2P
-// network. The game host is expected to be running on the same machine.
-func (p *PeerToPeer) Host(params HostParams) error {
-	// ip := p.GetHostIP("")
-
-	go p.runWebRTC(ModeHost, params.User, params.GameRoom)
-	return nil
-}
-
-func (p *PeerToPeer) Join(params JoinParams) (net.IP, error) {
-	if err := p.dialSignalServer(params.CurrentUser, params.GameName); err != nil {
-		return nil, err
-	}
-
-	// ip := p.IpRing.IP()
-	ip := net.IPv4(127, 0, 1, 2)
-	go p.runWebRTC(ModeGuest, params.CurrentUser, params.GameName)
-	return ip, nil
-}
-
-func (p *PeerToPeer) Exchange(params ExchangeParams) (net.IP, error) {
-	// TODO implement me
-	panic("implement me")
-}
-
-func (p *PeerToPeer) Close() {
-	if p == nil {
-		return
-	}
-	if p.ws != nil {
-		if err := p.ws.Close(); err != nil {
-			slog.Warn("Could not close websocket connection", "error", err)
-		}
-	}
 }
 
 func (p *PeerToPeer) runWebRTC(mode int, user string, gameRoom string) {
