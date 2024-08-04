@@ -4,6 +4,7 @@ import (
 	"container/ring"
 	"context"
 	"fmt"
+	client2 "github.com/dimspell/gladiator/internal/backend/proxy/client"
 	"log"
 	"log/slog"
 	"net"
@@ -11,7 +12,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dimspell/gladiator/backend/proxy/client"
 	"github.com/dimspell/gladiator/console/signalserver"
 	"github.com/fxamacker/cbor/v2"
 	"github.com/pion/webrtc/v4"
@@ -34,8 +34,8 @@ type PeerToPeer struct {
 	SignalServerURL string
 	IpRing          *IpRing
 
-	Self  *client.Peer
-	Peers *client.Peers
+	Self  *client2.Peer
+	Peers *client2.Peers
 
 	ws   *websocket.Conn
 	mode int
@@ -45,7 +45,7 @@ func NewPeerToPeer(signalServerURL string) *PeerToPeer {
 	return &PeerToPeer{
 		SignalServerURL: signalServerURL,
 		IpRing:          NewIpRing(),
-		Peers:           client.NewPeers(),
+		Peers:           client2.NewPeers(),
 	}
 }
 
@@ -129,11 +129,11 @@ func (p *PeerToPeer) Create(localIPAddress string, hostUser string) (net.IP, err
 // network. The game host is expected to be running on the same machine.
 func (p *PeerToPeer) HostGame(gameRoom GameRoom, currentUser User) error {
 	ip := p.GetHostIP("")
-	host, err := client.ListenHost(ip.To4().String())
+	host, err := client2.ListenHost(ip.To4().String())
 	if err != nil {
 		return err
 	}
-	p.Self = &client.Peer{
+	p.Self = &client2.Peer{
 		IP:   ip.String(),
 		Host: host,
 	}
@@ -254,7 +254,7 @@ func (p *PeerToPeer) handlePackets(mode int, user User, room GameRoom) func(cont
 		mtx       sync.Mutex
 	)
 
-	createGuest := func(i int) (*client.GuestProxy, error) {
+	createGuest := func(i int) (*client2.GuestProxy, error) {
 		defer mtx.Unlock()
 		mtx.Lock()
 		portIndex++
@@ -267,7 +267,7 @@ func (p *PeerToPeer) handlePackets(mode int, user User, room GameRoom) func(cont
 			udpPort += 1000
 		}
 
-		return client.NewGuestProxy(
+		return client2.NewGuestProxy(
 			net.JoinHostPort("127.0.0.1", fmt.Sprintf("%d", tcpPort)),
 			net.JoinHostPort("127.0.0.1", fmt.Sprintf("%d", udpPort)),
 		)
@@ -393,7 +393,7 @@ func (p *PeerToPeer) handlePackets(mode int, user User, room GameRoom) func(cont
 	}
 }
 
-func (p *PeerToPeer) addPeer(member signalserver.Member, room GameRoom, user User, guest *client.GuestProxy, isJoinNotRTCOffer bool) *client.Peer {
+func (p *PeerToPeer) addPeer(member signalserver.Member, room GameRoom, user User, guest *client2.GuestProxy, isJoinNotRTCOffer bool) *client2.Peer {
 	config := webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{
 			// {
@@ -412,7 +412,7 @@ func (p *PeerToPeer) addPeer(member signalserver.Member, room GameRoom, user Use
 		panic(err)
 	}
 
-	peer := &client.Peer{
+	peer := &client2.Peer{
 		ID:         member.ID,
 		Name:       member.Name,
 		Connection: peerConnection,
@@ -475,7 +475,7 @@ func (p *PeerToPeer) addPeer(member signalserver.Member, room GameRoom, user Use
 			slog.Debug("Opened WebRTC channel", "label", dc.Label(), "peer", member.ID)
 
 			ctx, cancel := context.WithCancel(context.TODO())
-			pipe := client.NewPipe(dc, guest)
+			pipe := client2.NewPipe(dc, guest)
 
 			switch dc.Label() {
 			case fmt.Sprintf("%s/tcp", room):
@@ -502,13 +502,13 @@ func (p *PeerToPeer) addPeer(member signalserver.Member, room GameRoom, user Use
 	return peer
 }
 
-func (p *PeerToPeer) createChannels(ctx context.Context, peer *client.Peer, guest *client.GuestProxy, room GameRoom) error {
+func (p *PeerToPeer) createChannels(ctx context.Context, peer *client2.Peer, guest *client2.GuestProxy, room GameRoom) error {
 	// UDP
 	dcUDP, err := peer.Connection.CreateDataChannel(fmt.Sprintf("%s/udp", room), nil)
 	if err != nil {
 		return fmt.Errorf("could not create data channel %q: %v", room, err)
 	}
-	pipeUDP := client.NewPipe(dcUDP, guest)
+	pipeUDP := client2.NewPipe(dcUDP, guest)
 
 	dcUDP.OnError(func(err error) {
 		slog.Warn("Data channel error", "error", err)
@@ -531,7 +531,7 @@ func (p *PeerToPeer) createChannels(ctx context.Context, peer *client.Peer, gues
 	if err != nil {
 		return fmt.Errorf("could not create data channel %q: %v", room, err)
 	}
-	pipeTCP := client.NewPipe(dcTCP, guest)
+	pipeTCP := client2.NewPipe(dcTCP, guest)
 
 	dcTCP.OnError(func(err error) {
 		slog.Warn("Data channel error", "error", err)

@@ -2,8 +2,8 @@ package backend
 
 import (
 	"connectrpc.com/connect"
-	"github.com/dimspell/gladiator/backend/proxy"
 	v1 "github.com/dimspell/gladiator/gen/multi/v1"
+	"github.com/dimspell/gladiator/internal/backend/proxy"
 	"github.com/dimspell/gladiator/model"
 	"github.com/stretchr/testify/assert"
 	"testing"

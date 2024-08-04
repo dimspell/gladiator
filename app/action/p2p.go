@@ -3,11 +3,11 @@ package action
 import (
 	"bufio"
 	"context"
+	proxy2 "github.com/dimspell/gladiator/internal/backend/proxy"
+	"github.com/dimspell/gladiator/internal/backend/proxy/client"
 	"log"
 	"os"
 
-	"github.com/dimspell/gladiator/backend/proxy"
-	"github.com/dimspell/gladiator/backend/proxy/client"
 	"github.com/google/uuid"
 	"github.com/urfave/cli/v3"
 )
@@ -37,7 +37,7 @@ func P2PCommand() *cli.Command {
 	cmd.Action = func(ctx context.Context, c *cli.Command) error {
 		id := uuid.New().String()[:6]
 
-		p2p := proxy.NewPeerToPeer("ws://localhost:5050")
+		p2p := proxy2.NewPeerToPeer("ws://localhost:5050")
 
 		// ch := make(chan string)
 		//
@@ -54,7 +54,7 @@ func P2PCommand() *cli.Command {
 			if _, err := p2p.Create("", id); err != nil {
 				return err
 			}
-			if err := p2p.HostGame("test", proxy.User(id)); err != nil {
+			if err := p2p.HostGame("test", proxy2.User(id)); err != nil {
 				return err
 			}
 		} else {
