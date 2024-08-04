@@ -149,7 +149,11 @@ func (c *Channel) Run() {
 }
 
 func (c *Channel) Broadcast(msg Message) {
-	payload, _ := cbor.Marshal(msg)
+	payload, err := cbor.Marshal(msg)
+	if err != nil {
+		log.Println("write:", err)
+		return
+	}
 	payload = append([]byte{byte(msg.Type)}, payload...)
 	c.Members.Range(func(ws *websocket.Conn) bool {
 		if err := ws.WriteMessage(websocket.TextMessage, payload); err != nil {
@@ -160,7 +164,11 @@ func (c *Channel) Broadcast(msg Message) {
 }
 
 func SendMessage(ws *websocket.Conn, msg Message) {
-	payload, _ := cbor.Marshal(msg)
+	payload, err := cbor.Marshal(msg)
+	if err != nil {
+		log.Println("write:", err)
+		return
+	}
 	payload = append([]byte{byte(msg.Type)}, payload...)
 	if err := ws.WriteMessage(websocket.TextMessage, payload); err != nil {
 		log.Println("write:", err)

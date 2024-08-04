@@ -13,13 +13,9 @@ import (
 type Peer struct {
 	ID   string
 	Name string
+	IP   string
 
-	IP string
-
-	Host   *HostListener
-	Guest  *GuestProxy
-	Proxer Proxer
-
+	Proxer     Proxer
 	Connection *webrtc.PeerConnection
 }
 

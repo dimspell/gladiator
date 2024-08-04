@@ -127,16 +127,9 @@ func (p *PeerToPeer) Create(localIPAddress string, hostUser string) (net.IP, err
 // HostGame connects to the game host and redirects the traffic to the P2P
 // network. The game host is expected to be running on the same machine.
 func (p *PeerToPeer) HostGame(gameRoom GameRoom, currentUser User) error {
-	ip := p.GetHostIP("")
-	host, err := client.ListenHost(ip.To4().String())
-	if err != nil {
-		return err
-	}
-	me := &client.Peer{
-		IP:   ip.String(),
-		Host: host,
-	}
-	go p.runWebRTC(ModeHost, User(currentUser), GameRoom(gameRoom), me)
+	// ip := p.GetHostIP("")
+
+	go p.runWebRTC(ModeHost, User(currentUser), GameRoom(gameRoom))
 	return nil
 }
 
@@ -147,19 +140,7 @@ func (p *PeerToPeer) Join(gameId string, hostUser string, currentPlayer string, 
 
 	// ip := p.IpRing.IP()
 	ip := net.IPv4(127, 0, 1, 2)
-
-	// guest, err := client.NewGuestProxyIP(net.IPv4(127, 0, 0, 1))
-	tcpAddr, udpAddr := net.JoinHostPort(ip.To4().String(), "6114"), net.JoinHostPort(ip.To4().String(), "6113")
-	guest, err := client.NewGuestProxy(tcpAddr, udpAddr)
-	if err != nil {
-		return nil, err
-	}
-
-	me := &client.Peer{
-		IP:    ip.String(),
-		Guest: guest,
-	}
-	go p.runWebRTC(ModeGuest, User(currentPlayer), GameRoom(gameId), me)
+	go p.runWebRTC(ModeGuest, User(currentPlayer), GameRoom(gameId))
 	return ip, nil
 }
 
@@ -179,7 +160,7 @@ func (p *PeerToPeer) Close() {
 	}
 }
 
-func (p *PeerToPeer) runWebRTC(mode int, user User, gameRoom GameRoom, me *client.Peer) {
+func (p *PeerToPeer) runWebRTC(mode int, user User, gameRoom GameRoom) {
 	if p.ws == nil {
 		panic("Not implemented")
 	}
@@ -187,7 +168,7 @@ func (p *PeerToPeer) runWebRTC(mode int, user User, gameRoom GameRoom, me *clien
 	signalMessages := make(chan []byte)
 	g, ctx := errgroup.WithContext(context.TODO())
 
-	handlePacket := p.handlePackets(mode, user, gameRoom, me)
+	handlePacket := p.handlePackets(mode, user, gameRoom)
 
 	g.Go(func() error {
 		resetTimer := func(t *time.Timer, d time.Duration) {
@@ -260,7 +241,7 @@ func (p *PeerToPeer) runWebRTC(mode int, user User, gameRoom GameRoom, me *clien
 	}
 }
 
-func (p *PeerToPeer) handlePackets(mode int, user User, room GameRoom, me *client.Peer) func(context.Context, []byte) error {
+func (p *PeerToPeer) handlePackets(mode int, user User, room GameRoom) func(context.Context, []byte) error {
 	var (
 		portIndex int
 		mtx       sync.Mutex
@@ -280,13 +261,13 @@ func (p *PeerToPeer) handlePackets(mode int, user User, room GameRoom, me *clien
 		}
 
 		if mode == ModeGuest {
-			return client.NewGuestProxy(
+			return client.ListenGuest(
 				net.JoinHostPort("127.0.0.1", fmt.Sprintf("%d", tcpPort)),
 				net.JoinHostPort("127.0.0.1", fmt.Sprintf("%d", udpPort)),
 			)
 		}
 		if mode == ModeHost {
-			return client.ListenHost("127.0.0.1")
+			return client.DialHost("127.0.0.1")
 		}
 
 		panic("Not implemented")
@@ -435,9 +416,7 @@ func (p *PeerToPeer) addPeer(member signalserver.Member, room GameRoom, user Use
 		ID:         member.ID,
 		Name:       member.Name,
 		Connection: peerConnection,
-		// Guest:      guest,
-		Proxer: guest,
-		// IP:         guest.Addr(),
+		Proxer:     guest,
 	}
 	p.Peers.Set(member.ID, peer)
 

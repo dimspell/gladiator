@@ -21,10 +21,10 @@ type GuestProxy struct {
 
 func NewGuestProxyIP(ip net.IP) (*GuestProxy, error) {
 	tcpAddr, udpAddr := net.JoinHostPort(ip.To4().String(), "6114"), net.JoinHostPort(ip.To4().String(), "6113")
-	return NewGuestProxy(tcpAddr, udpAddr)
+	return ListenGuest(tcpAddr, udpAddr)
 }
 
-func NewGuestProxy(tcpAddr, udpAddr string) (*GuestProxy, error) {
+func ListenGuest(tcpAddr, udpAddr string) (*GuestProxy, error) {
 	tcpListener, err := net.Listen("tcp", tcpAddr)
 	if err != nil {
 		return nil, err
