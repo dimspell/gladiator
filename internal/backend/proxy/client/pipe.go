@@ -8,6 +8,7 @@ import (
 	"log/slog"
 
 	"github.com/pion/webrtc/v4"
+	"golang.org/x/sync/errgroup"
 )
 
 type Peer struct {
@@ -38,55 +39,63 @@ func NewPipe(dc *webrtc.DataChannel, room string, proxy Proxer) *Pipe {
 
 	ctx, cancel := context.WithCancel(context.TODO())
 
-	switch dc.Label() {
-	case fmt.Sprintf("%s/tcp", room):
-		go func() {
-			if err := proxy.RunTCP(ctx, pipe); err != nil {
-				panic(err)
-			}
-		}()
-	case fmt.Sprintf("%s/udp", room):
-		go func() {
-			if err := proxy.RunUDP(ctx, pipe); err != nil {
-				panic(err)
-			}
-		}()
-	}
+	isTCP := dc.Label() == fmt.Sprintf("%s/tcp", room)
+	isUDP := dc.Label() == fmt.Sprintf("%s/udp", room)
 
-	dc.OnClose(func() {
-		pipe.Close()
-		cancel()
+	g, ctx := errgroup.WithContext(ctx)
+	g.Go(func() error {
+		if isTCP {
+			return proxy.RunTCP(ctx, pipe)
+		}
+		if isUDP {
+			return proxy.RunUDP(ctx, pipe)
+		}
+		return nil
 	})
-
-	go func() {
+	g.Go(func() error {
 		for {
 			select {
 			case <-ctx.Done():
-				return
+				return ctx.Err()
 			case <-pipe.done:
-				return
+				return nil
 			case msg := <-pipe.dcData:
 				slog.Debug("Pipe.OnMessage.select", "data", msg.Data, "channel", pipe.dc.Label())
 
 				if pipe.dcData == nil {
-					return
+					return nil
 				}
 
-				if dc.Label() == fmt.Sprintf("%s/tcp", room) {
-					if err := proxy.WriteTCPMessage(msg.Data); err != nil {
+				if isUDP {
+					if err := proxy.WriteUDPMessage(msg.Data); err != nil {
 						slog.Warn("Failed to send data to peer", "error", err)
 					}
 					continue
 				}
-				if dc.Label() == fmt.Sprintf("%s/udp", room) {
-					if err := proxy.WriteUDPMessage(msg.Data); err != nil {
+				if isTCP {
+					if err := proxy.WriteTCPMessage(msg.Data); err != nil {
 						slog.Warn("Failed to send data to peer", "error", err)
 					}
 					continue
 				}
 			}
 		}
+	})
+	go func() {
+		if err := g.Wait(); err != nil {
+			slog.Warn("Error running proxy", "error", err)
+		}
 	}()
+
+	dc.OnError(func(err error) {
+		slog.Warn("Data channel error", "error", err)
+	})
+	dc.OnClose(func() {
+		if err := pipe.Close(); err != nil {
+			slog.Error("Error closing pipe", "error", err)
+		}
+		cancel()
+	})
 
 	dc.OnMessage(func(msg webrtc.DataChannelMessage) {
 		slog.Debug("Pipe.OnMessage.callback", "data", msg.Data, "channel", pipe.dc.Label())
@@ -95,10 +104,6 @@ func NewPipe(dc *webrtc.DataChannel, room string, proxy Proxer) *Pipe {
 			return
 		}
 		pipe.dcData <- msg
-	})
-
-	dc.OnError(func(err error) {
-		slog.Warn("Data channel error", "error", err)
 	})
 
 	return pipe
