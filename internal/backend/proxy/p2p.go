@@ -113,11 +113,11 @@ func (p *PeerToPeer) sendSignal(message []byte) (err error) {
 	return
 }
 
-func (p *PeerToPeer) Create(localIPAddress string, hostUser string) (net.IP, error) {
+func (p *PeerToPeer) Create(params CreateParams) (net.IP, error) {
 	if p.ws != nil {
 		panic("Not implemented")
 	}
-	if err := p.dialSignalServer(hostUser, todoRoomNameDefault); err != nil {
+	if err := p.dialSignalServer(params.HostUser, todoRoomNameDefault); err != nil {
 		return nil, err
 	}
 
@@ -126,25 +126,25 @@ func (p *PeerToPeer) Create(localIPAddress string, hostUser string) (net.IP, err
 
 // HostGame connects to the game host and redirects the traffic to the P2P
 // network. The game host is expected to be running on the same machine.
-func (p *PeerToPeer) HostGame(gameRoom GameRoom, currentUser User) error {
+func (p *PeerToPeer) Host(params HostParams) error {
 	// ip := p.GetHostIP("")
 
-	go p.runWebRTC(ModeHost, User(currentUser), GameRoom(gameRoom))
+	go p.runWebRTC(ModeHost, params.User, params.GameRoom)
 	return nil
 }
 
-func (p *PeerToPeer) Join(gameId string, hostUser string, currentPlayer string, ipAddress string) (net.IP, error) {
-	if err := p.dialSignalServer(hostUser, GameRoom(gameId).String()); err != nil {
+func (p *PeerToPeer) Join(params JoinParams) (net.IP, error) {
+	if err := p.dialSignalServer(params.CurrentUser, params.GameName); err != nil {
 		return nil, err
 	}
 
 	// ip := p.IpRing.IP()
 	ip := net.IPv4(127, 0, 1, 2)
-	go p.runWebRTC(ModeGuest, User(currentPlayer), GameRoom(gameId))
+	go p.runWebRTC(ModeGuest, params.CurrentUser, params.GameName)
 	return ip, nil
 }
 
-func (p *PeerToPeer) Exchange(gameId string, userId string, ipAddress string) (net.IP, error) {
+func (p *PeerToPeer) Exchange(params ExchangeParams) (net.IP, error) {
 	// TODO implement me
 	panic("implement me")
 }
@@ -160,7 +160,7 @@ func (p *PeerToPeer) Close() {
 	}
 }
 
-func (p *PeerToPeer) runWebRTC(mode int, user User, gameRoom GameRoom) {
+func (p *PeerToPeer) runWebRTC(mode int, user string, gameRoom string) {
 	if p.ws == nil {
 		panic("Not implemented")
 	}
@@ -181,14 +181,6 @@ func (p *PeerToPeer) runWebRTC(mode int, user User, gameRoom GameRoom) {
 			t.Reset(d)
 		}
 		defer func() {
-			if mode == ModeHost {
-				// TODO: Close the connection to the game server process
-				// if mode == ModeHost {
-				//	me.Host.Close()
-				// } else {
-				//	me.Proxy.Close()
-				// }
-			}
 			close(signalMessages)
 		}()
 
@@ -241,7 +233,7 @@ func (p *PeerToPeer) runWebRTC(mode int, user User, gameRoom GameRoom) {
 	}
 }
 
-func (p *PeerToPeer) handlePackets(mode int, user User, room GameRoom) func(context.Context, []byte) error {
+func (p *PeerToPeer) handlePackets(mode int, user string, room string) func(context.Context, []byte) error {
 	var (
 		portIndex int
 		mtx       sync.Mutex
@@ -280,7 +272,7 @@ func (p *PeerToPeer) handlePackets(mode int, user User, room GameRoom) func(cont
 				slog.Debug("JOIN", "id", m.Content.ID)
 
 				// Validate the message
-				if m.Content.ID == user.String() {
+				if m.Content.ID == user {
 					// return fmt.Errorf("peer %q is the same as the host, ignoring join", m.Content.ID)
 					return nil
 				}
@@ -314,7 +306,7 @@ func (p *PeerToPeer) handlePackets(mode int, user User, room GameRoom) func(cont
 				if !ok {
 					return fmt.Errorf("could not find peer %q", m.From)
 				}
-				if peer.ID == user.String() {
+				if peer.ID == user {
 					return fmt.Errorf("peer %q is the same as the host, ignoring leave", m.From)
 				}
 
@@ -349,7 +341,7 @@ func (p *PeerToPeer) handlePackets(mode int, user User, room GameRoom) func(cont
 				}
 
 				response := &signalserver.Message{
-					From:    user.String(),
+					From:    user,
 					To:      m.From,
 					Type:    signalserver.RTCAnswer,
 					Content: signalserver.Offer{Name: peer.Name, Offer: answer},
@@ -393,7 +385,7 @@ func (p *PeerToPeer) handlePackets(mode int, user User, room GameRoom) func(cont
 	}
 }
 
-func (p *PeerToPeer) addPeer(member signalserver.Member, room GameRoom, user User, guest client.Proxer, isJoinNotRTCOffer bool) *client.Peer {
+func (p *PeerToPeer) addPeer(member signalserver.Member, room string, user string, guest client.Proxer, isJoinNotRTCOffer bool) *client.Peer {
 	config := webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{
 			// {
@@ -429,7 +421,7 @@ func (p *PeerToPeer) addPeer(member signalserver.Member, room GameRoom, user Use
 			return
 		}
 		reply := &signalserver.Message{
-			From:    user.String(),
+			From:    user,
 			To:      member.ID,
 			Type:    signalserver.RTCICECandidate,
 			Content: candidate.ToJSON(),
@@ -456,7 +448,7 @@ func (p *PeerToPeer) addPeer(member signalserver.Member, room GameRoom, user Use
 		}
 
 		reply := &signalserver.Message{
-			From: user.String(),
+			From: user,
 			To:   member.ID,
 			Type: signalserver.RTCOffer,
 			Content: signalserver.Offer{
@@ -472,20 +464,20 @@ func (p *PeerToPeer) addPeer(member signalserver.Member, room GameRoom, user Use
 	peerConnection.OnDataChannel(func(dc *webrtc.DataChannel) {
 		dc.OnOpen(func() {
 			slog.Debug("Opened WebRTC channel", "label", dc.Label(), "peer", member.ID)
-			client.NewPipe(dc, room.String(), guest)
+			client.NewPipe(dc, room, guest)
 		})
 	})
 
 	return peer
 }
 
-func (p *PeerToPeer) createChannels(peer *client.Peer, other client.Proxer, room GameRoom) error {
+func (p *PeerToPeer) createChannels(peer *client.Peer, other client.Proxer, room string) error {
 	// UDP
 	dcUDP, err := peer.Connection.CreateDataChannel(fmt.Sprintf("%s/udp", room), nil)
 	if err != nil {
 		return fmt.Errorf("could not create data channel %q: %v", room, err)
 	}
-	client.NewPipe(dcUDP, room.String(), other)
+	client.NewPipe(dcUDP, room, other)
 
 	// dcUDP.OnClose(func() {
 	//	log.Printf("dataChannel for %s has closed", peer.ID)
@@ -498,7 +490,7 @@ func (p *PeerToPeer) createChannels(peer *client.Peer, other client.Proxer, room
 	if err != nil {
 		return fmt.Errorf("could not create data channel %q: %v", room, err)
 	}
-	client.NewPipe(dcTCP, room.String(), other)
+	client.NewPipe(dcTCP, room, other)
 
 	// dcTCP.OnClose(func() {
 	//	log.Printf("dataChannel for %s has closed", peer.ID)

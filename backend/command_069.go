@@ -9,6 +9,7 @@ import (
 	"connectrpc.com/connect"
 	"github.com/dimspell/gladiator/backend/packet"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
+	"github.com/dimspell/gladiator/internal/backend/proxy"
 	"github.com/dimspell/gladiator/model"
 )
 
@@ -40,12 +41,12 @@ func (b *Backend) HandleSelectGame(session *model.Session, req SelectGameRequest
 		return nil
 	}
 
-	hostIP, err := b.Proxy.Join(
-		respGame.Msg.GetGame().GetName(),
-		session.Username,
-		session.Username,
-		respGame.Msg.GetGame().HostIpAddress,
-	)
+	hostIP, err := b.Proxy.Join(proxy.JoinParams{
+		HostUser:    session.Username,
+		CurrentUser: session.Username,
+		GameName:    respGame.Msg.GetGame().GetName(),
+		IPAddress:   respGame.Msg.GetGame().HostIpAddress,
+	})
 	if err != nil {
 		return err
 	}
@@ -68,11 +69,12 @@ func (b *Backend) HandleSelectGame(session *model.Session, req SelectGameRequest
 			continue
 		}
 
-		proxyIP, err := b.Proxy.Exchange(
-			respGame.Msg.GetGame().String(),
-			player.Username,
-			player.IpAddress,
-		)
+		proxyIP, err := b.Proxy.Exchange(proxy.ExchangeParams{
+			GameId:    respGame.Msg.GetGame().String(),
+			UserId:    player.Username,
+			IPAddress: player.IpAddress,
+		})
+
 		if err != nil {
 			return err
 		}

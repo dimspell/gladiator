@@ -4,8 +4,9 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
-	"github.com/dimspell/gladiator/internal/backend/proxy"
 	"log/slog"
+
+	"github.com/dimspell/gladiator/internal/backend/proxy"
 
 	"connectrpc.com/connect"
 	"github.com/dimspell/gladiator/backend/packet"
@@ -28,8 +29,10 @@ func (b *Backend) HandleCreateGame(session *model.Session, req CreateGameRequest
 
 	switch data.State {
 	case uint32(model.GameStateNone):
-		// b.Proxy.Close()
-		hostIPAddress, err := b.Proxy.Create(session.LocalIpAddress, session.Username)
+		hostIPAddress, err := b.Proxy.Create(proxy.CreateParams{
+			LocalIP:  session.LocalIpAddress,
+			HostUser: session.Username,
+		})
 		if err != nil {
 			return fmt.Errorf("packet-28: incorrect host address %w", err)
 		}
@@ -65,7 +68,10 @@ func (b *Backend) HandleCreateGame(session *model.Session, req CreateGameRequest
 			return err
 		}
 
-		if err := b.Proxy.HostGame(proxy.GameRoom(respGame.Msg.Game.Name), proxy.User(session.Username)); err != nil {
+		if err := b.Proxy.Host(proxy.HostParams{
+			GameRoom: respGame.Msg.Game.Name,
+			User:     session.Username,
+		}); err != nil {
 			return err
 		}
 		binary.LittleEndian.PutUint32(response[0:4], uint32(model.GameStateStarted))

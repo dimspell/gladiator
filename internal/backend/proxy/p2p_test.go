@@ -53,7 +53,7 @@ func TestPeerToPeer(t *testing.T) {
 			t.Error(err)
 			return
 		}
-		if err := a.HostGame(GameRoom(roomName), User("user1")); err != nil {
+		if err := a.Host(GameRoom(roomName), User("user1")); err != nil {
 			t.Error(err)
 			return
 		}
