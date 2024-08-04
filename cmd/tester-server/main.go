@@ -49,9 +49,7 @@ func (p *Proxy) listenUDP(ctx context.Context, connHost, connPort string) {
 			break
 		}
 
-		fmt.Println("Accepted UDP connection", addr.String())
-
-		fmt.Println(connPort, addr.String(), string(buf[:n]), buf[:n])
+		fmt.Println("Accepted UDP connection", connPort, addr.String(), buf[:n])
 
 		if buf[0] == 26 {
 			{
@@ -79,7 +77,7 @@ func (p *Proxy) listenTCP(ctx context.Context, connHost, connPort string) {
 			buf := make([]byte, 1024)
 			n, err := conn.Read(buf)
 			if err != nil {
-				fmt.Printf("error reading (%s): %s\n", connPort, err)
+				log.Println("TCP: error reading", conn.LocalAddr(), conn.RemoteAddr(), err)
 				return
 			}
 			log.Println(connPort, string(buf[:n]), n, buf[:n])

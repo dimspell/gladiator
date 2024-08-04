@@ -27,6 +27,7 @@ func ListenHost(gameServerIP string) (*HostListener, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not connect to game server on 6114: %s", err.Error())
 	}
+	log.Println("Host: Connected TCP", tcpConn.LocalAddr().String(), tcpConn.RemoteAddr().String())
 
 	// udp:6113
 	udpAddr, err := net.ResolveUDPAddr("udp", net.JoinHostPort(gameServerIP, "6113"))
@@ -37,6 +38,7 @@ func ListenHost(gameServerIP string) (*HostListener, error) {
 	if err != nil {
 		log.Fatal(err)
 	}
+	log.Println("Host: Connected UDP", udpConn.LocalAddr().String(), udpConn.RemoteAddr().String())
 
 	return &HostListener{
 		tcpConn: tcpConn,
@@ -48,6 +50,8 @@ func ListenHost(gameServerIP string) (*HostListener, error) {
 type Proxer interface {
 	RunUDP(ctx context.Context, rw io.ReadWriteCloser) error
 	RunTCP(ctx context.Context, rw io.ReadWriteCloser) error
+	WriteUDPMessage(msg []byte) error
+	WriteTCPMessage(msg []byte) error
 }
 
 func (d *HostListener) RunUDP(ctx context.Context, rw io.ReadWriteCloser) error {

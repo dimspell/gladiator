@@ -2,7 +2,6 @@ package client
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"log"
 	"log/slog"
@@ -15,6 +14,9 @@ import (
 type GuestProxy struct {
 	connTCP net.Listener
 	connUDP *net.UDPConn
+
+	writeUDP chan []byte
+	writeTCP chan []byte
 }
 
 func NewGuestProxyIP(ip net.IP) (*GuestProxy, error) {
@@ -27,6 +29,7 @@ func NewGuestProxy(tcpAddr, udpAddr string) (*GuestProxy, error) {
 	if err != nil {
 		return nil, err
 	}
+	log.Println("Guest: Listening TCP", tcpListener.Addr().String())
 
 	srcAddr, err := net.ResolveUDPAddr("udp", udpAddr)
 	if err != nil {
@@ -36,38 +39,18 @@ func NewGuestProxy(tcpAddr, udpAddr string) (*GuestProxy, error) {
 	if err != nil {
 		return nil, err
 	}
+	log.Println("Guest: Listening UDP", srcConn.LocalAddr(), srcConn.RemoteAddr())
 
-	p := GuestProxy{}
+	p := GuestProxy{
+		writeUDP: make(chan []byte),
+		writeTCP: make(chan []byte),
+	}
 	p.connTCP = tcpListener
 	p.connUDP = srcConn
 	return &p, nil
 }
 
-func (p *GuestProxy) Addr() string {
-	return fmt.Sprintf("tcp=%s udp=%s", p.connTCP.Addr().String(), p.connUDP.LocalAddr().String())
-}
-
 func (p *GuestProxy) RunTCP(ctx context.Context, rw io.ReadWriteCloser) error {
-	reader := func(conn net.Conn) {
-		defer func() {
-			slog.Warn("Closing connection to client", "protocol", "tcp")
-			conn.Close()
-			rw.Close()
-		}()
-
-		go func() {
-			if _, err := io.Copy(conn, rw); err != nil {
-				slog.Warn("Error copying from client to server", "error", err.Error(), "protocol", "tcp")
-			}
-			conn.Close()
-		}()
-
-		_, err := io.Copy(rw, conn)
-		if err != nil {
-			slog.Warn("Error copying from server to client", "error", err.Error(), "protocol", "tcp")
-		}
-	}
-
 	defer p.connTCP.Close()
 	for {
 		if ctx.Err() != nil {
@@ -80,13 +63,55 @@ func (p *GuestProxy) RunTCP(ctx context.Context, rw io.ReadWriteCloser) error {
 			continue
 		}
 		slog.Debug("Accepted connection on port", "port", conn.RemoteAddr(), "protocol", "tcp")
-		go reader(conn)
+		go p.readerTCP(ctx, conn, rw)
+	}
+}
+
+func (p *GuestProxy) readerTCP(ctx context.Context, conn net.Conn, rw io.ReadWriteCloser) {
+	defer func() {
+		slog.Warn("Closing connection to client", "protocol", "tcp")
+		conn.Close()
+		rw.Close()
+	}()
+
+	g, ctx := errgroup.WithContext(ctx)
+	g.Go(func() error {
+		if _, err := io.Copy(conn, rw); err != nil {
+			slog.Warn("Error copying from client to server", "error", err, "protocol", "tcp")
+			return err
+		}
+		return nil
+	})
+	g.Go(func() error {
+		_, err := io.Copy(rw, conn)
+		if err != nil {
+			slog.Warn("Error copying from server to client", "error", err, "protocol", "tcp")
+		}
+		return err
+	})
+	g.Go(func() error {
+		for {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case msg := <-p.writeTCP:
+				if _, err := conn.Write(msg); err != nil {
+					slog.Warn("Error writing to TCP", "error", err, "protocol", "tcp")
+					return err
+				}
+			}
+		}
+	})
+
+	if err := g.Wait(); err != nil {
+		slog.Error("Failed proxying TCP", "error", err)
 	}
 }
 
 func (p *GuestProxy) RunUDP(ctx context.Context, rw io.ReadWriteCloser) error {
 	defer func() {
 		log.Println(p.connUDP.Close())
+		close(p.writeUDP)
 	}()
 
 	var (
@@ -121,6 +146,22 @@ func (p *GuestProxy) RunUDP(ctx context.Context, rw io.ReadWriteCloser) error {
 	})
 	g.Go(func() error {
 		for {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case msg := <-p.writeUDP:
+				if clientDestAddr != nil {
+					continue
+				}
+				if _, err := p.connUDP.WriteToUDP(msg, clientDestAddr); err != nil {
+					slog.Warn("Error writing to UDP", "error", err, "protocol", "udp")
+					return err
+				}
+			}
+		}
+	})
+	g.Go(func() error {
+		for {
 			if ctx.Err() != nil {
 				return ctx.Err()
 			}
@@ -142,4 +183,20 @@ func (p *GuestProxy) RunUDP(ctx context.Context, rw io.ReadWriteCloser) error {
 	})
 
 	return g.Wait()
+}
+
+func (p *GuestProxy) WriteUDPMessage(msg []byte) error {
+	if p.connUDP == nil {
+		return io.EOF
+	}
+	p.writeUDP <- msg
+	return nil
+}
+
+func (p *GuestProxy) WriteTCPMessage(msg []byte) error {
+	if p.connTCP == nil {
+		return io.EOF
+	}
+	p.writeTCP <- msg
+	return nil
 }

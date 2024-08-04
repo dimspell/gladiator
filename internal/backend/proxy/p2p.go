@@ -4,13 +4,14 @@ import (
 	"container/ring"
 	"context"
 	"fmt"
-	"github.com/dimspell/gladiator/internal/backend/proxy/client"
 	"log"
 	"log/slog"
 	"net"
 	"net/url"
 	"sync"
 	"time"
+
+	"github.com/dimspell/gladiator/internal/backend/proxy/client"
 
 	"github.com/dimspell/gladiator/console/signalserver"
 	"github.com/fxamacker/cbor/v2"
@@ -32,7 +33,7 @@ var _ Proxy = (*PeerToPeer)(nil)
 
 type PeerToPeer struct {
 	SignalServerURL string
-	IpRing          *IpRing
+	// IpRing          *IpRing
 
 	ws    *websocket.Conn
 	Peers *client.Peers
@@ -41,12 +42,13 @@ type PeerToPeer struct {
 func NewPeerToPeer(signalServerURL string) *PeerToPeer {
 	return &PeerToPeer{
 		SignalServerURL: signalServerURL,
-		IpRing:          NewIpRing(),
-		Peers:           client.NewPeers(),
+		// IpRing:          NewIpRing(),
+		Peers: client.NewPeers(),
 	}
 }
 
 func (p *PeerToPeer) GetHostIP(hostIpAddress string) net.IP {
+	// TODO: Not true, but good enough for now. Joining user will need to have different IP address.
 	return net.IPv4(127, 0, 0, 1)
 }
 
@@ -143,11 +145,16 @@ func (p *PeerToPeer) Join(gameId string, hostUser string, currentPlayer string, 
 		return nil, err
 	}
 
-	ip := p.IpRing.IP()
-	guest, err := client.NewGuestProxyIP(net.IPv4(127, 0, 0, 1))
+	// ip := p.IpRing.IP()
+	ip := net.IPv4(127, 0, 1, 2)
+
+	// guest, err := client.NewGuestProxyIP(net.IPv4(127, 0, 0, 1))
+	tcpAddr, udpAddr := net.JoinHostPort(ip.To4().String(), "6114"), net.JoinHostPort(ip.To4().String(), "6113")
+	guest, err := client.NewGuestProxy(tcpAddr, udpAddr)
 	if err != nil {
 		return nil, err
 	}
+
 	me := &client.Peer{
 		IP:    ip.String(),
 		Guest: guest,
@@ -195,11 +202,11 @@ func (p *PeerToPeer) runWebRTC(mode int, user User, gameRoom GameRoom, me *clien
 		defer func() {
 			if mode == ModeHost {
 				// TODO: Close the connection to the game server process
-				//if mode == ModeHost {
+				// if mode == ModeHost {
 				//	me.Host.Close()
-				//} else {
+				// } else {
 				//	me.Proxy.Close()
-				//}
+				// }
 			}
 			close(signalMessages)
 		}()
@@ -428,7 +435,7 @@ func (p *PeerToPeer) addPeer(member signalserver.Member, room GameRoom, user Use
 		ID:         member.ID,
 		Name:       member.Name,
 		Connection: peerConnection,
-		//Guest:      guest,
+		// Guest:      guest,
 		Proxer: guest,
 		// IP:         guest.Addr(),
 	}
@@ -501,11 +508,11 @@ func (p *PeerToPeer) createChannels(peer *client.Peer, other client.Proxer, room
 	}
 	client.NewPipe(dcUDP, room.String(), other)
 
-	//dcUDP.OnClose(func() {
+	// dcUDP.OnClose(func() {
 	//	log.Printf("dataChannel for %s has closed", peer.ID)
 	//	p.Peers.Delete(peer.ID)
 	//	pipeUDP.Close()
-	//})
+	// })
 
 	// TCP
 	dcTCP, err := peer.Connection.CreateDataChannel(fmt.Sprintf("%s/tcp", room), nil)
@@ -514,11 +521,11 @@ func (p *PeerToPeer) createChannels(peer *client.Peer, other client.Proxer, room
 	}
 	client.NewPipe(dcTCP, room.String(), other)
 
-	//dcTCP.OnClose(func() {
+	// dcTCP.OnClose(func() {
 	//	log.Printf("dataChannel for %s has closed", peer.ID)
 	//	p.Peers.Delete(peer.ID)
 	//	pipeTCP.Close()
-	//})
+	// })
 
 	return nil
 }

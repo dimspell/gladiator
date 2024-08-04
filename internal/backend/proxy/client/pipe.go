@@ -45,7 +45,7 @@ func NewPipe(dc *webrtc.DataChannel, room string, proxy Proxer) *Pipe {
 	switch dc.Label() {
 	case fmt.Sprintf("%s/tcp", room):
 		go func() {
-			if err := proxy.RunUDP(ctx, pipe); err != nil {
+			if err := proxy.RunTCP(ctx, pipe); err != nil {
 				panic(err)
 			}
 		}()
@@ -65,22 +65,35 @@ func NewPipe(dc *webrtc.DataChannel, room string, proxy Proxer) *Pipe {
 	go func() {
 		for {
 			select {
+			case <-ctx.Done():
+				return
 			case <-pipe.done:
 				return
 			case msg := <-pipe.dcData:
+				slog.Debug("Pipe.OnMessage.select", "data", msg.Data, "channel", pipe.dc.Label())
+
 				if pipe.dcData == nil {
 					return
 				}
-				log.Println("channel", pipe.dc.Label(), "msg", msg.Data)
-				// guest.connUDP.Write(msg.Data)
-				// log.Println("Pipe.OnMessage", msg.Data, pipe.dc.Label())
-				// case guest.
+
+				if dc.Label() == fmt.Sprintf("%s/tcp", room) {
+					if err := proxy.WriteTCPMessage(msg.Data); err != nil {
+						slog.Warn("Failed to send data to peer", "error", err)
+					}
+					continue
+				}
+				if dc.Label() == fmt.Sprintf("%s/udp", room) {
+					if err := proxy.WriteUDPMessage(msg.Data); err != nil {
+						slog.Warn("Failed to send data to peer", "error", err)
+					}
+					continue
+				}
 			}
 		}
 	}()
 
 	dc.OnMessage(func(msg webrtc.DataChannelMessage) {
-		log.Println("Pipe.OnMessage", msg.Data, pipe.dc.Label())
+		slog.Debug("Pipe.OnMessage.callback", "data", msg.Data, "channel", pipe.dc.Label())
 
 		if pipe.dcData == nil {
 			return
@@ -98,6 +111,7 @@ func NewPipe(dc *webrtc.DataChannel, room string, proxy Proxer) *Pipe {
 // Read from the DC channel
 func (pipe *Pipe) Read(p []byte) (n int, err error) {
 	if pipe.dcData == nil {
+		slog.Warn("DC channel closed", "channel", pipe.dc.Label())
 		return 0, io.EOF
 	}
 
@@ -108,6 +122,7 @@ func (pipe *Pipe) Read(p []byte) (n int, err error) {
 			log.Println("Pipe.Read", (msg.Data), pipe.dc.Label())
 			return 0, io.EOF
 		}
+		log.Println("Pipe.Read", (msg.Data), len(msg.Data), pipe.dc.Label())
 
 		copy(p, msg.Data)
 		return len(msg.Data), nil
