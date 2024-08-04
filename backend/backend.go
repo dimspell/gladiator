@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	proxy2 "github.com/dimspell/gladiator/internal/backend/proxy"
 	"io"
 	"log/slog"
 	"math"
@@ -14,6 +13,7 @@ import (
 	"time"
 
 	"github.com/dimspell/gladiator/gen/multi/v1/multiv1connect"
+	"github.com/dimspell/gladiator/internal/backend/proxy"
 	"github.com/dimspell/gladiator/model"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -27,7 +27,7 @@ type Backend struct {
 	PacketLogger   *slog.Logger
 	SessionCounter uint64
 
-	Proxy     proxy2.Proxy
+	Proxy     proxy.Proxy
 	EventChan chan uint8
 	listener  net.Listener
 
@@ -64,7 +64,7 @@ func NewBackend(backendAddr, consoleAddr, myIPAddress string) *Backend {
 		Addr:        backendAddr,
 		MyIPAddress: myIPAddress,
 		Sessions:    make(map[string]*model.Session),
-		Proxy:       proxy2.NewLAN(),
+		Proxy:       proxy.NewLAN(),
 
 		characterClient: multiv1connect.NewCharacterServiceClient(httpClient, consoleUri),
 		gameClient:      multiv1connect.NewGameServiceClient(httpClient, consoleUri),
