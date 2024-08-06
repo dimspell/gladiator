@@ -12,9 +12,12 @@ import (
 
 	"github.com/dimspell/gladiator/console/signalserver"
 	"github.com/lmittmann/tint"
+	"go.uber.org/goleak"
 )
 
 func TestPeerToPeer(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	// slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug, AddSource: true})))
 	slog.SetDefault(slog.New(
 		tint.NewHandler(

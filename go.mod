@@ -25,6 +25,7 @@ require (
 	github.com/samber/slog-chi v1.11.0
 	github.com/stretchr/testify v1.9.0
 	github.com/urfave/cli/v3 v3.0.0-alpha9
+	go.uber.org/goleak v1.3.0
 	golang.org/x/crypto v0.24.0
 	golang.org/x/net v0.26.0
 	golang.org/x/sync v0.7.0
