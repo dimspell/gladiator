@@ -62,7 +62,7 @@ func (h *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.Join(roomName).Members.Set(userID, conn)
+	h.Join(r.Context(), roomName).Members.Set(userID, conn)
 	defer h.Leave(roomName, userID)
 
 	for {
@@ -87,19 +87,19 @@ func (h *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *Server) Join(channelName string) *Channel {
+func (h *Server) Join(ctx context.Context, channelName string) *Channel {
+	if existing, ok := h.Get(channelName); ok {
+		return existing
+	}
+
 	c := &Channel{
 		Name:     channelName,
 		Members:  &Members{ws: make(map[string]*websocket.Conn)},
 		Messages: make(chan Message),
 	}
-	if existing, ok := h.Get(channelName); !ok {
-		go c.Run()
-		h.Set(channelName, c)
-		return c
-	} else {
-		return existing
-	}
+	h.Set(channelName, c)
+	go c.Run()
+	return c
 }
 
 func (h *Server) Leave(channelName string, userID string) {

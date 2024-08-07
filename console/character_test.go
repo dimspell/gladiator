@@ -10,9 +10,12 @@ import (
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/model"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
 )
 
-func setupDatabase() *database.SQLite {
+func setupDatabase(t testing.TB) *database.SQLite {
+	t.Helper()
+
 	db, err := database.NewMemory()
 	if err != nil {
 		panic(err)
@@ -20,13 +23,22 @@ func setupDatabase() *database.SQLite {
 	if err := db.Ping(); err != nil {
 		panic(err)
 	}
+
+	t.Cleanup(func() {
+		if db != nil {
+			_ = db.Close()
+		}
+	})
+
 	return db
 }
 
 func TestCharacterServiceServer_ListCharacters(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	t.Run("No user", func(t *testing.T) {
 		// Arrange
-		db := setupDatabase()
+		db := setupDatabase(t)
 		defer db.Close()
 
 		// Act
@@ -47,7 +59,7 @@ func TestCharacterServiceServer_ListCharacters(t *testing.T) {
 
 	t.Run("No characters", func(t *testing.T) {
 		// Arrange
-		db := setupDatabase()
+		db := setupDatabase(t)
 		defer db.Close()
 
 		if _, err := db.Writer.Exec("INSERT INTO users (id, username, password) VALUES (15, 'test', '<PASSWORD>')"); err != nil {
@@ -70,7 +82,7 @@ func TestCharacterServiceServer_ListCharacters(t *testing.T) {
 
 	t.Run("Two characters", func(t *testing.T) {
 		// Arrange
-		db := setupDatabase()
+		db := setupDatabase(t)
 		defer db.Close()
 
 		if _, err := db.Writer.Exec("INSERT INTO users (id, username, password) VALUES (10, 'test', '<PASSWORD>')"); err != nil {

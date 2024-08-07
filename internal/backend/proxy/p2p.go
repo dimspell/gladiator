@@ -2,7 +2,6 @@ package proxy
 
 import (
 	"container/ring"
-	"context"
 	"fmt"
 	"log"
 	"log/slog"
@@ -17,11 +16,7 @@ import (
 	"github.com/fxamacker/cbor/v2"
 	"github.com/pion/webrtc/v4"
 	"golang.org/x/net/websocket"
-	"golang.org/x/sync/errgroup"
 )
-
-// TODO: Remove me and refactor me.
-const todoRoomNameDefault = "test"
 
 const (
 	_ = iota
@@ -33,17 +28,19 @@ var _ Proxy = (*PeerToPeer)(nil)
 
 type PeerToPeer struct {
 	SignalServerURL string
-	// IpRing          *IpRing
+	IpRing          *IpRing
 
-	ws    *websocket.Conn
 	Peers *client.Peers
+
+	ws *websocket.Conn
+	// done chan struct{}
 }
 
 func NewPeerToPeer(signalServerURL string) *PeerToPeer {
 	return &PeerToPeer{
 		SignalServerURL: signalServerURL,
 		Peers:           client.NewPeers(),
-		// IpRing:          NewIpRing(),
+		IpRing:          NewIpRing(),
 	}
 }
 
@@ -56,7 +53,7 @@ func (p *PeerToPeer) Create(params CreateParams) (net.IP, error) {
 	if p.ws != nil {
 		return nil, fmt.Errorf("already connected to the signal server")
 	}
-	if err := p.dialSignalServer(params.HostUserID, todoRoomNameDefault); err != nil {
+	if err := p.dialSignalServer(params.HostUserID, params.GameID); err != nil {
 		return nil, fmt.Errorf("failed to connect to the signal server: %w", err)
 	}
 	return net.IPv4(127, 0, 0, 1), nil
@@ -73,6 +70,10 @@ func (p *PeerToPeer) Join(params JoinParams) (net.IP, error) {
 	}
 
 	ip := net.IPv4(127, 0, 1, 2)
+
+	// close(p.done)
+	// p.done = make(chan struct{}, 1)
+
 	go p.runWebRTC(ModeGuest, params.CurrentUserID, params.GameID)
 
 	// select {
@@ -165,106 +166,52 @@ func (p *PeerToPeer) sendSignal(message []byte) (err error) {
 
 func (p *PeerToPeer) runWebRTC(mode int, user string, gameRoom string) {
 	signalMessages := make(chan []byte)
-	g, ctx := errgroup.WithContext(context.TODO())
+	defer func() {
+		close(signalMessages)
+		p.ws.Close()
+	}()
 
-	handleSignalMessage := p.handlePackets(mode, user, gameRoom)
-
-	g.Go(func() error {
-		resetTimer := func(t *time.Timer, d time.Duration) {
-			if !t.Stop() {
-				select {
-				case <-t.C:
-				default:
-				}
-			}
-			t.Reset(d)
-		}
-		defer func() {
-			close(signalMessages)
-		}()
-
-		const timeout = time.Second * 25
-		timer := time.NewTimer(timeout)
+	go func() {
 		for {
-			resetTimer(timer, timeout)
-			select {
-			case msg := <-signalMessages:
-				// if err := p.ws.SetWriteDeadline(time.Now().Add(10 * time.Second)); err != nil {
-				// 	return err
-				// }
-				if err := handleSignalMessage(ctx, msg); err != nil {
-					slog.Error("could not handle signal message", "error", err)
-				}
-			case <-timer.C:
-				// if err := p.ws.SetWriteDeadline(time.Now().Add(10 * time.Second)); err != nil {
-				// 	return err
-				// }
-				if _, err := p.ws.Write([]byte{0}); err != nil {
-					return err
-				}
-			case <-ctx.Done():
-				return ctx.Err()
-			}
-		}
-	})
-	g.Go(func() error {
-		for {
-			if ctx.Err() != nil {
-				slog.Warn("Closing websocket connection", "error", ctx.Err())
-				return ctx.Err()
-			}
-
-			// if err := p.ws.SetReadDeadline(time.Now().Add(60 * time.Second)); err != nil {
-			// 	return err
-			// }
-
 			buf := make([]byte, 1024)
 			n, err := p.ws.Read(buf)
 			if err != nil {
-				return fmt.Errorf("error reading message: %v", err)
+				slog.Error("error reading websocket message", "error", err)
+				return
+			}
+			if signalMessages == nil {
+				return
 			}
 			signalMessages <- buf[:n]
 		}
-	})
+	}()
 
-	if err := g.Wait(); err != nil {
-		panic(err)
+	handleSignalMessage := p.handlePackets(mode, user, gameRoom)
+
+	const timeout = time.Second * 25
+	timer := time.NewTimer(timeout)
+	for {
+		resetTimer(timer, timeout)
+		select {
+		case msg, ok := <-signalMessages:
+			if !ok {
+				return
+			}
+			if err := handleSignalMessage(msg); err != nil {
+				slog.Error("could not handle signal message", "error", err)
+			}
+		case <-timer.C:
+			if _, err := p.ws.Write([]byte{0}); err != nil {
+				// return err
+				return
+			}
+			return
+		}
 	}
 }
 
-func (p *PeerToPeer) handlePackets(mode int, user string, room string) func(context.Context, []byte) error {
-	var (
-		portIndex int
-		mtx       sync.Mutex
-	)
-
-	addProxyClient := func(i int) (client.Proxer, error) {
-		defer mtx.Unlock()
-		mtx.Lock()
-		portIndex++
-
-		tcpPort := 7000 + i*2
-		udpPort := 7000 + i*2 + 1
-
-		if mode == ModeHost {
-			tcpPort += 1000
-			udpPort += 1000
-		}
-
-		if mode == ModeGuest {
-			return client.ListenGuest(
-				net.JoinHostPort("127.0.0.1", fmt.Sprintf("%d", tcpPort)),
-				net.JoinHostPort("127.0.0.1", fmt.Sprintf("%d", udpPort)),
-			)
-		}
-		if mode == ModeHost {
-			return client.DialHost("127.0.0.1")
-		}
-
-		panic("Not implemented")
-	}
-
-	return func(ctx context.Context, buf []byte) error {
+func (p *PeerToPeer) handlePackets(mode int, user string, room string) func([]byte) error {
+	return func(buf []byte) error {
 		switch signalserver.EventType(buf[0]) {
 		case signalserver.Join:
 			return decodeAndRun(buf[1:], func(m signalserver.MessageContent[signalserver.Member]) error {
@@ -280,7 +227,7 @@ func (p *PeerToPeer) handlePackets(mode int, user string, room string) func(cont
 				}
 
 				// Create a fake endpoint that could be listened and redirect the packets
-				guest, err := addProxyClient(portIndex)
+				guest, err := p.IpRing.CreateClient(mode)
 				if err != nil {
 					return fmt.Errorf("could not create guest proxy for %s: %v", user, err)
 				}
@@ -289,10 +236,10 @@ func (p *PeerToPeer) handlePackets(mode int, user string, room string) func(cont
 
 				// Add the peer to the list of peers, and start the WebRTC connection
 				member := m.Content
-				peer := p.addPeer(ctx, member, room, user, guest, true)
+				peer := p.addPeer(member, room, user, guest, true)
 
 				// Create the data channels over the WebRTC connection
-				if err := p.createChannels(ctx, peer, guest, room); err != nil {
+				if err := p.createChannels(peer, guest, room); err != nil {
 					return fmt.Errorf("could not create data channels: %v", err)
 				}
 				return nil
@@ -320,12 +267,12 @@ func (p *PeerToPeer) handlePackets(mode int, user string, room string) func(cont
 
 				member := signalserver.Member{ID: m.From, Name: m.Content.Name}
 
-				guest, err := addProxyClient(portIndex)
+				guest, err := p.IpRing.CreateClient(mode)
 				if err != nil {
 					return fmt.Errorf("could not create guest proxy for %s: %v", user, err)
 				}
 
-				peer := p.addPeer(ctx, member, room, user, guest, false)
+				peer := p.addPeer(member, room, user, guest, false)
 
 				if err := peer.Connection.SetRemoteDescription(m.Content.Offer); err != nil {
 					return fmt.Errorf("could not set remote description: %v", err)
@@ -385,7 +332,7 @@ func (p *PeerToPeer) handlePackets(mode int, user string, room string) func(cont
 	}
 }
 
-func (p *PeerToPeer) addPeer(ctx context.Context, member signalserver.Member, room string, user string, guest client.Proxer, isJoinNotRTCOffer bool) *client.Peer {
+func (p *PeerToPeer) addPeer(member signalserver.Member, room string, user string, guest client.Proxer, isJoinNotRTCOffer bool) *client.Peer {
 	config := webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{
 			// {
@@ -464,39 +411,45 @@ func (p *PeerToPeer) addPeer(ctx context.Context, member signalserver.Member, ro
 	peerConnection.OnDataChannel(func(dc *webrtc.DataChannel) {
 		dc.OnOpen(func() {
 			slog.Debug("Opened WebRTC channel", "label", dc.Label(), "peer", member.ID)
-			client.NewPipe(ctx, dc, room, guest)
+
+			switch {
+			case isTCPChannel(dc, room):
+				client.NewPipeTCP(dc, guest)
+			case isUDPChannel(dc, room):
+				client.NewPipeUDP(dc, guest)
+			}
 		})
 	})
 
 	return peer
 }
 
-func (p *PeerToPeer) createChannels(ctx context.Context, peer *client.Peer, other client.Proxer, room string) error {
+func (p *PeerToPeer) createChannels(peer *client.Peer, other client.Proxer, room string) error {
 	// UDP
 	dcUDP, err := peer.Connection.CreateDataChannel(fmt.Sprintf("%s/udp", room), nil)
 	if err != nil {
 		return fmt.Errorf("could not create data channel %q: %v", room, err)
 	}
-	client.NewPipe(ctx, dcUDP, room, other)
+	pipeUDP := client.NewPipeUDP(dcUDP, other)
 
-	// dcUDP.OnClose(func() {
-	//	log.Printf("dataChannel for %s has closed", peer.ID)
-	//	p.Peers.Delete(peer.ID)
-	//	pipeUDP.Close()
-	// })
+	dcUDP.OnClose(func() {
+		log.Printf("dataChannel for %s has closed", peer.ID)
+		p.Peers.Delete(peer.ID)
+		pipeUDP.Close()
+	})
 
 	// TCP
 	dcTCP, err := peer.Connection.CreateDataChannel(fmt.Sprintf("%s/tcp", room), nil)
 	if err != nil {
 		return fmt.Errorf("could not create data channel %q: %v", room, err)
 	}
-	client.NewPipe(ctx, dcTCP, room, other)
+	pipeTCP := client.NewPipeTCP(dcTCP, other)
 
-	// dcTCP.OnClose(func() {
-	//	log.Printf("dataChannel for %s has closed", peer.ID)
-	//	p.Peers.Delete(peer.ID)
-	//	pipeTCP.Close()
-	// })
+	dcTCP.OnClose(func() {
+		log.Printf("dataChannel for %s has closed", peer.ID)
+		p.Peers.Delete(peer.ID)
+		pipeTCP.Close()
+	})
 
 	return nil
 }
@@ -518,8 +471,28 @@ func decodeCBOR[T any](data []byte) (v T, err error) {
 	return v, err
 }
 
+func isTCPChannel(dc *webrtc.DataChannel, room string) bool {
+	return dc.Label() == fmt.Sprintf("%s/tcp", room)
+}
+
+func isUDPChannel(dc *webrtc.DataChannel, room string) bool {
+	return dc.Label() == fmt.Sprintf("%s/udp", room)
+}
+
+func resetTimer(t *time.Timer, d time.Duration) {
+	if !t.Stop() {
+		select {
+		case <-t.C:
+		default:
+		}
+	}
+	t.Reset(d)
+}
+
 type IpRing struct {
 	*ring.Ring
+
+	mtx sync.Mutex
 }
 
 func NewIpRing() *IpRing {
@@ -529,11 +502,39 @@ func NewIpRing() *IpRing {
 		r.Value = i + 2
 		r = r.Next()
 	}
-	return &IpRing{r}
+	return &IpRing{Ring: r}
 }
 
 func (r *IpRing) IP() net.IP {
 	d := byte(r.Value.(int))
 	defer r.Next()
 	return net.IPv4(127, 0, 1, d)
+}
+
+func (r *IpRing) CreateClient(mode int) (client.Proxer, error) {
+	defer r.mtx.Unlock()
+	r.mtx.Lock()
+
+	i := r.Value.(int)
+	defer r.Next()
+
+	tcpPort := 7000 + i*2
+	udpPort := 7000 + i*2 + 1
+
+	if mode == ModeHost {
+		tcpPort += 1000
+		udpPort += 1000
+	}
+
+	if mode == ModeGuest {
+		return client.ListenGuest(
+			net.JoinHostPort("127.0.0.1", fmt.Sprintf("%d", tcpPort)),
+			net.JoinHostPort("127.0.0.1", fmt.Sprintf("%d", udpPort)),
+		)
+	}
+	if mode == ModeHost {
+		return client.DialHost("127.0.0.1")
+	}
+
+	panic("Not implemented")
 }

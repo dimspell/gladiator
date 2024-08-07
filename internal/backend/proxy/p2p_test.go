@@ -6,6 +6,8 @@ import (
 	"log"
 	"log/slog"
 	"net"
+	"net/http/httptest"
+	"net/url"
 	"os"
 	"testing"
 	"time"
@@ -33,13 +35,17 @@ func TestPeerToPeer(t *testing.T) {
 	t.Run("Hosting a game", func(t *testing.T) {
 		const roomName = "room"
 
-		StartHost(t)
+		// StartHost(t)
 		websocketURL := StartSignalServer(t)
+		// websocketURL := "ws://localhost:5050"
 
 		a := NewPeerToPeer(websocketURL)
+		defer a.Close()
+
 		if _, err := a.Create(CreateParams{
 			HostUserIP: "",
 			HostUserID: "user1",
+			GameID:     roomName,
 		}); err != nil {
 			t.Error(err)
 			return
@@ -53,6 +59,8 @@ func TestPeerToPeer(t *testing.T) {
 		}
 
 		b := NewPeerToPeer(websocketURL)
+		defer b.Close()
+
 		if _, err := b.Join(JoinParams{
 			HostUserID:    "user1",
 			GameID:        roomName,
@@ -77,14 +85,6 @@ func TestPeerToPeer(t *testing.T) {
 			return
 		}
 	})
-
-	// t.Run("Joining a game", func(t *testing.T) {
-	//
-	// })
-
-	// t.Run("Switching host", func(t *testing.T) {
-	//
-	// })
 }
 
 func StartHost(t testing.TB) {
@@ -172,21 +172,19 @@ func StartHost(t testing.TB) {
 func StartSignalServer(t testing.TB) string {
 	t.Helper()
 
-	s, err := signalserver.NewServer()
+	h, err := signalserver.NewServer()
 	if err != nil {
 		t.Fatal(err)
+		return ""
 	}
-
-	start, stop := s.Run()
-
-	go func() {
-		start(context.TODO())
-	}()
+	ts := httptest.NewServer(h)
 
 	t.Cleanup(func() {
-		stop(context.TODO())
+		ts.Close()
 	})
 
-	const websocketURL = "ws://localhost:5050"
-	return websocketURL
+	wsURI, _ := url.Parse(ts.URL)
+	wsURI.Scheme = "ws"
+
+	return wsURI.String()
 }

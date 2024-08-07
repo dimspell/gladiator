@@ -49,6 +49,9 @@ func DialHost(gameServerIP string) (*HostProxy, error) {
 	}, nil
 }
 
+type ProxyReaderFunc func(ctx context.Context, rw io.ReadWriteCloser) error
+type ProxyWriterFunc func(msg []byte) error
+
 type Proxer interface {
 	RunUDP(ctx context.Context, rw io.ReadWriteCloser) error
 	RunTCP(ctx context.Context, rw io.ReadWriteCloser) error
