@@ -167,11 +167,14 @@ func (p *PeerToPeer) sendSignal(message []byte) (err error) {
 func (p *PeerToPeer) runWebRTC(mode int, user string, gameRoom string) {
 	signalMessages := make(chan []byte)
 	defer func() {
-		close(signalMessages)
-		p.ws.Close()
+		if err := p.ws.Close(); err != nil {
+			return
+		}
 	}()
 
 	go func() {
+		defer close(signalMessages)
+
 		for {
 			buf := make([]byte, 1024)
 			n, err := p.ws.Read(buf)
