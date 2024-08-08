@@ -23,20 +23,20 @@ func NewServer() (*Server, error) {
 	}, nil
 }
 
-func (h *Server) Get(channelName string) (*Channel, bool) {
+func (h *Server) GetChannel(channelName string) (*Channel, bool) {
 	h.RLock()
 	channel, ok := h.Channels[channelName]
 	h.RUnlock()
 	return channel, ok
 }
 
-func (h *Server) Set(channelName string, channel *Channel) {
+func (h *Server) SetChannel(channelName string, channel *Channel) {
 	h.Lock()
 	h.Channels[channelName] = channel
 	h.Unlock()
 }
 
-func (h *Server) Delete(channelName string) {
+func (h *Server) DeleteChannel(channelName string) {
 	h.Lock()
 	delete(h.Channels, channelName)
 	h.Unlock()
@@ -81,14 +81,14 @@ func (h *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if err := cbor.Unmarshal(rawSignal, &m); err != nil {
 			continue
 		}
-		if ch, ok := h.Get(roomName); ok {
+		if ch, ok := h.GetChannel(roomName); ok {
 			ch.Messages <- m
 		}
 	}
 }
 
 func (h *Server) Join(ctx context.Context, channelName string) *Channel {
-	if existing, ok := h.Get(channelName); ok {
+	if existing, ok := h.GetChannel(channelName); ok {
 		return existing
 	}
 
@@ -97,18 +97,18 @@ func (h *Server) Join(ctx context.Context, channelName string) *Channel {
 		Members:  &Members{ws: make(map[string]*websocket.Conn)},
 		Messages: make(chan Message),
 	}
-	h.Set(channelName, c)
+	h.SetChannel(channelName, c)
 	go c.Run()
 	return c
 }
 
 func (h *Server) Leave(channelName string, userID string) {
-	if c, ok := h.Get(channelName); ok {
-		c.Broadcast(Message{Type: Leave, From: userID})
+	if c, ok := h.GetChannel(channelName); ok {
+		c.Broadcast(Leave, Message{Type: Leave, From: userID})
 		c.Members.Delete(userID)
 		if c.Members.Count() == 0 {
 			close(c.Messages)
-			h.Delete(channelName)
+			h.DeleteChannel(channelName)
 		}
 	}
 }
@@ -123,24 +123,19 @@ func (c *Channel) Run() {
 	for msg := range c.Messages {
 		switch msg.Type {
 		case HandshakeRequest:
-			if member, ok := c.Members.Get(msg.From); ok {
-				SendMessage(member, Message{
+			if ws, ok := c.Members.Get(msg.From); ok {
+				SendMessage(ws, HandshakeResponse, MessageContent[string]{
 					Type:    HandshakeResponse,
 					Content: msg.From,
 				})
 			}
-			c.Broadcast(
-				Message{
-					Type: Join,
-					Content: Member{
-						ID:   msg.From,
-						Name: msg.Content.(string),
-						// Channel: c.Name,
-					},
-				})
+			c.Broadcast(Join, Message{
+				Type:    Join,
+				Content: msg.Content,
+			})
 		case RTCOffer, RTCAnswer, RTCICECandidate:
-			if member, ok := c.Members.Get(msg.To); ok {
-				SendMessage(member, msg)
+			if ws, ok := c.Members.Get(msg.To); ok {
+				SendMessage(ws, msg.Type, msg)
 			}
 		default:
 			// Do nothing
@@ -148,30 +143,30 @@ func (c *Channel) Run() {
 	}
 }
 
-func (c *Channel) Broadcast(msg Message) {
+func (c *Channel) Broadcast(msgType EventType, msg any) {
 	payload, err := cbor.Marshal(msg)
 	if err != nil {
-		log.Println("write:", err)
+		slog.Error("Could not marshal the websocket message", "error", err)
 		return
 	}
-	payload = append([]byte{byte(msg.Type)}, payload...)
+	payload = append([]byte{byte(msgType)}, payload...)
 	c.Members.Range(func(ws *websocket.Conn) bool {
 		if err := ws.WriteMessage(websocket.TextMessage, payload); err != nil {
-			log.Println("write:", err)
+			slog.Error("Could not broadcast websocket message", "error", err)
 		}
 		return true
 	})
 }
 
-func SendMessage(ws *websocket.Conn, msg Message) {
+func SendMessage(ws *websocket.Conn, msgType EventType, msg any) {
 	payload, err := cbor.Marshal(msg)
 	if err != nil {
-		log.Println("write:", err)
+		slog.Error("Could not marshal the websocket message", "error", err)
 		return
 	}
-	payload = append([]byte{byte(msg.Type)}, payload...)
+	payload = append([]byte{byte(msgType)}, payload...)
 	if err := ws.WriteMessage(websocket.TextMessage, payload); err != nil {
-		log.Println("write:", err)
+		slog.Error("Could not write websocket message", "error", err)
 	}
 }
 

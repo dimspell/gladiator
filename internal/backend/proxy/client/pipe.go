@@ -7,13 +7,13 @@ import (
 	"log/slog"
 	"net"
 
+	"github.com/dimspell/gladiator/console/signalserver"
 	"github.com/pion/webrtc/v4"
 	"golang.org/x/sync/errgroup"
 )
 
 type Peer struct {
-	ID   string
-	Name string
+	User signalserver.Member
 	IP   net.IP
 
 	Proxer     Proxer

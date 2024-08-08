@@ -41,14 +41,20 @@ func (m Message) ToCBOR() []byte {
 	return out
 }
 
-type Member struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
+const (
+	RoleHost  string = "host"
+	RoleGuest string = "guest"
+)
 
-	// Channel string `json:"channel"`
+type Member struct {
+	// UserID is the identifier used by the console to identify the user.
+	UserID string `json:"userID"`
+
+	// Role defines information who is the given user (RoleHost or RoleGuest)
+	Role string `json:"role"`
 }
 
 type Offer struct {
-	Name  string                    `json:"name"`
-	Offer webrtc.SessionDescription `json:"offer"`
+	Member Member                    `json:"member"`
+	Offer  webrtc.SessionDescription `json:"offer"`
 }
