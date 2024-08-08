@@ -219,115 +219,26 @@ func (p *PeerToPeer) handlePackets(mode int, user string, room string) func([]by
 		case signalserver.Join:
 			return decodeAndRun(buf[1:], func(m signalserver.MessageContent[signalserver.Member]) error {
 				slog.Debug("JOIN", "id", m.Content.ID)
-
-				// Validate the message
-				if m.Content.ID == user {
-					// return fmt.Errorf("peer %q is the same as the host, ignoring join", m.Content.ID)
-					return nil
-				}
-				if p.Peers.Exist(m.Content.ID) {
-					return fmt.Errorf("peer %q already exists, ignoring join", m.Content.ID)
-				}
-
-				// Create a fake endpoint that could be listened and redirect the packets
-				guest, err := p.IpRing.CreateClient(mode)
-				if err != nil {
-					return fmt.Errorf("could not create guest proxy for %s: %v", user, err)
-				}
-
-				log.Println("Joining peer", m.Content.ID)
-
-				// Add the peer to the list of peers, and start the WebRTC connection
-				member := m.Content
-				peer := p.addPeer(member, room, user, guest, true)
-
-				// Create the data channels over the WebRTC connection
-				if err := p.createChannels(peer, guest, room); err != nil {
-					return fmt.Errorf("could not create data channels: %v", err)
-				}
-				return nil
+				return p.handleJoin(m, user, room, mode)
 			})
 		case signalserver.Leave:
 			return decodeAndRun(buf[1:], func(m signalserver.MessageContent[any]) error {
 				slog.Debug("LEAVE", "from", m.From, "to", m.To)
-
-				peer, ok := p.Peers.Get(m.From)
-				if !ok {
-					// fmt.Errorf("could not find peer %q", m.From)
-					return nil
-				}
-				if peer.ID == user {
-					return fmt.Errorf("peer %q is the same as the host, ignoring leave", m.From)
-				}
-
-				slog.Info("User left", "peer", peer.Name)
-				p.Peers.Delete(peer.ID)
-				return nil
+				return p.handleLeave(m, user)
 			})
 		case signalserver.RTCOffer:
 			return decodeAndRun(buf[1:], func(m signalserver.MessageContent[signalserver.Offer]) error {
 				slog.Debug("RTC_OFFER", "from", m.From, "to", m.To)
-
-				member := signalserver.Member{ID: m.From, Name: m.Content.Name}
-
-				guest, err := p.IpRing.CreateClient(mode)
-				if err != nil {
-					return fmt.Errorf("could not create guest proxy for %s: %v", user, err)
-				}
-
-				peer := p.addPeer(member, room, user, guest, false)
-
-				if err := peer.Connection.SetRemoteDescription(m.Content.Offer); err != nil {
-					return fmt.Errorf("could not set remote description: %v", err)
-				}
-
-				answer, err := peer.Connection.CreateAnswer(nil)
-				if err != nil {
-					return fmt.Errorf("could not create answer: %v", err)
-				}
-
-				if err := peer.Connection.SetLocalDescription(answer); err != nil {
-					return fmt.Errorf("could not set local description: %v", err)
-				}
-
-				response := &signalserver.Message{
-					From:    user,
-					To:      m.From,
-					Type:    signalserver.RTCAnswer,
-					Content: signalserver.Offer{Name: peer.Name, Offer: answer},
-				}
-				if err := p.sendSignal(response.ToCBOR()); err != nil {
-					return fmt.Errorf("could not send answer: %v", err)
-				}
-				return nil
+				return p.handleRTCOffer(m, user, room, mode)
 			})
 		case signalserver.RTCAnswer:
 			return decodeAndRun(buf[1:], func(m signalserver.MessageContent[signalserver.Offer]) error {
 				slog.Debug("RTC_ANSWER", "from", m.From, "to", m.To)
-
-				answer := webrtc.SessionDescription{
-					Type: webrtc.SDPTypeAnswer,
-					SDP:  m.Content.Offer.SDP,
-				}
-				peer, ok := p.Peers.Get(m.From)
-				if !ok {
-					return fmt.Errorf("could not find peer %q that sent the RTC answer", m.From)
-				}
-				if err := peer.Connection.SetRemoteDescription(answer); err != nil {
-					return fmt.Errorf("could not set remote description: %v", err)
-				}
-				return nil
+				return p.handleRTCAnswer(m, user, room, mode)
 			})
 		case signalserver.RTCICECandidate:
 			return decodeAndRun(buf[1:], func(m signalserver.MessageContent[webrtc.ICECandidateInit]) error {
-				peer, ok := p.Peers.Get(m.From)
-				if !ok {
-					return fmt.Errorf("could not find peer %q", m.From)
-				}
-				if err := peer.Connection.AddICECandidate(m.Content); err != nil {
-					return fmt.Errorf("could not add ICE candidate: %w", err)
-				}
-				return nil
+				return p.handleRTCCandidate(m)
 			})
 		default:
 			return nil
@@ -335,7 +246,102 @@ func (p *PeerToPeer) handlePackets(mode int, user string, room string) func([]by
 	}
 }
 
-func (p *PeerToPeer) addPeer(member signalserver.Member, room string, user string, guest client.Proxer, isJoinNotRTCOffer bool) *client.Peer {
+func (p *PeerToPeer) handleJoin(m signalserver.MessageContent[signalserver.Member], user, room string, mode int) error {
+	// Validate the message
+	if m.Content.ID == user {
+		// return fmt.Errorf("peer %q is the same as the host, ignoring join", m.Content.ID)
+		return nil
+	}
+	if p.Peers.Exist(m.Content.ID) {
+		// return fmt.Errorf("peer %q already exists, ignoring join", m.Content.ID)
+		return nil
+	}
+
+	// Create a fake endpoint that could be listened and redirect the packets
+	guest, err := p.IpRing.CreateClient(mode)
+	if err != nil {
+		return fmt.Errorf("could not create guest proxy for %s: %v", user, err)
+	}
+
+	log.Println("Joining peer", m.Content.ID)
+
+	// Add the peer to the list of peers, and start the WebRTC connection
+	member := m.Content
+	peer := p.addPeer(member, room, user, guest, true)
+
+	// Create the data channels over the WebRTC connection
+	if err := p.createChannels(peer, guest, room); err != nil {
+		return fmt.Errorf("could not create data channels: %v", err)
+	}
+	return nil
+}
+
+func (p *PeerToPeer) handleLeave(m signalserver.MessageContent[any], user string) error {
+	peer, ok := p.Peers.Get(m.From)
+	if !ok {
+		// fmt.Errorf("could not find peer %q", m.From)
+		return nil
+	}
+	if peer.ID == user {
+		return fmt.Errorf("peer %q is the same as the host, ignoring leave", m.From)
+	}
+
+	slog.Info("User left", "peer", peer.Name)
+	p.Peers.Delete(peer.ID)
+	return nil
+}
+
+func (p *PeerToPeer) handleRTCOffer(m signalserver.MessageContent[signalserver.Offer], user string, room string, mode int) error {
+	member := signalserver.Member{ID: m.From, Name: m.Content.Name}
+
+	guest, err := p.IpRing.CreateClient(mode)
+	if err != nil {
+		return fmt.Errorf("could not create guest proxy for %s: %v", user, err)
+	}
+
+	peer := p.addPeer(member, room, user, guest, false)
+
+	if err := peer.Connection.SetRemoteDescription(m.Content.Offer); err != nil {
+		return fmt.Errorf("could not set remote description: %v", err)
+	}
+
+	answer, err := peer.Connection.CreateAnswer(nil)
+	if err != nil {
+		return fmt.Errorf("could not create answer: %v", err)
+	}
+
+	if err := peer.Connection.SetLocalDescription(answer); err != nil {
+		return fmt.Errorf("could not set local description: %v", err)
+	}
+
+	response := &signalserver.Message{
+		From:    user,
+		To:      m.From,
+		Type:    signalserver.RTCAnswer,
+		Content: signalserver.Offer{Name: peer.Name, Offer: answer},
+	}
+	if err := p.sendSignal(response.ToCBOR()); err != nil {
+		return fmt.Errorf("could not send answer: %v", err)
+	}
+	return nil
+}
+
+func (p *PeerToPeer) handleRTCAnswer(m signalserver.MessageContent[signalserver.Offer], user string, room string, mode int) error {
+	answer := webrtc.SessionDescription{
+		Type: webrtc.SDPTypeAnswer,
+		SDP:  m.Content.Offer.SDP,
+	}
+	peer, ok := p.Peers.Get(m.From)
+	if !ok {
+		return fmt.Errorf("could not find peer %q that sent the RTC answer", m.From)
+	}
+	if err := peer.Connection.SetRemoteDescription(answer); err != nil {
+		return fmt.Errorf("could not set remote description: %v", err)
+	}
+	return nil
+}
+
+func (p *PeerToPeer) addPeer(member signalserver.Member, room string, user string, guest client.Proxer, sendRTCOffer bool) *client.Peer {
 	config := webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{
 			// {
@@ -391,7 +397,7 @@ func (p *PeerToPeer) addPeer(member signalserver.Member, room string, user strin
 			panic(err)
 		}
 
-		if !isJoinNotRTCOffer {
+		if !sendRTCOffer {
 			// If this is a message sent first time after joining,
 			// then we send the offer to invite yourself to join other users.
 			return
@@ -457,6 +463,17 @@ func (p *PeerToPeer) createChannels(peer *client.Peer, other client.Proxer, room
 	return nil
 }
 
+func (p *PeerToPeer) handleRTCCandidate(m signalserver.MessageContent[webrtc.ICECandidateInit]) error {
+	peer, ok := p.Peers.Get(m.From)
+	if !ok {
+		return fmt.Errorf("could not find peer %q", m.From)
+	}
+	if err := peer.Connection.AddICECandidate(m.Content); err != nil {
+		return fmt.Errorf("could not add ICE candidate: %w", err)
+	}
+	return nil
+}
+
 func decodeAndRun[T any](data []byte, f func(T) error) error {
 	v, err := decodeCBOR[T](data)
 	if err != nil {
@@ -512,6 +529,10 @@ func (r *IpRing) IP() net.IP {
 	d := byte(r.Value.(int))
 	defer r.Next()
 	return net.IPv4(127, 0, 1, d)
+}
+
+func (r *IpRing) name() {
+
 }
 
 func (r *IpRing) CreateClient(mode int) (client.Proxer, error) {
