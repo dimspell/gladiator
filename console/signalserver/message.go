@@ -50,8 +50,10 @@ type Member struct {
 	// UserID is the identifier used by the console to identify the user.
 	UserID string `json:"userID"`
 
-	// Role defines information who is the given user (RoleHost or RoleGuest)
-	Role string `json:"role"`
+	IsHost bool `json:"isHost"`
+
+	// Joined defines whether the given user has already joined to the room.
+	Joined bool `json:"joined"`
 }
 
 type Offer struct {

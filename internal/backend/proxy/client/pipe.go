@@ -16,7 +16,6 @@ type Peer struct {
 	User signalserver.Member
 	IP   net.IP
 
-	Proxer     Proxer
 	Connection *webrtc.PeerConnection
 }
 
@@ -26,6 +25,7 @@ type Pipe struct {
 	dc DataChannel
 	// done   chan struct{}
 	dcData chan webrtc.DataChannelMessage
+	proxy  Redirector
 }
 
 type DataChannel interface {
@@ -38,19 +38,10 @@ type DataChannel interface {
 	io.Closer
 }
 
-func NewPipeTCP(dc DataChannel, proxy Proxer) *Pipe {
-	slog.Debug("Registered DataChannel.onMessage handler", "label", dc.Label(), "protocol", "tcp")
-	return newPipe(dc, proxy.RunTCP, proxy.WriteTCPMessage)
-}
-
-func NewPipeUDP(dc DataChannel, proxy Proxer) *Pipe {
-	slog.Debug("Registered DataChannel.onMessage handler", "label", dc.Label(), "protocol", "udp")
-	return newPipe(dc, proxy.RunUDP, proxy.WriteUDPMessage)
-}
-
-func newPipe(dc DataChannel, reader ProxyReaderFunc, writer ProxyWriterFunc) *Pipe {
+func NewPipe(dc DataChannel, proxy Redirector) *Pipe {
 	pipe := &Pipe{
-		dc: dc,
+		dc:    dc,
+		proxy: proxy,
 		// done:   make(chan struct{}, 1),
 		dcData: make(chan webrtc.DataChannelMessage, 1),
 	}
@@ -58,7 +49,7 @@ func newPipe(dc DataChannel, reader ProxyReaderFunc, writer ProxyWriterFunc) *Pi
 	ctx, cancel := context.WithCancel(context.TODO())
 	g, ctx := errgroup.WithContext(ctx)
 	g.Go(func() error {
-		return reader(ctx, pipe)
+		return proxy.Run(ctx, pipe)
 	})
 	g.Go(func() error {
 		for {
@@ -75,7 +66,7 @@ func newPipe(dc DataChannel, reader ProxyReaderFunc, writer ProxyWriterFunc) *Pi
 					return nil
 				}
 
-				if err := writer(msg.Data); err != nil {
+				if _, err := proxy.Write(msg.Data); err != nil {
 					slog.Warn("Failed to send data to peer", "error", err)
 					return err
 				}
@@ -145,6 +136,7 @@ func (pipe *Pipe) Close() error {
 	if pipe.dcData != nil {
 		// pipe.done <- struct{}{}
 		close(pipe.dcData)
+		pipe.proxy.Close()
 		// close(pipe.done)
 	}
 	return pipe.dc.Close()

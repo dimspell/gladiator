@@ -31,8 +31,6 @@ type PeerToPeer struct {
 	// done chan struct{}
 }
 
-type Role string
-
 type WebSocket interface {
 	io.Closer
 	io.Reader
@@ -56,19 +54,19 @@ func (p *PeerToPeer) Create(params CreateParams) (net.IP, error) {
 	if p.ws != nil {
 		return nil, fmt.Errorf("already connected to the signal server")
 	}
-	if err := p.dialSignalServer(params.HostUserID, params.GameID, Role(signalserver.RoleHost)); err != nil {
+	if err := p.dialSignalServer(params.HostUserID, params.GameID, true); err != nil {
 		return nil, fmt.Errorf("failed to connect to the signal server: %w", err)
 	}
 	return net.IPv4(127, 0, 0, 1), nil
 }
 
 func (p *PeerToPeer) Host(params HostParams) error {
-	go p.runWebRTC(Role(signalserver.RoleHost), params.HostUserID, params.GameID)
+	go p.runWebRTC(true, params.HostUserID, params.GameID)
 	return nil
 }
 
 func (p *PeerToPeer) Join(params JoinParams) (net.IP, error) {
-	if err := p.dialSignalServer(params.CurrentUserID, params.GameID, Role(signalserver.RoleGuest)); err != nil {
+	if err := p.dialSignalServer(params.CurrentUserID, params.GameID, false); err != nil {
 		return nil, fmt.Errorf("failed to connect to the signal server: %w", err)
 	}
 
@@ -77,7 +75,7 @@ func (p *PeerToPeer) Join(params JoinParams) (net.IP, error) {
 	// close(p.done)
 	// p.done = make(chan struct{}, 1)
 
-	go p.runWebRTC(Role(signalserver.RoleGuest), params.CurrentUserID, params.GameID)
+	go p.runWebRTC(false, params.CurrentUserID, params.GameID)
 
 	// select {
 	// case <-time.After(5 * time.Second):
@@ -106,7 +104,7 @@ func (p *PeerToPeer) Close() {
 	p.Peers.Reset()
 }
 
-func (p *PeerToPeer) dialSignalServer(userId, roomName string, role Role) error {
+func (p *PeerToPeer) dialSignalServer(userId, roomName string, isHost bool) error {
 	// Parse the signaling URL provided from the parameters (command flags)
 	u, err := url.Parse(p.SignalServerURL)
 	if err != nil {
@@ -132,7 +130,8 @@ func (p *PeerToPeer) dialSignalServer(userId, roomName string, role Role) error 
 		From: userId,
 		Content: signalserver.Member{
 			UserID: userId,
-			Role:   string(role),
+			IsHost: isHost,
+			Joined: isHost, // Note: Host is always joined.
 		},
 	}
 	if _, err := ws.Write(req.ToCBOR()); err != nil {
@@ -170,7 +169,7 @@ func (p *PeerToPeer) sendSignal(message []byte) (err error) {
 	return
 }
 
-func (p *PeerToPeer) runWebRTC(mode Role, user string, gameRoom string) {
+func (p *PeerToPeer) runWebRTC(mode bool, user string, gameRoom string) {
 	signalMessages := make(chan []byte)
 	defer func() {
 		if err := p.ws.Close(); err != nil {
@@ -219,13 +218,13 @@ func (p *PeerToPeer) runWebRTC(mode Role, user string, gameRoom string) {
 	}
 }
 
-func (p *PeerToPeer) handlePackets(currentUserRole Role, currentUserId string, room string) func([]byte) error {
+func (p *PeerToPeer) handlePackets(currentUserIsHost bool, currentUserId string, room string) func([]byte) error {
 	return func(buf []byte) error {
 		switch signalserver.EventType(buf[0]) {
 		case signalserver.Join:
 			return decodeAndRun(buf[1:], func(m signalserver.MessageContent[signalserver.Member]) error {
-				slog.Debug("JOIN", "id", m.Content.UserID, "role", m.Content.Role)
-				return p.handleJoin(m, currentUserId, room, currentUserRole)
+				slog.Debug("JOIN", "id", m.Content.UserID, "host", m.Content.IsHost)
+				return p.handleJoin(m, currentUserId, room, currentUserIsHost)
 			})
 		case signalserver.Leave:
 			return decodeAndRun(buf[1:], func(m signalserver.MessageContent[any]) error {
@@ -235,12 +234,12 @@ func (p *PeerToPeer) handlePackets(currentUserRole Role, currentUserId string, r
 		case signalserver.RTCOffer:
 			return decodeAndRun(buf[1:], func(m signalserver.MessageContent[signalserver.Offer]) error {
 				slog.Debug("RTC_OFFER", "from", m.From, "to", m.To)
-				return p.handleRTCOffer(m, currentUserId, room, currentUserRole)
+				return p.handleRTCOffer(m, currentUserId, room, currentUserIsHost)
 			})
 		case signalserver.RTCAnswer:
 			return decodeAndRun(buf[1:], func(m signalserver.MessageContent[signalserver.Offer]) error {
 				slog.Debug("RTC_ANSWER", "from", m.From, "to", m.To)
-				return p.handleRTCAnswer(m, currentUserId, room, currentUserRole)
+				return p.handleRTCAnswer(m)
 			})
 		case signalserver.RTCICECandidate:
 			return decodeAndRun(buf[1:], func(m signalserver.MessageContent[webrtc.ICECandidateInit]) error {
@@ -253,19 +252,19 @@ func (p *PeerToPeer) handlePackets(currentUserRole Role, currentUserId string, r
 	}
 }
 
-func (p *PeerToPeer) handleJoin(m signalserver.MessageContent[signalserver.Member], currentUserId, room string, currentUserRole Role) error {
+func (p *PeerToPeer) handleJoin(m signalserver.MessageContent[signalserver.Member], currentUserId, room string, currentUserIsHost bool) error {
 	// Validate the message
 	if m.Content.UserID == currentUserId {
-		slog.Debug("Peer is the same as the host, ignoring join", "userId", m.Content.UserID, "role", m.Content.Role)
+		slog.Debug("Peer is the same as the host, ignoring join", "userId", m.Content.UserID, "host", m.Content.IsHost)
 		return nil
 	}
 	if p.Peers.Exist(m.Content.UserID) {
-		slog.Debug("Peer already exist, ignoring join", "userId", m.Content.UserID, "role", m.Content.Role)
+		slog.Debug("Peer already exist, ignoring join", "userId", m.Content.UserID, "host", m.Content.IsHost)
 		return nil
 	}
 
 	// Create a fake endpoint that could be listened and redirect the packets
-	guest, err := p.IpRing.CreateClient(currentUserRole, m.Content)
+	_, guestTCP, guestUDP, err := p.IpRing.CreateClient(currentUserIsHost, m.Content)
 	if err != nil {
 		return fmt.Errorf("could not create guest proxy for %s: %v", currentUserId, err)
 	}
@@ -274,12 +273,38 @@ func (p *PeerToPeer) handleJoin(m signalserver.MessageContent[signalserver.Membe
 
 	// Add the peer to the list of peers, and start the WebRTC connection
 	member := m.Content
-	peer := p.addPeer(member, room, currentUserId, currentUserRole, guest, true)
+	peer := p.addPeer(member, room, currentUserId, currentUserIsHost, guestTCP, guestUDP, true)
 
-	// Create the data channels over the WebRTC connection
-	if err := p.createChannels(peer, guest, room); err != nil {
-		return fmt.Errorf("could not create data channels: %v", err)
+	if guestTCP != nil {
+		dcTCP, err := peer.Connection.CreateDataChannel(fmt.Sprintf("%s/tcp", room), nil)
+		if err != nil {
+			return fmt.Errorf("could not create data channel %q: %v", room, err)
+		}
+		pipeTCP := client.NewPipe(dcTCP, guestTCP)
+
+		dcTCP.OnClose(func() {
+			log.Printf("dataChannel for %s has closed", peer.User.UserID)
+			p.Peers.Delete(peer.User.UserID)
+			pipeTCP.Close()
+		})
+
 	}
+
+	if guestUDP != nil {
+		// UDP
+		dcUDP, err := peer.Connection.CreateDataChannel(fmt.Sprintf("%s/udp", room), nil)
+		if err != nil {
+			return fmt.Errorf("could not create data channel %q: %v", room, err)
+		}
+		pipeUDP := client.NewPipe(dcUDP, guestUDP)
+
+		dcUDP.OnClose(func() {
+			log.Printf("dataChannel for %s has closed", peer.User.UserID)
+			p.Peers.Delete(peer.User.UserID)
+			pipeUDP.Close()
+		})
+	}
+
 	return nil
 }
 
@@ -298,13 +323,13 @@ func (p *PeerToPeer) handleLeave(m signalserver.MessageContent[any], user string
 	return nil
 }
 
-func (p *PeerToPeer) handleRTCOffer(m signalserver.MessageContent[signalserver.Offer], currentUserId string, room string, currentUserRole Role) error {
-	guest, err := p.IpRing.CreateClient(currentUserRole, m.Content.Member)
+func (p *PeerToPeer) handleRTCOffer(m signalserver.MessageContent[signalserver.Offer], currentUserId string, room string, currentUserIsHost bool) error {
+	_, guestTCP, guestUDP, err := p.IpRing.CreateClient(currentUserIsHost, m.Content.Member)
 	if err != nil {
 		return fmt.Errorf("could not create guest proxy for %s: %v", currentUserId, err)
 	}
 
-	peer := p.addPeer(m.Content.Member, room, currentUserId, currentUserRole, guest, false)
+	peer := p.addPeer(m.Content.Member, room, currentUserId, currentUserIsHost, guestTCP, guestUDP, false)
 
 	if err := peer.Connection.SetRemoteDescription(m.Content.Offer); err != nil {
 		return fmt.Errorf("could not set remote description: %v", err)
@@ -324,7 +349,7 @@ func (p *PeerToPeer) handleRTCOffer(m signalserver.MessageContent[signalserver.O
 		To:   m.From,
 		Type: signalserver.RTCAnswer,
 		Content: signalserver.Offer{
-			Member: signalserver.Member{UserID: currentUserId, Role: string(currentUserRole)}, // TODO: Unused data
+			Member: signalserver.Member{UserID: currentUserId, IsHost: currentUserIsHost}, // TODO: Unused data
 			Offer:  answer,
 		},
 	}
@@ -334,7 +359,7 @@ func (p *PeerToPeer) handleRTCOffer(m signalserver.MessageContent[signalserver.O
 	return nil
 }
 
-func (p *PeerToPeer) handleRTCAnswer(m signalserver.MessageContent[signalserver.Offer], user string, room string, mode Role) error {
+func (p *PeerToPeer) handleRTCAnswer(m signalserver.MessageContent[signalserver.Offer]) error {
 	answer := webrtc.SessionDescription{
 		Type: webrtc.SDPTypeAnswer,
 		SDP:  m.Content.Offer.SDP,
@@ -349,7 +374,7 @@ func (p *PeerToPeer) handleRTCAnswer(m signalserver.MessageContent[signalserver.
 	return nil
 }
 
-func (p *PeerToPeer) addPeer(member signalserver.Member, room string, user string, role Role, guest client.Proxer, sendRTCOffer bool) *client.Peer {
+func (p *PeerToPeer) addPeer(member signalserver.Member, room string, user string, currentUserIsHost bool, guestTCP client.Redirector, guestUDP client.Redirector, sendRTCOffer bool) *client.Peer {
 	config := webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{
 			// {
@@ -371,7 +396,7 @@ func (p *PeerToPeer) addPeer(member signalserver.Member, room string, user strin
 	peer := &client.Peer{
 		User: member,
 		// IP:         unknown, TODO: Fix me
-		Proxer:     guest,
+		// Proxer:     guest,
 		Connection: peerConnection,
 	}
 	p.Peers.Set(member.UserID, peer)
@@ -418,7 +443,7 @@ func (p *PeerToPeer) addPeer(member signalserver.Member, room string, user strin
 			Content: signalserver.Offer{
 				Member: signalserver.Member{
 					UserID: user,
-					Role:   string(role),
+					IsHost: currentUserIsHost,
 				}, // TODO: Is it correct?
 				Offer: offer,
 			},
@@ -434,44 +459,14 @@ func (p *PeerToPeer) addPeer(member signalserver.Member, room string, user strin
 
 			switch {
 			case isTCPChannel(dc, room):
-				client.NewPipeTCP(dc, guest)
+				client.NewPipe(dc, guestTCP)
 			case isUDPChannel(dc, room):
-				client.NewPipeUDP(dc, guest)
+				client.NewPipe(dc, guestUDP)
 			}
 		})
 	})
 
 	return peer
-}
-
-func (p *PeerToPeer) createChannels(peer *client.Peer, other client.Proxer, room string) error {
-	// UDP
-	dcUDP, err := peer.Connection.CreateDataChannel(fmt.Sprintf("%s/udp", room), nil)
-	if err != nil {
-		return fmt.Errorf("could not create data channel %q: %v", room, err)
-	}
-	pipeUDP := client.NewPipeUDP(dcUDP, other)
-
-	dcUDP.OnClose(func() {
-		log.Printf("dataChannel for %s has closed", peer.User.UserID)
-		p.Peers.Delete(peer.User.UserID)
-		pipeUDP.Close()
-	})
-
-	// TCP
-	dcTCP, err := peer.Connection.CreateDataChannel(fmt.Sprintf("%s/tcp", room), nil)
-	if err != nil {
-		return fmt.Errorf("could not create data channel %q: %v", room, err)
-	}
-	pipeTCP := client.NewPipeTCP(dcTCP, other)
-
-	dcTCP.OnClose(func() {
-		log.Printf("dataChannel for %s has closed", peer.User.UserID)
-		p.Peers.Delete(peer.User.UserID)
-		pipeTCP.Close()
-	})
-
-	return nil
 }
 
 func (p *PeerToPeer) handleRTCCandidate(m signalserver.MessageContent[webrtc.ICECandidateInit]) error {
@@ -551,17 +546,61 @@ func (r *IpRing) NextPort() string {
 	return fmt.Sprintf("2137%d", r.NextInt())
 }
 
-func (r *IpRing) CreateClient(currentUserRole Role, member signalserver.Member) (proxer client.Proxer, err error) {
-	if currentUserRole == Role(signalserver.RoleHost) {
-		return client.DialHost("127.0.0.1")
+func (r *IpRing) CreateClient(currentUserIsHost bool, other signalserver.Member) (ip net.IP, tcpProxy client.Redirector, udpProxy client.Redirector, err error) {
+	if currentUserIsHost {
+		// All players, who connect to the server are guests (joiners).
+		// We are connecting (dialing) to ourselves on the loopback interface,
+		// to the local instance served by the DispelMulti.exe.
+
+		ip = net.IPv4(127, 0, 0, 1)
+		tcpProxy, err = client.DialTCP(ip.To4().String())
+		if err != nil {
+			return ip, nil, nil, err
+		}
+		udpProxy, err = client.DialUDP(ip.To4().String())
+		if err != nil {
+			return ip, nil, nil, err
+		}
+		return ip, tcpProxy, udpProxy, nil
 	}
 
-	i := r.NextInt()
-	tcpPort := 7000 + i*2
-	udpPort := 7000 + i*2 + 1
+	if other.IsHost {
+		// The person who is connecting is a host (game creator).
+		// We are exposing a packet redirect on the local IP address,
+		// to which the game is going to connect (dial).
 
-	return client.ListenGuest(
-		net.JoinHostPort("127.0.0.1", fmt.Sprintf("%d", tcpPort)),
-		net.JoinHostPort("127.0.0.1", fmt.Sprintf("%d", udpPort)),
-	)
+		ip = r.NextIP()
+		tcpProxy, err = client.ListenTCP(ip.To4().String())
+		if err != nil {
+			return ip, nil, nil, err
+		}
+		udpProxy, err = client.ListenUDP(ip.To4().String())
+		if err != nil {
+			return ip, nil, nil, err
+		}
+		return ip, tcpProxy, udpProxy, nil
+	}
+
+	if other.Joined {
+		// The person who is connecting is a guest, who has already joined.
+		// We are connecting (dialing) to the host (game creator) on the loopback interface,
+		// to the local instance served by the DispelMulti.exe.
+		ip = r.NextIP()
+		udpProxy, err = client.ListenUDP(ip.To4().String())
+		if err != nil {
+			return ip, nil, nil, err
+		}
+		return ip, nil, udpProxy, nil
+	}
+
+	// The person who is connecting is a guest, who has not joined yet.
+	// We have registered the join during the game phase.
+	// In the rest of the cases, we are dialing to ourselves on the loopback
+	// interface,
+	ip = net.IPv4(127, 0, 0, 1)
+	udpProxy, err = client.DialUDP(ip.To4().String())
+	if err != nil {
+		return ip, nil, nil, err
+	}
+	return ip, nil, udpProxy, nil
 }
