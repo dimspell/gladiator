@@ -12,13 +12,17 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+var _ Redirector = (*DiallerTCP)(nil)
+
 type DiallerTCP struct {
 	tcpConn net.Conn
 }
 
-func DialTCP(gameServerIP string) (*DiallerTCP, error) {
-	// tcp:6114
-	tcpConn, err := net.DialTimeout("tcp", net.JoinHostPort(gameServerIP, "6114"), 3*time.Second)
+func DialTCP(ipv4 string, portNumber string) (*DiallerTCP, error) {
+	if portNumber == "" {
+		portNumber = "6114"
+	}
+	tcpConn, err := net.DialTimeout("tcp", net.JoinHostPort(ipv4, portNumber), 3*time.Second)
 	if err != nil {
 		return nil, fmt.Errorf("could not connect to game server on 6114: %s", err.Error())
 	}

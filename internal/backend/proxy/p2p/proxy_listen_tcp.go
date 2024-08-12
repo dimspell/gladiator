@@ -10,13 +10,18 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+var _ Redirector = (*ListenerTCP)(nil)
+
 type ListenerTCP struct {
 	connTCP  net.Listener
 	writeTCP chan []byte
 }
 
-func ListenTCP(tcpAddr string) (*ListenerTCP, error) {
-	tcpListener, err := net.Listen("tcp", tcpAddr)
+func ListenTCP(ipv4 string, portNumber string) (*ListenerTCP, error) {
+	if portNumber == "" {
+		portNumber = "6114"
+	}
+	tcpListener, err := net.Listen("tcp", net.JoinHostPort(ipv4, portNumber))
 	if err != nil {
 		return nil, err
 	}

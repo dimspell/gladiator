@@ -11,14 +11,18 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+var _ Redirector = (*DiallerUDP)(nil)
+
 type DiallerUDP struct {
 	udpAddr *net.UDPAddr
 	udpConn *net.UDPConn
 }
 
-func DialUDP(gameServerIP string) (*DiallerUDP, error) {
-	// udp:6113
-	udpAddr, err := net.ResolveUDPAddr("udp", net.JoinHostPort(gameServerIP, "6113"))
+func DialUDP(ipv4 string, portNumber string) (*DiallerUDP, error) {
+	if portNumber == "" {
+		portNumber = "6113"
+	}
+	udpAddr, err := net.ResolveUDPAddr("udp", net.JoinHostPort(ipv4, portNumber))
 	if err != nil {
 		return nil, fmt.Errorf("could not resolve UDP address on 6113 as a host: %s", err.Error())
 	}

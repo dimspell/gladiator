@@ -11,13 +11,18 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+var _ Redirector = (*ListenerUDP)(nil)
+
 type ListenerUDP struct {
 	connUDP  *net.UDPConn
 	writeUDP chan []byte
 }
 
-func ListenUDP(udpAddr string) (*ListenerUDP, error) {
-	srcAddr, err := net.ResolveUDPAddr("udp", udpAddr)
+func ListenUDP(ipv4 string, portNumber string) (*ListenerUDP, error) {
+	if portNumber == "" {
+		portNumber = "6113"
+	}
+	srcAddr, err := net.ResolveUDPAddr("udp", net.JoinHostPort(ipv4, portNumber))
 	if err != nil {
 		return nil, err
 	}
@@ -25,7 +30,7 @@ func ListenUDP(udpAddr string) (*ListenerUDP, error) {
 	if err != nil {
 		return nil, err
 	}
-	slog.Info("Guest: Listening UDP", "local", srcConn.LocalAddr(), "remote", srcConn.RemoteAddr())
+	slog.Info("Guest: Listening UDP", "addr", srcAddr.String())
 
 	p := ListenerUDP{
 		writeUDP: make(chan []byte),

@@ -1,11 +1,8 @@
 package proxy
 
 import (
-	"context"
 	"fmt"
-	"log"
 	"log/slog"
-	"net"
 	"net/http/httptest"
 	"net/url"
 	"os"
@@ -13,9 +10,156 @@ import (
 	"time"
 
 	"github.com/dimspell/gladiator/console/signalserver"
+	"github.com/dimspell/gladiator/internal/backend/proxy/p2p"
 	"github.com/lmittmann/tint"
+	"github.com/pion/webrtc/v4"
 	"go.uber.org/goleak"
 )
+
+func TestPeerTopeerManual(t *testing.T) {
+	t.Cleanup(func() {
+		defer goleak.VerifyNone(t)
+	})
+	StartHost(t)
+
+	slog.SetDefault(slog.New(
+		tint.NewHandler(
+			os.Stderr,
+			&tint.Options{
+				Level:      slog.LevelDebug,
+				TimeFormat: time.TimeOnly,
+				AddSource:  true,
+			},
+		),
+	))
+
+	const roomName = "test"
+	const (
+		player1Name = "player1"
+		player2Name = "player2"
+		player3Name = "player3"
+		player4Name = "player4"
+
+		hostRole  = Role(signalserver.RoleHost)
+		guestRole = Role(signalserver.RoleGuest)
+	)
+
+	ws := &FakeWebsocket{Buffer: make([][]byte, 0)}
+
+	player1 := &PeerToPeer{
+		Peers:  p2p.NewPeers(),
+		IpRing: NewIpRing(),
+		ws:     ws,
+	} // Host called "player1"
+	player1HandlePackets := player1.handlePackets(hostRole, player1Name, roomName)
+
+	player2 := &PeerToPeer{
+		Peers:  p2p.NewPeers(),
+		IpRing: NewIpRing(),
+		ws:     ws,
+	} // Guest, called "player2", joining to "player1"
+	player2HandlePackets := player2.handlePackets(guestRole, player2Name, roomName)
+
+	if err := player1.handleJoin(signalserver.MessageContent[signalserver.Member]{
+		Type: signalserver.Join,
+		Content: signalserver.Member{
+			UserID: player2Name,
+			Role:   signalserver.RoleGuest,
+		},
+		From: "",
+		To:   "",
+	}, player1Name, roomName, hostRole); err != nil {
+		t.Error(err)
+		return
+	}
+
+	player1.Peers.Range(func(_ string, peer *p2p.Peer) {
+		<-webrtc.GatheringCompletePromise(peer.Connection)
+	})
+
+	{
+		var arr []byte
+		arr = make([]byte, 1024)
+		n, err := ws.Read(arr)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		if err := player1HandlePackets(arr[:n]); err != nil {
+			t.Error(err)
+			return
+		}
+	}
+
+	if err := player2.handleJoin(signalserver.MessageContent[signalserver.Member]{
+		Type: signalserver.Join,
+		Content: signalserver.Member{
+			UserID: player1Name,
+			Role:   signalserver.RoleHost,
+		},
+		From: "",
+		To:   "",
+	}, player2Name, roomName, guestRole); err != nil {
+		t.Error(err)
+		return
+	}
+
+	{
+		var arr []byte
+		arr = make([]byte, 1024)
+		n, err := ws.Read(arr)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		if err := player2HandlePackets(arr[:n]); err != nil {
+			t.Error(err)
+			return
+		}
+	}
+
+	player2.Peers.Range(func(_ string, peer *p2p.Peer) {
+		<-webrtc.GatheringCompletePromise(peer.Connection)
+	})
+
+	{
+		var arr []byte
+		arr = make([]byte, 1024)
+		n, err := ws.Read(arr)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		if err := player2HandlePackets(arr[:n]); err != nil {
+			t.Error(err)
+			return
+		}
+	}
+
+	{
+		var arr []byte
+		arr = make([]byte, 1024)
+		n, err := ws.Read(arr)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		if err := player1HandlePackets(arr[:n]); err != nil {
+			t.Error(err)
+			return
+		}
+	}
+
+	fmt.Println(player1.Peers.Get(player2Name))
+	fmt.Println(player2.Peers.Get(player1Name))
+	fmt.Println("Done")
+
+	player1.Close()
+	player2.Close()
+
+	// assert.NoError(t, err)
+
+}
 
 func TestPeerToPeer(t *testing.T) {
 	defer goleak.VerifyNone(t)
@@ -84,88 +228,6 @@ func TestPeerToPeer(t *testing.T) {
 			t.Error(err)
 			return
 		}
-	})
-}
-
-func StartHost(t testing.TB) {
-	t.Helper()
-
-	ctx, cancel := context.WithCancel(context.TODO())
-
-	// Listen for incoming connections.
-	tcpListener, err := net.Listen("tcp", net.JoinHostPort("127.0.0.1", "6114"))
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	udpAddr, err := net.ResolveUDPAddr("udp", net.JoinHostPort("127.0.0.1", "6113"))
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	udpConn, err := net.ListenUDP("udp", udpAddr)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// Listen UDP
-	go func() {
-		for {
-			if ctx.Err() != nil {
-				fmt.Println("context err")
-				return
-			}
-
-			buf := make([]byte, 1024)
-			_, _, err := udpConn.ReadFrom(buf)
-			if err != nil {
-				break
-			}
-
-			if buf[0] == 26 {
-				{
-					_, err = udpConn.WriteToUDP([]byte{27, 0, 2, 0}, udpAddr)
-					log.Println(err)
-				}
-				fmt.Println("Responded with 27")
-			}
-		}
-	}()
-
-	go func() {
-		processPackets := func(conn net.Conn) {
-			defer conn.Close()
-
-			for {
-				conn.SetDeadline(time.Now().Add(10 * time.Second))
-
-				buf := make([]byte, 1024)
-				if _, err := conn.Read(buf); err != nil {
-					return
-				}
-
-				conn.Write([]byte{35, 35, 116, 101, 115, 116, 0})
-			}
-		}
-
-		for {
-			if ctx.Err() != nil {
-				return
-			}
-
-			// Listen for an incoming connection.
-			conn, err := tcpListener.Accept()
-			if err != nil {
-				continue
-			}
-			go processPackets(conn)
-		}
-	}()
-
-	t.Cleanup(func() {
-		cancel()
-		udpConn.Close()
-		tcpListener.Close()
 	})
 }
 
