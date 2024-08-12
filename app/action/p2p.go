@@ -7,7 +7,7 @@ import (
 	"os"
 
 	"github.com/dimspell/gladiator/internal/backend/proxy"
-	"github.com/dimspell/gladiator/internal/backend/proxy/client"
+	"github.com/dimspell/gladiator/internal/backend/proxy/p2p"
 	"github.com/google/uuid"
 	"github.com/urfave/cli/v3"
 )
@@ -37,7 +37,7 @@ func P2PCommand() *cli.Command {
 	cmd.Action = func(ctx context.Context, c *cli.Command) error {
 		id := uuid.New().String()[:6]
 
-		p2p := proxy.NewPeerToPeer("ws://localhost:5050")
+		peerToPeer := proxy.NewPeerToPeer("ws://localhost:5050")
 
 		// ch := make(chan string)
 		//
@@ -51,21 +51,21 @@ func P2PCommand() *cli.Command {
 		// }()
 
 		if c.String("mode") == "host" {
-			if _, err := p2p.Create(proxy.CreateParams{
+			if _, err := peerToPeer.Create(proxy.CreateParams{
 				HostUserIP: "",
 				GameID:     "test",
 				HostUserID: "host1",
 			}); err != nil {
 				return err
 			}
-			if err := p2p.Host(proxy.HostParams{
+			if err := peerToPeer.Host(proxy.HostParams{
 				GameID:     "test",
 				HostUserID: "host1",
 			}); err != nil {
 				return err
 			}
 		} else {
-			if ip, err := p2p.Join(proxy.JoinParams{
+			if ip, err := peerToPeer.Join(proxy.JoinParams{
 				HostUserID:    "host1",
 				CurrentUserID: id,
 				GameID:        "test",
@@ -85,7 +85,7 @@ func P2PCommand() *cli.Command {
 				return err
 			}
 
-			p2p.Peers.Range(func(s string, peer *client.Peer) {
+			peerToPeer.Peers.Range(func(s string, peer *p2p.Peer) {
 				log.Println(s, peer)
 			})
 			// ch <- string(line)

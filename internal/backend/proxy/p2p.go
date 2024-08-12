@@ -1,17 +1,14 @@
 package proxy
 
 import (
-	"container/ring"
 	"fmt"
-	"io"
 	"log"
 	"log/slog"
 	"net"
 	"net/url"
-	"sync"
 	"time"
 
-	"github.com/dimspell/gladiator/internal/backend/proxy/client"
+	"github.com/dimspell/gladiator/internal/backend/proxy/p2p"
 
 	"github.com/dimspell/gladiator/console/signalserver"
 	"github.com/fxamacker/cbor/v2"
@@ -23,25 +20,19 @@ var _ Proxy = (*PeerToPeer)(nil)
 
 type PeerToPeer struct {
 	SignalServerURL string
-	IpRing          *IpRing
+	IpRing          *p2p.IpRing
 
-	Peers *client.Peers
+	Peers *p2p.Peers
 
-	ws WebSocket
+	ws p2p.WebSocket
 	// done chan struct{}
-}
-
-type WebSocket interface {
-	io.Closer
-	io.Reader
-	io.Writer
 }
 
 func NewPeerToPeer(signalServerURL string) *PeerToPeer {
 	return &PeerToPeer{
 		SignalServerURL: signalServerURL,
-		Peers:           client.NewPeers(),
-		IpRing:          NewIpRing(),
+		Peers:           p2p.NewPeers(),
+		IpRing:          p2p.NewIpRing(),
 	}
 }
 
@@ -280,7 +271,7 @@ func (p *PeerToPeer) handleJoin(m signalserver.MessageContent[signalserver.Membe
 		if err != nil {
 			return fmt.Errorf("could not create data channel %q: %v", room, err)
 		}
-		pipeTCP := client.NewPipe(dcTCP, guestTCP)
+		pipeTCP := p2p.NewPipe(dcTCP, guestTCP)
 
 		dcTCP.OnClose(func() {
 			log.Printf("dataChannel for %s has closed", peer.User.UserID)
@@ -296,7 +287,7 @@ func (p *PeerToPeer) handleJoin(m signalserver.MessageContent[signalserver.Membe
 		if err != nil {
 			return fmt.Errorf("could not create data channel %q: %v", room, err)
 		}
-		pipeUDP := client.NewPipe(dcUDP, guestUDP)
+		pipeUDP := p2p.NewPipe(dcUDP, guestUDP)
 
 		dcUDP.OnClose(func() {
 			log.Printf("dataChannel for %s has closed", peer.User.UserID)
@@ -374,7 +365,7 @@ func (p *PeerToPeer) handleRTCAnswer(m signalserver.MessageContent[signalserver.
 	return nil
 }
 
-func (p *PeerToPeer) addPeer(member signalserver.Member, room string, user string, currentUserIsHost bool, guestTCP client.Redirector, guestUDP client.Redirector, sendRTCOffer bool) *client.Peer {
+func (p *PeerToPeer) addPeer(member signalserver.Member, room string, user string, currentUserIsHost bool, guestTCP p2p.Redirector, guestUDP p2p.Redirector, sendRTCOffer bool) *p2p.Peer {
 	config := webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{
 			// {
@@ -393,7 +384,7 @@ func (p *PeerToPeer) addPeer(member signalserver.Member, room string, user strin
 		panic(err)
 	}
 
-	peer := &client.Peer{
+	peer := &p2p.Peer{
 		User: member,
 		// IP:         unknown, TODO: Fix me
 		// Proxer:     guest,
@@ -459,9 +450,9 @@ func (p *PeerToPeer) addPeer(member signalserver.Member, room string, user strin
 
 			switch {
 			case isTCPChannel(dc, room):
-				client.NewPipe(dc, guestTCP)
+				p2p.NewPipe(dc, guestTCP)
 			case isUDPChannel(dc, room):
-				client.NewPipe(dc, guestUDP)
+				p2p.NewPipe(dc, guestUDP)
 			}
 		})
 	})
@@ -513,94 +504,4 @@ func resetTimer(t *time.Timer, d time.Duration) {
 		}
 	}
 	t.Reset(d)
-}
-
-type IpRing struct {
-	Ring *ring.Ring
-	mtx  sync.Mutex
-}
-
-func NewIpRing() *IpRing {
-	r := ring.New(3)
-	n := r.Len()
-	for i := 0; i < n; i++ {
-		r.Value = i + 2
-		r = r.Next()
-	}
-	return &IpRing{Ring: r}
-}
-
-func (r *IpRing) NextInt() int {
-	r.mtx.Lock()
-	defer r.mtx.Unlock()
-	d := r.Ring.Value.(int)
-	r.Ring = r.Ring.Next()
-	return d
-}
-
-func (r *IpRing) NextIP() net.IP {
-	return net.IPv4(127, 0, 1, byte(r.NextInt()))
-}
-
-func (r *IpRing) NextPort() string {
-	return fmt.Sprintf("2137%d", r.NextInt())
-}
-
-func (r *IpRing) CreateClient(currentUserIsHost bool, other signalserver.Member) (ip net.IP, tcpProxy client.Redirector, udpProxy client.Redirector, err error) {
-	if currentUserIsHost {
-		// All players, who connect to the server are guests (joiners).
-		// We are connecting (dialing) to ourselves on the loopback interface,
-		// to the local instance served by the DispelMulti.exe.
-
-		ip = net.IPv4(127, 0, 0, 1)
-		tcpProxy, err = client.DialTCP(ip.To4().String())
-		if err != nil {
-			return ip, nil, nil, err
-		}
-		udpProxy, err = client.DialUDP(ip.To4().String())
-		if err != nil {
-			return ip, nil, nil, err
-		}
-		return ip, tcpProxy, udpProxy, nil
-	}
-
-	if other.IsHost {
-		// The person who is connecting is a host (game creator).
-		// We are exposing a packet redirect on the local IP address,
-		// to which the game is going to connect (dial).
-
-		ip = r.NextIP()
-		tcpProxy, err = client.ListenTCP(ip.To4().String())
-		if err != nil {
-			return ip, nil, nil, err
-		}
-		udpProxy, err = client.ListenUDP(ip.To4().String())
-		if err != nil {
-			return ip, nil, nil, err
-		}
-		return ip, tcpProxy, udpProxy, nil
-	}
-
-	if other.Joined {
-		// The person who is connecting is a guest, who has already joined.
-		// We are connecting (dialing) to the host (game creator) on the loopback interface,
-		// to the local instance served by the DispelMulti.exe.
-		ip = r.NextIP()
-		udpProxy, err = client.ListenUDP(ip.To4().String())
-		if err != nil {
-			return ip, nil, nil, err
-		}
-		return ip, nil, udpProxy, nil
-	}
-
-	// The person who is connecting is a guest, who has not joined yet.
-	// We have registered the join during the game phase.
-	// In the rest of the cases, we are dialing to ourselves on the loopback
-	// interface,
-	ip = net.IPv4(127, 0, 0, 1)
-	udpProxy, err = client.DialUDP(ip.To4().String())
-	if err != nil {
-		return ip, nil, nil, err
-	}
-	return ip, nil, udpProxy, nil
 }
