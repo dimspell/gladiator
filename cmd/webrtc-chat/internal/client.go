@@ -7,6 +7,7 @@ import (
 	"net/url"
 
 	"github.com/dimspell/gladiator/console/signalserver"
+	"github.com/dimspell/gladiator/internal/backend/proxy/p2p"
 	"github.com/fxamacker/cbor/v2"
 	"github.com/pion/webrtc/v4"
 	"golang.org/x/net/websocket"
@@ -16,7 +17,6 @@ type DialParams struct {
 	SignalingURL string
 	RoomName     string
 	ID           string
-	Name         string
 }
 
 func Dial(params *DialParams) (*Client, error) {
@@ -68,8 +68,7 @@ func Dial(params *DialParams) (*Client, error) {
 	slog.Info("Connected to signaling server", "response", resp.Content)
 
 	return &Client{
-		ID:   params.ID,
-		Name: params.Name,
+		ID: params.ID,
 
 		Peers: NewPeers(),
 		ws:    ws,
@@ -88,11 +87,10 @@ func (c *Client) Close() {
 }
 
 type Client struct {
-	ID   string
-	Name string
+	ID string
 
 	// ws is the websocket connection to the signaling server
-	ws *websocket.Conn
+	ws p2p.WebSocket
 
 	// peers stores the WebRTC peer connections
 	Peers *Peers
@@ -179,7 +177,7 @@ func (c *Client) handleJoin(msg signalserver.MessageContent[signalserver.Member]
 	c.addNewDataChannel(peer, onUDP)
 }
 
-func (c *Client) addPeer(member signalserver.Member, isJoinNotRTCOffer bool, onTCP MessageHandler) *Peer {
+func (c *Client) addPeer(member signalserver.Member, sendRTCOffer bool, onTCP MessageHandler) *Peer {
 	config := webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{
 			// {
@@ -231,7 +229,7 @@ func (c *Client) addPeer(member signalserver.Member, isJoinNotRTCOffer bool, onT
 			panic(err)
 		}
 
-		if !isJoinNotRTCOffer {
+		if !sendRTCOffer {
 			// If this is a message sent first time after joining,
 			// then we send the offer to invite yourself to join other users.
 			return
