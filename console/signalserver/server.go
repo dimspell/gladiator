@@ -170,21 +170,28 @@ func SendMessage(ws *websocket.Conn, msgType EventType, msg any) {
 	}
 }
 
-func (h *Server) Run() (start func(context.Context) error, shutdown func(context.Context) error) {
+func (h *Server) Run(httpAddr, turnPublicIP string, turnPortNumber int) (start func(context.Context) error, shutdown func(context.Context) error) {
+	if httpAddr == "" {
+		httpAddr = ":5050"
+	}
+	if turnPublicIP == "" {
+		turnPublicIP = "127.0.0.1" // IP Address that TURN can be contacted by
+	}
+	if turnPortNumber == 0 {
+		turnPortNumber = 3478 // Listening port
+	}
 	httpServer := &http.Server{
-		Addr:         ":5050",
+		Addr:         httpAddr,
 		Handler:      h,
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  120 * time.Second,
 	}
 
-	publicIP := "127.0.0.1"                            // IP Address that TURN can be contacted by
-	port := 3478                                       // Listening port
 	users := `username1=password1,username2=password2` // List of username and password (e.g. "user=pass,user=pass")
 	realm := "dispelmulti.net"                         // Realm
 
-	turnServer, err := startTURNServer(&publicIP, &port, &users, &realm)
+	turnServer, err := startTURNServer(&turnPublicIP, &turnPortNumber, &users, &realm)
 	if err != nil {
 		log.Panicf("Could not start TURN server: %s", err)
 	}

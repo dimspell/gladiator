@@ -30,7 +30,7 @@ func TurnCommand() *cli.Command {
 		if err != nil {
 			return err
 		}
-		start, stop := s.Run()
+		start, stop := s.Run(":5050", "127.0.0.1", 3478)
 		defer stop(ctx)
 		return start(ctx)
 	}
