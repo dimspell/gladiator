@@ -65,18 +65,24 @@ func (b *Backend) HandleSelectGame(session *model.Session, req SelectGameRequest
 	response = binary.LittleEndian.AppendUint32(response, gameRoom.MapID)
 
 	for _, player := range respPlayers.Msg.GetPlayers() {
-		if player.UserId == session.UserID {
-			continue
-		}
-
-		proxyIP, err := b.Proxy.Exchange(proxy.ExchangeParams{
+		ps := proxy.ExchangeParams{
 			GameID:    respGame.Msg.GetGame().String(),
 			UserID:    fmt.Sprintf("%d", session.UserID),
 			IPAddress: player.IpAddress,
-		})
+		}
+		proxyIP, err := b.Proxy.Exchange(ps)
 
 		if err != nil {
-			return err
+			slog.Warn("Not found a player with the provided ID",
+				"player", player.Username,
+				"proxyIP", proxyIP,
+				"error", err,
+				"gameID", ps.GameID,
+				"userId", ps.UserID,
+				"ipAddress", ps.IPAddress,
+			)
+			// return err
+			continue
 		}
 
 		// TODO: make sure the host is the first one
