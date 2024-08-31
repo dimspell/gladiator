@@ -3,6 +3,7 @@ package p2p
 import (
 	"container/ring"
 	"fmt"
+	"log/slog"
 	"net"
 	"sync"
 
@@ -59,6 +60,8 @@ func (r *IpRing) CreateClient(currentUserIsHost bool, other signalserver.Member)
 		// to the local instance served by the DispelMulti.exe.
 
 		ip := net.IPv4(127, 0, 0, 1)
+		slog.Debug("Creating client to dial TCP and UDP on default ports", "ip", ip)
+
 		tcpProxy, err = DialTCP(ip.To4().String(), "")
 		if err != nil {
 			return nil, nil, err
@@ -76,6 +79,8 @@ func (r *IpRing) CreateClient(currentUserIsHost bool, other signalserver.Member)
 		// to which the game is going to connect (dial).
 
 		ip, portTCP, portUDP := r.NextAddr()
+		slog.Debug("Creating TCP and UDP listeners on custom ports", "ip", ip, "tcpPort", portTCP, "udpPort", portUDP)
+
 		tcpProxy, err = ListenTCP(ip, portTCP)
 		if err != nil {
 			return nil, nil, err
@@ -91,7 +96,10 @@ func (r *IpRing) CreateClient(currentUserIsHost bool, other signalserver.Member)
 		// The person who is connecting is a guest, who has already joined.
 		// We are connecting (dialing) to the host (game creator) on the loopback interface,
 		// to the local instance served by the DispelMulti.exe.
+
 		ip, _, portUDP := r.NextAddr()
+		slog.Debug("Creating UDP listener only on a custom port", "ip", ip, "udpPort", portUDP)
+
 		udpProxy, err = ListenUDP(ip, portUDP)
 		if err != nil {
 			return nil, nil, err
@@ -103,7 +111,10 @@ func (r *IpRing) CreateClient(currentUserIsHost bool, other signalserver.Member)
 	// We have registered the join during the game phase.
 	// In the rest of the cases, we are dialing to ourselves on the loopback
 	// interface,
+
 	ip := net.IPv4(127, 0, 0, 1)
+	slog.Debug("Creating UDP dialler on the default port", "ip", ip)
+
 	udpProxy, err = DialUDP(ip.To4().String(), "")
 	if err != nil {
 		return nil, nil, err
