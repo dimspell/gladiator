@@ -31,7 +31,7 @@ func (b *Backend) HandleCreateGame(session *model.Session, req CreateGameRequest
 	case uint32(model.GameStateNone):
 		hostIPAddress, err := b.Proxy.Create(proxy.CreateParams{
 			HostUserIP: session.LocalIpAddress,
-			HostUserID: session.Username,
+			HostUserID: fmt.Sprintf("%d", session.UserID),
 			GameID:     data.RoomName,
 		})
 		if err != nil {

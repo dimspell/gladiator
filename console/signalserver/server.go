@@ -5,6 +5,7 @@ import (
 	"log"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"sync"
 	"time"
 
@@ -180,8 +181,14 @@ func (h *Server) Run(httpAddr, turnPublicIP string, turnPortNumber int) (start f
 	if turnPortNumber == 0 {
 		turnPortNumber = 3478 // Listening port
 	}
+
+	u, err := url.Parse(httpAddr)
+	if err != nil {
+		panic(err)
+	}
+
 	httpServer := &http.Server{
-		Addr:         httpAddr,
+		Addr:         u.Host,
 		Handler:      h,
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,
