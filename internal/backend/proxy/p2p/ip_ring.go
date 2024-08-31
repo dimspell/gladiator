@@ -3,6 +3,7 @@ package p2p
 import (
 	"container/ring"
 	"fmt"
+	"github.com/dimspell/gladiator/internal/backend/proxy/redirect"
 	"log/slog"
 	"net"
 	"sync"
@@ -53,7 +54,7 @@ func (r *IpRing) NextAddr() (ip string, portTCP string, portUDP string) {
 	return ip, portTCP, portUDP
 }
 
-func (r *IpRing) CreateClient(currentUserIsHost bool, other signalserver.Member) (tcpProxy Redirector, udpProxy Redirector, err error) {
+func (r *IpRing) CreateClient(currentUserIsHost bool, other signalserver.Member) (tcpProxy redirect.Redirect, udpProxy redirect.Redirect, err error) {
 	if currentUserIsHost {
 		// All players, who connect to the server are guests (joiners).
 		// We are connecting (dialing) to ourselves on the loopback interface,
@@ -62,11 +63,11 @@ func (r *IpRing) CreateClient(currentUserIsHost bool, other signalserver.Member)
 		ip := net.IPv4(127, 0, 0, 1)
 		slog.Debug("Creating client to dial TCP and UDP on default ports", "ip", ip)
 
-		tcpProxy, err = DialTCP(ip.To4().String(), "")
+		tcpProxy, err = redirect.DialTCP(ip.To4().String(), "")
 		if err != nil {
 			return nil, nil, err
 		}
-		udpProxy, err = DialUDP(ip.To4().String(), "")
+		udpProxy, err = redirect.DialUDP(ip.To4().String(), "")
 		if err != nil {
 			return nil, nil, err
 		}
@@ -81,11 +82,11 @@ func (r *IpRing) CreateClient(currentUserIsHost bool, other signalserver.Member)
 		ip, portTCP, portUDP := r.NextAddr()
 		slog.Debug("Creating TCP and UDP listeners on custom ports", "ip", ip, "tcpPort", portTCP, "udpPort", portUDP)
 
-		tcpProxy, err = ListenTCP(ip, portTCP)
+		tcpProxy, err = redirect.ListenTCP(ip, portTCP)
 		if err != nil {
 			return nil, nil, err
 		}
-		udpProxy, err = ListenUDP(ip, portUDP)
+		udpProxy, err = redirect.ListenUDP(ip, portUDP)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -100,7 +101,7 @@ func (r *IpRing) CreateClient(currentUserIsHost bool, other signalserver.Member)
 		ip, _, portUDP := r.NextAddr()
 		slog.Debug("Creating UDP listener only on a custom port", "ip", ip, "udpPort", portUDP)
 
-		udpProxy, err = ListenUDP(ip, portUDP)
+		udpProxy, err = redirect.ListenUDP(ip, portUDP)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -115,7 +116,7 @@ func (r *IpRing) CreateClient(currentUserIsHost bool, other signalserver.Member)
 	ip := net.IPv4(127, 0, 0, 1)
 	slog.Debug("Creating UDP dialler on the default port", "ip", ip)
 
-	udpProxy, err = DialUDP(ip.To4().String(), "")
+	udpProxy, err = redirect.DialUDP(ip.To4().String(), "")
 	if err != nil {
 		return nil, nil, err
 	}

@@ -1,4 +1,4 @@
-package p2p
+package redirect
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-var _ Redirector = (*ListenerTCP)(nil)
+var _ Redirect = (*ListenerTCP)(nil)
 
 type ListenerTCP struct {
 	connTCP  net.Listener

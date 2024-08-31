@@ -2,6 +2,7 @@ package p2p
 
 import (
 	"context"
+	"github.com/dimspell/gladiator/internal/backend/proxy/redirect"
 	"io"
 	"log"
 	"log/slog"
@@ -25,7 +26,7 @@ type Pipe struct {
 	dc     DataChannel
 	done   func()
 	dcData chan webrtc.DataChannelMessage
-	proxy  Redirector
+	proxy  redirect.Redirect
 }
 
 type DataChannel interface {
@@ -38,7 +39,7 @@ type DataChannel interface {
 	io.Closer
 }
 
-func NewPipe(dc DataChannel, proxy Redirector) *Pipe {
+func NewPipe(dc DataChannel, proxy redirect.Redirect) *Pipe {
 	pipe := &Pipe{
 		dc:     dc,
 		proxy:  proxy,

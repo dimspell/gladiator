@@ -1,11 +1,11 @@
-package p2p
+package redirect
 
 import (
 	"context"
 	"io"
 )
 
-type Redirector interface {
+type Redirect interface {
 	Run(ctx context.Context, rw io.ReadWriteCloser) error
 
 	io.Writer

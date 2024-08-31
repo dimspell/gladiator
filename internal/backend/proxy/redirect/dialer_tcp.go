@@ -1,4 +1,4 @@
-package p2p
+package redirect
 
 import (
 	"context"
@@ -12,13 +12,13 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-var _ Redirector = (*DiallerTCP)(nil)
+var _ Redirect = (*DialerTCP)(nil)
 
-type DiallerTCP struct {
+type DialerTCP struct {
 	tcpConn net.Conn
 }
 
-func DialTCP(ipv4 string, portNumber string) (*DiallerTCP, error) {
+func DialTCP(ipv4 string, portNumber string) (*DialerTCP, error) {
 	if portNumber == "" {
 		portNumber = "6114"
 	}
@@ -28,12 +28,12 @@ func DialTCP(ipv4 string, portNumber string) (*DiallerTCP, error) {
 	}
 	slog.Info("Host: Connected TCP", "local", tcpConn.LocalAddr().String(), "remote", tcpConn.RemoteAddr().String())
 
-	return &DiallerTCP{
+	return &DialerTCP{
 		tcpConn: tcpConn,
 	}, nil
 }
 
-func (p *DiallerTCP) Run(ctx context.Context, rw io.ReadWriteCloser) error {
+func (p *DialerTCP) Run(ctx context.Context, rw io.ReadWriteCloser) error {
 	g, ctx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
@@ -69,7 +69,7 @@ func (p *DiallerTCP) Run(ctx context.Context, rw io.ReadWriteCloser) error {
 	return g.Wait()
 }
 
-func (p *DiallerTCP) Write(msg []byte) (n int, err error) {
+func (p *DialerTCP) Write(msg []byte) (n int, err error) {
 	n, err = p.tcpConn.Write(msg)
 	if err != nil {
 		log.Println("(tcp): Error writing to server: ", err)
@@ -79,7 +79,7 @@ func (p *DiallerTCP) Write(msg []byte) (n int, err error) {
 	return n, err
 }
 
-func (p *DiallerTCP) Close() error {
+func (p *DialerTCP) Close() error {
 	// return p.tcpConn.Close()
 	return nil
 }

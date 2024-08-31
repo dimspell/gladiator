@@ -1,4 +1,4 @@
-package p2p
+package redirect
 
 import (
 	"context"
@@ -12,7 +12,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-var _ Redirector = (*ListenerUDP)(nil)
+var _ Redirect = (*ListenerUDP)(nil)
 
 type ListenerUDP struct {
 	connUDP  *net.UDPConn

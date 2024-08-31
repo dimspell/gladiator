@@ -2,6 +2,7 @@ package p2p
 
 import (
 	"fmt"
+	"github.com/dimspell/gladiator/internal/backend/proxy/redirect"
 	"log"
 	"log/slog"
 	"net/url"
@@ -300,7 +301,7 @@ func (p *PeerToPeer) handleRTCAnswer(m signalserver.MessageContent[signalserver.
 	return nil
 }
 
-func (p *PeerToPeer) addPeer(member signalserver.Member, guestTCP Redirector, guestUDP Redirector, sendRTCOffer bool) *Peer {
+func (p *PeerToPeer) addPeer(member signalserver.Member, guestTCP redirect.Redirect, guestUDP redirect.Redirect, sendRTCOffer bool) *Peer {
 	peerConnection, err := webrtc.NewPeerConnection(p.WebRTCConfig)
 	if err != nil {
 		panic(err)

@@ -1,4 +1,4 @@
-package p2p
+package redirect
 
 import (
 	"context"
@@ -11,14 +11,14 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-var _ Redirector = (*DiallerUDP)(nil)
+var _ Redirect = (*DialerUDP)(nil)
 
-type DiallerUDP struct {
+type DialerUDP struct {
 	udpAddr *net.UDPAddr
 	udpConn *net.UDPConn
 }
 
-func DialUDP(ipv4 string, portNumber string) (*DiallerUDP, error) {
+func DialUDP(ipv4 string, portNumber string) (*DialerUDP, error) {
 	if portNumber == "" {
 		portNumber = "6113"
 	}
@@ -32,13 +32,13 @@ func DialUDP(ipv4 string, portNumber string) (*DiallerUDP, error) {
 	}
 	slog.Info("Host: Connected UDP", "local", udpConn.LocalAddr().String(), "remote", udpConn.RemoteAddr().String())
 
-	return &DiallerUDP{
+	return &DialerUDP{
 		udpAddr: udpAddr,
 		udpConn: udpConn,
 	}, nil
 }
 
-func (p *DiallerUDP) Run(ctx context.Context, rw io.ReadWriteCloser) error {
+func (p *DialerUDP) Run(ctx context.Context, rw io.ReadWriteCloser) error {
 	g, ctx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
@@ -81,7 +81,7 @@ func (p *DiallerUDP) Run(ctx context.Context, rw io.ReadWriteCloser) error {
 	return g.Wait()
 }
 
-func (p *DiallerUDP) Write(msg []byte) (n int, err error) {
+func (p *DialerUDP) Write(msg []byte) (n int, err error) {
 	n, err = p.udpConn.Write(msg)
 	if err != nil {
 		return n, fmt.Errorf("could not write UDP message: %s", err.Error())
@@ -90,6 +90,6 @@ func (p *DiallerUDP) Write(msg []byte) (n int, err error) {
 	return n, err
 }
 
-func (p *DiallerUDP) Close() error {
+func (p *DialerUDP) Close() error {
 	return p.udpConn.Close()
 }
