@@ -58,11 +58,12 @@ func (b *Backend) HandleJoinGame(session *model.Session, req JoinGameRequest) er
 			continue
 		}
 
-		proxyIP, err := b.Proxy.Exchange(proxy.ExchangeParams{
+		ps := proxy.ExchangeParams{
 			GameID:    respGame.Msg.GetGame().GetName(),
 			UserID:    fmt.Sprintf("%d", player.UserId),
 			IPAddress: player.IpAddress,
-		})
+		}
+		proxyIP, err := b.Proxy.Exchange(ps)
 		if err != nil {
 			return err
 		}

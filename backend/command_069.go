@@ -66,8 +66,8 @@ func (b *Backend) HandleSelectGame(session *model.Session, req SelectGameRequest
 
 	for _, player := range respPlayers.Msg.GetPlayers() {
 		ps := proxy.ExchangeParams{
-			GameID:    respGame.Msg.GetGame().String(),
-			UserID:    fmt.Sprintf("%d", session.UserID),
+			GameID:    respGame.Msg.GetGame().GetName(),
+			UserID:    fmt.Sprintf("%d", player.UserId),
 			IPAddress: player.IpAddress,
 		}
 		proxyIP, err := b.Proxy.Exchange(ps)
