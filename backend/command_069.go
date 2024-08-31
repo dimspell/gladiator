@@ -57,8 +57,8 @@ func (b *Backend) HandleSelectGame(session *model.Session, req SelectGameRequest
 			Name:          respGame.Msg.Game.Name,
 			Password:      "",
 		},
-		MapID:   uint32(respGame.Msg.Game.GetMapId()),
-		Players: []model.LobbyPlayer{},
+		MapID: uint32(respGame.Msg.Game.GetMapId()),
+		// Players: []model.LobbyPlayer{}, // Unused
 	}
 
 	response := []byte{}

@@ -3,11 +3,11 @@ package action
 import (
 	"bufio"
 	"context"
+	"fmt"
 	"log"
 	"os"
 
 	"github.com/dimspell/gladiator/internal/backend/proxy"
-	"github.com/dimspell/gladiator/internal/backend/proxy/p2p"
 	"github.com/google/uuid"
 	"github.com/urfave/cli/v3"
 )
@@ -85,9 +85,10 @@ func P2PCommand() *cli.Command {
 				return err
 			}
 
-			peerToPeer.Peers.Range(func(s string, peer *p2p.Peer) {
-				log.Println(s, peer)
-			})
+			fmt.Println("test")
+			// peerToPeer.Peers.Range(func(s string, peer *p2p.Peer) {
+			// 	log.Println(s, peer)
+			// })
 			// ch <- string(line)
 		}
 

@@ -32,7 +32,6 @@ func main() {
 		SignalingURL: "ws://localhost:5050",
 		RoomName:     "test",
 		ID:           userID,
-		Name:         userID,
 	})
 	if err != nil {
 		panic(err)
