@@ -80,5 +80,6 @@ func (p *DiallerTCP) Write(msg []byte) (n int, err error) {
 }
 
 func (p *DiallerTCP) Close() error {
-	return p.tcpConn.Close()
+	// return p.tcpConn.Close()
+	return nil
 }

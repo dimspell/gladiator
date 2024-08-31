@@ -22,8 +22,8 @@ type Peer struct {
 var _ io.ReadWriteCloser = (*Pipe)(nil)
 
 type Pipe struct {
-	dc DataChannel
-	// done   chan struct{}
+	dc     DataChannel
+	done   func()
 	dcData chan webrtc.DataChannelMessage
 	proxy  Redirector
 }
@@ -40,13 +40,14 @@ type DataChannel interface {
 
 func NewPipe(dc DataChannel, proxy Redirector) *Pipe {
 	pipe := &Pipe{
-		dc:    dc,
-		proxy: proxy,
-		// done:   make(chan struct{}, 1),
+		dc:     dc,
+		proxy:  proxy,
 		dcData: make(chan webrtc.DataChannelMessage, 1),
 	}
 
 	ctx, cancel := context.WithCancel(context.TODO())
+	pipe.done = cancel
+
 	g, ctx := errgroup.WithContext(ctx)
 	g.Go(func() error {
 		return proxy.Run(ctx, pipe)
@@ -57,8 +58,6 @@ func NewPipe(dc DataChannel, proxy Redirector) *Pipe {
 			case <-ctx.Done():
 				slog.Debug("context done", "error", ctx.Err())
 				return ctx.Err()
-			// case <-pipe.done:
-			// 	return nil
 			case msg := <-pipe.dcData:
 				slog.Debug("Pipe.OnMessage.select", "data", msg.Data, "channel", pipe.dc.Label())
 
@@ -133,11 +132,6 @@ func (pipe *Pipe) Write(p []byte) (n int, err error) {
 }
 
 func (pipe *Pipe) Close() error {
-	if pipe.dcData != nil {
-		// pipe.done <- struct{}{}
-		close(pipe.dcData)
-		pipe.proxy.Close()
-		// close(pipe.done)
-	}
-	return pipe.dc.Close()
+	pipe.done()
+	return nil
 }

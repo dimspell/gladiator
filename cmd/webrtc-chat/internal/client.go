@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"log/slog"
@@ -8,7 +9,6 @@ import (
 
 	"github.com/dimspell/gladiator/console/signalserver"
 	"github.com/dimspell/gladiator/internal/backend/proxy/p2p"
-	"github.com/fxamacker/cbor/v2"
 	"github.com/pion/webrtc/v4"
 	"golang.org/x/net/websocket"
 )
@@ -46,7 +46,7 @@ func Dial(params *DialParams) (*Client, error) {
 			UserID: params.ID,
 		},
 	}
-	if _, err := ws.Write(req.ToCBOR()); err != nil {
+	if _, err := ws.Write(req.ToJSON()); err != nil {
 		return nil, err
 	}
 
@@ -60,7 +60,7 @@ func Dial(params *DialParams) (*Client, error) {
 	if n == 0 || buf[0] != byte(signalserver.HandshakeResponse) {
 		return nil, fmt.Errorf("unexpected handshake response: %v", buf[:n])
 	}
-	resp, err := decodeCBOR[signalserver.MessageContent[string]](buf[1:n])
+	resp, err := decodeJSON[signalserver.MessageContent[string]](buf[1:n])
 	if err != nil {
 		return nil, err
 	}
@@ -110,7 +110,7 @@ func (c *Client) Run(onUDP MessageHandler) {
 		switch signalserver.EventType(buf[0]) {
 		case signalserver.Join:
 			slog.Warn("JOIN")
-			msg, err := decodeCBOR[signalserver.MessageContent[signalserver.Member]](buf[1:n])
+			msg, err := decodeJSON[signalserver.MessageContent[signalserver.Member]](buf[1:n])
 			if err != nil {
 				log.Println(err)
 				continue
@@ -119,7 +119,7 @@ func (c *Client) Run(onUDP MessageHandler) {
 			break
 		case signalserver.Leave:
 			slog.Warn("LEAVE")
-			msg, err := decodeCBOR[signalserver.MessageContent[any]](buf[1:n])
+			msg, err := decodeJSON[signalserver.MessageContent[any]](buf[1:n])
 			if err != nil {
 				log.Println(err)
 				continue
@@ -128,7 +128,7 @@ func (c *Client) Run(onUDP MessageHandler) {
 			break
 		case signalserver.RTCOffer:
 			slog.Warn("RTC_OFFER")
-			msg, err := decodeCBOR[signalserver.MessageContent[signalserver.Offer]](buf[1:n])
+			msg, err := decodeJSON[signalserver.MessageContent[signalserver.Offer]](buf[1:n])
 			if err != nil {
 				log.Println(err)
 				continue
@@ -137,7 +137,7 @@ func (c *Client) Run(onUDP MessageHandler) {
 			break
 		case signalserver.RTCAnswer:
 			slog.Warn("RTC_ANSWER")
-			msg, err := decodeCBOR[signalserver.MessageContent[signalserver.Offer]](buf[1:n])
+			msg, err := decodeJSON[signalserver.MessageContent[signalserver.Offer]](buf[1:n])
 			if err != nil {
 				log.Println(err)
 				continue
@@ -146,7 +146,7 @@ func (c *Client) Run(onUDP MessageHandler) {
 			break
 		case signalserver.RTCICECandidate:
 			slog.Warn("RTC_ICE_CANDIDATE")
-			msg, err := decodeCBOR[signalserver.MessageContent[webrtc.ICECandidateInit]](buf[1:n])
+			msg, err := decodeJSON[signalserver.MessageContent[webrtc.ICECandidateInit]](buf[1:n])
 			if err != nil {
 				log.Println(err)
 				continue
@@ -214,7 +214,7 @@ func (c *Client) addPeer(member signalserver.Member, sendRTCOffer bool, onTCP Me
 		msg := c.newMessage(signalserver.RTCICECandidate, candidate.ToJSON())
 		msg.To = member.UserID
 
-		if err := c.SendSignal(msg.ToCBOR()); err != nil {
+		if err := c.SendSignal(msg.ToJSON()); err != nil {
 			panic(err)
 		}
 	})
@@ -240,7 +240,7 @@ func (c *Client) addPeer(member signalserver.Member, sendRTCOffer bool, onTCP Me
 			Offer:  offer,
 		})
 		msg.To = member.UserID
-		if err := c.SendSignal(msg.ToCBOR()); err != nil {
+		if err := c.SendSignal(msg.ToJSON()); err != nil {
 			panic(err)
 		}
 	})
@@ -319,7 +319,7 @@ func (c *Client) handleRTCOffer(msg signalserver.MessageContent[signalserver.Off
 	response := c.newMessage(signalserver.RTCAnswer, signalserver.Offer{Member: signalserver.Member{UserID: c.ID}, Offer: answer})
 	response.To = msg.From
 
-	if err := c.SendSignal(response.ToCBOR()); err != nil {
+	if err := c.SendSignal(response.ToJSON()); err != nil {
 		panic(err)
 	}
 }
@@ -385,10 +385,10 @@ func (c *Client) SendSignal(message []byte) (err error) {
 	return
 }
 
-func decodeCBOR[T any](data []byte) (v T, err error) {
-	err = cbor.Unmarshal(data, &v)
+func decodeJSON[T any](data []byte) (v T, err error) {
+	err = json.Unmarshal(data, &v)
 	if err != nil {
-		slog.Warn("Error decoding CBOR", "error", err, "payload", string(data))
+		slog.Warn("Error decoding JSON", "error", err, "payload", string(data))
 	}
 	return
 }

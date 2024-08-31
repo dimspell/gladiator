@@ -2,6 +2,7 @@ package p2p
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log"
 	"log/slog"
@@ -81,7 +82,10 @@ func (p *ListenerUDP) Run(ctx context.Context, rw io.ReadWriteCloser) error {
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
-			case msg := <-p.writeUDP:
+			case msg, ok := <-p.writeUDP:
+				if !ok {
+					return fmt.Errorf("closed channel")
+				}
 				if clientDestAddr != nil {
 					continue
 				}

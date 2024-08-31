@@ -2,6 +2,7 @@ package p2p
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log"
 	"log/slog"
@@ -77,7 +78,10 @@ func (p *ListenerTCP) readerTCP(ctx context.Context, conn net.Conn, rw io.ReadWr
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
-			case msg := <-p.writeTCP:
+			case msg, ok := <-p.writeTCP:
+				if !ok {
+					return fmt.Errorf("closed channel")
+				}
 				if _, err := conn.Write(msg); err != nil {
 					slog.Warn("Error writing to TCP", "error", err, "protocol", "tcp")
 					return err

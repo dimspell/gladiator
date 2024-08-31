@@ -4,15 +4,18 @@ import (
 	"testing"
 
 	"github.com/dimspell/gladiator/console/signalserver"
+	"go.uber.org/goleak"
+)
+
+const (
+	roomName    = "test"
+	player1Name = "player1"
+	player2Name = "player2"
+	player3Name = "player3"
 )
 
 func TestIpRing_CreateClient(t *testing.T) {
-	const (
-		roomName    = "test"
-		player1Name = "player1"
-		player2Name = "player2"
-		player3Name = "player3"
-	)
+	defer goleak.VerifyNone(t)
 
 	t.Run("I am a host, one is joining me", func(t *testing.T) {
 		StartHost(t)
@@ -20,7 +23,6 @@ func TestIpRing_CreateClient(t *testing.T) {
 		r := NewIpRing()
 		r.isTesting = true
 
-		// Hosting player on localhost tcp:6114, udp:6113
 		other := signalserver.Member{
 			UserID: player2Name,
 			IsHost: false,
@@ -37,11 +39,10 @@ func TestIpRing_CreateClient(t *testing.T) {
 		t.Log(tcpProxy, udpProxy)
 	})
 
-	t.Run("I am a guest, joining to the host", func(t *testing.T) {
+	t.Run("I am a guest and I am joining to the host", func(t *testing.T) {
 		r := NewIpRing()
 		r.isTesting = true
 
-		// Hosting player on localhost tcp:6114, udp:6113
 		other := signalserver.Member{
 			UserID: player2Name,
 			IsHost: true,

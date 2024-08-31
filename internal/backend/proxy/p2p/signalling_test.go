@@ -5,9 +5,12 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"net/http/httptest"
+	"net/url"
 	"testing"
 	"time"
 
+	"github.com/dimspell/gladiator/console/signalserver"
 	"github.com/pion/webrtc/v4"
 )
 
@@ -45,33 +48,66 @@ type FakeDataChannel struct {
 
 	Buffer [][]byte
 	i      int
+
+	msgChan chan []byte
+	closed  bool
+
+	onClose   func()
+	onMessage func(msg webrtc.DataChannelMessage)
+}
+
+func newFakeDataChannel(label string) *FakeDataChannel {
+	return &FakeDataChannel{
+		label:  label,
+		Buffer: [][]byte{},
+	}
 }
 
 func (f *FakeDataChannel) Label() string { return f.label }
 
 func (f *FakeDataChannel) OnError(fn func(err error)) {
 	// TODO implement me
-	panic("implement me")
 }
 
 func (f *FakeDataChannel) OnMessage(fn func(msg webrtc.DataChannelMessage)) {
-	// TODO implement me
-	panic("implement me")
+	f.onMessage = fn
 }
 
 func (f *FakeDataChannel) OnClose(fn func()) {
-	// TODO implement me
-	panic("implement me")
+	f.onClose = fn
 }
 
-func (f *FakeDataChannel) Send(bytes []byte) error {
-	// TODO implement me
-	panic("implement me")
+func (f *FakeDataChannel) Send(p []byte) error {
+	f.Buffer = append(f.Buffer, p)
+	return nil
 }
 
 func (f *FakeDataChannel) Close() error {
-	// TODO implement me
-	panic("implement me")
+	if f.closed {
+		return fmt.Errorf("already closed")
+	}
+	f.onClose()
+	return nil
+}
+
+func StartSignalServer(t testing.TB) string {
+	t.Helper()
+
+	h, err := signalserver.NewServer()
+	if err != nil {
+		t.Fatal(err)
+		return ""
+	}
+	ts := httptest.NewServer(h)
+
+	t.Cleanup(func() {
+		ts.Close()
+	})
+
+	wsURI, _ := url.Parse(ts.URL)
+	wsURI.Scheme = "ws"
+
+	return wsURI.String()
 }
 
 func StartHost(t testing.TB) {
@@ -104,37 +140,57 @@ func StartHost(t testing.TB) {
 			}
 
 			buf := make([]byte, 1024)
-			_, _, err := udpConn.ReadFrom(buf)
+			n, _, err := udpConn.ReadFrom(buf)
 			if err != nil {
 				break
 			}
 
-			if buf[0] == 26 {
-				{
-					_, err = udpConn.WriteToUDP([]byte{27, 0, 2, 0}, udpAddr)
+			if buf[0] == '#' {
+				resp := append([]byte{27, 0}, buf[1:n]...)
+				_, err := udpConn.WriteToUDP(resp, udpAddr)
+				if err != nil {
 					log.Println(err)
+					return
 				}
-				fmt.Println("Responded with 27")
+				log.Println("UDP response", string(resp))
 			}
 		}
 	}()
 
-	go func() {
-		processPackets := func(conn net.Conn) {
+	processPackets := func(conn net.Conn) {
+		message := make(chan []byte, 1)
+
+		go func() {
 			defer conn.Close()
 
 			for {
-				conn.SetDeadline(time.Now().Add(10 * time.Second))
-
-				buf := make([]byte, 1024)
-				if _, err := conn.Read(buf); err != nil {
+				select {
+				case <-ctx.Done():
 					return
+				case msg, ok := <-message:
+					if !ok {
+						return
+					}
+					log.Println("Message received", string(msg))
+					conn.Write([]byte{35, 35, 116, 101, 115, 116, 0})
 				}
-
-				conn.Write([]byte{35, 35, 116, 101, 115, 116, 0})
 			}
-		}
+		}()
 
+		for {
+			conn.SetDeadline(time.Now().Add(10 * time.Second))
+
+			buf := make([]byte, 1024)
+			n, err := conn.Read(buf)
+			if err != nil {
+				close(message)
+				return
+			}
+			message <- buf[:n]
+		}
+	}
+
+	go func() {
 		for {
 			if ctx.Err() != nil {
 				return
