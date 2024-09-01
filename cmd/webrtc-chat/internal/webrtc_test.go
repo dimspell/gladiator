@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dimspell/gladiator/internal/backend/proxy/p2p"
+	"github.com/dimspell/gladiator/internal/proxy/p2p"
 	"github.com/dimspell/gladiator/internal/proxy/signalserver"
 	"github.com/google/uuid"
 	"github.com/pion/webrtc/v4"

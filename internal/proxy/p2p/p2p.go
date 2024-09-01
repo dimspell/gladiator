@@ -1,8 +1,8 @@
 package p2p
 
 import (
+	"context"
 	"fmt"
-	"io"
 	"log"
 	"log/slog"
 	"net/url"
@@ -11,9 +11,9 @@ import (
 	"github.com/dimspell/gladiator/internal/proxy/redirect"
 	"github.com/dimspell/gladiator/internal/proxy/signalserver"
 
+	"github.com/coder/websocket"
 	"github.com/fxamacker/cbor/v2"
 	"github.com/pion/webrtc/v4"
-	"golang.org/x/net/websocket"
 )
 
 type PeerToPeer struct {
@@ -26,11 +26,7 @@ type PeerToPeer struct {
 	IpRing *IpRing
 	Peers  *Peers
 
-	ws interface {
-		io.Reader
-		io.Closer
-		io.Writer
-	}
+	ws           *websocket.Conn
 	WebRTCConfig webrtc.Configuration
 }
 
@@ -47,9 +43,12 @@ func DialSignalServer(signalServerURL string, currentUserID, roomName string, is
 	v.Set("roomName", roomName)
 	u.RawQuery = v.Encode()
 
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+	defer cancel()
+
 	// Connect to the signaling server
 	slog.Debug("Connecting to the signaling server", "url", u.String())
-	ws, err := websocket.Dial(u.String(), "", "http://localhost:8080")
+	ws, _, err := websocket.Dial(ctx, u.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -64,23 +63,23 @@ func DialSignalServer(signalServerURL string, currentUserID, roomName string, is
 			Joined: isHost, // Note: Host is always joined.
 		},
 	}
-	if _, err := ws.Write(req.ToCBOR()); err != nil {
+
+	if err := ws.Write(context.TODO(), websocket.MessageText, req.ToCBOR()); err != nil {
 		return nil, err
 	}
 
 	// Read the response from the signaling server (could be some auth token)
-	buf := make([]byte, 128)
-	n, err := ws.Read(buf)
+	_, data, err := ws.Read(context.TODO())
 	if err != nil {
 		slog.Error("Error reading message", "error", err)
 		return nil, err
 	}
 	// Check that the response is a handshake response
-	if n == 0 || buf[0] != byte(signalserver.HandshakeResponse) {
-		return nil, fmt.Errorf("unexpected handshake response: %v", buf[:n])
+	if len(data) == 0 || data[0] != byte(signalserver.HandshakeResponse) {
+		return nil, fmt.Errorf("unexpected handshake response: %v", data)
 	}
 	// TODO: Check that the response contains the same room name as the request
-	resp, err := decodeCBOR[signalserver.MessageContent[string]](buf[1:n])
+	resp, err := decodeCBOR[signalserver.MessageContent[string]](data[1:])
 	if err != nil {
 		return nil, err
 	}
@@ -116,7 +115,7 @@ func DialSignalServer(signalServerURL string, currentUserID, roomName string, is
 func (p *PeerToPeer) Run(hostUserID string) {
 	signalMessages := make(chan []byte)
 	defer func() {
-		if err := p.ws.Close(); err != nil {
+		if err := p.ws.CloseNow(); err != nil {
 			return
 		}
 	}()
@@ -125,8 +124,7 @@ func (p *PeerToPeer) Run(hostUserID string) {
 		defer close(signalMessages)
 
 		for {
-			buf := make([]byte, 1024)
-			n, err := p.ws.Read(buf)
+			_, data, err := p.ws.Read(context.TODO())
 			if err != nil {
 				slog.Error("error reading websocket message", "error", err)
 				return
@@ -134,14 +132,14 @@ func (p *PeerToPeer) Run(hostUserID string) {
 			if signalMessages == nil {
 				return
 			}
-			signalMessages <- buf[:n]
+			signalMessages <- data
 		}
 	}()
 
-	const timeout = time.Second * 25
-	timer := time.NewTimer(timeout)
+	// const timeout = time.Second * 25
+	// timer := time.NewTimer(timeout)
 	for {
-		resetTimer(timer, timeout)
+		// resetTimer(timer, timeout)
 
 		select {
 		case msg, ok := <-signalMessages:
@@ -151,11 +149,11 @@ func (p *PeerToPeer) Run(hostUserID string) {
 			if err := p.handlePackets(msg); err != nil {
 				slog.Error("could not handle signal message", "error", err)
 			}
-		case <-timer.C:
-			if _, err := p.ws.Write([]byte{0}); err != nil {
-				// return err
-				// return
-			}
+			// case <-timer.C:
+			// 	if _, err := p.ws.Write([]byte{0}); err != nil {
+			// 		// return err
+			// 		// return
+			// 	}
 		}
 	}
 }
@@ -404,8 +402,8 @@ func (p *PeerToPeer) sendSignal(message []byte) (err error) {
 	if p.ws == nil {
 		panic("Not implemented")
 	}
-	_, err = p.ws.Write(message)
-	return
+	err = p.ws.Write(context.TODO(), websocket.MessageText, message)
+	return err
 }
 
 func decodeAndRun[T any](data []byte, f func(T) error) error {
@@ -433,19 +431,19 @@ func isUDPChannel(dc *webrtc.DataChannel, room string) bool {
 	return dc.Label() == fmt.Sprintf("%s/udp", room)
 }
 
-func resetTimer(t *time.Timer, d time.Duration) {
-	if !t.Stop() {
-		select {
-		case <-t.C:
-		default:
-		}
-	}
-	t.Reset(d)
-}
+// func resetTimer(t *time.Timer, d time.Duration) {
+// 	if !t.Stop() {
+// 		select {
+// 		case <-t.C:
+// 		default:
+// 		}
+// 	}
+// 	t.Reset(d)
+// }
 
 func (p *PeerToPeer) Close() {
 	if p.ws != nil {
-		if err := p.ws.Close(); err != nil {
+		if err := p.ws.CloseNow(); err != nil {
 			slog.Warn("Could not close websocket connection", "error", err)
 		}
 	}

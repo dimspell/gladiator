@@ -6,6 +6,7 @@ require (
 	connectrpc.com/connect v1.16.2
 	fyne.io/fyne/v2 v2.4.5
 	github.com/cenkalti/backoff/v4 v4.3.0
+	github.com/coder/websocket v1.8.12
 	github.com/fxamacker/cbor/v2 v2.7.0
 	github.com/fynelabs/fyneselfupdate v0.1.1
 	github.com/fynelabs/selfupdate v0.2.0
