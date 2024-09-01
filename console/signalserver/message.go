@@ -51,11 +51,6 @@ func (m Message) ToJSON() []byte {
 	return out
 }
 
-const (
-	RoleHost  string = "host"
-	RoleGuest string = "guest"
-)
-
 type Member struct {
 	// UserID is the identifier used by the console to identify the user.
 	UserID string `json:"userID"`
