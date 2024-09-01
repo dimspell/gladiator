@@ -10,8 +10,6 @@ import (
 	"github.com/pion/webrtc/v4"
 )
 
-var api *webrtc.API
-
 func newWebrtcPeer() *webrtc.PeerConnection {
 	config := webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{

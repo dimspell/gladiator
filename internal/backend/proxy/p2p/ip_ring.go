@@ -3,12 +3,12 @@ package p2p
 import (
 	"container/ring"
 	"fmt"
-	"github.com/dimspell/gladiator/internal/backend/proxy/redirect"
 	"log/slog"
 	"net"
 	"sync"
 
 	"github.com/dimspell/gladiator/console/signalserver"
+	"github.com/dimspell/gladiator/internal/backend/proxy/redirect"
 )
 
 type IpRing struct {

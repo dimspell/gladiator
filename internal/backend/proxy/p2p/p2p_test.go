@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dimspell/gladiator/internal/backend/proxy/proxytesthelper"
 	"github.com/lmittmann/tint"
 	"go.uber.org/goleak"
 )
@@ -25,8 +26,8 @@ func TestWebRTCMock(t *testing.T) {
 		),
 	))
 
-	StartHost(t)
-	signalServerURL := StartSignalServer(t)
+	proxytesthelper.StartHost(t)
+	signalServerURL := proxytesthelper.StartSignalServer(t)
 
 	ipRing := NewIpRing()
 	ipRing.isTesting = true

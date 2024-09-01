@@ -6,16 +6,17 @@ import (
 	"testing"
 
 	"github.com/dimspell/gladiator/console/signalserver"
+	"github.com/dimspell/gladiator/internal/backend/proxy/proxytesthelper"
 )
 
 func TestNewPipe(t *testing.T) {
 	t.Run("I am a host, one is joining me", func(t *testing.T) {
-		StartHost(t)
+		proxytesthelper.StartHost(t)
 
 		r := NewIpRing()
 		r.isTesting = true
 
-		dc := newFakeDataChannel(fmt.Sprint(roomName, "/udp"))
+		dc := proxytesthelper.NewFakeDataChannel(fmt.Sprint(roomName, "/udp"))
 
 		tcpProxyHost, _, err := r.CreateClient(false, signalserver.Member{
 			UserID: player2Name,

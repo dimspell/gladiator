@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/dimspell/gladiator/console/signalserver"
+	"github.com/dimspell/gladiator/internal/backend/proxy/proxytesthelper"
 	"go.uber.org/goleak"
 )
 
@@ -18,7 +19,7 @@ func TestIpRing_CreateClient(t *testing.T) {
 	defer goleak.VerifyNone(t)
 
 	t.Run("I am a host, one is joining me", func(t *testing.T) {
-		StartHost(t)
+		proxytesthelper.StartHost(t)
 
 		r := NewIpRing()
 		r.isTesting = true

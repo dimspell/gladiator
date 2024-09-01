@@ -2,11 +2,13 @@ package p2p
 
 import (
 	"fmt"
-	"github.com/dimspell/gladiator/internal/backend/proxy/redirect"
+	"io"
 	"log"
 	"log/slog"
 	"net/url"
 	"time"
+
+	"github.com/dimspell/gladiator/internal/backend/proxy/redirect"
 
 	"github.com/dimspell/gladiator/console/signalserver"
 	"github.com/fxamacker/cbor/v2"
@@ -24,7 +26,11 @@ type PeerToPeer struct {
 	IpRing *IpRing
 	Peers  *Peers
 
-	ws           WebSocket
+	ws interface {
+		io.Reader
+		io.Closer
+		io.Writer
+	}
 	WebRTCConfig webrtc.Configuration
 }
 
