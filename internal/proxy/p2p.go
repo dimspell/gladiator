@@ -48,24 +48,23 @@ func (p *PeerToPeer) Host(params HostParams) error {
 	return nil
 }
 
-func (p *PeerToPeer) Join(params JoinParams) (net.IP, error) {
-	ip := net.IPv4(127, 0, 1, 2)
+func (p *PeerToPeer) Join(params JoinParams) error {
 	if p.Client != nil {
-		return ip, nil
+		return nil
 	}
 
 	// p.mtxClient.Lock()
 	// TODO: It is called twice, leading to the deadlock and memory usage
 	client, err := p2p.DialSignalServer(p.SignalServerURL, params.CurrentUserID, params.GameID, false)
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to the signal server: %w", err)
+		return fmt.Errorf("failed to connect to the signal server: %w", err)
 	}
 	p.Client = client
 
 	// close(p.done)
 	// p.done = make(chan struct{}, 1)
 
-	go p.Client.Run(params.HostUserID)
+	go p.Client.Run(params.HostUserIP)
 
 	// select {
 	// case <-time.After(5 * time.Second):
@@ -74,7 +73,7 @@ func (p *PeerToPeer) Join(params JoinParams) (net.IP, error) {
 	// 	// 	return ip, nil
 	// }
 
-	return ip, nil
+	return nil
 }
 
 func (p *PeerToPeer) Exchange(params ExchangeParams) (net.IP, error) {

@@ -11,7 +11,7 @@ type Proxy interface {
 	Host(HostParams) error
 
 	// Join is used to connect to TCP game host
-	Join(JoinParams) (net.IP, error)
+	Join(JoinParams) error
 
 	// Exchange is used by UDP clients
 	Exchange(ExchangeParams) (net.IP, error)
@@ -35,7 +35,7 @@ type HostParams struct {
 type JoinParams struct {
 	HostUserID    string
 	GameID        string
-	CurrentUserIP string
+	HostUserIP    string
 	CurrentUserID string
 }
 

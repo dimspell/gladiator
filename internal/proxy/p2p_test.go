@@ -192,7 +192,7 @@ package proxy
 // 		if _, err := b.Join(JoinParams{
 // 			HostUserID:    "user1",
 // 			GameID:        roomName,
-// 			CurrentUserIP: "",
+// 			HostUserIP: "",
 // 			CurrentUserID: "user2",
 // 		}); err != nil {
 // 			t.Error(err)

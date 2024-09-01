@@ -69,7 +69,7 @@ func P2PCommand() *cli.Command {
 				HostUserID:    "host1",
 				CurrentUserID: id,
 				GameID:        "test",
-				CurrentUserIP: "",
+				HostUserIP:    "",
 			}); err != nil {
 				return err
 			} else {

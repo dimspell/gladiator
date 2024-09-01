@@ -41,30 +41,24 @@ func (b *Backend) HandleSelectGame(session *model.Session, req SelectGameRequest
 		return nil
 	}
 
-	hostIP, err := b.Proxy.Join(proxy.JoinParams{
-		HostUserID:    fmt.Sprintf("%d", respGame.Msg.GetGame().HostUserId),
-		CurrentUserID: fmt.Sprintf("%d", session.UserID),
-		GameID:        respGame.Msg.GetGame().GetName(),
-		CurrentUserIP: respGame.Msg.GetGame().HostIpAddress,
-	})
-	if err != nil {
-		return err
-	}
-
-	gameRoom := SelectGameResponse{
-		Lobby: model.LobbyRoom{
-			HostIPAddress: hostIP.To4(),
-			Name:          respGame.Msg.Game.Name,
-			Password:      "",
-		},
-		MapID: uint32(respGame.Msg.Game.GetMapId()),
-		// Players: []model.LobbyPlayer{}, // Unused
-	}
+	// gameRoom := SelectGameResponse{
+	// 	Lobby: model.LobbyRoom{
+	// 		HostIPAddress: hostIP.To4(),
+	// 		Name:          respGame.Msg.Game.Name,
+	// 		Password:      "",
+	// 	},
+	// 	MapID: uint32(respGame.Msg.Game.GetMapId()),
+	// 	// Players: []model.LobbyPlayer{}, // Unused
+	// }
 
 	response := []byte{}
-	response = binary.LittleEndian.AppendUint32(response, gameRoom.MapID)
+	response = binary.LittleEndian.AppendUint32(response, uint32(respGame.Msg.Game.GetMapId()))
 
 	for _, player := range respPlayers.Msg.GetPlayers() {
+		if player.UserId == session.UserID {
+			continue
+		}
+
 		ps := proxy.ExchangeParams{
 			GameID:    respGame.Msg.GetGame().GetName(),
 			UserID:    fmt.Sprintf("%d", player.UserId),

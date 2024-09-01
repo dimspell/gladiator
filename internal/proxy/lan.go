@@ -27,13 +27,7 @@ func (p *LAN) Host(_ HostParams) error {
 	return nil
 }
 
-func (p *LAN) Join(params JoinParams) (net.IP, error) {
-	ip := net.ParseIP(params.CurrentUserIP)
-	if ip == nil {
-		return net.IP{}, fmt.Errorf("incorrect join IP address: %s", params.CurrentUserIP)
-	}
-	return ip, nil
-}
+func (p *LAN) Join(_ JoinParams) error { return nil }
 
 func (p *LAN) Exchange(params ExchangeParams) (net.IP, error) {
 	ip := net.ParseIP(params.IPAddress)
