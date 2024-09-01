@@ -1,20 +1,21 @@
 package p2p
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
+	"net/http/httptest"
+	"net/url"
 	"os"
 	"testing"
 	"time"
 
-	"github.com/dimspell/gladiator/internal/proxy/proxytesthelper"
+	"github.com/dimspell/gladiator/internal/proxy/signalserver"
 	"github.com/lmittmann/tint"
 	"go.uber.org/goleak"
 )
 
 func TestWebRTCMock(t *testing.T) {
-	defer goleak.VerifyNone(t)
-
 	slog.SetDefault(slog.New(
 		tint.NewHandler(
 			os.Stderr,
@@ -26,11 +27,23 @@ func TestWebRTCMock(t *testing.T) {
 		),
 	))
 
-	proxytesthelper.StartHost(t)
-	signalServerURL := proxytesthelper.StartSignalServer(t)
+	// proxytesthelper.StartHost(t)
+	// signalServerURL := proxytesthelper.StartSignalServer(t)
+	h, err := signalserver.NewServer()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ts := httptest.NewServer(h)
+	wsURI, _ := url.Parse(ts.URL)
+	wsURI.Scheme = "ws"
+
+	signalServerURL := wsURI.String()
 
 	ipRing := NewIpRing()
 	ipRing.isTesting = true
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
 
 	// Player 1
 	player1, err := DialSignalServer(signalServerURL, "player1", roomName, true)
@@ -38,7 +51,7 @@ func TestWebRTCMock(t *testing.T) {
 		panic(err)
 	}
 	player1.IpRing = ipRing
-	go player1.Run("player1")
+	go player1.Run(ctx, "player1")
 
 	// Player 2
 	player2, err := DialSignalServer(signalServerURL, "player2", roomName, false)
@@ -46,7 +59,7 @@ func TestWebRTCMock(t *testing.T) {
 		panic(err)
 	}
 	player2.IpRing = ipRing
-	go player2.Run("player1")
+	go player2.Run(ctx, "player1")
 
 	// Player 3
 	player3, err := DialSignalServer(signalServerURL, "player3", roomName, false)
@@ -54,7 +67,7 @@ func TestWebRTCMock(t *testing.T) {
 		panic(err)
 	}
 	player3.IpRing = ipRing
-	go player3.Run("player1")
+	go player3.Run(ctx, "player1")
 
 	<-time.After(3 * time.Second)
 
@@ -65,4 +78,11 @@ func TestWebRTCMock(t *testing.T) {
 	player1.Close()
 	player2.Close()
 	player3.Close()
+
+	ts.Close()
+
+	t.Cleanup(func() {
+		time.Sleep(1 * time.Second)
+		goleak.VerifyNone(t)
+	})
 }

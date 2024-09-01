@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"sync"
@@ -14,18 +15,19 @@ type PeerToPeer struct {
 	SignalServerURL string
 	Client          *p2p.PeerToPeer
 	mtxClient       sync.Mutex
+	hostIPAddress   net.IP
+
+	stop context.CancelFunc
 }
 
 func NewPeerToPeer(signalServerURL string) *PeerToPeer {
 	return &PeerToPeer{
+		hostIPAddress:   net.IPv4(127, 0, 0, 1),
 		SignalServerURL: signalServerURL,
 	}
 }
 
-func (p *PeerToPeer) GetHostIP(hostIpAddress string) net.IP {
-	// TODO: Not true, but good enough for now. Joining user will need to have different IP address.
-	return net.IPv4(127, 0, 0, 1)
-}
+func (p *PeerToPeer) GetHostIP(_ string) net.IP { return p.hostIPAddress }
 
 func (p *PeerToPeer) Create(params CreateParams) (net.IP, error) {
 	// p.mtxClient.Lock()
@@ -44,7 +46,10 @@ func (p *PeerToPeer) Create(params CreateParams) (net.IP, error) {
 }
 
 func (p *PeerToPeer) Host(params HostParams) error {
-	go p.Client.Run(params.HostUserID)
+	// ctx, cancel := context.WithCancel(context.Background())
+	// p.stop = cancel
+	// go p.Client.Run(ctx, params.HostUserID)
+	// return nil
 	return nil
 }
 
@@ -64,7 +69,7 @@ func (p *PeerToPeer) Join(params JoinParams) error {
 	// close(p.done)
 	// p.done = make(chan struct{}, 1)
 
-	go p.Client.Run(params.HostUserIP)
+	go p.Client.Run(ctx params.HostUserIP)
 
 	// select {
 	// case <-time.After(5 * time.Second):
@@ -85,7 +90,10 @@ func (p *PeerToPeer) GetPlayerAddr(params GetPlayerAddrParams) (net.IP, error) {
 }
 
 func (p *PeerToPeer) Close() {
-	// defer p.mtxClient.Unlock()
+
+	if p.stop != nil {
+		p.stop()
+	}
 
 	if p.Client == nil {
 		return

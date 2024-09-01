@@ -113,19 +113,19 @@ func DialSignalServer(signalServerURL string, currentUserID, roomName string, is
 	}, nil
 }
 
-func (p *PeerToPeer) Run(hostUserID string) {
+func (p *PeerToPeer) Run(ctx context.Context, hostUserID string) {
 	signalMessages := make(chan []byte)
 	defer func() {
+		close(signalMessages)
+
 		if err := p.ws.CloseNow(); err != nil {
 			return
 		}
 	}()
 
 	go func() {
-		defer close(signalMessages)
-
 		for {
-			_, data, err := p.ws.Read(context.TODO())
+			_, data, err := p.ws.Read(ctx)
 			if err != nil {
 				slog.Error("error reading websocket message", "error", err)
 				return
@@ -143,6 +143,9 @@ func (p *PeerToPeer) Run(hostUserID string) {
 		// resetTimer(timer, timeout)
 
 		select {
+		case <-ctx.Done():
+			slog.Error(ctx.Err().Error())
+			return
 		case msg, ok := <-signalMessages:
 			if !ok {
 				return
@@ -447,5 +450,6 @@ func (p *PeerToPeer) Close() {
 			slog.Warn("Could not close websocket connection", "error", err)
 		}
 	}
+
 	p.Peers.Reset()
 }

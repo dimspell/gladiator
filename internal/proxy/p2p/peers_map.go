@@ -47,7 +47,10 @@ func (p *Peers) Delete(id string) {
 
 func (p *Peers) Reset() {
 	p.Lock()
-	p.peers = make(map[string]*Peer)
+	for id, peer := range p.peers {
+		peer.Connection.Close()
+		delete(p.peers, id)
+	}
 	p.Unlock()
 }
 
