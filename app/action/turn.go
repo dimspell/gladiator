@@ -13,15 +13,22 @@ func TurnCommand() *cli.Command {
 		Description: "Start signalling and TURN server",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
-				Name:  "turn-addr",
-				Value: "192.168.121.169:38",
-				Usage: "IP address of the game server hosting a game",
+				Name:  "websocket-addr",
+				Value: "ws://localhost:5050",
 			},
 			&cli.StringFlag{
-				Name:  "turn-realm",
-				Value: "dispel-multi",
-				Usage: "Realm to use for TURN server",
+				Name:  "turn-public-ip",
+				Value: "127.0.0.1",
 			},
+			&cli.IntFlag{
+				Name:  "turn-port",
+				Value: 3478,
+			},
+			// &cli.StringFlag{
+			// 	Name:  "turn-realm",
+			// 	Value: "dispel-multi",
+			// 	Usage: "Realm to use for TURN server",
+			// },
 		},
 	}
 
@@ -30,7 +37,7 @@ func TurnCommand() *cli.Command {
 		if err != nil {
 			return err
 		}
-		start, stop := s.Run(":5050", "127.0.0.1", 3478)
+		start, stop := s.Run(c.String("websocket-addr"), c.String("turn-public-ip"), int(c.Int("turn-port")))
 		defer stop(ctx)
 		return start(ctx)
 	}

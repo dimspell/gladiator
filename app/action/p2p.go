@@ -65,7 +65,7 @@ func P2PCommand() *cli.Command {
 				return err
 			}
 		} else {
-			if ip, err := peerToPeer.Join(proxy.JoinParams{
+			if err := peerToPeer.Join(proxy.JoinParams{
 				HostUserID:    "host1",
 				CurrentUserID: id,
 				GameID:        "test",
@@ -73,7 +73,7 @@ func P2PCommand() *cli.Command {
 			}); err != nil {
 				return err
 			} else {
-				log.Printf("Joined game at %s", ip)
+				log.Printf("Joined game")
 			}
 		}
 

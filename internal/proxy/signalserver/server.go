@@ -173,7 +173,7 @@ func SendMessage(ws *websocket.Conn, msgType EventType, msg any) {
 
 func (h *Server) Run(httpAddr, turnPublicIP string, turnPortNumber int) (start func(context.Context) error, shutdown func(context.Context) error) {
 	if httpAddr == "" {
-		httpAddr = ":5050"
+		httpAddr = "ws://localhost:5050"
 	}
 	if turnPublicIP == "" {
 		turnPublicIP = "127.0.0.1" // IP Address that TURN can be contacted by
@@ -204,6 +204,7 @@ func (h *Server) Run(httpAddr, turnPublicIP string, turnPortNumber int) (start f
 	}
 
 	start = func(ctx context.Context) error {
+		slog.Info("Signal server is running on", "addr", httpAddr)
 		return httpServer.ListenAndServe()
 	}
 
