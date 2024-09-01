@@ -59,12 +59,12 @@ func (b *Backend) HandleSelectGame(session *model.Session, req SelectGameRequest
 			continue
 		}
 
-		ps := proxy.ExchangeParams{
+		ps := proxy.GetPlayerAddrParams{
 			GameID:    respGame.Msg.GetGame().GetName(),
 			UserID:    fmt.Sprintf("%d", player.UserId),
 			IPAddress: player.IpAddress,
 		}
-		proxyIP, err := b.Proxy.Exchange(ps)
+		proxyIP, err := b.Proxy.GetPlayerAddr(ps)
 
 		if err != nil {
 			slog.Warn("Not found a player with the provided ID",

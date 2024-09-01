@@ -5,18 +5,17 @@ import (
 )
 
 type Proxy interface {
-	// Create is used to start serving the traffic to the game host
-	Create(CreateParams) (net.IP, error)
+	// GetHostIP is used when game attempts to list the IP address of the game
+	// room. This function can be used to override the IP address.
+	GetHostIP(hostIpAddress string) net.IP
 
+	Create(CreateParams) (net.IP, error)
 	Host(HostParams) error
+
+	GetPlayerAddr(GetPlayerAddrParams) (net.IP, error)
 
 	// Join is used to connect to TCP game host
 	Join(JoinParams) error
-
-	// Exchange is used by UDP clients
-	Exchange(ExchangeParams) (net.IP, error)
-
-	GetHostIP(hostIpAddress string) net.IP
 
 	Close()
 }
@@ -39,7 +38,7 @@ type JoinParams struct {
 	CurrentUserID string
 }
 
-type ExchangeParams struct {
+type GetPlayerAddrParams struct {
 	GameID    string
 	UserID    string
 	IPAddress string

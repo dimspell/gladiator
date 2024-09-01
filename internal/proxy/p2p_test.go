@@ -204,7 +204,7 @@ package proxy
 // 		fmt.Println(a.Peers)
 // 		fmt.Println(b.Peers)
 
-// 		if _, err := b.Exchange(ExchangeParams{
+// 		if _, err := b.GetPlayerAddr(GetPlayerAddrParams{
 // 			GameID:    roomName,
 // 			UserID:    "user1",
 // 			IPAddress: "127.0.0.1",

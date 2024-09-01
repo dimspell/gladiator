@@ -76,7 +76,7 @@ func (p *PeerToPeer) Join(params JoinParams) error {
 	return nil
 }
 
-func (p *PeerToPeer) Exchange(params ExchangeParams) (net.IP, error) {
+func (p *PeerToPeer) GetPlayerAddr(params GetPlayerAddrParams) (net.IP, error) {
 	peer, ok := p.Client.Peers.Get(params.UserID)
 	if !ok {
 		return nil, fmt.Errorf("user %s not found", params.UserID)
