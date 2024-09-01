@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"net/url"
 
-	"github.com/dimspell/gladiator/internal/proxy/p2p"
 	"github.com/dimspell/gladiator/internal/proxy/signalserver"
 	"github.com/pion/webrtc/v4"
 	"golang.org/x/net/websocket"
@@ -90,7 +89,7 @@ type Client struct {
 	ID string
 
 	// ws is the websocket connection to the signaling server
-	ws p2p.WebSocket
+	ws *websocket.Conn
 
 	// peers stores the WebRTC peer connections
 	Peers *Peers
@@ -211,7 +210,7 @@ func (c *Client) addPeer(member signalserver.Member, sendRTCOffer bool, onTCP Me
 			return
 		}
 
-		msg := c.newMessage(signalserver.RTCICECandidate, candidate.Encode())
+		msg := c.newMessage(signalserver.RTCICECandidate, candidate.ToJSON())
 		msg.To = member.UserID
 
 		if err := c.SendSignal(msg.Encode()); err != nil {

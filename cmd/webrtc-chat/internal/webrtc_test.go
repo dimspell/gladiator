@@ -5,19 +5,17 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
-	"net/http/httptest"
-	"net/url"
 	"testing"
 	"time"
 
-	"github.com/dimspell/gladiator/internal/proxy/p2p"
+	"github.com/dimspell/gladiator/internal/proxy/proxytesthelper"
 	"github.com/dimspell/gladiator/internal/proxy/signalserver"
 	"github.com/google/uuid"
 	"github.com/pion/webrtc/v4"
 )
 
 func TestWebRTC(t *testing.T) {
-	signalingURL := StartSignalServer(t)
+	signalingURL := proxytesthelper.StartSignalServer(t)
 
 	// Player 1
 	{
@@ -52,8 +50,6 @@ func TestWebRTC(t *testing.T) {
 	<-time.After(3 * time.Second)
 }
 
-var _ p2p.WebSocket = (*FakeSocket)(nil)
-
 type FakeSocket struct {
 	buf *bytes.Buffer
 }
@@ -79,12 +75,12 @@ func TestWebRTCMock(t *testing.T) {
 	player1 := &Client{
 		ID:    uuid.New().String()[:6],
 		Peers: NewPeers(),
-		ws:    &FakeSocket{bytes.NewBuffer([]byte{})},
+		// ws:    &FakeSocket{bytes.NewBuffer([]byte{})},
 	}
 	player2 := &Client{
 		ID:    uuid.New().String()[:6],
 		Peers: NewPeers(),
-		ws:    &FakeSocket{bytes.NewBuffer([]byte{})},
+		// ws:    &FakeSocket{bytes.NewBuffer([]byte{})},
 	}
 
 	player1.handleJoin(signalserver.MessageContent[signalserver.Member]{
@@ -215,24 +211,4 @@ func TestWebRTCOffer(t *testing.T) {
 	})
 
 	<-time.After(3 * time.Second)
-}
-
-func StartSignalServer(t testing.TB) string {
-	t.Helper()
-
-	h, err := signalserver.NewServer()
-	if err != nil {
-		t.Fatal(err)
-		return ""
-	}
-	ts := httptest.NewServer(h)
-
-	t.Cleanup(func() {
-		ts.Close()
-	})
-
-	wsURI, _ := url.Parse(ts.URL)
-	wsURI.Scheme = "ws"
-
-	return wsURI.String()
 }

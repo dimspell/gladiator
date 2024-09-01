@@ -196,8 +196,8 @@ func (p *PeerToPeer) handleJoin(m signalserver.MessageContent[signalserver.Membe
 	slog.Debug("JOIN", "id", m.Content.UserID, "host", m.Content.IsHost)
 
 	// Add the peer to the list of peers, and start the WebRTC connection
-	member := m.Content
-	if _, err := p.addPeer(member, true, true); err != nil {
+	if _, err := p.addPeer(m.Content, true, true); err != nil {
+		slog.Warn("Could add peer", "userId", m.Content.UserID, "error", err)
 		return err
 	}
 
@@ -290,7 +290,7 @@ func (p *PeerToPeer) addPeer(member signalserver.Member, sendRTCOffer bool, crea
 
 	p.Peers.Set(member.UserID, peer)
 
-	guestTCP, guestUDP, err := redirect.New(peer.Mode, peer.Addr)
+	guestTCP, guestUDP, err := redirect.NewNoop(peer.Mode, peer.Addr)
 	if err != nil {
 		return nil, fmt.Errorf("could not create guest proxy for %s: %v", member.UserID, err)
 	}
