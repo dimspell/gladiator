@@ -96,8 +96,7 @@ func New(joinType RedirectType, addr *Addressing) (tcpProxy Redirect, udpProxy R
 	case OtherUserIsJoining:
 		// The person who is connecting is a guest, who has not joined yet.
 		// We have registered the join during the game phase.
-		// In the rest of the cases, we are dialing to ourselves on the loopback
-		// interface,
+		// We are dialing to ourselves on the loopback interface,
 
 		slog.Debug("Creating UDP dialler on the default port", "ip", addr.IP)
 		udpProxy, err = DialUDP(addr.IP.To4().String(), "")
@@ -108,20 +107,4 @@ func New(joinType RedirectType, addr *Addressing) (tcpProxy Redirect, udpProxy R
 	default:
 		return nil, nil, fmt.Errorf("unknown joining type: %s", joinType)
 	}
-}
-
-var _ Redirect = (*Noop)(nil)
-
-type Noop struct{}
-
-func (r *Noop) Write(_ []byte) (n int, err error) {
-	return 0, nil
-}
-
-func (r *Noop) Close() error {
-	return nil
-}
-
-func (r *Noop) Run(_ context.Context, _ io.ReadWriteCloser) error {
-	return nil
 }
