@@ -5,21 +5,11 @@ import (
 	"io"
 	"log"
 	"log/slog"
-	"net"
 
 	"github.com/dimspell/gladiator/internal/proxy/redirect"
-	"github.com/dimspell/gladiator/internal/proxy/signalserver"
-
 	"github.com/pion/webrtc/v4"
 	"golang.org/x/sync/errgroup"
 )
-
-type Peer struct {
-	User signalserver.Member
-	IP   net.IP
-
-	Connection *webrtc.PeerConnection
-}
 
 var _ io.ReadWriteCloser = (*Pipe)(nil)
 

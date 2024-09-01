@@ -113,7 +113,7 @@ func DialSignalServer(signalServerURL string, currentUserID, roomName string, is
 	}, nil
 }
 
-func (p *PeerToPeer) Run(ctx context.Context, hostUserID string) {
+func (p *PeerToPeer) Run(ctx context.Context) {
 	signalMessages := make(chan []byte)
 	defer func() {
 		close(signalMessages)
@@ -214,8 +214,8 @@ func (p *PeerToPeer) handleJoin(m signalserver.MessageContent[signalserver.Membe
 		pipeTCP := NewPipe(dcTCP, guestTCP)
 
 		dcTCP.OnClose(func() {
-			log.Printf("dataChannel for %s has closed", peer.User.UserID)
-			p.Peers.Delete(peer.User.UserID)
+			log.Printf("dataChannel for %s has closed", peer.PeerUserID)
+			p.Peers.Delete(peer.PeerUserID)
 			pipeTCP.Close()
 		})
 	}
@@ -229,8 +229,8 @@ func (p *PeerToPeer) handleJoin(m signalserver.MessageContent[signalserver.Membe
 		pipeUDP := NewPipe(dcUDP, guestUDP)
 
 		dcUDP.OnClose(func() {
-			log.Printf("dataChannel for %s has closed", peer.User.UserID)
-			p.Peers.Delete(peer.User.UserID)
+			log.Printf("dataChannel for %s has closed", peer.PeerUserID)
+			p.Peers.Delete(peer.PeerUserID)
 			pipeUDP.Close()
 		})
 	}
@@ -246,13 +246,13 @@ func (p *PeerToPeer) handleLeave(m signalserver.MessageContent[any]) error {
 		// fmt.Errorf("could not find peer %q", m.From)
 		return nil
 	}
-	if peer.User.UserID == p.CurrentUserID {
+	if peer.PeerUserID == p.CurrentUserID {
 		// return fmt.Errorf("peer %q is the same as the host, ignoring leave", m.From)
 		return nil
 	}
 
-	slog.Info("User left", "peer", peer.User.UserID)
-	p.Peers.Delete(peer.User.UserID)
+	slog.Info("User left", "peer", peer.PeerUserID)
+	p.Peers.Delete(peer.PeerUserID)
 	return nil
 }
 
@@ -318,7 +318,7 @@ func (p *PeerToPeer) addPeer(member signalserver.Member, guestTCP redirect.Redir
 	}
 
 	peer := &Peer{
-		User:       member,
+		Peer:       member,
 		Connection: peerConnection,
 	}
 	p.Peers.Set(member.UserID, peer)

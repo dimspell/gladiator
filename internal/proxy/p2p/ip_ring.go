@@ -53,22 +53,38 @@ func (r *IpRing) NextAddr() (ip net.IP, portTCP string, portUDP string) {
 	return ip, portTCP, portUDP
 }
 
-// Deprecated: use redirect.New() instead.
-func (r *IpRing) ParseJoiningType(currentUserIsHost bool, other signalserver.Member) (redirect.RedirectType, *redirect.Addressing) {
-	switch {
-	case currentUserIsHost:
-		return redirect.CurrentUserIsHost, &redirect.Addressing{IP: net.IPv4(127, 0, 0, 1)}
-	case other.IsHost:
+func (r *IpRing) NextPeerAddress(userId string, isCurrentUser, isHost bool) *Peer {
+	switch true {
+	case isCurrentUser:
+		return &Peer{
+			PeerUserID: userId,
+			Addr:       &redirect.Addressing{IP: net.IPv4(127, 0, 0, 1)},
+			Mode:       redirect.CurrentUserIsHost,
+		}
+	case !isCurrentUser && isHost:
 		ip, portTCP, portUDP := r.NextAddr()
-		return redirect.OtherUserIsHost, &redirect.Addressing{ip, portTCP, portUDP}
-	case other.Joined:
+		return &Peer{
+			PeerUserID: userId,
+			Addr:       &redirect.Addressing{IP: ip, TCPPort: portTCP, UDPPort: portUDP},
+			Mode:       redirect.OtherUserIsHost,
+		}
+	case !isCurrentUser && !isHost:
 		ip, _, portUDP := r.NextAddr()
-		return redirect.OtherUserHasJoined, &redirect.Addressing{IP: ip, TCPPort: "", UDPPort: portUDP}
+		return &Peer{
+			PeerUserID: userId,
+			Addr:       &redirect.Addressing{IP: ip, TCPPort: "", UDPPort: portUDP},
+			Mode:       redirect.OtherUserHasJoined,
+		}
 	default:
-		return redirect.OtherUserIsJoining, &redirect.Addressing{IP: net.IPv4(127, 0, 0, 1)}
+		return &Peer{
+			PeerUserID: userId,
+			Addr:       &redirect.Addressing{IP: net.IPv4(127, 0, 0, 1)},
+			Mode:       redirect.OtherUserIsJoining,
+		}
 	}
 }
 
+// Deprecated: use redirect.New() instead.
 func (r *IpRing) CreateClient(currentUserIsHost bool, other signalserver.Member) (tcpProxy redirect.Redirect, udpProxy redirect.Redirect, err error) {
 	// joinType, addr := r.ParseJoiningType(currentUserIsHost, other)
 	// return redirect.New(joinType, addr)

@@ -62,9 +62,11 @@ func (b *Backend) HandleSelectGame(session *model.Session, req SelectGameRequest
 		}
 
 		ps := proxy.GetPlayerAddrParams{
-			GameID:    respGame.Msg.GetGame().GetName(),
-			UserID:    fmt.Sprintf("%d", player.UserId),
-			IPAddress: player.IpAddress,
+			GameID:        respGame.Msg.GetGame().GetName(),
+			UserID:        fmt.Sprintf("%d", player.UserId),
+			IPAddress:     player.IpAddress,
+			CurrentUserID: fmt.Sprintf("%d", session.UserID),
+			HostUserID:    fmt.Sprintf("%d", respGame.Msg.GetGame().HostUserId),
 		}
 		proxyIP, err := b.Proxy.GetPlayerAddr(ps)
 

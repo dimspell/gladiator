@@ -51,7 +51,7 @@ func TestWebRTCMock(t *testing.T) {
 		panic(err)
 	}
 	player1.IpRing = ipRing
-	go player1.Run(ctx, "player1")
+	go player1.Run(ctx, "player1", nil)
 
 	// Player 2
 	player2, err := DialSignalServer(signalServerURL, "player2", roomName, false)
@@ -59,7 +59,7 @@ func TestWebRTCMock(t *testing.T) {
 		panic(err)
 	}
 	player2.IpRing = ipRing
-	go player2.Run(ctx, "player1")
+	go player2.Run(ctx, "player1", nil)
 
 	// Player 3
 	player3, err := DialSignalServer(signalServerURL, "player3", roomName, false)
@@ -67,7 +67,7 @@ func TestWebRTCMock(t *testing.T) {
 		panic(err)
 	}
 	player3.IpRing = ipRing
-	go player3.Run(ctx, "player1")
+	go player3.Run(ctx, "player1", nil)
 
 	<-time.After(3 * time.Second)
 

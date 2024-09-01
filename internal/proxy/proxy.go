@@ -39,7 +39,9 @@ type JoinParams struct {
 }
 
 type GetPlayerAddrParams struct {
-	GameID    string
-	UserID    string
-	IPAddress string
+	GameID        string
+	UserID        string
+	IPAddress     string
+	CurrentUserID string
+	HostUserID    string
 }

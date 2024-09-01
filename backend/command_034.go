@@ -52,15 +52,6 @@ func (b *Backend) HandleJoinGame(session *model.Session, req JoinGameRequest) er
 		return nil
 	}
 
-	if err = b.Proxy.Join(proxy.JoinParams{
-		HostUserID:    fmt.Sprintf("%d", respGame.Msg.GetGame().HostUserId),
-		HostUserIP:    respGame.Msg.GetGame().HostIpAddress,
-		CurrentUserID: fmt.Sprintf("%d", session.UserID),
-		GameID:        respGame.Msg.GetGame().GetName(),
-	}); err != nil {
-		return err
-	}
-
 	response := []byte{model.GameStateStarted, 0}
 	for _, player := range respPlayers.Msg.GetPlayers() {
 		if player.UserId == session.UserID {
@@ -68,9 +59,11 @@ func (b *Backend) HandleJoinGame(session *model.Session, req JoinGameRequest) er
 		}
 
 		ps := proxy.GetPlayerAddrParams{
-			GameID:    respGame.Msg.GetGame().GetName(),
-			UserID:    fmt.Sprintf("%d", player.UserId),
-			IPAddress: player.IpAddress,
+			GameID:        respGame.Msg.GetGame().GetName(),
+			UserID:        fmt.Sprintf("%d", player.UserId),
+			IPAddress:     player.IpAddress,
+			CurrentUserID: fmt.Sprintf("%d", session.UserID),
+			HostUserID:    fmt.Sprintf("%d", respGame.Msg.GetGame().HostUserId),
 		}
 		proxyIP, err := b.Proxy.GetPlayerAddr(ps)
 		if err != nil {
@@ -92,6 +85,15 @@ func (b *Backend) HandleJoinGame(session *model.Session, req JoinGameRequest) er
 		response = append(response, proxyIP.To4()[:]...)             // IP Address (4 bytes)
 		response = append(response, player.Username...)              // Player name (null terminated string)
 		response = append(response, byte(0))                         // Null byte
+	}
+
+	if err = b.Proxy.Join(proxy.JoinParams{
+		HostUserID:    fmt.Sprintf("%d", respGame.Msg.GetGame().HostUserId),
+		HostUserIP:    respGame.Msg.GetGame().HostIpAddress,
+		CurrentUserID: fmt.Sprintf("%d", session.UserID),
+		GameID:        respGame.Msg.GetGame().GetName(),
+	}); err != nil {
+		return err
 	}
 
 	return b.Send(session.Conn, JoinGame, response)

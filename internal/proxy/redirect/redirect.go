@@ -8,17 +8,17 @@ import (
 	"net"
 )
 
-type RedirectType int
+type Mode int
 
 const (
-	None RedirectType = iota
+	None Mode = iota
 	CurrentUserIsHost
 	OtherUserIsHost
 	OtherUserHasJoined
 	OtherUserIsJoining
 )
 
-func (s RedirectType) String() string {
+func (s Mode) String() string {
 	switch s {
 	case None:
 		return "None"
@@ -48,7 +48,7 @@ type Addressing struct {
 	UDPPort string
 }
 
-func New(joinType RedirectType, addr *Addressing) (tcpProxy Redirect, udpProxy Redirect, err error) {
+func New(joinType Mode, addr *Addressing) (tcpProxy Redirect, udpProxy Redirect, err error) {
 	switch joinType {
 	case CurrentUserIsHost:
 		// All players, who connect to the server are guests (joiners).
@@ -107,4 +107,8 @@ func New(joinType RedirectType, addr *Addressing) (tcpProxy Redirect, udpProxy R
 	default:
 		return nil, nil, fmt.Errorf("unknown joining type: %s", joinType)
 	}
+}
+
+func NewNoop(_ Mode, _ *Addressing) (Redirect, Redirect, error) {
+	return &Noop{}, &Noop{}, nil
 }
