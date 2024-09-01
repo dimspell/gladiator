@@ -45,9 +45,6 @@ type Member struct {
 	UserID string `json:"userID"`
 
 	IsHost bool `json:"isHost"`
-
-	// Joined defines whether the given user has already joined to the room.
-	Joined bool `json:"joined"`
 }
 
 type Offer struct {

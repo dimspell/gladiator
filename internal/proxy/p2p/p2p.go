@@ -61,7 +61,6 @@ func DialSignalServer(signalServerURL string, currentUserID, roomName string, is
 		Content: signalserver.Member{
 			UserID: currentUserID,
 			IsHost: isHost,
-			Joined: isHost, // Note: Host is always joined.
 		},
 	}
 
@@ -187,52 +186,19 @@ func (p *PeerToPeer) handleJoin(m signalserver.MessageContent[signalserver.Membe
 		// slog.Debug("Peer is the same as the host, ignoring join", "userId", m.Content.UserID, "host", m.Content.IsHost)
 		return nil
 	}
-	if p.Peers.Exist(m.Content.UserID) {
+
+	peer, connected := p.Peers.Get(m.Content.UserID)
+	if connected && peer.Connection != nil {
 		// slog.Debug("Peer already exist, ignoring join", "userId", m.Content.UserID, "host", m.Content.IsHost)
 		return nil
 	}
 
 	slog.Debug("JOIN", "id", m.Content.UserID, "host", m.Content.IsHost)
 
-	// Create a fake endpoint that could be listened and redirect the packets
-	guestTCP, guestUDP, err := p.IpRing.CreateClient(p.CurrentUserIsHost, m.Content)
-	if err != nil {
-		return fmt.Errorf("could not create guest proxy for %s: %v", p.CurrentUserID, err)
-	}
-
-	log.Println("Joining peer", m.Content.UserID)
-
 	// Add the peer to the list of peers, and start the WebRTC connection
 	member := m.Content
-	peer := p.addPeer(member, guestTCP, guestUDP, true)
-
-	if guestTCP != nil {
-		dcTCP, err := peer.Connection.CreateDataChannel(fmt.Sprintf("%s/tcp", p.RoomName), nil)
-		if err != nil {
-			return fmt.Errorf("could not create data channel %q: %v", p.RoomName, err)
-		}
-		pipeTCP := NewPipe(dcTCP, guestTCP)
-
-		dcTCP.OnClose(func() {
-			log.Printf("dataChannel for %s has closed", peer.PeerUserID)
-			p.Peers.Delete(peer.PeerUserID)
-			pipeTCP.Close()
-		})
-	}
-
-	if guestUDP != nil {
-		// UDP
-		dcUDP, err := peer.Connection.CreateDataChannel(fmt.Sprintf("%s/udp", p.RoomName), nil)
-		if err != nil {
-			return fmt.Errorf("could not create data channel %q: %v", p.RoomName, err)
-		}
-		pipeUDP := NewPipe(dcUDP, guestUDP)
-
-		dcUDP.OnClose(func() {
-			log.Printf("dataChannel for %s has closed", peer.PeerUserID)
-			p.Peers.Delete(peer.PeerUserID)
-			pipeUDP.Close()
-		})
+	if _, err := p.addPeer(member, true, true); err != nil {
+		return err
 	}
 
 	return nil
@@ -259,12 +225,10 @@ func (p *PeerToPeer) handleLeave(m signalserver.MessageContent[any]) error {
 func (p *PeerToPeer) handleRTCOffer(m signalserver.MessageContent[signalserver.Offer]) error {
 	slog.Debug("RTC_OFFER", "from", m.From, "to", m.To)
 
-	guestTCP, guestUDP, err := p.IpRing.CreateClient(p.CurrentUserIsHost, m.Content.Member)
+	peer, err := p.addPeer(m.Content.Member, false, false)
 	if err != nil {
-		return fmt.Errorf("could not create guest proxy for %s: %v", m.From, err)
+		return err
 	}
-
-	peer := p.addPeer(m.Content.Member, guestTCP, guestUDP, false)
 
 	if err := peer.Connection.SetRemoteDescription(m.Content.Offer); err != nil {
 		return fmt.Errorf("could not set remote description: %v", err)
@@ -311,17 +275,25 @@ func (p *PeerToPeer) handleRTCAnswer(m signalserver.MessageContent[signalserver.
 	return nil
 }
 
-func (p *PeerToPeer) addPeer(member signalserver.Member, guestTCP redirect.Redirect, guestUDP redirect.Redirect, sendRTCOffer bool) *Peer {
+func (p *PeerToPeer) addPeer(member signalserver.Member, sendRTCOffer bool, createChannels bool) (*Peer, error) {
 	peerConnection, err := webrtc.NewPeerConnection(p.WebRTCConfig)
 	if err != nil {
 		panic(err)
 	}
 
-	peer := &Peer{
-		Peer:       member,
-		Connection: peerConnection,
+	peer, ok := p.Peers.Get(member.UserID)
+	if !ok {
+		// TODO: Always guest is created, but should be checked if the user is a host
+		peer = p.IpRing.NextPeerAddress(member.UserID, false, false)
 	}
+	peer.Connection = peerConnection
+
 	p.Peers.Set(member.UserID, peer)
+
+	guestTCP, guestUDP, err := redirect.New(peer.Mode, peer.Addr)
+	if err != nil {
+		return nil, fmt.Errorf("could not create guest proxy for %s: %v", member.UserID, err)
+	}
 
 	peerConnection.OnICEConnectionStateChange(func(connectionState webrtc.ICEConnectionState) {
 		slog.Debug("ICE Connection State has changed", "peer", member.UserID, "state", connectionState.String())
@@ -388,7 +360,38 @@ func (p *PeerToPeer) addPeer(member signalserver.Member, guestTCP redirect.Redir
 		})
 	})
 
-	return peer
+	if createChannels {
+		if guestTCP != nil {
+			dcTCP, err := peer.Connection.CreateDataChannel(fmt.Sprintf("%s/tcp", p.RoomName), nil)
+			if err != nil {
+				return nil, fmt.Errorf("could not create data channel %q: %v", p.RoomName, err)
+			}
+			pipeTCP := NewPipe(dcTCP, guestTCP)
+
+			dcTCP.OnClose(func() {
+				log.Printf("dataChannel for %s has closed", peer.PeerUserID)
+				p.Peers.Delete(peer.PeerUserID)
+				pipeTCP.Close()
+			})
+		}
+
+		if guestUDP != nil {
+			// UDP
+			dcUDP, err := peer.Connection.CreateDataChannel(fmt.Sprintf("%s/udp", p.RoomName), nil)
+			if err != nil {
+				return nil, fmt.Errorf("could not create data channel %q: %v", p.RoomName, err)
+			}
+			pipeUDP := NewPipe(dcUDP, guestUDP)
+
+			dcUDP.OnClose(func() {
+				log.Printf("dataChannel for %s has closed", peer.PeerUserID)
+				p.Peers.Delete(peer.PeerUserID)
+				pipeUDP.Close()
+			})
+		}
+	}
+
+	return peer, nil
 }
 
 func (p *PeerToPeer) handleRTCCandidate(m signalserver.MessageContent[webrtc.ICECandidateInit]) error {

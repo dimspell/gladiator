@@ -19,13 +19,6 @@ func NewPeers() *Peers {
 	}
 }
 
-func (p *Peers) Exist(id string) bool {
-	p.RLock()
-	_, ok := p.peers[id]
-	p.RUnlock()
-	return ok
-}
-
 func (p *Peers) Get(id string) (*Peer, bool) {
 	p.RLock()
 	member, ok := p.peers[id]

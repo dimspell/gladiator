@@ -7,7 +7,6 @@ import (
 	"sync"
 
 	"github.com/dimspell/gladiator/internal/proxy/redirect"
-	"github.com/dimspell/gladiator/internal/proxy/signalserver"
 )
 
 type IpRing struct {
@@ -82,11 +81,4 @@ func (r *IpRing) NextPeerAddress(userId string, isCurrentUser, isHost bool) *Pee
 			Mode:       redirect.OtherUserIsJoining,
 		}
 	}
-}
-
-// Deprecated: use redirect.New() instead.
-func (r *IpRing) CreateClient(currentUserIsHost bool, other signalserver.Member) (tcpProxy redirect.Redirect, udpProxy redirect.Redirect, err error) {
-	// joinType, addr := r.ParseJoiningType(currentUserIsHost, other)
-	// return redirect.New(joinType, addr)
-	return &redirect.Noop{}, &redirect.Noop{}, nil
 }
