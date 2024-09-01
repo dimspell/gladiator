@@ -35,7 +35,6 @@ func DialTCP(ipv4 string, portNumber string) (*DialerTCP, error) {
 
 func (p *DialerTCP) Run(ctx context.Context, rw io.ReadWriteCloser) error {
 	g, ctx := errgroup.WithContext(ctx)
-
 	g.Go(func() error {
 		if _, err := io.Copy(rw, p.tcpConn); err != nil {
 			log.Println(err)
@@ -80,6 +79,5 @@ func (p *DialerTCP) Write(msg []byte) (n int, err error) {
 }
 
 func (p *DialerTCP) Close() error {
-	// return p.tcpConn.Close()
-	return nil
+	return p.tcpConn.Close()
 }
