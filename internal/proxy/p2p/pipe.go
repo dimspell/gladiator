@@ -31,10 +31,14 @@ type DataChannel interface {
 }
 
 func NewPipe(dc DataChannel, proxy redirect.Redirect) *Pipe {
+	if proxy == nil {
+		panic("proxy is nil")
+	}
+
 	pipe := &Pipe{
 		dc:     dc,
 		proxy:  proxy,
-		dcData: make(chan webrtc.DataChannelMessage, 1),
+		dcData: make(chan webrtc.DataChannelMessage),
 	}
 
 	ctx, cancel := context.WithCancel(context.TODO())

@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/dimspell/gladiator/internal/proxy/proxytesthelper"
-	"github.com/dimspell/gladiator/internal/proxy/signalserver"
+	"github.com/dimspell/gladiator/internal/proxy/redirect"
 )
 
 func TestNewPipe(t *testing.T) {
@@ -18,34 +18,24 @@ func TestNewPipe(t *testing.T) {
 
 		dc := proxytesthelper.NewFakeDataChannel(fmt.Sprint(roomName, "/udp"))
 
-		tcpProxyHost, _, err := r.CreateClient(false, signalserver.Member{
-			UserID: player2Name,
-			IsHost: false,
-			Joined: false,
-		})
+		peer1 := r.NextPeerAddress(player1Name, true, true)
+		_, proxy1, err := redirect.New(peer1.Mode, peer1.Addr)
 		if err != nil {
 			t.Error(err)
 			return
 		}
-		// defer tcpProxyHost.Close()
-		// defer udpProxyHost.Close()
 
-		player2 := NewPipe(dc, tcpProxyHost)
+		player2 := NewPipe(dc, proxy1)
 		defer player2.Close()
 
-		tcpProxyGuest2, _, err := r.CreateClient(true, signalserver.Member{
-			UserID: player2Name,
-			IsHost: false,
-			Joined: false,
-		})
+		peer2 := r.NextPeerAddress(player2Name, false, false)
+		_, proxy2, err := redirect.New(peer2.Mode, peer2.Addr)
 		if err != nil {
 			t.Error(err)
 			return
 		}
-		// defer tcpProxyGuest2.Close()
-		// defer udpProxyGuest2.Close()
 
-		player1 := NewPipe(dc, tcpProxyGuest2)
+		player1 := NewPipe(dc, proxy2)
 		defer player1.Close()
 
 		if _, err := player2.Write([]byte("#hello")); err != nil {

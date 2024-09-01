@@ -49,13 +49,15 @@ type Addressing struct {
 }
 
 func New(joinType Mode, addr *Addressing) (tcpProxy Redirect, udpProxy Redirect, err error) {
+	slog.Info("Creating redirect", "joinType", joinType.String(), "ip", addr.IP)
+
 	switch joinType {
 	case CurrentUserIsHost:
 		// All players, who connect to the server are guests (joiners).
 		// We are connecting (dialing) to ourselves on the loopback interface,
 		// to the local instance served by the DispelMulti.exe.
 
-		slog.Debug("Creating client to dial TCP and UDP on default ports", "ip", addr.IP)
+		slog.Info("Creating client to dial TCP and UDP on default ports", "ip", addr.IP)
 
 		tcpProxy, err = DialTCP(addr.IP.To4().String(), "")
 		if err != nil {
@@ -71,8 +73,7 @@ func New(joinType Mode, addr *Addressing) (tcpProxy Redirect, udpProxy Redirect,
 		// We are exposing a packet redirect on the local IP address,
 		// to which the game is going to connect (dial).
 
-		slog.Debug("Creating TCP and UDP listeners on custom ports", "ip", addr.IP, "tcpPort", addr.TCPPort, "udpPort", addr.UDPPort)
-
+		slog.Info("Creating TCP and UDP listeners on custom ports", "ip", addr.IP, "tcpPort", addr.TCPPort, "udpPort", addr.UDPPort)
 		tcpProxy, err = ListenTCP(addr.IP.To4().String(), addr.TCPPort)
 		if err != nil {
 			return nil, nil, err
@@ -87,7 +88,7 @@ func New(joinType Mode, addr *Addressing) (tcpProxy Redirect, udpProxy Redirect,
 		// We are connecting (dialing) to the host (game creator) on the loopback interface,
 		// to the local instance served by the DispelMulti.exe.
 
-		slog.Debug("Creating UDP listener only on a custom port", "ip", addr.IP, "udpPort", addr.UDPPort)
+		slog.Info("Creating UDP listener only on a custom port", "ip", addr.IP, "udpPort", addr.UDPPort)
 		udpProxy, err = ListenUDP(addr.IP.To4().String(), addr.UDPPort)
 		if err != nil {
 			return nil, nil, err
@@ -98,7 +99,7 @@ func New(joinType Mode, addr *Addressing) (tcpProxy Redirect, udpProxy Redirect,
 		// We have registered the join during the game phase.
 		// We are dialing to ourselves on the loopback interface,
 
-		slog.Debug("Creating UDP dialler on the default port", "ip", addr.IP)
+		slog.Info("Creating UDP dialler on the default port", "ip", addr.IP)
 		udpProxy, err = DialUDP(addr.IP.To4().String(), "")
 		if err != nil {
 			return nil, nil, err

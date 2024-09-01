@@ -10,9 +10,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dimspell/gladiator/internal/proxy/proxytesthelper"
 	"github.com/dimspell/gladiator/internal/proxy/signalserver"
 	"github.com/lmittmann/tint"
 	"go.uber.org/goleak"
+)
+
+const (
+	roomName    = "test"
+	player1Name = "player1"
+	player2Name = "player2"
 )
 
 func TestWebRTCMock(t *testing.T) {
@@ -27,8 +34,9 @@ func TestWebRTCMock(t *testing.T) {
 		),
 	))
 
-	// proxytesthelper.StartHost(t)
+	proxytesthelper.StartHost(t)
 	// signalServerURL := proxytesthelper.StartSignalServer(t)
+
 	h, err := signalserver.NewServer()
 	if err != nil {
 		t.Fatal(err)
@@ -51,7 +59,7 @@ func TestWebRTCMock(t *testing.T) {
 		panic(err)
 	}
 	player1.IpRing = ipRing
-	go player1.Run(ctx, "player1", nil)
+	go player1.Run(ctx)
 
 	// Player 2
 	player2, err := DialSignalServer(signalServerURL, "player2", roomName, false)
@@ -59,7 +67,7 @@ func TestWebRTCMock(t *testing.T) {
 		panic(err)
 	}
 	player2.IpRing = ipRing
-	go player2.Run(ctx, "player1", nil)
+	go player2.Run(ctx)
 
 	// Player 3
 	player3, err := DialSignalServer(signalServerURL, "player3", roomName, false)
@@ -67,7 +75,7 @@ func TestWebRTCMock(t *testing.T) {
 		panic(err)
 	}
 	player3.IpRing = ipRing
-	go player3.Run(ctx, "player1", nil)
+	go player3.Run(ctx)
 
 	<-time.After(3 * time.Second)
 
