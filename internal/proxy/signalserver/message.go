@@ -1,9 +1,6 @@
 package signalserver
 
 import (
-	"encoding/json"
-
-	"github.com/fxamacker/cbor/v2"
 	"github.com/pion/webrtc/v4"
 )
 
@@ -35,16 +32,8 @@ const (
 	RTCICECandidate
 )
 
-func (m Message) ToCBOR() []byte {
-	out, err := cbor.Marshal(m)
-	if err != nil {
-		panic(err)
-	}
-	return out
-}
-
-func (m Message) ToJSON() []byte {
-	out, err := json.Marshal(m)
+func (m Message) Encode() []byte {
+	out, err := DefaultCodec.Marshal(m)
 	if err != nil {
 		panic(err)
 	}

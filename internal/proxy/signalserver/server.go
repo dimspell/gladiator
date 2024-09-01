@@ -9,8 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/fxamacker/cbor/v2"
-	"github.com/gorilla/websocket"
+	"github.com/coder/websocket"
 )
 
 type Server struct {
@@ -43,23 +42,28 @@ func (h *Server) DeleteChannel(channelName string) {
 	h.Unlock()
 }
 
+const supportedSubProtocol = "signalserver"
+
 func (h *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	params := r.URL.Query()
 	roomName := params.Get("roomName")
 	userID := params.Get("userID")
 
-	var origin string
-	upgrader := websocket.Upgrader{
-		CheckOrigin: func(*http.Request) bool { return true },
-	}
-
-	conn, err := upgrader.Upgrade(w, r, nil)
+	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{
+		Subprotocols: []string{supportedSubProtocol},
+	})
 	if err != nil {
-		slog.Error("Could not upgrade connection",
+		slog.Error("Could not accept the connection",
 			"error", err,
-			"origin", origin,
+			"origin", r.Header.Get("Origin"),
 			"userId", userID,
 			"roomName", roomName)
+		return
+	}
+	defer conn.CloseNow()
+
+	if conn.Subprotocol() != supportedSubProtocol {
+		_ = conn.Close(websocket.StatusPolicyViolation, "client must speak the echo subprotocol")
 		return
 	}
 
@@ -67,25 +71,40 @@ func (h *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer h.Leave(roomName, userID)
 
 	for {
-		_, rawSignal, err := conn.ReadMessage()
+		err = h.WaitAndHandleMessage(r.Context(), conn, roomName)
+		if websocket.CloseStatus(err) == websocket.StatusNormalClosure {
+			return
+		}
 		if err != nil {
-			log.Println("read:", err)
-			break
-		}
-		if len(rawSignal) == 0 && rawSignal[0] == 0x00 {
-			if err := conn.WriteMessage(websocket.BinaryMessage, []byte{0x00}); err != nil {
-				return
-			}
-		}
-
-		var m Message
-		if err := cbor.Unmarshal(rawSignal, &m); err != nil {
-			continue
-		}
-		if ch, ok := h.GetChannel(roomName); ok {
-			ch.Messages <- m
+			slog.Error("Could not handle the message", "error", err)
+			return
 		}
 	}
+}
+
+func (h *Server) WaitAndHandleMessage(ctx context.Context, conn *websocket.Conn, roomName string) error {
+	_, payload, err := conn.Read(ctx)
+	if err != nil {
+		slog.Warn("Could not read the message", "error", err, "closeError", websocket.CloseStatus(err))
+		return err
+	}
+	// if len(payload) == 0 && payload[0] == 0x00 {
+	// 	ctx, cancel := context.WithTimeout(ctx, time.Second)
+	// 	defer cancel()
+	//
+	// 	if err := conn.Write(ctx, websocket.MessageText, []byte{0x00}); err != nil {
+	// 		return err
+	// 	}
+	// }
+
+	var m Message
+	if err := DefaultCodec.Unmarshal(payload, &m); err != nil {
+		return nil
+	}
+	if ch, ok := h.GetChannel(roomName); ok {
+		ch.Messages <- m
+	}
+	return nil
 }
 
 func (h *Server) Join(ctx context.Context, channelName string) *Channel {
@@ -99,13 +118,17 @@ func (h *Server) Join(ctx context.Context, channelName string) *Channel {
 		Messages: make(chan Message),
 	}
 	h.SetChannel(channelName, c)
-	go c.Run()
+	go c.Run(ctx)
 	return c
 }
 
 func (h *Server) Leave(channelName string, userID string) {
 	if c, ok := h.GetChannel(channelName); ok {
-		c.Broadcast(Leave, Message{Type: Leave, From: userID})
+		ctx := context.TODO()
+		// ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+		// defer cancel()
+
+		c.Broadcast(ctx, Leave, Message{Type: Leave, From: userID})
 		c.Members.Delete(userID)
 		if c.Members.Count() == 0 {
 			close(c.Messages)
@@ -120,53 +143,67 @@ type Channel struct {
 	Messages chan Message
 }
 
-func (c *Channel) Run() {
+func (c *Channel) Run(ctx context.Context) {
 	for msg := range c.Messages {
 		switch msg.Type {
 		case HandshakeRequest:
-			if ws, ok := c.Members.Get(msg.From); ok {
-				SendMessage(ws, HandshakeResponse, MessageContent[string]{
-					Type:    HandshakeResponse,
-					Content: msg.From,
-				})
-			}
-			c.Broadcast(Join, Message{
-				Type:    Join,
-				Content: msg.Content,
-			})
+			c.SendJoin(ctx, msg)
 		case RTCOffer, RTCAnswer, RTCICECandidate:
-			if ws, ok := c.Members.Get(msg.To); ok {
-				SendMessage(ws, msg.Type, msg)
-			}
+			c.ForwardRTCMessage(ctx, msg)
 		default:
 			// Do nothing
 		}
 	}
 }
 
-func (c *Channel) Broadcast(msgType EventType, msg any) {
-	payload, err := cbor.Marshal(msg)
+func (c *Channel) SendJoin(ctx context.Context, msg Message) {
+	ctx, cancel := context.WithTimeout(ctx, time.Second*10)
+	defer cancel()
+
+	if ws, ok := c.Members.Get(msg.From); ok {
+		SendMessage(ctx, ws, HandshakeResponse, MessageContent[string]{
+			Type:    HandshakeResponse,
+			Content: msg.From,
+		})
+	}
+	c.Broadcast(ctx, Join, Message{
+		Type:    Join,
+		Content: msg.Content,
+	})
+}
+
+func (c *Channel) ForwardRTCMessage(ctx context.Context, msg Message) {
+	ctx, cancel := context.WithTimeout(ctx, time.Second*5)
+	defer cancel()
+
+	if ws, ok := c.Members.Get(msg.To); ok {
+		SendMessage(ctx, ws, msg.Type, msg)
+	}
+}
+
+func (c *Channel) Broadcast(ctx context.Context, msgType EventType, msg any) {
+	payload, err := DefaultCodec.Marshal(msg)
 	if err != nil {
 		slog.Error("Could not marshal the websocket message", "error", err)
 		return
 	}
 	payload = append([]byte{byte(msgType)}, payload...)
 	c.Members.Range(func(ws *websocket.Conn) bool {
-		if err := ws.WriteMessage(websocket.TextMessage, payload); err != nil {
+		if err := ws.Write(ctx, websocket.MessageText, payload); err != nil {
 			slog.Error("Could not broadcast websocket message", "error", err)
 		}
 		return true
 	})
 }
 
-func SendMessage(ws *websocket.Conn, msgType EventType, msg any) {
-	payload, err := cbor.Marshal(msg)
+func SendMessage(ctx context.Context, ws *websocket.Conn, msgType EventType, msg any) {
+	payload, err := DefaultCodec.Marshal(msg)
 	if err != nil {
 		slog.Error("Could not marshal the websocket message", "error", err)
 		return
 	}
 	payload = append([]byte{byte(msgType)}, payload...)
-	if err := ws.WriteMessage(websocket.TextMessage, payload); err != nil {
+	if err := ws.Write(ctx, websocket.MessageText, payload); err != nil {
 		slog.Error("Could not write websocket message", "error", err)
 	}
 }

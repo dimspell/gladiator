@@ -12,7 +12,6 @@ import (
 	"github.com/dimspell/gladiator/internal/proxy/signalserver"
 
 	"github.com/coder/websocket"
-	"github.com/fxamacker/cbor/v2"
 	"github.com/pion/webrtc/v4"
 )
 
@@ -48,7 +47,9 @@ func DialSignalServer(signalServerURL string, currentUserID, roomName string, is
 
 	// Connect to the signaling server
 	slog.Debug("Connecting to the signaling server", "url", u.String())
-	ws, _, err := websocket.Dial(ctx, u.String(), nil)
+	ws, _, err := websocket.Dial(ctx, u.String(), &websocket.DialOptions{
+		Subprotocols: []string{"signalserver"},
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -64,7 +65,7 @@ func DialSignalServer(signalServerURL string, currentUserID, roomName string, is
 		},
 	}
 
-	if err := ws.Write(context.TODO(), websocket.MessageText, req.ToCBOR()); err != nil {
+	if err := ws.Write(context.TODO(), websocket.MessageText, req.Encode()); err != nil {
 		return nil, err
 	}
 
@@ -79,7 +80,7 @@ func DialSignalServer(signalServerURL string, currentUserID, roomName string, is
 		return nil, fmt.Errorf("unexpected handshake response: %v", data)
 	}
 	// TODO: Check that the response contains the same room name as the request
-	resp, err := decodeCBOR[signalserver.MessageContent[string]](data[1:])
+	resp, err := decodeSignalMessage[signalserver.MessageContent[string]](data[1:])
 	if err != nil {
 		return nil, err
 	}
@@ -159,6 +160,8 @@ func (p *PeerToPeer) Run(hostUserID string) {
 }
 
 func (p *PeerToPeer) handlePackets(buf []byte) error {
+	fmt.Println("handlePackets", buf[0], string(buf[1:]))
+
 	switch signalserver.EventType(buf[0]) {
 	case signalserver.Join:
 		return decodeAndRun(buf[1:], p.handleJoin)
@@ -282,7 +285,7 @@ func (p *PeerToPeer) handleRTCOffer(m signalserver.MessageContent[signalserver.O
 			Offer:  answer,
 		},
 	}
-	if err := p.sendSignal(response.ToCBOR()); err != nil {
+	if err := p.sendSignal(response.Encode()); err != nil {
 		return fmt.Errorf("could not send answer: %v", err)
 	}
 	return nil
@@ -331,7 +334,7 @@ func (p *PeerToPeer) addPeer(member signalserver.Member, guestTCP redirect.Redir
 			Type:    signalserver.RTCICECandidate,
 			Content: candidate.ToJSON(),
 		}
-		if err := p.sendSignal(reply.ToCBOR()); err != nil {
+		if err := p.sendSignal(reply.Encode()); err != nil {
 			panic(err)
 		}
 	})
@@ -364,7 +367,7 @@ func (p *PeerToPeer) addPeer(member signalserver.Member, guestTCP redirect.Redir
 				Offer: offer,
 			},
 		}
-		if err := p.sendSignal(reply.ToCBOR()); err != nil {
+		if err := p.sendSignal(reply.Encode()); err != nil {
 			panic(err)
 		}
 	})
@@ -398,26 +401,23 @@ func (p *PeerToPeer) handleRTCCandidate(m signalserver.MessageContent[webrtc.ICE
 	return nil
 }
 
-func (p *PeerToPeer) sendSignal(message []byte) (err error) {
-	if p.ws == nil {
-		panic("Not implemented")
-	}
-	err = p.ws.Write(context.TODO(), websocket.MessageText, message)
-	return err
+func (p *PeerToPeer) sendSignal(message []byte) error {
+	slog.Debug(string(message))
+	return p.ws.Write(context.TODO(), websocket.MessageText, message)
 }
 
 func decodeAndRun[T any](data []byte, f func(T) error) error {
-	v, err := decodeCBOR[T](data)
+	v, err := decodeSignalMessage[T](data)
 	if err != nil {
 		return err
 	}
 	return f(v)
 }
 
-func decodeCBOR[T any](data []byte) (v T, err error) {
-	err = cbor.Unmarshal(data, &v)
+func decodeSignalMessage[T any](data []byte) (v T, err error) {
+	err = signalserver.DefaultCodec.Unmarshal(data, &v)
 	if err != nil {
-		slog.Warn("Error decoding CBOR", "error", err, "payload", string(data))
+		slog.Warn("Error decoding signal message", "error", err, "payload", string(data))
 		panic(err)
 	}
 	return v, err

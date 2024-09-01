@@ -3,7 +3,7 @@ package signalserver
 import (
 	"sync"
 
-	"github.com/gorilla/websocket"
+	"github.com/coder/websocket"
 )
 
 type Members struct {

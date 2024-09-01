@@ -70,6 +70,7 @@ func (r *IpRing) ParseJoiningType(currentUserIsHost bool, other signalserver.Mem
 }
 
 func (r *IpRing) CreateClient(currentUserIsHost bool, other signalserver.Member) (tcpProxy redirect.Redirect, udpProxy redirect.Redirect, err error) {
-	joinType, addr := r.ParseJoiningType(currentUserIsHost, other)
-	return redirect.New(joinType, addr)
+	// joinType, addr := r.ParseJoiningType(currentUserIsHost, other)
+	// return redirect.New(joinType, addr)
+	return &redirect.Noop{}, &redirect.Noop{}, nil
 }

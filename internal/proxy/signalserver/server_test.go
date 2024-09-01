@@ -1,16 +1,34 @@
 package signalserver
 
 import (
+	"context"
+	"log/slog"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"testing"
+	"time"
 
+	"github.com/coder/websocket"
+	"github.com/lmittmann/tint"
 	"go.uber.org/goleak"
-	"golang.org/x/net/websocket"
 )
 
 func TestHandshake(t *testing.T) {
+	slog.SetDefault(slog.New(
+		tint.NewHandler(
+			os.Stderr,
+			&tint.Options{
+				Level:      slog.LevelDebug,
+				TimeFormat: time.TimeOnly,
+				AddSource:  true,
+			},
+		),
+	))
+
 	defer goleak.VerifyNone(t)
+
+	DefaultCodec = NewJSONCodec()
 
 	// Start the signaling server
 	h, err := NewServer()
@@ -33,13 +51,19 @@ func TestHandshake(t *testing.T) {
 	v.Set("roomName", roomName)
 	wsURI.RawQuery = v.Encode()
 
+	// Give 3 minutes for the whole test to finish
+	ctx, cancel := context.WithTimeout(context.TODO(), 3*time.Second)
+	defer cancel()
+
 	// Connect to the signaling server
-	ws, err := websocket.Dial(wsURI.String(), "", ts.URL)
+	ws, _, err := websocket.Dial(ctx, wsURI.String(), &websocket.DialOptions{
+		Subprotocols: []string{"signalserver"},
+	})
 	if err != nil {
 		t.Error(err)
 		return
 	}
-	defer ws.Close()
+	defer ws.CloseNow()
 
 	// Send "hello" message to the signaling server
 	req := &Message{
@@ -47,18 +71,21 @@ func TestHandshake(t *testing.T) {
 		Type:    HandshakeRequest,
 		Content: roomName,
 	}
-	if _, err := ws.Write(req.ToCBOR()); err != nil {
+	if err := ws.Write(ctx, websocket.MessageText, req.Encode()); err != nil {
 		t.Error(err)
 		return
 	}
 
 	// Wait for the response
-	buf := make([]byte, 128)
-	n, err := ws.Read(buf)
+	_, data, err := ws.Read(ctx)
 	if err != nil {
 		t.Error(err)
 		return
 	}
+	t.Log(string(data))
 
-	t.Log(string(buf[:n]))
+	if err := ws.Close(websocket.StatusNormalClosure, "fin"); err != nil {
+		t.Error(err)
+		return
+	}
 }

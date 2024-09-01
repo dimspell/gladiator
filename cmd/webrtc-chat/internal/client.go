@@ -46,7 +46,7 @@ func Dial(params *DialParams) (*Client, error) {
 			UserID: params.ID,
 		},
 	}
-	if _, err := ws.Write(req.ToJSON()); err != nil {
+	if _, err := ws.Write(req.Encode()); err != nil {
 		return nil, err
 	}
 
@@ -211,10 +211,10 @@ func (c *Client) addPeer(member signalserver.Member, sendRTCOffer bool, onTCP Me
 			return
 		}
 
-		msg := c.newMessage(signalserver.RTCICECandidate, candidate.ToJSON())
+		msg := c.newMessage(signalserver.RTCICECandidate, candidate.Encode())
 		msg.To = member.UserID
 
-		if err := c.SendSignal(msg.ToJSON()); err != nil {
+		if err := c.SendSignal(msg.Encode()); err != nil {
 			panic(err)
 		}
 	})
@@ -240,7 +240,7 @@ func (c *Client) addPeer(member signalserver.Member, sendRTCOffer bool, onTCP Me
 			Offer:  offer,
 		})
 		msg.To = member.UserID
-		if err := c.SendSignal(msg.ToJSON()); err != nil {
+		if err := c.SendSignal(msg.Encode()); err != nil {
 			panic(err)
 		}
 	})
@@ -319,7 +319,7 @@ func (c *Client) handleRTCOffer(msg signalserver.MessageContent[signalserver.Off
 	response := c.newMessage(signalserver.RTCAnswer, signalserver.Offer{Member: signalserver.Member{UserID: c.ID}, Offer: answer})
 	response.To = msg.From
 
-	if err := c.SendSignal(response.ToJSON()); err != nil {
+	if err := c.SendSignal(response.Encode()); err != nil {
 		panic(err)
 	}
 }
