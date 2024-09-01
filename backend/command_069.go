@@ -25,6 +25,8 @@ func (b *Backend) HandleSelectGame(session *model.Session, req SelectGameRequest
 		return nil
 	}
 
+	b.Proxy.Close()
+
 	respGame, err := b.gameClient.GetGame(context.TODO(), connect.NewRequest(&multiv1.GetGameRequest{
 		GameName: data.RoomName,
 	}))
