@@ -7,7 +7,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/dimspell/gladiator/internal/backend/proxy"
+	"github.com/dimspell/gladiator/internal/proxy"
 	"github.com/google/uuid"
 	"github.com/urfave/cli/v3"
 )

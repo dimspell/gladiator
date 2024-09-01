@@ -1,12 +1,13 @@
 package backend
 
 import (
+	"testing"
+
 	"connectrpc.com/connect"
 	v1 "github.com/dimspell/gladiator/gen/multi/v1"
-	"github.com/dimspell/gladiator/internal/backend/proxy"
+	"github.com/dimspell/gladiator/internal/proxy"
 	"github.com/dimspell/gladiator/model"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestBackend_HandleSelectGame(t *testing.T) {
@@ -31,12 +32,12 @@ func TestBackend_HandleSelectGame(t *testing.T) {
 							IpAddress:     "192.168.121.212",
 							Username:      "archer",
 						},
-						//{
+						// {
 						//	CharacterName: "mage",
 						//	ClassType:     int64(model.ClassTypeMage),
 						//	IpAddress:     "192.168.121.169",
 						//	Username:      "mage",
-						//},
+						// },
 					},
 				}),
 			},

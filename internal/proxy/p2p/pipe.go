@@ -2,13 +2,14 @@ package p2p
 
 import (
 	"context"
-	"github.com/dimspell/gladiator/internal/backend/proxy/redirect"
 	"io"
 	"log"
 	"log/slog"
 	"net"
 
-	"github.com/dimspell/gladiator/console/signalserver"
+	"github.com/dimspell/gladiator/internal/proxy/redirect"
+	"github.com/dimspell/gladiator/internal/proxy/signalserver"
+
 	"github.com/pion/webrtc/v4"
 	"golang.org/x/sync/errgroup"
 )

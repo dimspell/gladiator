@@ -5,7 +5,7 @@ import (
 	"net"
 	"sync"
 
-	"github.com/dimspell/gladiator/internal/backend/proxy/p2p"
+	"github.com/dimspell/gladiator/internal/proxy/p2p"
 )
 
 var _ Proxy = (*PeerToPeer)(nil)

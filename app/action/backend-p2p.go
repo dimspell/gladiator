@@ -7,7 +7,7 @@ import (
 
 	"github.com/dimspell/gladiator/backend"
 	"github.com/dimspell/gladiator/backend/packetlogger"
-	"github.com/dimspell/gladiator/internal/backend/proxy"
+	"github.com/dimspell/gladiator/internal/proxy"
 	"github.com/urfave/cli/v3"
 )
 

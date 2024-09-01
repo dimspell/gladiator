@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dimspell/gladiator/internal/backend/proxy/proxytesthelper"
+	"github.com/dimspell/gladiator/internal/proxy/proxytesthelper"
 	"github.com/lmittmann/tint"
 	"go.uber.org/goleak"
 )

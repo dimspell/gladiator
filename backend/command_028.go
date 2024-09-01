@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/dimspell/gladiator/internal/backend/proxy"
+	"github.com/dimspell/gladiator/internal/proxy"
 
 	"connectrpc.com/connect"
 	"github.com/dimspell/gladiator/backend/packet"

@@ -5,8 +5,8 @@ import (
 	"log"
 	"testing"
 
-	"github.com/dimspell/gladiator/console/signalserver"
-	"github.com/dimspell/gladiator/internal/backend/proxy/proxytesthelper"
+	"github.com/dimspell/gladiator/internal/proxy/proxytesthelper"
+	"github.com/dimspell/gladiator/internal/proxy/signalserver"
 )
 
 func TestNewPipe(t *testing.T) {

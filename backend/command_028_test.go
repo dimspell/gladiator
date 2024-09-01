@@ -1,7 +1,8 @@
 package backend
 
 import (
-	"github.com/dimspell/gladiator/internal/backend/proxy"
+	"github.com/dimspell/gladiator/internal/proxy"
+
 	"net"
 	"testing"
 

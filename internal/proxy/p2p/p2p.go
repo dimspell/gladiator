@@ -8,9 +8,9 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/dimspell/gladiator/internal/backend/proxy/redirect"
+	"github.com/dimspell/gladiator/internal/proxy/redirect"
+	"github.com/dimspell/gladiator/internal/proxy/signalserver"
 
-	"github.com/dimspell/gladiator/console/signalserver"
 	"github.com/fxamacker/cbor/v2"
 	"github.com/pion/webrtc/v4"
 	"golang.org/x/net/websocket"

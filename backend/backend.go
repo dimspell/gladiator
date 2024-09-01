@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/dimspell/gladiator/gen/multi/v1/multiv1connect"
-	"github.com/dimspell/gladiator/internal/backend/proxy"
+	"github.com/dimspell/gladiator/internal/proxy"
 	"github.com/dimspell/gladiator/model"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"

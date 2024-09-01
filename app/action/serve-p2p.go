@@ -10,8 +10,8 @@ import (
 	"github.com/dimspell/gladiator/backend/packetlogger"
 	"github.com/dimspell/gladiator/console"
 	"github.com/dimspell/gladiator/console/database"
-	"github.com/dimspell/gladiator/console/signalserver"
-	"github.com/dimspell/gladiator/internal/backend/proxy"
+	"github.com/dimspell/gladiator/internal/proxy"
+	"github.com/dimspell/gladiator/internal/proxy/signalserver"
 	"github.com/urfave/cli/v3"
 	"golang.org/x/sync/errgroup"
 )

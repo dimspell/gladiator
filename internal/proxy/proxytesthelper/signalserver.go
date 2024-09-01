@@ -5,7 +5,7 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/dimspell/gladiator/console/signalserver"
+	"github.com/dimspell/gladiator/internal/proxy/signalserver"
 )
 
 func StartSignalServer(t testing.TB) string {

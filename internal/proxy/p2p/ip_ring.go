@@ -6,8 +6,8 @@ import (
 	"net"
 	"sync"
 
-	"github.com/dimspell/gladiator/console/signalserver"
-	"github.com/dimspell/gladiator/internal/backend/proxy/redirect"
+	"github.com/dimspell/gladiator/internal/proxy/redirect"
+	"github.com/dimspell/gladiator/internal/proxy/signalserver"
 )
 
 type IpRing struct {
