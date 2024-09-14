@@ -2,9 +2,6 @@ package p2p
 
 import (
 	"sync"
-
-	"github.com/dimspell/gladiator/internal/proxy/redirect"
-	"github.com/pion/webrtc/v4"
 )
 
 type Peers struct {
@@ -44,7 +41,7 @@ func (p *Peers) Delete(id string) {
 func (p *Peers) Reset() {
 	p.Lock()
 	for id, peer := range p.peers {
-		peer.Connection.Close()
+		peer.Close()
 		delete(p.peers, id)
 	}
 	p.Unlock()
@@ -56,12 +53,4 @@ func (p *Peers) Range(f func(string, *Peer)) {
 	for id, peer := range p.peers {
 		f(id, peer)
 	}
-}
-
-type Peer struct {
-	PeerUserID string
-	Addr       *redirect.Addressing
-	Mode       redirect.Mode
-
-	Connection *webrtc.PeerConnection
 }
