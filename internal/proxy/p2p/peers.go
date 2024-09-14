@@ -18,11 +18,12 @@ func NewPeers() *Peers {
 
 func (p *Peers) Get(id string) (*Peer, bool) {
 	p.RLock()
+	defer p.RUnlock()
+
 	member, ok := p.peers[id]
 	if !ok {
 		return nil, false
 	}
-	p.RUnlock()
 	return member, ok
 }
 

@@ -32,6 +32,27 @@ const (
 	RTCICECandidate
 )
 
+func (e EventType) String() string {
+	switch e {
+	case HandshakeRequest:
+		return "HandshakeRequest"
+	case HandshakeResponse:
+		return "HandshakeResponse"
+	case Join:
+		return "Join"
+	case Leave:
+		return "Leave"
+	case RTCOffer:
+		return "RTCOffer"
+	case RTCAnswer:
+		return "RTCAnswer"
+	case RTCICECandidate:
+		return "RTCICECandidate"
+	default:
+		return "Unknown"
+	}
+}
+
 func (m Message) Encode() []byte {
 	out, err := DefaultCodec.Marshal(m)
 	if err != nil {

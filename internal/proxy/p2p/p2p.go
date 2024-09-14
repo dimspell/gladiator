@@ -162,8 +162,6 @@ func (p *PeerToPeer) Run(ctx context.Context) {
 }
 
 func (p *PeerToPeer) handlePackets(buf []byte) error {
-	fmt.Println("handlePackets", buf[0], string(buf[1:]))
-
 	switch signalserver.EventType(buf[0]) {
 	case signalserver.Join:
 		return decodeAndRun(buf[1:], p.handleJoin)
@@ -197,7 +195,7 @@ func (p *PeerToPeer) handleJoin(m signalserver.MessageContent[signalserver.Membe
 
 	// Add the peer to the list of peers, and start the WebRTC connection
 	if _, err := p.addPeer(m.Content, true, true); err != nil {
-		slog.Warn("Could add peer", "userId", m.Content.UserID, "error", err)
+		slog.Warn("Could not add a peer", "userId", m.Content.UserID, "error", err)
 		return err
 	}
 

@@ -145,6 +145,8 @@ type Channel struct {
 
 func (c *Channel) Run(ctx context.Context) {
 	for msg := range c.Messages {
+		slog.Debug("Received a signal message", "channel", c.Name, "type", msg.Type.String(), "from", msg.From, "to", msg.To)
+
 		switch msg.Type {
 		case HandshakeRequest:
 			c.SendJoin(ctx, msg)
@@ -157,12 +159,14 @@ func (c *Channel) Run(ctx context.Context) {
 }
 
 func (c *Channel) SendJoin(ctx context.Context, msg Message) {
-	ctx, cancel := context.WithTimeout(ctx, time.Second*10)
-	defer cancel()
+	ctx = context.TODO()
+	// ctx, cancel := context.WithTimeout(context.TODO(), time.Second*10)
+	// defer cancel()
 
 	if ws, ok := c.Members.Get(msg.From); ok {
-		SendMessage(ctx, ws, HandshakeResponse, MessageContent[string]{
+		SendMessage(ctx, ws, HandshakeResponse, Message{
 			Type:    HandshakeResponse,
+			To:      msg.From,
 			Content: msg.From,
 		})
 	}
@@ -173,6 +177,8 @@ func (c *Channel) SendJoin(ctx context.Context, msg Message) {
 }
 
 func (c *Channel) ForwardRTCMessage(ctx context.Context, msg Message) {
+	slog.Debug("Forwarding RTC message", "channel", c.Name, "type", msg.Type.String(), "from", msg.From, "to", msg.To)
+
 	ctx, cancel := context.WithTimeout(ctx, time.Second*5)
 	defer cancel()
 
@@ -181,7 +187,7 @@ func (c *Channel) ForwardRTCMessage(ctx context.Context, msg Message) {
 	}
 }
 
-func (c *Channel) Broadcast(ctx context.Context, msgType EventType, msg any) {
+func (c *Channel) Broadcast(ctx context.Context, msgType EventType, msg Message) {
 	payload, err := DefaultCodec.Marshal(msg)
 	if err != nil {
 		slog.Error("Could not marshal the websocket message", "error", err)
@@ -196,7 +202,9 @@ func (c *Channel) Broadcast(ctx context.Context, msgType EventType, msg any) {
 	})
 }
 
-func SendMessage(ctx context.Context, ws *websocket.Conn, msgType EventType, msg any) {
+func SendMessage(ctx context.Context, ws *websocket.Conn, msgType EventType, msg Message) {
+	slog.Debug("Sending a signal message", "type", msgType.String(), "from", msg.From, "to", msg.To)
+
 	payload, err := DefaultCodec.Marshal(msg)
 	if err != nil {
 		slog.Error("Could not marshal the websocket message", "error", err)
