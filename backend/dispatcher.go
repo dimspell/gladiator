@@ -49,7 +49,7 @@ func (b *Backend) handshake(conn net.Conn) (*Session, error) {
 		}
 	}
 
-	session := b.NewSession(conn)
+	session := b.AddSession(conn)
 
 	// Command 255 30 aka 0x1eff
 	{
@@ -97,8 +97,8 @@ func (b *Backend) handleCommands(session *Session) error {
 		}
 
 		pt := PacketType(packet[1])
-		if b.PacketLogger != nil {
-			b.PacketLogger.Debug("Recv",
+		if PacketLogger != nil {
+			PacketLogger.Debug("Recv",
 				"packetType", pt,
 				"bytes", packet,
 				"sessionId", session.ID,
@@ -206,39 +206,4 @@ func splitMultiPacket(buf []byte) [][]byte {
 		offset += length
 	}
 	return packets
-}
-
-func (b *Backend) Send(conn net.Conn, packetType PacketType, payload []byte) error {
-	if conn == nil {
-		return fmt.Errorf("backend: invalid client connection")
-	}
-
-	data := encodePacket(packetType, payload)
-
-	if b.PacketLogger != nil {
-		b.PacketLogger.Debug("Sent",
-			"packetType", packetType,
-			"remoteAddr", conn.RemoteAddr().String(),
-			"bytes", data,
-			"length", len(data),
-		)
-	}
-
-	_, err := conn.Write(data)
-	return err
-}
-
-func encodePacket(packetType PacketType, payload []byte) []byte {
-	length := len(payload) + 4
-	packet := make([]byte, length)
-
-	// Header
-	packet[0] = 255
-	packet[1] = byte(packetType)
-	binary.LittleEndian.PutUint16(packet[2:4], uint16(length))
-
-	// Data
-	copy(packet[4:], payload)
-
-	return packet
 }

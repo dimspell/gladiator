@@ -13,7 +13,7 @@ import (
 
 func TestBackend_HandleJoinGame(t *testing.T) {
 	b := &Backend{
-		Proxy: proxy.NewLAN(),
+		Proxy: proxy.NewLAN("127.0.100.1"),
 		gameClient: &mockGameClient{
 			GetGameResponse: connect.NewResponse(&v1.GetGameResponse{
 				Game: &v1.Game{
@@ -44,7 +44,7 @@ func TestBackend_HandleJoinGame(t *testing.T) {
 		},
 	}
 	conn := &mockConn{}
-	session := &model.Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP", LocalIpAddress: "127.0.100.1"}
+	session := &Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
 
 	assert.NoError(t, b.HandleJoinGame(session, JoinGameRequest{
 		103, 97, 109, 101, 82, 111, 111, 109, 0, // Game name

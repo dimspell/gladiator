@@ -45,8 +45,7 @@ func BackendP2PCommand() *cli.Command {
 		singalingAddr := c.String("signaling-addr")
 		// turnPublicAddr := c.String("turn-public-addr")
 
-		bd := backend.NewBackend(backendAddr, consoleAddr, "")
-		bd.Proxy = proxy.NewPeerToPeer(singalingAddr)
+		bd := backend.NewBackend(backendAddr, consoleAddr, proxy.NewPeerToPeer(singalingAddr))
 		bd.PacketLogger = slog.New(packetlogger.New(os.Stderr, &packetlogger.Options{
 			Level: slog.LevelDebug,
 		}))

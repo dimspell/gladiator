@@ -11,7 +11,7 @@ import (
 	"github.com/dimspell/gladiator/console"
 	"github.com/dimspell/gladiator/console/database"
 	"github.com/dimspell/gladiator/internal/proxy"
-	"github.com/dimspell/gladiator/internal/proxy/signalserver"
+	"github.com/dimspell/gladiator/internal/signalserver"
 	"github.com/urfave/cli/v3"
 	"golang.org/x/sync/errgroup"
 )
@@ -94,8 +94,7 @@ func ServeP2PCommand() *cli.Command {
 			slog.Warn("Seed queries failed", "error", err)
 		}
 
-		bd := backend.NewBackend(backendAddr, consoleAddr, "")
-		bd.Proxy = proxy.NewPeerToPeer(singalingAddr)
+		bd := backend.NewBackend(backendAddr, consoleAddr, proxy.NewPeerToPeer(singalingAddr))
 		bd.PacketLogger = slog.New(packetlogger.New(os.Stderr, &packetlogger.Options{
 			Level: slog.LevelDebug,
 		}))

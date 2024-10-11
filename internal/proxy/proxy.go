@@ -21,7 +21,6 @@ type Proxy interface {
 }
 
 type CreateParams struct {
-	HostUserIP string
 	HostUserID string
 	GameID     string
 }

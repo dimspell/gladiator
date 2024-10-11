@@ -7,6 +7,7 @@ import (
 
 	"github.com/dimspell/gladiator/backend"
 	"github.com/dimspell/gladiator/backend/packetlogger"
+	"github.com/dimspell/gladiator/internal/proxy"
 	"github.com/urfave/cli/v3"
 )
 
@@ -38,7 +39,7 @@ func BackendCommand() *cli.Command {
 		backendAddr := c.String("backend-addr")
 		myIpAddr := c.String("my-ip-addr")
 
-		bd := backend.NewBackend(backendAddr, consoleAddr, myIpAddr)
+		bd := backend.NewBackend(backendAddr, consoleAddr, proxy.NewLAN(myIpAddr))
 		bd.PacketLogger = slog.New(packetlogger.New(os.Stderr, &packetlogger.Options{
 			Level: slog.LevelDebug,
 		}))

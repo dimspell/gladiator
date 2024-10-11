@@ -33,11 +33,18 @@ func (b *Backend) HandleJoinGame(session *Session, req JoinGameRequest) error {
 		return err
 	}
 
+	// TODO: Refactor me
+	var ipAddr string
+	gameProxy, ok := b.Proxy.(*proxy.LAN)
+	if ok {
+		ipAddr = gameProxy.MyIPAddress
+	}
+
 	_, err = b.gameClient.JoinGame(context.TODO(), connect.NewRequest(&multiv1.JoinGameRequest{
 		UserId:      session.UserID,
 		CharacterId: session.CharacterID,
 		GameRoomId:  respGame.Msg.Game.GetGameId(),
-		IpAddress:   session.LocalIpAddress,
+		IpAddress:   ipAddr,
 	}))
 	if err != nil {
 		slog.Error("Could not join game room", "error", err)

@@ -36,7 +36,7 @@ func TestCreateGameRequest(t *testing.T) {
 
 func TestBackend_HandleCreateGame(t *testing.T) {
 	b := &Backend{
-		Proxy: proxy.NewLAN(),
+		Proxy: proxy.NewLAN("127.0.0.1"),
 		gameClient: &mockGameClient{
 			CreateGameResponse: connect.NewResponse(&v1.CreateGameResponse{
 				Game: &v1.Game{
@@ -49,11 +49,10 @@ func TestBackend_HandleCreateGame(t *testing.T) {
 			}),
 		}}
 	conn := &mockConn{RemoteAddress: &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 12137}}
-		Conn:           conn,
-		UserID:         2137,
-		Username:       "JP",
-		LocalIpAddress: "127.0.0.1",
 	session := &Session{ID: "TEST",
+		Conn:     conn,
+		UserID:   2137,
+		Username: "JP",
 	}
 
 	// State = 0

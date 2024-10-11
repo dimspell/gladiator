@@ -8,11 +8,15 @@ import (
 var _ Proxy = (*LAN)(nil)
 
 type LAN struct {
-	// myIPAddress string
+	MyIPAddress string
 }
 
-func NewLAN() *LAN {
-	return &LAN{}
+func NewLAN(myIPAddress string) *LAN {
+	if myIPAddress == "" {
+		myIPAddress = "127.0.0.1"
+	}
+
+	return &LAN{myIPAddress}
 }
 
 func (p *LAN) GetHostIP(hostIpAddress string) net.IP {
@@ -23,10 +27,10 @@ func (p *LAN) GetHostIP(hostIpAddress string) net.IP {
 	return ip
 }
 
-func (p *LAN) Create(params CreateParams) (net.IP, error) {
-	ip := net.ParseIP(params.HostUserIP)
+func (p *LAN) Create(_ CreateParams) (net.IP, error) {
+	ip := net.ParseIP(p.MyIPAddress)
 	if ip == nil {
-		return net.IP{}, fmt.Errorf("incorrect host IP address: %s", params.HostUserIP)
+		return net.IP{}, fmt.Errorf("incorrect host IP address: %s", p.MyIPAddress)
 	}
 	return ip, nil
 }

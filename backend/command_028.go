@@ -6,11 +6,10 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/dimspell/gladiator/internal/proxy"
-
 	"connectrpc.com/connect"
 	"github.com/dimspell/gladiator/backend/packet"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
+	"github.com/dimspell/gladiator/internal/proxy"
 	"github.com/dimspell/gladiator/model"
 )
 
@@ -32,7 +31,6 @@ func (b *Backend) HandleCreateGame(session *Session, req CreateGameRequest) erro
 		b.Proxy.Close()
 
 		hostIPAddress, err := b.Proxy.Create(proxy.CreateParams{
-			HostUserIP: session.LocalIpAddress,
 			HostUserID: fmt.Sprintf("%d", session.UserID),
 			GameID:     data.RoomName,
 		})

@@ -20,7 +20,7 @@ type Session struct {
 	Conn net.Conn
 }
 
-func (b *Backend) NewSession(conn net.Conn) *Session {
+func (b *Backend) AddSession(tcpConn net.Conn) *Session {
 	if b.SessionCounter == math.MaxUint64 {
 		b.SessionCounter = 0
 	}

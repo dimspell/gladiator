@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/dimspell/gladiator/internal/proxy/proxytesthelper"
-	"github.com/dimspell/gladiator/internal/proxy/signalserver"
+	"github.com/dimspell/gladiator/internal/signalserver"
 	"github.com/lmittmann/tint"
 	"go.uber.org/goleak"
 )

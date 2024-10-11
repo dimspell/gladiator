@@ -8,10 +8,9 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/dimspell/gladiator/internal/proxy/redirect"
-	"github.com/dimspell/gladiator/internal/proxy/signalserver"
-
 	"github.com/coder/websocket"
+	icesignal2 "github.com/dimspell/gladiator/internal/icesignal"
+	"github.com/dimspell/gladiator/internal/proxy/redirect"
 	"github.com/pion/webrtc/v4"
 )
 
@@ -55,10 +54,10 @@ func DialSignalServer(signalServerURL string, currentUserID, roomName string, is
 	}
 
 	// Send "hello" message to the signaling server
-	req := &signalserver.Message{
-		Type: signalserver.HandshakeRequest,
+	req := &icesignal2.Message{
+		Type: icesignal2.Hello,
 		From: currentUserID,
-		Content: signalserver.Member{
+		Content: icesignal2.Member{
 			UserID: currentUserID,
 			IsHost: isHost,
 		},
@@ -75,11 +74,11 @@ func DialSignalServer(signalServerURL string, currentUserID, roomName string, is
 		return nil, err
 	}
 	// Check that the response is a handshake response
-	if len(data) == 0 || data[0] != byte(signalserver.HandshakeResponse) {
+	if len(data) == 0 || data[0] != byte(icesignal2.LobbyUsers) {
 		return nil, fmt.Errorf("unexpected handshake response: %v", data)
 	}
 	// TODO: Check that the response contains the same room name as the request
-	resp, err := decodeSignalMessage[signalserver.MessageContent[string]](data[1:])
+	resp, err := decodeSignalMessage[icesignal2.MessageContent[string]](data[1:])
 	if err != nil {
 		return nil, err
 	}
@@ -162,23 +161,23 @@ func (p *PeerToPeer) Run(ctx context.Context) {
 }
 
 func (p *PeerToPeer) handlePackets(buf []byte) error {
-	switch signalserver.EventType(buf[0]) {
-	case signalserver.Join:
+	switch icesignal2.EventType(buf[0]) {
+	case icesignal2.Join:
 		return decodeAndRun(buf[1:], p.handleJoin)
-	case signalserver.Leave:
+	case icesignal2.Leave:
 		return decodeAndRun(buf[1:], p.handleLeave)
-	case signalserver.RTCOffer:
+	case icesignal2.RTCOffer:
 		return decodeAndRun(buf[1:], p.handleRTCOffer)
-	case signalserver.RTCAnswer:
+	case icesignal2.RTCAnswer:
 		return decodeAndRun(buf[1:], p.handleRTCAnswer)
-	case signalserver.RTCICECandidate:
+	case icesignal2.RTCICECandidate:
 		return decodeAndRun(buf[1:], p.handleRTCCandidate)
 	default:
 		return nil
 	}
 }
 
-func (p *PeerToPeer) handleJoin(m signalserver.MessageContent[signalserver.Member]) error {
+func (p *PeerToPeer) handleJoin(m icesignal2.MessageContent[icesignal2.Member]) error {
 	// Validate the message
 	if m.Content.UserID == p.CurrentUserID {
 		// slog.Debug("Peer is the same as the host, ignoring join", "userId", m.Content.UserID, "host", m.Content.IsHost)
@@ -202,7 +201,7 @@ func (p *PeerToPeer) handleJoin(m signalserver.MessageContent[signalserver.Membe
 	return nil
 }
 
-func (p *PeerToPeer) handleLeave(m signalserver.MessageContent[any]) error {
+func (p *PeerToPeer) handleLeave(m icesignal2.MessageContent[any]) error {
 	slog.Debug("LEAVE", "from", m.From, "to", m.To)
 
 	peer, ok := p.Peers.Get(m.From)
@@ -220,7 +219,7 @@ func (p *PeerToPeer) handleLeave(m signalserver.MessageContent[any]) error {
 	return nil
 }
 
-func (p *PeerToPeer) handleRTCOffer(m signalserver.MessageContent[signalserver.Offer]) error {
+func (p *PeerToPeer) handleRTCOffer(m icesignal2.MessageContent[icesignal2.Offer]) error {
 	slog.Debug("RTC_OFFER", "from", m.From, "to", m.To)
 
 	peer, err := p.addPeer(m.Content.Member, false, false)
@@ -241,12 +240,12 @@ func (p *PeerToPeer) handleRTCOffer(m signalserver.MessageContent[signalserver.O
 		return fmt.Errorf("could not set local description: %v", err)
 	}
 
-	response := &signalserver.Message{
+	response := &icesignal2.Message{
 		From: p.CurrentUserID,
 		To:   m.From,
-		Type: signalserver.RTCAnswer,
-		Content: signalserver.Offer{
-			Member: signalserver.Member{UserID: p.CurrentUserID, IsHost: p.CurrentUserIsHost}, // TODO: Unused data
+		Type: icesignal2.RTCAnswer,
+		Content: icesignal2.Offer{
+			Member: icesignal2.Member{UserID: p.CurrentUserID, IsHost: p.CurrentUserIsHost}, // TODO: Unused data
 			Offer:  answer,
 		},
 	}
@@ -256,7 +255,7 @@ func (p *PeerToPeer) handleRTCOffer(m signalserver.MessageContent[signalserver.O
 	return nil
 }
 
-func (p *PeerToPeer) handleRTCAnswer(m signalserver.MessageContent[signalserver.Offer]) error {
+func (p *PeerToPeer) handleRTCAnswer(m icesignal2.MessageContent[icesignal2.Offer]) error {
 	slog.Debug("RTC_ANSWER", "from", m.From, "to", m.To)
 
 	answer := webrtc.SessionDescription{
@@ -273,7 +272,7 @@ func (p *PeerToPeer) handleRTCAnswer(m signalserver.MessageContent[signalserver.
 	return nil
 }
 
-func (p *PeerToPeer) addPeer(member signalserver.Member, sendRTCOffer bool, createChannels bool) (*Peer, error) {
+func (p *PeerToPeer) addPeer(member icesignal2.Member, sendRTCOffer bool, createChannels bool) (*Peer, error) {
 	peerConnection, err := webrtc.NewPeerConnection(p.WebRTCConfig)
 	if err != nil {
 		panic(err)
@@ -301,10 +300,10 @@ func (p *PeerToPeer) addPeer(member signalserver.Member, sendRTCOffer bool, crea
 		if candidate == nil {
 			return
 		}
-		reply := &signalserver.Message{
+		reply := &icesignal2.Message{
 			From:    p.CurrentUserID,
 			To:      member.UserID,
-			Type:    signalserver.RTCICECandidate,
+			Type:    icesignal2.RTCICECandidate,
 			Content: candidate.ToJSON(),
 		}
 		if err := p.sendSignal(reply.Encode()); err != nil {
@@ -328,12 +327,12 @@ func (p *PeerToPeer) addPeer(member signalserver.Member, sendRTCOffer bool, crea
 			return
 		}
 
-		reply := &signalserver.Message{
+		reply := &icesignal2.Message{
 			From: p.CurrentUserID,
 			To:   member.UserID,
-			Type: signalserver.RTCOffer,
-			Content: signalserver.Offer{
-				Member: signalserver.Member{
+			Type: icesignal2.RTCOffer,
+			Content: icesignal2.Offer{
+				Member: icesignal2.Member{
 					UserID: p.CurrentUserID,
 					IsHost: p.CurrentUserIsHost,
 				}, // TODO: Is it correct?
@@ -392,7 +391,7 @@ func (p *PeerToPeer) addPeer(member signalserver.Member, sendRTCOffer bool, crea
 	return peer, nil
 }
 
-func (p *PeerToPeer) handleRTCCandidate(m signalserver.MessageContent[webrtc.ICECandidateInit]) error {
+func (p *PeerToPeer) handleRTCCandidate(m icesignal2.MessageContent[webrtc.ICECandidateInit]) error {
 	slog.Debug("RTC_ICE_CANDIDATE", "from", m.From, "to", m.To)
 
 	peer, ok := p.Peers.Get(m.From)
@@ -419,7 +418,7 @@ func decodeAndRun[T any](data []byte, f func(T) error) error {
 }
 
 func decodeSignalMessage[T any](data []byte) (v T, err error) {
-	err = signalserver.DefaultCodec.Unmarshal(data, &v)
+	err = icesignal2.DefaultCodec.Unmarshal(data, &v)
 	if err != nil {
 		slog.Warn("Error decoding signal message", "error", err, "payload", string(data))
 		panic(err)

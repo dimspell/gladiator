@@ -52,7 +52,6 @@ func P2PCommand() *cli.Command {
 
 		if c.String("mode") == "host" {
 			if _, err := peerToPeer.Create(proxy.CreateParams{
-				HostUserIP: "",
 				GameID:     "test",
 				HostUserID: "host1",
 			}); err != nil {

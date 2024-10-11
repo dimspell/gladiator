@@ -13,7 +13,7 @@ import (
 func TestBackend_HandleSelectGame(t *testing.T) {
 	t.Run("Sample game", func(t *testing.T) {
 		b := &Backend{
-			Proxy: proxy.NewLAN(),
+			Proxy: proxy.NewLAN("127.0.100.1"),
 			gameClient: &mockGameClient{
 				GetGameResponse: connect.NewResponse(&v1.GetGameResponse{
 					Game: &v1.Game{
@@ -43,7 +43,7 @@ func TestBackend_HandleSelectGame(t *testing.T) {
 			},
 		}
 		conn := &mockConn{}
-		session := &model.Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "mage", LocalIpAddress: "127.0.100.1"}
+		session := &Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "mage"}
 
 		assert.NoError(t, b.HandleSelectGame(session, SelectGameRequest{
 			'r', 'e', 't', 'r', 'e', 'a', 'a', 't', 0, // Game name
@@ -61,7 +61,7 @@ func TestBackend_HandleSelectGame(t *testing.T) {
 
 	t.Run("Host only", func(t *testing.T) {
 		b := &Backend{
-			Proxy: proxy.NewLAN(),
+			Proxy: proxy.NewLAN("127.0.0.1"),
 			gameClient: &mockGameClient{
 				GetGameResponse: connect.NewResponse(&v1.GetGameResponse{
 					Game: &v1.Game{
@@ -85,7 +85,7 @@ func TestBackend_HandleSelectGame(t *testing.T) {
 			},
 		}
 		conn := &mockConn{}
-		session := &model.Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP", LocalIpAddress: "127.0.0.1"}
+		session := &Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
 
 		assert.NoError(t, b.HandleSelectGame(session, SelectGameRequest{
 			103, 97, 109, 101, 82, 111, 111, 109, 0, // Game name
