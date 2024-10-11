@@ -39,7 +39,7 @@ func (mp *Multiplayer) Close() { mp.done() }
 
 func (mp *Multiplayer) Reset() {
 	mp.forEachSession(func(userSession *UserSession) bool {
-		_ = userSession.Conn.CloseNow()
+		_ = userSession.wsConn.CloseNow()
 		return true
 	})
 	clear(mp.sessions)
@@ -65,8 +65,6 @@ func (mp *Multiplayer) Run(ctx context.Context) {
 					From:    msg.From,
 					Content: msg.Content,
 				}))
-			case icesignal.HandshakeRequest:
-				mp.SendJoin(ctx, msg)
 			case icesignal.RTCOffer, icesignal.RTCAnswer, icesignal.RTCICECandidate:
 				mp.ForwardRTCMessage(ctx, msg)
 			default:
@@ -102,23 +100,6 @@ func (mp *Multiplayer) HandleSession(ctx context.Context, session *UserSession) 
 	}
 }
 
-func (mp *Multiplayer) SendJoin(ctx context.Context, msg icesignal.Message) {
-	ctx, cancel := context.WithTimeout(ctx, time.Second*3)
-	defer cancel()
-
-	if user, ok := mp.getSession(msg.From); ok {
-		user.SendMessage(ctx, icesignal.HandshakeResponse, icesignal.Message{
-			Type:    icesignal.HandshakeResponse,
-			To:      msg.From,
-			Content: msg.From,
-		})
-	}
-	mp.BroadcastMessage(ctx, compose(icesignal.Join, icesignal.Message{
-		Type:    icesignal.Join,
-		Content: msg.Content,
-	}))
-}
-
 func (mp *Multiplayer) ForwardRTCMessage(ctx context.Context, msg icesignal.Message) {
 	slog.Debug("Forwarding RTC message", "type", msg.Type.String(), "from", msg.From, "to", msg.To)
 
@@ -139,7 +120,7 @@ func (mp *Multiplayer) EnqueueMessage(payload []byte) error {
 	// 	ctx, cancel := context.WithTimeout(ctx, time.Second)
 	// 	defer cancel()
 	//
-	// 	if err := conn.Write(ctx, websocket.MessageText, []byte{0x00}); err != nil {
+	// 	if err := wsConn.Write(ctx, websocket.MessageText, []byte{0x00}); err != nil {
 	// 		return err
 	// 	}
 	// }

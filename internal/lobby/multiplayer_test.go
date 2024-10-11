@@ -130,14 +130,6 @@ func TestLobby(t *testing.T) {
 		}
 	}()
 
-	if err := wsFirst.Write(ctx, websocket.MessageText, compose(icesignal.HandshakeRequest, icesignal.Message{
-		From:    "first",
-		Content: "first",
-	})); err != nil {
-		t.Error(err)
-		return
-	}
-
 	if err := wsFirst.Write(ctx, websocket.MessageText, compose(icesignal.Chat, icesignal.Message{
 		From:    "first",
 		Content: "Hello, World!",

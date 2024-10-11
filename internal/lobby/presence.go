@@ -2,6 +2,7 @@ package lobby
 
 import (
 	"context"
+	"time"
 
 	"github.com/dimspell/gladiator/internal/icesignal"
 )
@@ -108,12 +109,27 @@ func (mp *Multiplayer) SetRoomReady() {
 // SetPlayerConnected notifies the user has connected to the lobby.
 func (mp *Multiplayer) SetPlayerConnected(session *UserSession) {
 	mp.addSession(session.UserID, session)
+	sessions := mp.listSessions()
+
+	ctx, cancel := context.WithTimeout(context.TODO(), time.Second*3)
+	defer cancel()
+
+	session.SendMessage(ctx, icesignal.LobbyUsers, icesignal.Message{
+		Type:    icesignal.LobbyUsers,
+		To:      session.UserID,
+		Content: sessions, // TODO: Map it to some readable form
+	})
+
+	mp.BroadcastMessage(ctx, compose(icesignal.Join, icesignal.Message{
+		Type:    icesignal.Join,
+		Content: session.UserID,
+	}))
 }
 
 // SetPlayerDisconnected notifies the user has left the lobby.
 func (mp *Multiplayer) SetPlayerDisconnected(session *UserSession) {
 	// TODO: Close the socket
-	session.Conn.CloseNow()
+	session.wsConn.CloseNow()
 	mp.deleteSession(session.UserID)
 	mp.BroadcastMessage(context.TODO(), compose(icesignal.Leave, icesignal.Message{Type: icesignal.Leave, From: session.UserID}))
 }
@@ -160,4 +176,18 @@ func (mp *Multiplayer) forEachSession(f func(session *UserSession) bool) {
 			return
 		}
 	}
+}
+
+// listSession is a thread-safe method to retrieve the sessions list.
+func (mp *Multiplayer) listSessions() []UserSession {
+	mp.sessionMutex.RLock()
+	defer mp.sessionMutex.RUnlock()
+
+	list := make([]UserSession, len(mp.sessions))
+	i := 0
+	for _, session := range mp.sessions {
+		list[i] = *session
+		i++
+	}
+	return list
 }

@@ -5,7 +5,7 @@ type EventType uint
 const (
 	_ EventType = iota
 	HandshakeRequest
-	HandshakeResponse
+	LobbyUsers
 	Join
 	Leave
 	RTCOffer
@@ -18,8 +18,8 @@ func (e EventType) String() string {
 	switch e {
 	case HandshakeRequest:
 		return "HandshakeRequest"
-	case HandshakeResponse:
-		return "HandshakeResponse"
+	case LobbyUsers:
+		return "LobbyUsers"
 	case Join:
 		return "Join"
 	case Leave:

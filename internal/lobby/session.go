@@ -11,12 +11,12 @@ import (
 )
 
 type UserSession struct {
-	UserID    string
-	GameID    string
-	Connected bool
-	LastSeen  time.Time
+	UserID    string    `json:"userID,omitempty"`
+	GameID    string    `json:"gameID,omitempty"`
+	Connected bool      `json:"connected,omitempty"`
+	LastSeen  time.Time `json:"lastSeen"`
 
-	Conn ConnReadWriter
+	wsConn ConnReadWriter
 }
 
 func NewUserSession(id string, conn ConnReadWriter) *UserSession {
@@ -24,7 +24,7 @@ func NewUserSession(id string, conn ConnReadWriter) *UserSession {
 		UserID:    id,
 		Connected: true,
 		LastSeen:  time.Now().In(time.UTC),
-		Conn:      conn,
+		wsConn:    conn,
 	}
 }
 
@@ -32,7 +32,7 @@ func (us *UserSession) ReadNext(ctx context.Context) ([]byte, error) {
 	if !us.Connected {
 		return nil, fmt.Errorf("not connected")
 	}
-	_, payload, err := us.Conn.Read(ctx)
+	_, payload, err := us.wsConn.Read(ctx)
 	if err != nil {
 		slog.Warn("Could not read the message", "error", err, "closeError", websocket.CloseStatus(err))
 		return nil, err
@@ -52,7 +52,7 @@ func (us *UserSession) Send(ctx context.Context, payload []byte) {
 
 	slog.Debug("Sending a signal message", "to", us.UserID, "type", icesignal.EventType(payload[0]).String())
 
-	if err := us.Conn.Write(ctx, websocket.MessageText, payload); err != nil {
+	if err := us.wsConn.Write(ctx, websocket.MessageText, payload); err != nil {
 		slog.Warn("Could not send a WS message", "to", us.UserID, "error", err)
 		us.Connected = false
 		// TODO: There is no logic to disconnect and remove the failing session
