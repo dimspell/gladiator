@@ -33,6 +33,12 @@ func (b *Backend) HandleClientAuthentication(session *Session, req ClientAuthent
 	// Assign user into session
 	session.UserID = user.Msg.User.UserId
 	session.Username = user.Msg.User.Username
+	if err = b.RegisterNewObserver(session); err != nil {
+		slog.Debug("packet-41: could not register observer", "err", err)
+		return b.Send(session.Conn, ClientAuthentication, []byte{0, 0, 0, 0})
+	}
+
+	// session.Update(user.Msg.User.UserId, user.Msg.User.Username, observer)
 
 	return b.Send(session.Conn, ClientAuthentication, []byte{1, 0, 0, 0})
 }
