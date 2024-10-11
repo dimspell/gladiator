@@ -4,7 +4,8 @@ type EventType uint
 
 const (
 	_ EventType = iota
-	HandshakeRequest
+	Hello
+	Welcome
 	LobbyUsers
 	Join
 	Leave
@@ -16,8 +17,10 @@ const (
 
 func (e EventType) String() string {
 	switch e {
-	case HandshakeRequest:
-		return "HandshakeRequest"
+	case Hello:
+		return "Hello"
+	case Welcome:
+		return "Welcome"
 	case LobbyUsers:
 		return "LobbyUsers"
 	case Join:

@@ -42,3 +42,9 @@ type Offer struct {
 	Member Member                    `json:"member"`
 	Offer  webrtc.SessionDescription `json:"offer"`
 }
+
+type Player struct {
+	ID                 string
+	CharacterID        string
+	CharacterClassType int
+}

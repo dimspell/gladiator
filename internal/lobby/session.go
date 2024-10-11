@@ -17,6 +17,8 @@ type UserSession struct {
 	LastSeen  time.Time `json:"lastSeen"`
 
 	wsConn ConnReadWriter
+
+	Player icesignal.Player
 }
 
 func NewUserSession(id string, conn ConnReadWriter) *UserSession {
@@ -60,19 +62,7 @@ func (us *UserSession) Send(ctx context.Context, payload []byte) {
 }
 
 func (us *UserSession) SendMessage(ctx context.Context, msgType icesignal.EventType, msg icesignal.Message) {
-	us.Send(ctx, compose(msgType, msg))
-}
-
-func compose(msgType icesignal.EventType, msg icesignal.Message) []byte {
-	msg.Type = msgType
-
-	payload, err := icesignal.DefaultCodec.Marshal(msg)
-	if err != nil {
-		slog.Error("Could not marshal the websocket message", "error", err)
-		return nil
-	}
-	payload = append([]byte{byte(msgType)}, payload...)
-	return payload
+	us.Send(ctx, icesignal.Compose(msgType, msg))
 }
 
 var _ ConnReadWriter = (*websocket.Conn)(nil)

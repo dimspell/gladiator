@@ -2,12 +2,8 @@ package lobby
 
 import (
 	"context"
-	"io"
-	"log/slog"
 	"sync"
-	"time"
 
-	"github.com/coder/websocket"
 	"github.com/dimspell/gladiator/internal/icesignal"
 )
 
@@ -56,79 +52,7 @@ func (mp *Multiplayer) Run(ctx context.Context) {
 			if !ok {
 				return
 			}
-
-			slog.Debug("Received a signal message", "type", msg.Type.String(), "from", msg.From, "to", msg.To)
-
-			switch msg.Type {
-			case icesignal.Chat:
-				mp.BroadcastMessage(ctx, compose(icesignal.Chat, icesignal.Message{
-					From:    msg.From,
-					Content: msg.Content,
-				}))
-			case icesignal.RTCOffer, icesignal.RTCAnswer, icesignal.RTCICECandidate:
-				mp.ForwardRTCMessage(ctx, msg)
-			default:
-				// Do nothing
-			}
+			mp.HandleIncomingMessage(ctx, msg)
 		}
 	}
-}
-
-func (mp *Multiplayer) HandleSession(ctx context.Context, session *UserSession) error {
-	// Add user to the list of connected players.
-	mp.SetPlayerConnected(session)
-
-	// Remove the player
-	defer mp.SetPlayerDisconnected(session)
-
-	// Handle all the incoming messages.
-	for {
-		// Register that the user is still being active.
-		session.LastSeen = time.Now().In(time.UTC)
-
-		payload, err := session.ReadNext(ctx)
-		if websocket.CloseStatus(err) == websocket.StatusNormalClosure {
-			return err
-		}
-		if err != nil {
-			slog.Error("Could not handle the message", "error", err)
-			return err
-		}
-		if err := mp.EnqueueMessage(payload); err != nil {
-			return err
-		}
-	}
-}
-
-func (mp *Multiplayer) ForwardRTCMessage(ctx context.Context, msg icesignal.Message) {
-	slog.Debug("Forwarding RTC message", "type", msg.Type.String(), "from", msg.From, "to", msg.To)
-
-	ctx, cancel := context.WithTimeout(ctx, time.Second*5)
-	defer cancel()
-
-	if user, ok := mp.getSession(msg.To); ok {
-		user.SendMessage(ctx, msg.Type, msg)
-	}
-}
-
-func (mp *Multiplayer) EnqueueMessage(payload []byte) error {
-	if len(payload) == 0 {
-		return io.ErrShortBuffer
-	}
-
-	// if len(payload) == 1 && payload[0] == 0x00 {
-	// 	ctx, cancel := context.WithTimeout(ctx, time.Second)
-	// 	defer cancel()
-	//
-	// 	if err := wsConn.Write(ctx, websocket.MessageText, []byte{0x00}); err != nil {
-	// 		return err
-	// 	}
-	// }
-
-	var m icesignal.Message
-	if err := icesignal.DefaultCodec.Unmarshal(payload[1:], &m); err != nil {
-		return err
-	}
-	mp.Messages <- m
-	return nil
 }
