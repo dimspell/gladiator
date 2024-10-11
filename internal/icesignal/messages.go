@@ -4,6 +4,10 @@ import (
 	"github.com/pion/webrtc/v4"
 )
 
+const (
+	SupportedRealm = "signalserver"
+)
+
 // Message represents a chat message
 type Message struct {
 	To      string    `json:"to,omitempty"`
