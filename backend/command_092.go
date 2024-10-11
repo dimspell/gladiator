@@ -11,7 +11,7 @@ import (
 	"github.com/dimspell/gladiator/model"
 )
 
-func (b *Backend) HandleCreateCharacter(session *model.Session, req CreateCharacterRequest) error {
+func (b *Backend) HandleCreateCharacter(session *Session, req CreateCharacterRequest) error {
 	if session.UserID == 0 {
 		return fmt.Errorf("packet-92: user is not logged in")
 	}

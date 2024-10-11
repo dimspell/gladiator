@@ -8,10 +8,9 @@ import (
 	"connectrpc.com/connect"
 	"github.com/dimspell/gladiator/backend/packet"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
-	"github.com/dimspell/gladiator/model"
 )
 
-func (b *Backend) HandleUpdateCharacterSpells(session *model.Session, req UpdateCharacterSpellsRequest) error {
+func (b *Backend) HandleUpdateCharacterSpells(session *Session, req UpdateCharacterSpellsRequest) error {
 	if session.UserID == 0 {
 		return fmt.Errorf("packet-73: user has been already logged in")
 	}

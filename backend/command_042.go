@@ -8,11 +8,10 @@ import (
 	"connectrpc.com/connect"
 	"github.com/dimspell/gladiator/backend/packet"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
-	"github.com/dimspell/gladiator/model"
 )
 
 // 008-JP1-20001
-func (b *Backend) HandleCreateNewAccount(session *model.Session, req CreateNewAccountRequest) error {
+func (b *Backend) HandleCreateNewAccount(session *Session, req CreateNewAccountRequest) error {
 	data, err := req.Parse()
 	if err != nil {
 		slog.Warn("Invalid packet", "error", err)

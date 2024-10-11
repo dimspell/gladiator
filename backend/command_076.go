@@ -9,10 +9,9 @@ import (
 	"connectrpc.com/connect"
 	"github.com/dimspell/gladiator/backend/packet"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
-	"github.com/dimspell/gladiator/model"
 )
 
-func (b *Backend) HandleSelectCharacter(session *model.Session, req SelectCharacterRequest) error {
+func (b *Backend) HandleSelectCharacter(session *Session, req SelectCharacterRequest) error {
 	if session.UserID == 0 {
 		return fmt.Errorf("packet-76: user is not logged in")
 	}

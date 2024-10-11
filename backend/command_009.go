@@ -12,7 +12,7 @@ import (
 )
 
 // HandleListGames handles 0x9ff (255-9) command
-func (b *Backend) HandleListGames(session *model.Session, req ListGamesRequest) error {
+func (b *Backend) HandleListGames(session *Session, req ListGamesRequest) error {
 	if session.UserID == 0 {
 		return fmt.Errorf("packet-09: user is not logged in")
 	}
@@ -33,7 +33,7 @@ func (b *Backend) HandleListGames(session *model.Session, req ListGamesRequest) 
 			HostIPAddress: b.Proxy.GetHostIP(room.HostIpAddress).To4(),
 		}
 
-		//response = append(response, lobby.ToBytes()...)
+		// response = append(response, lobby.ToBytes()...)
 
 		response = append(response, lobby.HostIPAddress[:]...) // Host IP Address (4 bytes)
 		response = append(response, lobby.Name...)             // Room name (null terminated string)

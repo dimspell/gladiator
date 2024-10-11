@@ -5,7 +5,6 @@ import (
 	"log/slog"
 
 	"github.com/dimspell/gladiator/backend/packet"
-	"github.com/dimspell/gladiator/model"
 )
 
 // HandleAuthorizationHandshake handles 0x6ff (255-6) command.
@@ -21,7 +20,7 @@ import (
 // When the game client will receive the response on the 255-6 command, it is
 // going to display a login screen, asking user to create a new account or sign
 // in using with already existing credentials.
-func (b *Backend) HandleAuthorizationHandshake(session *model.Session, req AuthorizationHandshakeRequest) error {
+func (b *Backend) HandleAuthorizationHandshake(session *Session, req AuthorizationHandshakeRequest) error {
 	data, err := req.Parse()
 	if err != nil {
 		slog.Warn("Invalid packet", "error", err)

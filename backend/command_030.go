@@ -4,11 +4,10 @@ import (
 	"fmt"
 
 	"github.com/dimspell/gladiator/backend/packet"
-	"github.com/dimspell/gladiator/model"
 )
 
 // HandleClientHostAndUsername handles 0x1eff (255-30) command
-func (b *Backend) HandleClientHostAndUsername(session *model.Session, req ClientHostAndUsernameRequest) error {
+func (b *Backend) HandleClientHostAndUsername(session *Session, req ClientHostAndUsernameRequest) error {
 	return b.Send(session.Conn, ClientHostAndUsername, []byte{1, 0, 0, 0})
 }
 

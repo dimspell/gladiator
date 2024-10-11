@@ -2,11 +2,9 @@ package backend
 
 import (
 	"bytes"
-
-	"github.com/dimspell/gladiator/model"
 )
 
-func (b *Backend) HandleSelectChannel(session *model.Session, req SelectChannelRequest) error {
+func (b *Backend) HandleSelectChannel(session *Session, req SelectChannelRequest) error {
 	channelName, _ := req.Parse()
 	if channelName == "DISPEL" {
 		//b.Send(session.Conn, ReceiveMessage, NewGlobalMessage("admin", "hello"))

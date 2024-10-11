@@ -4,11 +4,9 @@ import (
 	"encoding/binary"
 	"fmt"
 	"time"
-
-	"github.com/dimspell/gladiator/model"
 )
 
-func (b *Backend) HandlePing(session *model.Session, req PingRequest) error {
+func (b *Backend) HandlePing(session *Session, req PingRequest) error {
 	return b.Send(session.Conn, PingClockTime, []byte{1, 0, 0, 0})
 }
 

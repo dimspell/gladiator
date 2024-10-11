@@ -8,10 +8,9 @@ import (
 	"connectrpc.com/connect"
 	"github.com/dimspell/gladiator/backend/packet"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
-	"github.com/dimspell/gladiator/model"
 )
 
-func (b *Backend) HandleDeleteCharacter(session *model.Session, req DeleteCharacterRequest) error {
+func (b *Backend) HandleDeleteCharacter(session *Session, req DeleteCharacterRequest) error {
 	if session.UserID == 0 {
 		return fmt.Errorf("packet-61: user is not logged in")
 	}

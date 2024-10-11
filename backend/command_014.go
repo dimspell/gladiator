@@ -3,11 +3,9 @@ package backend
 import (
 	"bytes"
 	"fmt"
-
-	"github.com/dimspell/gladiator/model"
 )
 
-func (b *Backend) HandleSendLobbyMessage(session *model.Session, req SendLobbyMessageRequest) error {
+func (b *Backend) HandleSendLobbyMessage(session *Session, req SendLobbyMessageRequest) error {
 	message, err := req.Parse()
 	if err != nil {
 		return fmt.Errorf("packet-14: could not parse request: %w", err)

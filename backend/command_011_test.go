@@ -3,7 +3,6 @@ package backend
 import (
 	"testing"
 
-	"github.com/dimspell/gladiator/model"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -24,7 +23,7 @@ func TestListChannelsRequest(t *testing.T) {
 func TestBackend_HandleListChannels(t *testing.T) {
 	b := &Backend{}
 	conn := &mockConn{}
-	session := &model.Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
+	session := &Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
 
 	assert.NoError(t, b.HandleListChannels(session, ListChannelsRequest{}))
 	assert.Equal(t, []byte{255, 11, 11, 0}, conn.Written[0:4]) // Header

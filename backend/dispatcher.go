@@ -4,8 +4,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"net"
-
-	"github.com/dimspell/gladiator/model"
 )
 
 type PacketType byte
@@ -37,7 +35,7 @@ const (
 	UpdateCharacterStats     PacketType = 108 // 0x6cff
 )
 
-func (b *Backend) handshake(conn net.Conn) (*model.Session, error) {
+func (b *Backend) handshake(conn net.Conn) (*Session, error) {
 	// Ping (single byte - [0x01])
 	{
 		buf := make([]byte, 1)
@@ -82,7 +80,7 @@ func (b *Backend) handshake(conn net.Conn) (*model.Session, error) {
 	return session, nil
 }
 
-func (b *Backend) handleCommands(session *model.Session) error {
+func (b *Backend) handleCommands(session *Session) error {
 	buf := make([]byte, 1024)
 	n, err := session.Conn.Read(buf)
 	if err != nil {

@@ -8,10 +8,9 @@ import (
 
 	"connectrpc.com/connect"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
-	"github.com/dimspell/gladiator/model"
 )
 
-func (b *Backend) HandleGetCharacters(session *model.Session, req GetCharactersRequest) error {
+func (b *Backend) HandleGetCharacters(session *Session, req GetCharactersRequest) error {
 	if session.UserID == 0 {
 		return fmt.Errorf("packet-60: user is not logged in")
 	}

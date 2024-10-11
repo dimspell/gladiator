@@ -8,7 +8,6 @@ import (
 
 	"connectrpc.com/connect"
 	v1 "github.com/dimspell/gladiator/gen/multi/v1"
-	"github.com/dimspell/gladiator/model"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -50,11 +49,11 @@ func TestBackend_HandleCreateGame(t *testing.T) {
 			}),
 		}}
 	conn := &mockConn{RemoteAddress: &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 12137}}
-	session := &model.Session{ID: "TEST",
 		Conn:           conn,
 		UserID:         2137,
 		Username:       "JP",
 		LocalIpAddress: "127.0.0.1",
+	session := &Session{ID: "TEST",
 	}
 
 	// State = 0

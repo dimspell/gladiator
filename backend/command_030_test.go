@@ -3,7 +3,6 @@ package backend
 import (
 	"testing"
 
-	"github.com/dimspell/gladiator/model"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -29,7 +28,7 @@ func TestClientHostAndUsernameRequest(t *testing.T) {
 func TestBackend_HandleClientHostAndUsername(t *testing.T) {
 	b := &Backend{}
 	conn := &mockConn{}
-	session := &model.Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
+	session := &Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
 
 	assert.NoError(t, b.HandleClientHostAndUsername(session, ClientHostAndUsernameRequest{
 		255, 30, // Command code

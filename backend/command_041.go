@@ -8,10 +8,9 @@ import (
 	"connectrpc.com/connect"
 	"github.com/dimspell/gladiator/backend/packet"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
-	"github.com/dimspell/gladiator/model"
 )
 
-func (b *Backend) HandleClientAuthentication(session *model.Session, req ClientAuthenticationRequest) error {
+func (b *Backend) HandleClientAuthentication(session *Session, req ClientAuthenticationRequest) error {
 	if session.UserID != 0 {
 		return fmt.Errorf("packet-41: user has been already logged in")
 	}

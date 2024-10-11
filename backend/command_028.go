@@ -15,7 +15,7 @@ import (
 )
 
 // HandleCreateGame handles 0x1cff (255-28) command
-func (b *Backend) HandleCreateGame(session *model.Session, req CreateGameRequest) error {
+func (b *Backend) HandleCreateGame(session *Session, req CreateGameRequest) error {
 	if session.UserID == 0 {
 		return fmt.Errorf("packet-28: user is not logged in")
 	}

@@ -1,8 +1,6 @@
 package backend
 
-import "github.com/dimspell/gladiator/model"
-
-func (b *Backend) SendHostMigration(session *model.Session, isHost bool, newHostIP [4]byte) error {
+func (b *Backend) SendHostMigration(session *Session, isHost bool, newHostIP [4]byte) error {
 	payload := []byte{}
 
 	// Yes(int32 1)/No(int32 0)
