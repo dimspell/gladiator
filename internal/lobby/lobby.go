@@ -69,7 +69,7 @@ func (lb *Lobby) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 	version := r.Header.Get("X-Version")
 	if version != wire.ProtoVersion {
-		w.WriteHeader(http.StatusBadRequest)
+		w.WriteHeader(http.StatusForbidden)
 		return
 	}
 
