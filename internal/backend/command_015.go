@@ -48,11 +48,12 @@ func NewSystemMessage(user, text, unknown string) []byte {
 	return buf
 }
 
-func SetChannelName(channelName string) {
+func SetChannelName(channelName string) []byte {
 	buf := make([]byte, 4+4+4+1+len(channelName)+1)
 
 	buf[0] = 3                  // Message type
 	copy(buf[13:], channelName) // Character name
+	return buf
 }
 
 // 18?
