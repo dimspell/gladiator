@@ -168,6 +168,7 @@ func (mp *Multiplayer) HandleSession(ctx context.Context, session *UserSession) 
 
 		payload, err := session.ReadNext(ctx)
 		if websocket.CloseStatus(err) == websocket.StatusNormalClosure {
+			slog.Debug("Closing because of", "error", err)
 			return err
 		}
 		if err != nil {
@@ -178,6 +179,7 @@ func (mp *Multiplayer) HandleSession(ctx context.Context, session *UserSession) 
 		// Enqueue message
 		_, m, err := wire.Decode(payload)
 		if err != nil {
+			slog.Error("Could not decode the message", "error", err, "payload", string(payload))
 			return err
 		}
 		mp.Messages <- m
@@ -298,14 +300,19 @@ func (mp *Multiplayer) SetPlayerConnected(session *UserSession) {
 
 // SetPlayerDisconnected notifies the user has left the lobby.
 func (mp *Multiplayer) SetPlayerDisconnected(session *UserSession) {
-	// TODO: Close the socket
-	session.wsConn.CloseNow()
+	slog.Info("Closing player connection", "user", session.UserID)
+
+	if err := session.wsConn.CloseNow(); err != nil {
+		slog.Debug("Could not close the connection", "user", session.UserID, "error", err)
+	}
 	mp.DeleteUserSession(session.UserID)
 	mp.BroadcastMessage(context.TODO(), wire.Compose(wire.Leave, wire.Message{Type: wire.Leave, From: session.UserID}))
 }
 
 // BroadcastMessage sends a message to all connected users.
 func (mp *Multiplayer) BroadcastMessage(ctx context.Context, payload []byte) {
+	slog.Info("Broadcasting message", "type", wire.EventType(payload[0]).String(), "payload", string(payload[1:]))
+
 	mp.forEachSession(func(session *UserSession) bool {
 		session.Send(ctx, payload)
 		return true

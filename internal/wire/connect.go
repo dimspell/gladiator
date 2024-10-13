@@ -57,3 +57,21 @@ func Connect(ctx context.Context, wsURL string, user User) (*websocket.Conn, err
 
 	return ws, nil
 }
+
+var _ WebSocketWriter = (*websocket.Conn)(nil)
+
+type WebSocketWriter interface {
+	Write(ctx context.Context, messageType websocket.MessageType, payload []byte) error
+}
+
+func Write(ctx context.Context, wsConn WebSocketWriter, payload []byte) error {
+	return wsConn.Write(ctx, websocket.MessageText, payload)
+}
+
+func EncodeAndWrite(ctx context.Context, wsConn WebSocketWriter, p []byte) error {
+	encoded, err := Encode(p)
+	if err != nil {
+		return err
+	}
+	return wsConn.Write(ctx, websocket.MessageText, encoded)
+}

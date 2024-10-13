@@ -42,6 +42,23 @@ type Session struct {
 	onceSelectedCharacter sync.Once
 }
 
+func (us *Session) SendChatMessage(ctx context.Context, text string) error {
+	if err := wire.Write(ctx, us.wsConn, wire.ComposeTyped(
+		wire.Chat,
+		wire.MessageContent[wire.ChatMessage]{
+			From: fmt.Sprintf("%d", us.UserID),
+			Type: wire.Chat,
+			Content: wire.ChatMessage{
+				User: us.Username,
+				Text: text,
+			},
+		}),
+	); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (b *Backend) AddSession(tcpConn net.Conn) *Session {
 	if b.SessionCounter == math.MaxUint64 {
 		b.SessionCounter = 0

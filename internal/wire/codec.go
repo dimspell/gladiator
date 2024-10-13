@@ -3,6 +3,7 @@ package wire
 import (
 	"encoding/json"
 	"io"
+	"log/slog"
 
 	"github.com/fxamacker/cbor/v2"
 )
@@ -47,13 +48,20 @@ func ComposeTyped[T any](msgType EventType, msg MessageContent[T]) []byte {
 }
 
 func MustEncode(m any) []byte {
-	out, err := DefaultCodec.Marshal(m)
+	out, err := Encode(m)
 	if err != nil {
 		panic(err)
-		// slog.Error("Could not marshal the websocket message", "error", err)
-		// return err
 	}
 	return out
+}
+
+func Encode(m any) ([]byte, error) {
+	out, err := DefaultCodec.Marshal(m)
+	if err != nil {
+		slog.Error("Could not marshal the websocket message", "error", err)
+		return nil, err
+	}
+	return out, nil
 }
 
 func Decode(payload []byte) (et EventType, m Message, err error) {
