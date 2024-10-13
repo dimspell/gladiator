@@ -39,10 +39,11 @@ func BackendCommand() *cli.Command {
 		backendAddr := c.String("backend-addr")
 		myIpAddr := c.String("my-ip-addr")
 
-		bd := backend.NewBackend(backendAddr, consoleAddr, proxy.NewLAN(myIpAddr))
-		bd.PacketLogger = slog.New(packetlogger.New(os.Stderr, &packetlogger.Options{
+		backend.PacketLogger = slog.New(packetlogger.New(os.Stderr, &packetlogger.Options{
 			Level: slog.LevelDebug,
 		}))
+
+		bd := backend.NewBackend(backendAddr, consoleAddr, proxy.NewLAN(myIpAddr))
 
 		if err := bd.Start(); err != nil {
 			return err

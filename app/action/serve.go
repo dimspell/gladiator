@@ -10,6 +10,7 @@ import (
 	"github.com/dimspell/gladiator/backend/packetlogger"
 	"github.com/dimspell/gladiator/console"
 	"github.com/dimspell/gladiator/console/database"
+	"github.com/dimspell/gladiator/internal/proxy"
 	"github.com/urfave/cli/v3"
 	"golang.org/x/sync/errgroup"
 )
@@ -17,6 +18,7 @@ import (
 const (
 	defaultConsoleAddr = "127.0.0.1:2137"
 	defaultBackendAddr = "127.0.0.1:6112"
+	defaultLobbyAddr   = "127.0.0.1:5050"
 	defaultMyIPAddr    = "127.0.0.1"
 )
 
@@ -86,11 +88,11 @@ func ServeCommand() *cli.Command {
 			slog.Warn("Seed queries failed", "error", err)
 		}
 
-		bd := backend.NewBackend(backendAddr, consoleAddr, myIpAddr)
-		bd.PacketLogger = slog.New(packetlogger.New(os.Stderr, &packetlogger.Options{
+		backend.PacketLogger = slog.New(packetlogger.New(os.Stderr, &packetlogger.Options{
 			Level: slog.LevelDebug,
 		}))
 
+		bd := backend.NewBackend(backendAddr, consoleAddr, proxy.NewLAN(myIpAddr))
 		con := console.NewConsole(db, consoleAddr)
 
 		startConsole, stopConsole := con.Handlers()

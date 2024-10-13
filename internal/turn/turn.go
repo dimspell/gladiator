@@ -31,6 +31,10 @@ func Start() *turn.Server {
 		PublicIPAddr: "127.0.0.1",
 		PortNumber:   "3478",
 	}
+	return StartWithConfig(cfg)
+}
+
+func StartWithConfig(cfg *Config) *turn.Server {
 	turnServer, err := StartTURNServer(cfg)
 	if err != nil {
 		log.Panicf("Could not start TURN server: %s", err)

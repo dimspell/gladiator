@@ -42,11 +42,12 @@ func BackendP2PCommand() *cli.Command {
 	cmd.Action = func(ctx context.Context, c *cli.Command) error {
 		consoleAddr := c.String("console-addr")
 		backendAddr := c.String("backend-addr")
-		singalingAddr := c.String("signaling-addr")
+		signalingAddr := c.String("signaling-addr")
 		// turnPublicAddr := c.String("turn-public-addr")
 
-		bd := backend.NewBackend(backendAddr, consoleAddr, proxy.NewPeerToPeer(singalingAddr))
-		bd.PacketLogger = slog.New(packetlogger.New(os.Stderr, &packetlogger.Options{
+		bd := backend.NewBackend(backendAddr, consoleAddr, proxy.NewPeerToPeer(signalingAddr))
+
+		backend.PacketLogger = slog.New(packetlogger.New(os.Stderr, &packetlogger.Options{
 			Level: slog.LevelDebug,
 		}))
 

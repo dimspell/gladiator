@@ -54,10 +54,6 @@ func (lb *Lobby) Handler() http.Handler {
 	return r
 }
 
-func (lb *Lobby) HandleGetUsers(w http.ResponseWriter, r *http.Request) {
-	// lb.Multiplayer.Presence.List()
-}
-
 func (lb *Lobby) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	params := r.URL.Query()
 	roomName := params.Get("roomName")

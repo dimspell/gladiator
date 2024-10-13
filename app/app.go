@@ -75,7 +75,7 @@ func NewApp(version, commit, buildDate string) {
 		action.ServeCommand(),
 		action.TurnCommand(),
 		action.P2PCommand(),
-		action.ServeP2PCommand(),
+		action.LobbyCommand(),
 		action.BackendP2PCommand(),
 	)
 	if guiCmd := action.GUICommand(app.Version); guiCmd != nil {
