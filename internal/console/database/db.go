@@ -226,8 +226,8 @@ func (q *Queries) queryRow(ctx context.Context, stmt *sql.Stmt, query string, ar
 }
 
 type Queries struct {
-	db                           DBTX
-	tx                           *sql.Tx
+	db DBTX
+	tx *sql.Tx
 	addPlayerToRoomStmt          *sql.Stmt
 	createCharacterStmt          *sql.Stmt
 	createGameRoomStmt           *sql.Stmt

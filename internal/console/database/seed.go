@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/dimspell/gladiator/console/auth"
+	"github.com/dimspell/gladiator/internal/console/auth"
 	"github.com/dimspell/gladiator/model"
 )
 

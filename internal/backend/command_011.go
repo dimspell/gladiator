@@ -1,7 +1,7 @@
 package backend
 
 import (
-	"github.com/dimspell/gladiator/console/database"
+	"github.com/dimspell/gladiator/internal/console/database"
 )
 
 // HandleListChannels handles 0xbff (255-11) command

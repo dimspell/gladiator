@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
-	"github.com/dimspell/gladiator/console/database"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/gen/multi/v1/multiv1connect"
+	"github.com/dimspell/gladiator/internal/console/database"
 )
 
 var _ multiv1connect.GameServiceHandler = (*gameServiceServer)(nil)

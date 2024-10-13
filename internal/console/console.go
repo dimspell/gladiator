@@ -10,8 +10,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/dimspell/gladiator/console/database"
 	"github.com/dimspell/gladiator/gen/multi/v1/multiv1connect"
+	"github.com/dimspell/gladiator/internal/console/database"
 	"github.com/dimspell/gladiator/model"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
