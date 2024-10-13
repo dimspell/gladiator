@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/dimspell/gladiator/app/action"
+	"github.com/dimspell/gladiator/internal/app/action"
 	"github.com/urfave/cli/v3"
 )
 

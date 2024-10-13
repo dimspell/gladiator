@@ -9,7 +9,7 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
-	"github.com/dimspell/gladiator/app/ui"
+	"github.com/dimspell/gladiator/internal/app/ui"
 	"github.com/dimspell/gladiator/update"
 	"github.com/fynelabs/fyneselfupdate"
 	"github.com/fynelabs/selfupdate"
