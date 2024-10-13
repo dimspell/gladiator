@@ -78,7 +78,7 @@ func DialSignalServer(signalServerURL string, currentUserID, roomName string, is
 		return nil, fmt.Errorf("unexpected handshake response: %v", data)
 	}
 	// TODO: Check that the response contains the same room name as the request
-	resp, err := decodeSignalMessage[wire.MessageContent[string]](data[1:])
+	_, resp, err := wire.DecodeTyped[wire.MessageContent[string]](data[1:])
 	if err != nil {
 		return nil, err
 	}
@@ -410,20 +410,11 @@ func (p *PeerToPeer) sendSignal(message []byte) error {
 }
 
 func decodeAndRun[T any](data []byte, f func(T) error) error {
-	v, err := decodeSignalMessage[T](data)
+	_, v, err := wire.DecodeTyped[T](data)
 	if err != nil {
 		return err
 	}
-	return f(v)
-}
-
-func decodeSignalMessage[T any](data []byte) (v T, err error) {
-	err = wire.DefaultCodec.Unmarshal(data, &v)
-	if err != nil {
-		slog.Warn("Error decoding signal message", "error", err, "payload", string(data))
-		panic(err)
-	}
-	return v, err
+	return f(v.Content)
 }
 
 func isTCPChannel(dc *webrtc.DataChannel, room string) bool {
