@@ -1,4 +1,4 @@
-package icesignal
+package wire
 
 import (
 	"encoding/json"

@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
-	"github.com/dimspell/gladiator/internal/icesignal"
+	"github.com/dimspell/gladiator/internal/wire"
 )
 
 type UserSession struct {
@@ -18,7 +18,7 @@ type UserSession struct {
 
 	wsConn ConnReadWriter
 
-	Player icesignal.Player
+	Player wire.Player
 }
 
 func NewUserSession(id string, conn ConnReadWriter) *UserSession {
@@ -52,7 +52,7 @@ func (us *UserSession) Send(ctx context.Context, payload []byte) {
 		return
 	}
 
-	slog.Debug("Sending a signal message", "to", us.UserID, "type", icesignal.EventType(payload[0]).String())
+	slog.Debug("Sending a signal message", "to", us.UserID, "type", wire.EventType(payload[0]).String())
 
 	if err := us.wsConn.Write(ctx, websocket.MessageText, payload); err != nil {
 		slog.Warn("Could not send a WS message", "to", us.UserID, "error", err)
@@ -61,8 +61,8 @@ func (us *UserSession) Send(ctx context.Context, payload []byte) {
 	}
 }
 
-func (us *UserSession) SendMessage(ctx context.Context, msgType icesignal.EventType, msg icesignal.Message) {
-	us.Send(ctx, icesignal.Compose(msgType, msg))
+func (us *UserSession) SendMessage(ctx context.Context, msgType wire.EventType, msg wire.Message) {
+	us.Send(ctx, wire.Compose(msgType, msg))
 }
 
 var _ ConnReadWriter = (*websocket.Conn)(nil)

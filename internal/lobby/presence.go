@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
-	"github.com/dimspell/gladiator/internal/icesignal"
+	"github.com/dimspell/gladiator/internal/wire"
 )
 
 const (
@@ -76,16 +76,16 @@ const (
 
 // HandleIncomingMessage handles the incoming message pump by dispatching
 // commands based on the message type.
-func (mp *Multiplayer) HandleIncomingMessage(ctx context.Context, msg icesignal.Message) {
+func (mp *Multiplayer) HandleIncomingMessage(ctx context.Context, msg wire.Message) {
 	slog.Debug("Received a signal message", "type", msg.Type.String(), "from", msg.From, "to", msg.To)
 
 	switch msg.Type {
-	case icesignal.Chat:
-		mp.BroadcastMessage(ctx, icesignal.Compose(icesignal.Chat, icesignal.Message{
+	case wire.Chat:
+		mp.BroadcastMessage(ctx, wire.Compose(wire.Chat, wire.Message{
 			From:    msg.From,
 			Content: msg.Content,
 		}))
-	case icesignal.RTCOffer, icesignal.RTCAnswer, icesignal.RTCICECandidate:
+	case wire.RTCOffer, wire.RTCAnswer, wire.RTCICECandidate:
 		mp.ForwardRTCMessage(ctx, msg)
 	default:
 		// Do nothing
@@ -119,7 +119,7 @@ func (mp *Multiplayer) HandleSession(ctx context.Context, session *UserSession) 
 		}
 
 		// Enqueue message
-		_, m, err := icesignal.Decode(payload)
+		_, m, err := wire.Decode(payload)
 		if err != nil {
 			return err
 		}
@@ -127,7 +127,7 @@ func (mp *Multiplayer) HandleSession(ctx context.Context, session *UserSession) 
 	}
 }
 
-func (mp *Multiplayer) ForwardRTCMessage(ctx context.Context, msg icesignal.Message) {
+func (mp *Multiplayer) ForwardRTCMessage(ctx context.Context, msg wire.Message) {
 	slog.Debug("Forwarding RTC message", "type", msg.Type.String(), "from", msg.From, "to", msg.To)
 
 	ctx, cancel := context.WithTimeout(ctx, time.Second*5)
@@ -181,17 +181,17 @@ func (mp *Multiplayer) HandleHello(ctx context.Context, session *UserSession) er
 	if err != nil {
 		return err
 	}
-	et, m, err := icesignal.DecodeTyped[icesignal.Player](payload)
+	et, m, err := wire.DecodeTyped[wire.Player](payload)
 	if err != nil {
 		return err
 	}
-	if et != icesignal.Hello {
+	if et != wire.Hello {
 		return fmt.Errorf("inapprioprate event type")
 	}
 
 	session.Player = m.Content
 
-	session.SendMessage(ctx, icesignal.Welcome, icesignal.Message{To: session.UserID})
+	session.SendMessage(ctx, wire.Welcome, wire.Message{To: session.UserID})
 	return nil
 }
 
@@ -203,14 +203,14 @@ func (mp *Multiplayer) SetPlayerConnected(session *UserSession) {
 	ctx, cancel := context.WithTimeout(context.TODO(), time.Second*3)
 	defer cancel()
 
-	session.SendMessage(ctx, icesignal.LobbyUsers, icesignal.Message{
-		Type:    icesignal.LobbyUsers,
+	session.SendMessage(ctx, wire.LobbyUsers, wire.Message{
+		Type:    wire.LobbyUsers,
 		To:      session.UserID,
 		Content: players, // TODO: Map it to some readable form
 	})
 
-	mp.BroadcastMessage(ctx, icesignal.Compose(icesignal.Join, icesignal.Message{
-		Type:    icesignal.Join,
+	mp.BroadcastMessage(ctx, wire.Compose(wire.Join, wire.Message{
+		Type:    wire.Join,
 		Content: session.UserID,
 	}))
 }
@@ -220,7 +220,7 @@ func (mp *Multiplayer) SetPlayerDisconnected(session *UserSession) {
 	// TODO: Close the socket
 	session.wsConn.CloseNow()
 	mp.deleteSession(session.UserID)
-	mp.BroadcastMessage(context.TODO(), icesignal.Compose(icesignal.Leave, icesignal.Message{Type: icesignal.Leave, From: session.UserID}))
+	mp.BroadcastMessage(context.TODO(), wire.Compose(wire.Leave, wire.Message{Type: wire.Leave, From: session.UserID}))
 }
 
 // BroadcastMessage sends a message to all connected users.
@@ -268,11 +268,11 @@ func (mp *Multiplayer) forEachSession(f func(session *UserSession) bool) {
 }
 
 // listSession is a thread-safe method to retrieve the sessions list.
-func (mp *Multiplayer) listSessions() []icesignal.Player {
+func (mp *Multiplayer) listSessions() []wire.Player {
 	mp.sessionMutex.RLock()
 	defer mp.sessionMutex.RUnlock()
 
-	list := make([]icesignal.Player, len(mp.sessions))
+	list := make([]wire.Player, len(mp.sessions))
 	i := 0
 	for _, session := range mp.sessions {
 		list[i] = session.Player

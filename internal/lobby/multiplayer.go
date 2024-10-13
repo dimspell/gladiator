@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/dimspell/gladiator/internal/icesignal"
+	"github.com/dimspell/gladiator/internal/wire"
 )
 
 type Multiplayer struct {
@@ -15,7 +15,7 @@ type Multiplayer struct {
 	sessions     map[string]*UserSession
 
 	// Presence chan UserSession
-	Messages chan icesignal.Message
+	Messages chan wire.Message
 }
 
 func NewMultiplayer(ctx context.Context) *Multiplayer {
@@ -23,7 +23,7 @@ func NewMultiplayer(ctx context.Context) *Multiplayer {
 
 	mp := &Multiplayer{
 		sessions: make(map[string]*UserSession),
-		Messages: make(chan icesignal.Message),
+		Messages: make(chan wire.Message),
 		done:     done,
 	}
 

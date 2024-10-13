@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
-	"github.com/dimspell/gladiator/internal/icesignal"
+	"github.com/dimspell/gladiator/internal/wire"
 	"github.com/lmittmann/tint"
 )
 
@@ -130,7 +130,7 @@ func TestLobby(t *testing.T) {
 		}
 	}()
 
-	if err := wsFirst.Write(ctx, websocket.MessageText, compose(icesignal.Chat, icesignal.Message{
+	if err := wsFirst.Write(ctx, websocket.MessageText, compose(wire.Chat, wire.Message{
 		From:    "first",
 		Content: "Hello, World!",
 	})); err != nil {
@@ -138,7 +138,7 @@ func TestLobby(t *testing.T) {
 		return
 	}
 
-	if err := wsSecond.Write(ctx, websocket.MessageText, compose(icesignal.Chat, icesignal.Message{
+	if err := wsSecond.Write(ctx, websocket.MessageText, compose(wire.Chat, wire.Message{
 		From:    "second",
 		Content: "Welcome!",
 	})); err != nil {

@@ -11,8 +11,8 @@ import (
 	"sync"
 
 	"github.com/coder/websocket"
-	"github.com/dimspell/gladiator/internal/icesignal"
 	"github.com/dimspell/gladiator/internal/model"
+	"github.com/dimspell/gladiator/internal/wire"
 	"github.com/google/uuid"
 )
 
@@ -25,7 +25,7 @@ type Session struct {
 
 	Conn net.Conn
 
-	LobbyUsers   []icesignal.Player
+	LobbyUsers   []wire.Player
 	observerMtx  sync.Mutex
 	observerDone context.CancelFunc
 }
@@ -147,10 +147,10 @@ func (b *Backend) createObserver(wsConn *websocket.Conn, session *Session) (func
 			}
 			slog.Debug("Received packet", "session", session.ID, "packet", p)
 
-			et := icesignal.ParseEventType(p)
+			et := wire.ParseEventType(p)
 			switch et {
-			case icesignal.Chat:
-				_, msg, err := icesignal.DecodeTyped[icesignal.ChatMessage](p)
+			case wire.Chat:
+				_, msg, err := wire.DecodeTyped[wire.ChatMessage](p)
 				if err != nil {
 					slog.Warn("Could not decode the message", "session", session.ID, "error", err, "event", et.String(), "payload", p)
 					continue
@@ -159,9 +159,9 @@ func (b *Backend) createObserver(wsConn *websocket.Conn, session *Session) (func
 					slog.Error("Error writing chat message over the backend wire", "session", session.ID, "error", err)
 					continue
 				}
-			case icesignal.LobbyUsers:
+			case wire.LobbyUsers:
 				// TODO: Handle it. Note: It should be sent only once.
-				_, msg, err := icesignal.DecodeTyped[[]icesignal.Player](p)
+				_, msg, err := wire.DecodeTyped[[]wire.Player](p)
 				if err != nil {
 					slog.Warn("Could not decode the message", "session", session.ID, "error", err, "event", et.String(), "payload", p)
 					continue
@@ -178,8 +178,8 @@ func (b *Backend) createObserver(wsConn *websocket.Conn, session *Session) (func
 						continue
 					}
 				}
-			case icesignal.Join:
-				_, msg, err := icesignal.DecodeTyped[icesignal.Player](p)
+			case wire.Join:
+				_, msg, err := wire.DecodeTyped[wire.Player](p)
 				if err != nil {
 					slog.Warn("Could not decode the message", "session", session.ID, "error", err, "event", et.String(), "payload", p)
 					continue
@@ -193,14 +193,14 @@ func (b *Backend) createObserver(wsConn *websocket.Conn, session *Session) (func
 					slog.Warn("Error appending lobby user", "session", session.ID, "error", err)
 					continue
 				}
-			case icesignal.Leave:
-				_, msg, err := icesignal.DecodeTyped[icesignal.Player](p)
+			case wire.Leave:
+				_, msg, err := wire.DecodeTyped[wire.Player](p)
 				if err != nil {
 					slog.Warn("Could not decode the message", "session", session.ID, "error", err, "event", et.String(), "payload", p)
 					continue
 				}
 
-				session.LobbyUsers = slices.DeleteFunc(session.LobbyUsers, func(player icesignal.Player) bool {
+				session.LobbyUsers = slices.DeleteFunc(session.LobbyUsers, func(player wire.Player) bool {
 					return msg.Content.ID == player.ID
 				})
 
@@ -219,7 +219,7 @@ func (b *Backend) createObserver(wsConn *websocket.Conn, session *Session) (func
 }
 
 func (b *Backend) ConnectToWebSocket(ctx context.Context, session *Session) (*websocket.Conn, error) {
-	ws, err := icesignal.Connect(ctx, b.SignalServerURL, icesignal.Player{
+	ws, err := wire.Connect(ctx, b.SignalServerURL, wire.Player{
 		ID:                 fmt.Sprintf("%d", session.UserID),
 		Username:           session.Username,
 		CharacterID:        fmt.Sprintf("%d", session.CharacterID),

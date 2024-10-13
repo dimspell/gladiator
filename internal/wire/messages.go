@@ -1,4 +1,4 @@
-package icesignal
+package wire
 
 import (
 	"github.com/pion/webrtc/v4"

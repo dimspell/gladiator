@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
-	"github.com/dimspell/gladiator/internal/icesignal"
+	"github.com/dimspell/gladiator/internal/wire"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -68,7 +68,7 @@ func (lb *Lobby) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 
 	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{
-		Subprotocols: []string{icesignal.SupportedRealm},
+		Subprotocols: []string{wire.SupportedRealm},
 	})
 	if err != nil {
 		slog.Error("Could not accept the connection",
@@ -80,7 +80,7 @@ func (lb *Lobby) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 	defer conn.CloseNow()
 
-	if conn.Subprotocol() != icesignal.SupportedRealm {
+	if conn.Subprotocol() != wire.SupportedRealm {
 		_ = conn.Close(websocket.StatusPolicyViolation, "client must speak the right subprotocol")
 		return
 	}

@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
-	"github.com/dimspell/gladiator/internal/icesignal"
 	"github.com/dimspell/gladiator/internal/proxy/redirect"
+	"github.com/dimspell/gladiator/internal/wire"
 	"github.com/pion/webrtc/v4"
 )
 
@@ -54,10 +54,10 @@ func DialSignalServer(signalServerURL string, currentUserID, roomName string, is
 	}
 
 	// Send "hello" message to the signaling server
-	req := &icesignal.Message{
-		Type: icesignal.Hello,
+	req := &wire.Message{
+		Type: wire.Hello,
 		From: currentUserID,
-		Content: icesignal.Member{
+		Content: wire.Member{
 			UserID: currentUserID,
 			IsHost: isHost,
 		},
@@ -74,11 +74,11 @@ func DialSignalServer(signalServerURL string, currentUserID, roomName string, is
 		return nil, err
 	}
 	// Check that the response is a handshake response
-	if len(data) == 0 || data[0] != byte(icesignal.LobbyUsers) {
+	if len(data) == 0 || data[0] != byte(wire.LobbyUsers) {
 		return nil, fmt.Errorf("unexpected handshake response: %v", data)
 	}
 	// TODO: Check that the response contains the same room name as the request
-	resp, err := decodeSignalMessage[icesignal.MessageContent[string]](data[1:])
+	resp, err := decodeSignalMessage[wire.MessageContent[string]](data[1:])
 	if err != nil {
 		return nil, err
 	}
@@ -161,23 +161,23 @@ func (p *PeerToPeer) Run(ctx context.Context) {
 }
 
 func (p *PeerToPeer) handlePackets(buf []byte) error {
-	switch icesignal.EventType(buf[0]) {
-	case icesignal.Join:
+	switch wire.EventType(buf[0]) {
+	case wire.Join:
 		return decodeAndRun(buf[1:], p.handleJoin)
-	case icesignal.Leave:
+	case wire.Leave:
 		return decodeAndRun(buf[1:], p.handleLeave)
-	case icesignal.RTCOffer:
+	case wire.RTCOffer:
 		return decodeAndRun(buf[1:], p.handleRTCOffer)
-	case icesignal.RTCAnswer:
+	case wire.RTCAnswer:
 		return decodeAndRun(buf[1:], p.handleRTCAnswer)
-	case icesignal.RTCICECandidate:
+	case wire.RTCICECandidate:
 		return decodeAndRun(buf[1:], p.handleRTCCandidate)
 	default:
 		return nil
 	}
 }
 
-func (p *PeerToPeer) handleJoin(m icesignal.MessageContent[icesignal.Member]) error {
+func (p *PeerToPeer) handleJoin(m wire.MessageContent[wire.Member]) error {
 	// Validate the message
 	if m.Content.UserID == p.CurrentUserID {
 		// slog.Debug("Peer is the same as the host, ignoring join", "userId", m.Content.UserID, "host", m.Content.IsHost)
@@ -201,7 +201,7 @@ func (p *PeerToPeer) handleJoin(m icesignal.MessageContent[icesignal.Member]) er
 	return nil
 }
 
-func (p *PeerToPeer) handleLeave(m icesignal.MessageContent[any]) error {
+func (p *PeerToPeer) handleLeave(m wire.MessageContent[any]) error {
 	slog.Debug("LEAVE", "from", m.From, "to", m.To)
 
 	peer, ok := p.Peers.Get(m.From)
@@ -219,7 +219,7 @@ func (p *PeerToPeer) handleLeave(m icesignal.MessageContent[any]) error {
 	return nil
 }
 
-func (p *PeerToPeer) handleRTCOffer(m icesignal.MessageContent[icesignal.Offer]) error {
+func (p *PeerToPeer) handleRTCOffer(m wire.MessageContent[wire.Offer]) error {
 	slog.Debug("RTC_OFFER", "from", m.From, "to", m.To)
 
 	peer, err := p.addPeer(m.Content.Member, false, false)
@@ -240,12 +240,12 @@ func (p *PeerToPeer) handleRTCOffer(m icesignal.MessageContent[icesignal.Offer])
 		return fmt.Errorf("could not set local description: %v", err)
 	}
 
-	response := &icesignal.Message{
+	response := &wire.Message{
 		From: p.CurrentUserID,
 		To:   m.From,
-		Type: icesignal.RTCAnswer,
-		Content: icesignal.Offer{
-			Member: icesignal.Member{UserID: p.CurrentUserID, IsHost: p.CurrentUserIsHost}, // TODO: Unused data
+		Type: wire.RTCAnswer,
+		Content: wire.Offer{
+			Member: wire.Member{UserID: p.CurrentUserID, IsHost: p.CurrentUserIsHost}, // TODO: Unused data
 			Offer:  answer,
 		},
 	}
@@ -255,7 +255,7 @@ func (p *PeerToPeer) handleRTCOffer(m icesignal.MessageContent[icesignal.Offer])
 	return nil
 }
 
-func (p *PeerToPeer) handleRTCAnswer(m icesignal.MessageContent[icesignal.Offer]) error {
+func (p *PeerToPeer) handleRTCAnswer(m wire.MessageContent[wire.Offer]) error {
 	slog.Debug("RTC_ANSWER", "from", m.From, "to", m.To)
 
 	answer := webrtc.SessionDescription{
@@ -272,7 +272,7 @@ func (p *PeerToPeer) handleRTCAnswer(m icesignal.MessageContent[icesignal.Offer]
 	return nil
 }
 
-func (p *PeerToPeer) addPeer(member icesignal.Member, sendRTCOffer bool, createChannels bool) (*Peer, error) {
+func (p *PeerToPeer) addPeer(member wire.Member, sendRTCOffer bool, createChannels bool) (*Peer, error) {
 	peerConnection, err := webrtc.NewPeerConnection(p.WebRTCConfig)
 	if err != nil {
 		panic(err)
@@ -300,10 +300,10 @@ func (p *PeerToPeer) addPeer(member icesignal.Member, sendRTCOffer bool, createC
 		if candidate == nil {
 			return
 		}
-		reply := &icesignal.Message{
+		reply := &wire.Message{
 			From:    p.CurrentUserID,
 			To:      member.UserID,
-			Type:    icesignal.RTCICECandidate,
+			Type:    wire.RTCICECandidate,
 			Content: candidate.ToJSON(),
 		}
 		if err := p.sendSignal(reply.Encode()); err != nil {
@@ -327,12 +327,12 @@ func (p *PeerToPeer) addPeer(member icesignal.Member, sendRTCOffer bool, createC
 			return
 		}
 
-		reply := &icesignal.Message{
+		reply := &wire.Message{
 			From: p.CurrentUserID,
 			To:   member.UserID,
-			Type: icesignal.RTCOffer,
-			Content: icesignal.Offer{
-				Member: icesignal.Member{
+			Type: wire.RTCOffer,
+			Content: wire.Offer{
+				Member: wire.Member{
 					UserID: p.CurrentUserID,
 					IsHost: p.CurrentUserIsHost,
 				}, // TODO: Is it correct?
@@ -391,7 +391,7 @@ func (p *PeerToPeer) addPeer(member icesignal.Member, sendRTCOffer bool, createC
 	return peer, nil
 }
 
-func (p *PeerToPeer) handleRTCCandidate(m icesignal.MessageContent[webrtc.ICECandidateInit]) error {
+func (p *PeerToPeer) handleRTCCandidate(m wire.MessageContent[webrtc.ICECandidateInit]) error {
 	slog.Debug("RTC_ICE_CANDIDATE", "from", m.From, "to", m.To)
 
 	peer, ok := p.Peers.Get(m.From)
@@ -418,7 +418,7 @@ func decodeAndRun[T any](data []byte, f func(T) error) error {
 }
 
 func decodeSignalMessage[T any](data []byte) (v T, err error) {
-	err = icesignal.DefaultCodec.Unmarshal(data, &v)
+	err = wire.DefaultCodec.Unmarshal(data, &v)
 	if err != nil {
 		slog.Warn("Error decoding signal message", "error", err, "payload", string(data))
 		panic(err)

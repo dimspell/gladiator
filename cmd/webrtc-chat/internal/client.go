@@ -7,7 +7,7 @@ import (
 	"log/slog"
 	"net/url"
 
-	"github.com/dimspell/gladiator/internal/icesignal"
+	"github.com/dimspell/gladiator/internal/wire"
 	"github.com/pion/webrtc/v4"
 	"golang.org/x/net/websocket"
 )
@@ -38,10 +38,10 @@ func Dial(params *DialParams) (*Client, error) {
 	}
 
 	// Send "hello" message to the signaling server
-	req := &icesignal.Message{
-		Type: icesignal.Hello,
+	req := &wire.Message{
+		Type: wire.Hello,
 		From: params.ID,
-		Content: icesignal.Member{
+		Content: wire.Member{
 			UserID: params.ID,
 		},
 	}
@@ -56,10 +56,10 @@ func Dial(params *DialParams) (*Client, error) {
 		slog.Error("Error reading message", "error", err)
 		return nil, err
 	}
-	if n == 0 || buf[0] != byte(icesignal.LobbyUsers) {
+	if n == 0 || buf[0] != byte(wire.LobbyUsers) {
 		return nil, fmt.Errorf("unexpected handshake response: %v", buf[:n])
 	}
-	resp, err := decodeJSON[icesignal.MessageContent[string]](buf[1:n])
+	resp, err := decodeJSON[wire.MessageContent[string]](buf[1:n])
 	if err != nil {
 		return nil, err
 	}
@@ -106,46 +106,46 @@ func (c *Client) Run(onUDP MessageHandler) {
 			return
 		}
 
-		switch icesignal.EventType(buf[0]) {
-		case icesignal.Join:
+		switch wire.EventType(buf[0]) {
+		case wire.Join:
 			slog.Warn("JOIN")
-			msg, err := decodeJSON[icesignal.MessageContent[icesignal.Member]](buf[1:n])
+			msg, err := decodeJSON[wire.MessageContent[wire.Member]](buf[1:n])
 			if err != nil {
 				log.Println(err)
 				continue
 			}
 			c.handleJoin(msg, onUDP)
 			break
-		case icesignal.Leave:
+		case wire.Leave:
 			slog.Warn("LEAVE")
-			msg, err := decodeJSON[icesignal.MessageContent[any]](buf[1:n])
+			msg, err := decodeJSON[wire.MessageContent[any]](buf[1:n])
 			if err != nil {
 				log.Println(err)
 				continue
 			}
 			c.handleLeave(msg)
 			break
-		case icesignal.RTCOffer:
+		case wire.RTCOffer:
 			slog.Warn("RTC_OFFER")
-			msg, err := decodeJSON[icesignal.MessageContent[icesignal.Offer]](buf[1:n])
+			msg, err := decodeJSON[wire.MessageContent[wire.Offer]](buf[1:n])
 			if err != nil {
 				log.Println(err)
 				continue
 			}
 			c.handleRTCOffer(msg, onUDP)
 			break
-		case icesignal.RTCAnswer:
+		case wire.RTCAnswer:
 			slog.Warn("RTC_ANSWER")
-			msg, err := decodeJSON[icesignal.MessageContent[icesignal.Offer]](buf[1:n])
+			msg, err := decodeJSON[wire.MessageContent[wire.Offer]](buf[1:n])
 			if err != nil {
 				log.Println(err)
 				continue
 			}
 			c.handleRTCAnswer(msg)
 			break
-		case icesignal.RTCICECandidate:
+		case wire.RTCICECandidate:
 			slog.Warn("RTC_ICE_CANDIDATE")
-			msg, err := decodeJSON[icesignal.MessageContent[webrtc.ICECandidateInit]](buf[1:n])
+			msg, err := decodeJSON[wire.MessageContent[webrtc.ICECandidateInit]](buf[1:n])
 			if err != nil {
 				log.Println(err)
 				continue
@@ -158,7 +158,7 @@ func (c *Client) Run(onUDP MessageHandler) {
 	}
 }
 
-func (c *Client) handleJoin(msg icesignal.MessageContent[icesignal.Member], onUDP MessageHandler) {
+func (c *Client) handleJoin(msg wire.MessageContent[wire.Member], onUDP MessageHandler) {
 	slog.Info("Handling join message",
 		"id", msg.Content.UserID)
 
@@ -176,7 +176,7 @@ func (c *Client) handleJoin(msg icesignal.MessageContent[icesignal.Member], onUD
 	c.addNewDataChannel(peer, onUDP)
 }
 
-func (c *Client) addPeer(member icesignal.Member, sendRTCOffer bool, onTCP MessageHandler) *Peer {
+func (c *Client) addPeer(member wire.Member, sendRTCOffer bool, onTCP MessageHandler) *Peer {
 	config := webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{
 			// {
@@ -210,7 +210,7 @@ func (c *Client) addPeer(member icesignal.Member, sendRTCOffer bool, onTCP Messa
 			return
 		}
 
-		msg := c.newMessage(icesignal.RTCICECandidate, candidate.ToJSON())
+		msg := c.newMessage(wire.RTCICECandidate, candidate.ToJSON())
 		msg.To = member.UserID
 
 		if err := c.SendSignal(msg.Encode()); err != nil {
@@ -234,8 +234,8 @@ func (c *Client) addPeer(member icesignal.Member, sendRTCOffer bool, onTCP Messa
 			return
 		}
 
-		msg := c.newMessage(icesignal.RTCOffer, icesignal.Offer{
-			Member: icesignal.Member{UserID: c.ID},
+		msg := c.newMessage(wire.RTCOffer, wire.Offer{
+			Member: wire.Member{UserID: c.ID},
 			Offer:  offer,
 		})
 		msg.To = member.UserID
@@ -284,7 +284,7 @@ func (c *Client) addNewDataChannel(peer *Peer, onMessage MessageHandler) {
 	})
 }
 
-func (c *Client) handleLeave(msg icesignal.MessageContent[any]) {
+func (c *Client) handleLeave(msg wire.MessageContent[any]) {
 	peer, ok := c.Peers.Get(msg.From)
 	if !ok {
 		slog.Error("Could not find peer")
@@ -299,8 +299,8 @@ func (c *Client) handleLeave(msg icesignal.MessageContent[any]) {
 	c.Peers.Delete(peer.ID)
 }
 
-func (c *Client) handleRTCOffer(msg icesignal.MessageContent[icesignal.Offer], onMessage MessageHandler) {
-	peer := c.addPeer(icesignal.Member{UserID: msg.From}, false, onMessage)
+func (c *Client) handleRTCOffer(msg wire.MessageContent[wire.Offer], onMessage MessageHandler) {
+	peer := c.addPeer(wire.Member{UserID: msg.From}, false, onMessage)
 
 	if err := peer.Connection.SetRemoteDescription(msg.Content.Offer); err != nil {
 		panic(err)
@@ -315,7 +315,7 @@ func (c *Client) handleRTCOffer(msg icesignal.MessageContent[icesignal.Offer], o
 		panic(err)
 	}
 
-	response := c.newMessage(icesignal.RTCAnswer, icesignal.Offer{Member: icesignal.Member{UserID: c.ID}, Offer: answer})
+	response := c.newMessage(wire.RTCAnswer, wire.Offer{Member: wire.Member{UserID: c.ID}, Offer: answer})
 	response.To = msg.From
 
 	if err := c.SendSignal(response.Encode()); err != nil {
@@ -323,7 +323,7 @@ func (c *Client) handleRTCOffer(msg icesignal.MessageContent[icesignal.Offer], o
 	}
 }
 
-func (c *Client) handleRTCAnswer(msg icesignal.MessageContent[icesignal.Offer]) {
+func (c *Client) handleRTCAnswer(msg wire.MessageContent[wire.Offer]) {
 	answer := webrtc.SessionDescription{
 		Type: webrtc.SDPTypeAnswer,
 		SDP:  msg.Content.Offer.SDP,
@@ -339,7 +339,7 @@ func (c *Client) handleRTCAnswer(msg icesignal.MessageContent[icesignal.Offer]) 
 	}
 }
 
-func (c *Client) handleICECandidate(msg icesignal.MessageContent[webrtc.ICECandidateInit]) {
+func (c *Client) handleICECandidate(msg wire.MessageContent[webrtc.ICECandidateInit]) {
 	var candidate = msg.Content
 
 	peer, ok := c.Peers.Get(msg.From)
@@ -353,8 +353,8 @@ func (c *Client) handleICECandidate(msg icesignal.MessageContent[webrtc.ICECandi
 }
 
 // newMessage creates a new Message instance
-func (c *Client) newMessage(msgType icesignal.EventType, content any) *icesignal.Message {
-	return &icesignal.Message{
+func (c *Client) newMessage(msgType wire.EventType, content any) *wire.Message {
+	return &wire.Message{
 		From:    c.ID,
 		Type:    msgType,
 		Content: content,
