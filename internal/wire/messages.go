@@ -44,19 +44,21 @@ type Offer struct {
 }
 
 type User struct {
-	UserID   string `json:"userID,omitempty"`
-	Username string `json:"username,omitempty"`
-	Version  string `json:"version,omitempty"`
+	UserID   string `json:"userID"`
+	Username string `json:"username"`
+	Version  string `json:"version"`
 }
 
 type Character struct {
-	CharacterID string
-	ClassType   byte
+	CharacterID string `json:"characterID"`
+	ClassType   byte   `json:"classType"`
 }
 
 type Player struct {
-	User
-	Character
+	UserID      string `json:"userID"`
+	Username    string `json:"username"`
+	CharacterID string `json:"characterID"`
+	ClassType   byte   `json:"classType"`
 }
 
 type ChatMessage struct {

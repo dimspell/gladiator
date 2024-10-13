@@ -17,8 +17,19 @@ func (b *Backend) HandleGetCharacterInventory(session *Session, req GetCharacter
 	}
 	var err error
 	session.onceSelectedCharacter.Do(func() {
-		// TODO: It would be better to have it in the 41, but then change the character here.
-		err = b.UpdateCharacterInfo(session)
+		ctx := context.TODO()
+
+		// Once the character is selected (or created), the next packet will
+		// be 68 (GetCharacterInventory). This is the perfect time to tell the
+		// lobby server that someone has joined and is ready to chat & play.
+		err = b.JoinLobby(ctx, session)
+		if err != nil {
+			return
+		}
+		err = b.RegisterNewObserver(ctx, session)
+		if err != nil {
+			return
+		}
 	})
 	if err != nil {
 		return fmt.Errorf("packet-68: could not select the character: %w", err)

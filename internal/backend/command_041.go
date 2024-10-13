@@ -38,7 +38,7 @@ func (b *Backend) HandleClientAuthentication(session *Session, req ClientAuthent
 	defer session.Unlock()
 
 	// Connect to the lobby server.
-	if err = b.RegisterNewObserver(session); err != nil {
+	if err = b.ConnectToLobby(context.TODO(), session); err != nil {
 		slog.Debug("packet-41: could not register observer", "err", err)
 		return b.Send(session.Conn, ClientAuthentication, []byte{0, 0, 0, 0})
 	}

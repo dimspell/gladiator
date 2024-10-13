@@ -111,36 +111,66 @@ func encodePacket(packetType PacketType, payload []byte) []byte {
 	return packet
 }
 
-func (b *Backend) RegisterNewObserver(session *Session) (err error) {
-	// Only one observer at the time per session.
-	ctx, observerDone := context.WithCancel(context.Background())
+func (b *Backend) ConnectToLobby(ctx context.Context, session *Session) error {
+	ws, err := wire.Connect(ctx, b.SignalServerURL, wire.User{
+		UserID:   fmt.Sprintf("%d", session.UserID),
+		Username: session.Username,
 
-	wsConn, err := b.ConnectToWebSocket(ctx, session)
+		// TODO: Name the version of the protocol
+		Version: "latest",
+	})
 	if err != nil {
-		observerDone()
-		return err
-	}
-	observe, err := b.createObserver(wsConn, session)
-	if err != nil {
-		observerDone()
 		return err
 	}
 
-	session.wsConn = wsConn
-	session.observerDone = observerDone
+	ctx, session.observerDone = context.WithCancel(ctx)
+	session.wsConn = ws
 
-	go func() {
+	go func(ctx context.Context, ws *websocket.Conn) {
 		<-ctx.Done()
-		wsConn.CloseNow()
+		ws.CloseNow()
 		return
-	}()
-	go observe(ctx)
-
+	}(ctx, ws)
 	return nil
 }
 
-func (b *Backend) createObserver(wsConn *websocket.Conn, session *Session) (func(context.Context), error) {
-	observer := func(ctx context.Context) {
+func (b *Backend) JoinLobby(ctx context.Context, session *Session) error {
+	ctx, cancel := context.WithTimeout(ctx, time.Second*3)
+	defer cancel()
+
+	userID := fmt.Sprintf("%d", session.UserID)
+
+	err := session.wsConn.Write(ctx, websocket.MessageText,
+		wire.ComposeTyped[wire.Player](wire.Join, wire.MessageContent[wire.Player]{
+			From: userID,
+			Type: wire.Join,
+			Content: wire.Player{
+				UserID:      userID,
+				Username:    session.Username,
+				CharacterID: fmt.Sprintf("%d", session.CharacterID),
+				ClassType:   byte(session.ClassType),
+			},
+		}))
+	if err != nil {
+		return err
+	}
+
+	// Expect to receive the joined message.
+	_, p, err := session.wsConn.Read(ctx)
+	if err != nil {
+		return err
+	}
+	if len(p) != 1 || wire.EventType(p[0]) != wire.Joined {
+		return fmt.Errorf("expected joined message, got: %s", string(p))
+	}
+	return nil
+}
+
+func (b *Backend) RegisterNewObserver(ctx context.Context, session *Session) error {
+	if session.wsConn == nil {
+		return fmt.Errorf("backend: invalid websocket client connection")
+	}
+	observe := func(ctx context.Context, wsConn *websocket.Conn) {
 		for {
 			if ctx.Err() != nil {
 				return
@@ -228,52 +258,6 @@ func (b *Backend) createObserver(wsConn *websocket.Conn, session *Session) (func
 			}
 		}
 	}
-	return observer, nil
-}
-
-func (b *Backend) ConnectToWebSocket(ctx context.Context, session *Session) (*websocket.Conn, error) {
-	ws, err := wire.Connect(ctx, b.SignalServerURL, wire.User{
-		UserID:   fmt.Sprintf("%d", session.UserID),
-		Username: session.Username,
-	})
-	// CharacterID:        fmt.Sprintf("%d", session.CharacterID),
-	// CharacterClassType: int(session.ClassType),
-
-	if err != nil {
-		return nil, err
-	}
-	// TODO: Name the websocket version.
-	return ws, nil
-}
-
-func (b *Backend) UpdateCharacterInfo(session *Session) error {
-	ctx, cancel := context.WithTimeout(context.TODO(), time.Second*3)
-	defer cancel()
-
-	user := wire.User{
-		UserID:   fmt.Sprintf("%d", session.UserID),
-		Username: session.Username,
-	}
-	character := wire.Character{}
-
-	err := session.wsConn.Write(ctx, websocket.MessageText,
-		wire.ComposeTyped[wire.Player](wire.Join, wire.MessageContent[wire.Player]{
-			From:    user.UserID,
-			Type:    wire.Join,
-			Content: wire.Player{User: user, Character: character},
-		}))
-	if err != nil {
-		return err
-	}
-
-	// Expect to receive the joined message.
-	_, p, err := session.wsConn.Read(ctx)
-	if err != nil {
-		return err
-	}
-	if len(p) != 1 || wire.EventType(p[0]) != wire.Joined {
-		return fmt.Errorf("expected joined message, got: %s", string(p))
-	}
-
+	go observe(ctx, session.wsConn)
 	return nil
 }

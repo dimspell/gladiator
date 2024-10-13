@@ -138,14 +138,17 @@ func (mp *Multiplayer) ForwardRTCMessage(ctx context.Context, msg wire.Message) 
 	ctx, cancel := context.WithTimeout(ctx, time.Second*5)
 	defer cancel()
 
-	if user, ok := mp.getSession(msg.To); ok {
+	if user, ok := mp.GetUserSession(msg.To); ok {
 		user.SendMessage(ctx, msg.Type, msg)
 	}
 }
 
 // DebugState returns all information about the lobby.
 func (mp *Multiplayer) DebugState() {
-
+	fmt.Println("Connected players", len(mp.sessions))
+	for key, session := range mp.sessions {
+		fmt.Println(key, fmt.Sprintf("%#v", session.ToPlayer()))
+	}
 }
 
 // CreateRoom creates new lobby room.
@@ -209,11 +212,12 @@ func (mp *Multiplayer) HandleJoin(ctx context.Context, session *UserSession) err
 	if err != nil {
 		return err
 	}
-	if et != wire.Hello {
+	if et != wire.Join {
 		return fmt.Errorf("inapprioprate event type")
 	}
 
-	session.Character = m.Content.Character
+	session.Character.CharacterID = m.Content.CharacterID
+	session.Character.ClassType = m.Content.ClassType
 
 	session.Send(ctx, []byte{byte(wire.Joined)})
 	return nil
@@ -222,7 +226,7 @@ func (mp *Multiplayer) HandleJoin(ctx context.Context, session *UserSession) err
 // SetPlayerConnected notifies the user has connected to the lobby.
 func (mp *Multiplayer) SetPlayerConnected(session *UserSession) {
 	players := mp.listSessions()
-	mp.addSession(session.UserID, session)
+	mp.AddUserSession(session.UserID, session)
 
 	ctx, cancel := context.WithTimeout(context.TODO(), time.Second*3)
 	defer cancel()
@@ -230,16 +234,13 @@ func (mp *Multiplayer) SetPlayerConnected(session *UserSession) {
 	session.SendMessage(ctx, wire.LobbyUsers, wire.Message{
 		Type:    wire.LobbyUsers,
 		To:      session.UserID,
-		Content: players, // TODO: Map it to some readable form
+		Content: players,
 	})
 
 	// Notify all the users
 	mp.BroadcastMessage(ctx, wire.ComposeTyped(wire.Join, wire.MessageContent[wire.Player]{
-		Type: wire.Join,
-		Content: wire.Player{
-			User:      session.User,
-			Character: session.Character,
-		},
+		Type:    wire.Join,
+		Content: session.ToPlayer(),
 	}))
 }
 
@@ -247,7 +248,7 @@ func (mp *Multiplayer) SetPlayerConnected(session *UserSession) {
 func (mp *Multiplayer) SetPlayerDisconnected(session *UserSession) {
 	// TODO: Close the socket
 	session.wsConn.CloseNow()
-	mp.deleteSession(session.UserID)
+	mp.DeleteUserSession(session.UserID)
 	mp.BroadcastMessage(context.TODO(), wire.Compose(wire.Leave, wire.Message{Type: wire.Leave, From: session.UserID}))
 }
 
@@ -259,17 +260,17 @@ func (mp *Multiplayer) BroadcastMessage(ctx context.Context, payload []byte) {
 	})
 }
 
-// getSession is a thread-safe method to receive a session by ID.
-func (mp *Multiplayer) getSession(id string) (*UserSession, bool) {
+// GetUserSession is a thread-safe method to receive a session by ID.
+func (mp *Multiplayer) GetUserSession(id string) (*UserSession, bool) {
 	mp.sessionMutex.RLock()
 	member, ok := mp.sessions[id]
 	mp.sessionMutex.RUnlock()
 	return member, ok
 }
 
-// addSession is a thread-safe operation to add a session identified by ID.
-func (mp *Multiplayer) addSession(id string, session *UserSession) {
-	if _, exists := mp.getSession(id); exists {
+// AddUserSession is a thread-safe operation to add a session identified by ID.
+func (mp *Multiplayer) AddUserSession(id string, session *UserSession) {
+	if _, exists := mp.GetUserSession(id); exists {
 		return
 	}
 	mp.sessionMutex.Lock()
@@ -277,8 +278,8 @@ func (mp *Multiplayer) addSession(id string, session *UserSession) {
 	mp.sessionMutex.Unlock()
 }
 
-// deleteSession is a thread-safe operation to delete a session by ID.
-func (mp *Multiplayer) deleteSession(id string) {
+// DeleteUserSession is a thread-safe operation to delete a session by ID.
+func (mp *Multiplayer) DeleteUserSession(id string) {
 	mp.sessionMutex.Lock()
 	delete(mp.sessions, id)
 	mp.sessionMutex.Unlock()
@@ -303,10 +304,7 @@ func (mp *Multiplayer) listSessions() []wire.Player {
 	list := make([]wire.Player, len(mp.sessions))
 	i := 0
 	for _, session := range mp.sessions {
-		list[i] = wire.Player{
-			User:      session.User,
-			Character: session.Character,
-		}
+		list[i] = session.ToPlayer()
 		i++
 	}
 	return list

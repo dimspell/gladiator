@@ -67,6 +67,15 @@ func (us *UserSession) SendMessage(ctx context.Context, msgType wire.EventType, 
 	us.Send(ctx, wire.Compose(msgType, msg))
 }
 
+func (us *UserSession) ToPlayer() wire.Player {
+	return wire.Player{
+		UserID:      us.User.UserID,
+		Username:    us.User.Username,
+		CharacterID: us.Character.CharacterID,
+		ClassType:   us.Character.ClassType,
+	}
+}
+
 var _ ConnReadWriter = (*websocket.Conn)(nil)
 
 type ConnReadWriter interface {

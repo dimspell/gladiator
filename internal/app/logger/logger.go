@@ -58,7 +58,7 @@ func InitDefaultLogger(app *cli.Command) (CleanupFunc, error) {
 	case "text":
 		SetColoredLogger(w, logLevel, app.Bool("no-color"))
 	default:
-		SetDefaultJSONLogger(w, logLevel)
+		SetJSONLogger(w, logLevel)
 	}
 
 	return deferred, nil
@@ -91,7 +91,7 @@ func SetPlainTextLogger(w io.Writer, logLevel slog.Level) {
 	))
 }
 
-func SetDefaultJSONLogger(w io.Writer, logLevel slog.Level) {
+func SetJSONLogger(w io.Writer, logLevel slog.Level) {
 	slog.SetDefault(slog.New(
 		slog.NewJSONHandler(w, &slog.HandlerOptions{
 			AddSource: logLevel == slog.LevelDebug,

@@ -23,7 +23,7 @@ const (
 )
 
 func TestWebRTCMock(t *testing.T) {
-	logger.SetDefaultJSONLogger(os.Stderr, slog.LevelDebug)
+	logger.SetJSONLogger(os.Stderr, slog.LevelDebug)
 
 	proxytesthelper.StartHost(t)
 	// signalServerURL := proxytesthelper.StartSignalServer(t)
