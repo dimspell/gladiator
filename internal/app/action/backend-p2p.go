@@ -2,13 +2,13 @@ package action
 
 import (
 	"context"
+	"log/slog"
+	"os"
+
 	"github.com/dimspell/gladiator/internal/app/logger"
 	"github.com/dimspell/gladiator/internal/app/logger/packetlogger"
 	"github.com/dimspell/gladiator/internal/backend"
-	"github.com/dimspell/gladiator/internal/proxy"
 	"github.com/urfave/cli/v3"
-	"log/slog"
-	"os"
 )
 
 func BackendP2PCommand() *cli.Command {
@@ -49,7 +49,7 @@ func BackendP2PCommand() *cli.Command {
 			Level: slog.LevelDebug,
 		}))
 
-		bd := backend.NewBackend(backendAddr, consoleAddr, proxy.NewPeerToPeer(signalingAddr))
+		bd := backend.NewBackend(backendAddr, consoleAddr, backend.NewPeerToPeer(signalingAddr))
 
 		if err := bd.Start(); err != nil {
 			return err

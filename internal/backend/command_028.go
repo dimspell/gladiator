@@ -10,7 +10,6 @@ import (
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/internal/backend/packet"
 	"github.com/dimspell/gladiator/internal/model"
-	"github.com/dimspell/gladiator/internal/proxy"
 )
 
 // HandleCreateGame handles 0x1cff (255-28) command
@@ -30,7 +29,7 @@ func (b *Backend) HandleCreateGame(session *Session, req CreateGameRequest) erro
 	case uint32(model.GameStateNone):
 		b.Proxy.Close()
 
-		hostIPAddress, err := b.Proxy.Create(proxy.CreateParams{
+		hostIPAddress, err := b.Proxy.Create(CreateParams{
 			HostUserID: fmt.Sprintf("%d", session.UserID),
 			GameID:     data.RoomName,
 		})
@@ -69,7 +68,7 @@ func (b *Backend) HandleCreateGame(session *Session, req CreateGameRequest) erro
 			return err
 		}
 
-		if err := b.Proxy.Host(proxy.HostParams{
+		if err := b.Proxy.Host(HostParams{
 			GameID:     respGame.Msg.Game.Name,
 			HostUserID: session.Username,
 		}); err != nil {

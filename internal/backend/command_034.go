@@ -11,7 +11,6 @@ import (
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/internal/backend/packet"
 	"github.com/dimspell/gladiator/internal/model"
-	"github.com/dimspell/gladiator/internal/proxy"
 )
 
 // HandleJoinGame handles 0x22ff (255-34) command
@@ -35,7 +34,7 @@ func (b *Backend) HandleJoinGame(session *Session, req JoinGameRequest) error {
 
 	// TODO: Refactor me
 	var ipAddr string
-	gameProxy, ok := b.Proxy.(*proxy.LAN)
+	gameProxy, ok := b.Proxy.(*LAN)
 	if ok {
 		ipAddr = gameProxy.MyIPAddress
 	}
@@ -65,7 +64,7 @@ func (b *Backend) HandleJoinGame(session *Session, req JoinGameRequest) error {
 			continue
 		}
 
-		ps := proxy.GetPlayerAddrParams{
+		ps := GetPlayerAddrParams{
 			GameID:        respGame.Msg.GetGame().GetName(),
 			UserID:        fmt.Sprintf("%d", player.UserId),
 			IPAddress:     player.IpAddress,
@@ -94,7 +93,7 @@ func (b *Backend) HandleJoinGame(session *Session, req JoinGameRequest) error {
 		response = append(response, byte(0))                         // Null byte
 	}
 
-	if err = b.Proxy.Join(proxy.JoinParams{
+	if err = b.Proxy.Join(JoinParams{
 		HostUserID:    fmt.Sprintf("%d", respGame.Msg.GetGame().HostUserId),
 		HostUserIP:    respGame.Msg.GetGame().HostIpAddress,
 		CurrentUserID: fmt.Sprintf("%d", session.UserID),

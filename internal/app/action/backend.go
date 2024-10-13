@@ -2,13 +2,13 @@ package action
 
 import (
 	"context"
-	"github.com/dimspell/gladiator/internal/app/logger"
 	"log/slog"
 	"os"
 
+	"github.com/dimspell/gladiator/internal/app/logger"
+
 	"github.com/dimspell/gladiator/internal/app/logger/packetlogger"
 	"github.com/dimspell/gladiator/internal/backend"
-	"github.com/dimspell/gladiator/internal/proxy"
 	"github.com/urfave/cli/v3"
 )
 
@@ -44,7 +44,7 @@ func BackendCommand() *cli.Command {
 			Level: slog.LevelDebug,
 		}))
 
-		bd := backend.NewBackend(backendAddr, consoleAddr, proxy.NewLAN(myIpAddr))
+		bd := backend.NewBackend(backendAddr, consoleAddr, backend.NewLAN(myIpAddr))
 
 		if err := bd.Start(); err != nil {
 			return err

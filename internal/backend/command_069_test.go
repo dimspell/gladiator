@@ -6,14 +6,13 @@ import (
 	"connectrpc.com/connect"
 	v1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/internal/model"
-	"github.com/dimspell/gladiator/internal/proxy"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestBackend_HandleSelectGame(t *testing.T) {
 	t.Run("Sample game", func(t *testing.T) {
 		b := &Backend{
-			Proxy: proxy.NewLAN("127.0.100.1"),
+			Proxy: NewLAN("127.0.100.1"),
 			gameClient: &mockGameClient{
 				GetGameResponse: connect.NewResponse(&v1.GetGameResponse{
 					Game: &v1.Game{
@@ -61,7 +60,7 @@ func TestBackend_HandleSelectGame(t *testing.T) {
 
 	t.Run("Host only", func(t *testing.T) {
 		b := &Backend{
-			Proxy: proxy.NewLAN("127.0.0.1"),
+			Proxy: NewLAN("127.0.0.1"),
 			gameClient: &mockGameClient{
 				GetGameResponse: connect.NewResponse(&v1.GetGameResponse{
 					Game: &v1.Game{

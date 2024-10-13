@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/dimspell/gladiator/gen/multi/v1/multiv1connect"
-	"github.com/dimspell/gladiator/internal/proxy"
 )
 
 type Backend struct {
@@ -23,7 +22,7 @@ type Backend struct {
 	ConnectedSessions sync.Map
 	SessionCounter    uint64
 
-	Proxy proxy.Proxy
+	Proxy Proxy
 
 	characterClient multiv1connect.CharacterServiceClient
 	gameClient      multiv1connect.GameServiceClient
@@ -31,7 +30,7 @@ type Backend struct {
 	rankingClient   multiv1connect.RankingServiceClient
 }
 
-func NewBackend(backendAddr, consoleAddr string, gameProxy proxy.Proxy) *Backend {
+func NewBackend(backendAddr, consoleAddr string, gameProxy Proxy) *Backend {
 	httpClient := &http.Client{
 		Timeout: 5 * time.Second,
 		Transport: &http.Transport{

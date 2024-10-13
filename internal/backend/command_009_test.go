@@ -1,8 +1,6 @@
 package backend
 
 import (
-	"github.com/dimspell/gladiator/internal/proxy"
-
 	"testing"
 
 	"connectrpc.com/connect"
@@ -40,7 +38,7 @@ func TestBackend_HandleListGames(t *testing.T) {
 
 	t.Run("with one game", func(t *testing.T) {
 		b := &Backend{
-			Proxy: proxy.NewLAN("127.0.100.1"),
+			Proxy: NewLAN("127.0.100.1"),
 			gameClient: &mockGameClient{
 				ListGamesResponse: connect.NewResponse(&v1.ListGamesResponse{Games: []*v1.Game{
 					{
@@ -67,7 +65,7 @@ func TestBackend_HandleListGames(t *testing.T) {
 
 	t.Run("with games", func(t *testing.T) {
 		b := &Backend{
-			Proxy: proxy.NewLAN("127.0.100.1"),
+			Proxy: NewLAN("127.0.100.1"),
 			gameClient: &mockGameClient{
 				ListGamesResponse: connect.NewResponse(&v1.ListGamesResponse{Games: []*v1.Game{
 					{

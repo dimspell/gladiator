@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
-	"net/url"
-	"time"
 
 	"github.com/coder/websocket"
 	"github.com/dimspell/gladiator/internal/proxy/redirect"
@@ -29,62 +27,6 @@ type PeerToPeer struct {
 }
 
 func DialSignalServer(signalServerURL string, currentUserID, roomName string, isHost bool) (*PeerToPeer, error) {
-	// Parse the signaling URL provided from the parameters (command flags)
-	u, err := url.Parse(signalServerURL)
-	if err != nil {
-		return nil, err
-	}
-
-	// Set parameters
-	v := u.Query()
-	v.Set("userID", currentUserID)
-	v.Set("roomName", roomName)
-	u.RawQuery = v.Encode()
-
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
-	defer cancel()
-
-	// Connect to the signaling server
-	slog.Debug("Connecting to the signaling server", "url", u.String())
-	ws, _, err := websocket.Dial(ctx, u.String(), &websocket.DialOptions{
-		Subprotocols: []string{"signalserver"},
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	// Send "hello" message to the signaling server
-	req := &wire.Message{
-		Type: wire.Hello,
-		From: currentUserID,
-		Content: wire.Member{
-			UserID: currentUserID,
-			IsHost: isHost,
-		},
-	}
-
-	if err := ws.Write(context.TODO(), websocket.MessageText, req.Encode()); err != nil {
-		return nil, err
-	}
-
-	// Read the response from the signaling server (could be some auth token)
-	_, data, err := ws.Read(context.TODO())
-	if err != nil {
-		slog.Error("Error reading message", "error", err)
-		return nil, err
-	}
-	// Check that the response is a handshake response
-	if len(data) == 0 || data[0] != byte(wire.LobbyUsers) {
-		return nil, fmt.Errorf("unexpected handshake response: %v", data)
-	}
-	// TODO: Check that the response contains the same room name as the request
-	_, resp, err := wire.DecodeTyped[wire.MessageContent[string]](data[1:])
-	if err != nil {
-		return nil, err
-	}
-
-	slog.Info("Connected to signaling server", "response", resp.Content)
-
 	config := webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{
 			// {
@@ -103,7 +45,6 @@ func DialSignalServer(signalServerURL string, currentUserID, roomName string, is
 		IpRing:          NewIpRing(),
 		Peers:           NewPeers(),
 		WebRTCConfig:    config,
-		ws:              ws,
 
 		CurrentUserID:     currentUserID,
 		CurrentUserIsHost: isHost,

@@ -1,4 +1,4 @@
-package proxy
+package backend
 
 // func TestPeerTopeerManual(t *testing.T) {
 // 	t.Cleanup(func() {

@@ -1,8 +1,6 @@
 package backend
 
 import (
-	"github.com/dimspell/gladiator/internal/proxy"
-
 	"net"
 	"testing"
 
@@ -36,7 +34,7 @@ func TestCreateGameRequest(t *testing.T) {
 
 func TestBackend_HandleCreateGame(t *testing.T) {
 	b := &Backend{
-		Proxy: proxy.NewLAN("127.0.0.1"),
+		Proxy: NewLAN("127.0.0.1"),
 		gameClient: &mockGameClient{
 			CreateGameResponse: connect.NewResponse(&v1.CreateGameResponse{
 				Game: &v1.Game{

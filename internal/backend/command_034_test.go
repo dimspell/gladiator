@@ -1,10 +1,9 @@
 package backend
 
 import (
-	"github.com/dimspell/gladiator/internal/model"
-	"github.com/dimspell/gladiator/internal/proxy"
-
 	"testing"
+
+	"github.com/dimspell/gladiator/internal/model"
 
 	"connectrpc.com/connect"
 	v1 "github.com/dimspell/gladiator/gen/multi/v1"
@@ -13,7 +12,7 @@ import (
 
 func TestBackend_HandleJoinGame(t *testing.T) {
 	b := &Backend{
-		Proxy: proxy.NewLAN("127.0.100.1"),
+		Proxy: NewLAN("127.0.100.1"),
 		gameClient: &mockGameClient{
 			GetGameResponse: connect.NewResponse(&v1.GetGameResponse{
 				Game: &v1.Game{

@@ -1,4 +1,4 @@
-package proxy
+package backend
 
 import (
 	"fmt"
