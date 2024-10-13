@@ -14,7 +14,7 @@ import (
 	"github.com/dimspell/gladiator/internal/backend"
 	"github.com/dimspell/gladiator/internal/console"
 	"github.com/dimspell/gladiator/internal/console/database"
-	"github.com/dimspell/gladiator/model"
+	"github.com/dimspell/gladiator/internal/model"
 	"github.com/dimspell/gladiator/probe"
 )
 

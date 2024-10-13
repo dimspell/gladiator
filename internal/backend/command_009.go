@@ -8,7 +8,7 @@ import (
 
 	"connectrpc.com/connect"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
-	"github.com/dimspell/gladiator/model"
+	"github.com/dimspell/gladiator/internal/model"
 )
 
 // HandleListGames handles 0x9ff (255-9) command

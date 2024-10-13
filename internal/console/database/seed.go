@@ -5,7 +5,7 @@ import (
 	"database/sql"
 
 	"github.com/dimspell/gladiator/internal/console/auth"
-	"github.com/dimspell/gladiator/model"
+	"github.com/dimspell/gladiator/internal/model"
 )
 
 func Seed(queries *Queries) error {

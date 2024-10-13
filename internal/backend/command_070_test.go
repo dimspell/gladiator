@@ -3,7 +3,7 @@ package backend
 import (
 	"testing"
 
-	"github.com/dimspell/gladiator/model"
+	"github.com/dimspell/gladiator/internal/model"
 	"github.com/stretchr/testify/assert"
 )
 

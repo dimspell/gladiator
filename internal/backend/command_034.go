@@ -10,8 +10,8 @@ import (
 	"connectrpc.com/connect"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/internal/backend/packet"
+	"github.com/dimspell/gladiator/internal/model"
 	"github.com/dimspell/gladiator/internal/proxy"
-	"github.com/dimspell/gladiator/model"
 )
 
 // HandleJoinGame handles 0x22ff (255-34) command

@@ -9,8 +9,8 @@ import (
 	"connectrpc.com/connect"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/internal/backend/packet"
+	"github.com/dimspell/gladiator/internal/model"
 	"github.com/dimspell/gladiator/internal/proxy"
-	"github.com/dimspell/gladiator/model"
 )
 
 // HandleSelectGame handles 0x45ff (255-69) command

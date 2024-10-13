@@ -8,7 +8,7 @@ import (
 	"connectrpc.com/connect"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/internal/console/database"
-	"github.com/dimspell/gladiator/model"
+	"github.com/dimspell/gladiator/internal/model"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/goleak"
 )

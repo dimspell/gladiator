@@ -12,7 +12,7 @@ import (
 
 	"github.com/dimspell/gladiator/gen/multi/v1/multiv1connect"
 	"github.com/dimspell/gladiator/internal/console/database"
-	"github.com/dimspell/gladiator/model"
+	"github.com/dimspell/gladiator/internal/model"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/rs/cors"

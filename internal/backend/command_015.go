@@ -3,7 +3,7 @@ package backend
 import (
 	"encoding/binary"
 
-	"github.com/dimspell/gladiator/model"
+	"github.com/dimspell/gladiator/internal/model"
 )
 
 func AppendCharacterToLobby(characterName string, classType model.ClassType, idx uint32) []byte {

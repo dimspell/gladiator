@@ -8,7 +8,7 @@ import (
 	"connectrpc.com/connect"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/internal/backend/packet"
-	"github.com/dimspell/gladiator/model"
+	"github.com/dimspell/gladiator/internal/model"
 )
 
 func (b *Backend) HandleCreateCharacter(session *Session, req CreateCharacterRequest) error {

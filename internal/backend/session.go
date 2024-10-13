@@ -12,7 +12,7 @@ import (
 
 	"github.com/coder/websocket"
 	"github.com/dimspell/gladiator/internal/icesignal"
-	"github.com/dimspell/gladiator/model"
+	"github.com/dimspell/gladiator/internal/model"
 	"github.com/google/uuid"
 )
 

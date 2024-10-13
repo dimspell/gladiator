@@ -12,7 +12,7 @@ import (
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/gen/multi/v1/multiv1connect"
 	"github.com/dimspell/gladiator/internal/console/database"
-	"github.com/dimspell/gladiator/model"
+	"github.com/dimspell/gladiator/internal/model"
 )
 
 var _ multiv1connect.CharacterServiceHandler = (*characterServiceServer)(nil)

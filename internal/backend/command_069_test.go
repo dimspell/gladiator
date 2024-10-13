@@ -5,8 +5,8 @@ import (
 
 	"connectrpc.com/connect"
 	v1 "github.com/dimspell/gladiator/gen/multi/v1"
+	"github.com/dimspell/gladiator/internal/model"
 	"github.com/dimspell/gladiator/internal/proxy"
-	"github.com/dimspell/gladiator/model"
 	"github.com/stretchr/testify/assert"
 )
 
