@@ -7,8 +7,8 @@ import (
 	"log/slog"
 
 	"connectrpc.com/connect"
-	"github.com/dimspell/gladiator/backend/packet"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
+	"github.com/dimspell/gladiator/internal/backend/packet"
 )
 
 func (b *Backend) HandleGetCharacterInventory(session *Session, req GetCharacterInventoryRequest) error {

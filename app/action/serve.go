@@ -6,10 +6,10 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/dimspell/gladiator/backend"
-	"github.com/dimspell/gladiator/backend/packetlogger"
 	"github.com/dimspell/gladiator/console"
 	"github.com/dimspell/gladiator/console/database"
+	"github.com/dimspell/gladiator/internal/backend"
+	"github.com/dimspell/gladiator/internal/backend/packetlogger"
 	"github.com/dimspell/gladiator/internal/proxy"
 	"github.com/urfave/cli/v3"
 	"golang.org/x/sync/errgroup"

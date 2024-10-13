@@ -66,7 +66,7 @@ const (
 //
 // 	c := &Channel{
 // 		Name:     channelName,
-// 		Messages: make(chan icesignal2.Message),
+// 		Messages: make(chan icesignal.Message),
 // 	}
 // 	s.SetChannel(channelName, c)
 // 	go c.Run(ctx)

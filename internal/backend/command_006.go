@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/dimspell/gladiator/backend/packet"
+	"github.com/dimspell/gladiator/internal/backend/packet"
 )
 
 // HandleAuthorizationHandshake handles 0x6ff (255-6) command.

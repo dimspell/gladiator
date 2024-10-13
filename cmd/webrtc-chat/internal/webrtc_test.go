@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dimspell/gladiator/internal/icesignal"
 	"github.com/dimspell/gladiator/internal/proxy/proxytesthelper"
-	"github.com/dimspell/gladiator/internal/proxy/signalserver"
 	"github.com/google/uuid"
 	"github.com/pion/webrtc/v4"
 )
@@ -83,10 +83,10 @@ func TestWebRTCMock(t *testing.T) {
 		// ws:    &FakeSocket{bytes.NewBuffer([]byte{})},
 	}
 
-	player1.handleJoin(signalserver.MessageContent[signalserver.Member]{
+	player1.handleJoin(icesignal.MessageContent[icesignal.Member]{
 		From:    player2.ID,
-		Type:    signalserver.Join,
-		Content: signalserver.Member{UserID: player2.ID},
+		Type:    icesignal.Join,
+		Content: icesignal.Member{UserID: player2.ID},
 		To:      player1.ID,
 	}, onMessage)
 
@@ -96,8 +96,8 @@ func TestWebRTCMock(t *testing.T) {
 func TestWebRTCOffer(t *testing.T) {
 	myID := uuid.New().String()[:6]
 
-	newMessage := func(msgType signalserver.EventType, content any) *signalserver.Message {
-		return &signalserver.Message{
+	newMessage := func(msgType icesignal.EventType, content any) *icesignal.Message {
+		return &icesignal.Message{
 			From:    myID,
 			Type:    msgType,
 			Content: content,
@@ -109,7 +109,7 @@ func TestWebRTCOffer(t *testing.T) {
 	// 	Peers: NewPeers(),
 	// 	ws:    &FakeSocket{bytes.NewBuffer([]byte{})},
 	// }
-	member := signalserver.Member{UserID: uuid.New().String()[:6]}
+	member := icesignal.Member{UserID: uuid.New().String()[:6]}
 
 	config := webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{
@@ -143,7 +143,7 @@ func TestWebRTCOffer(t *testing.T) {
 			return
 		}
 
-		msg := newMessage(signalserver.RTCICECandidate, candidate.ToJSON())
+		msg := newMessage(icesignal.RTCICECandidate, candidate.ToJSON())
 		msg.To = member.UserID
 
 		log.Println(msg)
@@ -168,8 +168,8 @@ func TestWebRTCOffer(t *testing.T) {
 		// 	return
 		// }
 
-		msg := newMessage(signalserver.RTCOffer, signalserver.Offer{
-			Member: signalserver.Member{UserID: myID},
+		msg := newMessage(icesignal.RTCOffer, icesignal.Offer{
+			Member: icesignal.Member{UserID: myID},
 			Offer:  offer,
 		})
 		msg.To = member.UserID

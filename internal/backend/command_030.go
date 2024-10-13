@@ -3,7 +3,7 @@ package backend
 import (
 	"fmt"
 
-	"github.com/dimspell/gladiator/backend/packet"
+	"github.com/dimspell/gladiator/internal/backend/packet"
 )
 
 // HandleClientHostAndUsername handles 0x1eff (255-30) command

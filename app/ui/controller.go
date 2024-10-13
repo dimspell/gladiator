@@ -11,9 +11,9 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/data/binding"
-	"github.com/dimspell/gladiator/backend"
 	"github.com/dimspell/gladiator/console"
 	"github.com/dimspell/gladiator/console/database"
+	"github.com/dimspell/gladiator/internal/backend"
 	"github.com/dimspell/gladiator/model"
 	"github.com/dimspell/gladiator/probe"
 )
