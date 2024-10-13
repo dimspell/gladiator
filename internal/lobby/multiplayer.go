@@ -2,6 +2,7 @@ package lobby
 
 import (
 	"context"
+	"log/slog"
 	"sync"
 
 	"github.com/dimspell/gladiator/internal/wire"
@@ -46,6 +47,7 @@ func (mp *Multiplayer) Run(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
+			slog.Info("Received signal, closing the server")
 			mp.Reset()
 			return
 		case msg, ok := <-mp.Messages:

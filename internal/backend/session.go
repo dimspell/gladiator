@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"log/slog"
 	"math"
 	"net"
@@ -111,10 +112,10 @@ func encodePacket(packetType PacketType, payload []byte) []byte {
 	return packet
 }
 
-func (b *Backend) ConnectToLobby(ctx context.Context, session *Session) error {
+func (b *Backend) ConnectToLobby(ctx context.Context, user *multiv1.User, session *Session) error {
 	ws, err := wire.Connect(ctx, b.SignalServerURL, wire.User{
-		UserID:   fmt.Sprintf("%d", session.UserID),
-		Username: session.Username,
+		UserID:   fmt.Sprintf("%d", user.UserId),
+		Username: user.Username,
 
 		// TODO: Name the version of the protocol
 		Version: "latest",
