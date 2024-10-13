@@ -6,8 +6,8 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/dimspell/gladiator/internal/app/logger/packetlogger"
 	"github.com/dimspell/gladiator/internal/backend"
-	"github.com/dimspell/gladiator/internal/backend/packetlogger"
 	"github.com/dimspell/gladiator/internal/console"
 	"github.com/dimspell/gladiator/internal/console/database"
 	"github.com/dimspell/gladiator/internal/proxy"

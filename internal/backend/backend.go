@@ -14,8 +14,6 @@ import (
 	"github.com/dimspell/gladiator/internal/proxy"
 )
 
-var PacketLogger *slog.Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
-
 type Backend struct {
 	Addr            string
 	SignalServerURL string

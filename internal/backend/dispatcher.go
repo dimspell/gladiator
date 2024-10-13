@@ -4,6 +4,8 @@ import (
 	"encoding/binary"
 	"fmt"
 	"net"
+
+	"github.com/dimspell/gladiator/internal/app/logger"
 )
 
 type PacketType byte
@@ -97,8 +99,8 @@ func (b *Backend) handleCommands(session *Session) error {
 		}
 
 		pt := PacketType(packet[1])
-		if PacketLogger != nil {
-			PacketLogger.Debug("Recv",
+		if logger.PacketLogger != nil {
+			logger.PacketLogger.Debug("Recv",
 				"packetType", pt,
 				"bytes", packet,
 				"sessionId", session.ID,

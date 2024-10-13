@@ -1,4 +1,4 @@
-package app
+package logger
 
 import (
 	"fmt"
@@ -14,8 +14,12 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
-// LogLevels maps log level names to slog.Level values.
-var LogLevels = map[string]slog.Level{
+var (
+	PacketLogger = slog.New(slog.NewTextHandler(io.Discard, nil))
+)
+
+// logLevels maps log level names to slog.Level values.
+var logLevels = map[string]slog.Level{
 	"trace":   slog.LevelDebug,
 	"debug":   slog.LevelDebug,
 	"info":    slog.LevelInfo,
@@ -28,11 +32,11 @@ var LogLevels = map[string]slog.Level{
 // CleanupFunc is a function that can be deferred to clean up resources.
 type CleanupFunc func() error
 
-// initDefaultLogger initializes the default logger.
-func initDefaultLogger(app *cli.Command) (CleanupFunc, error) {
+// InitDefaultLogger initializes the default logger.
+func InitDefaultLogger(app *cli.Command) (CleanupFunc, error) {
 	deferred := io.NopCloser(nil).Close
 
-	logLevel, ok := LogLevels[strings.ToLower(app.String("log-level"))]
+	logLevel, ok := logLevels[strings.ToLower(app.String("log-level"))]
 	if !ok {
 		return deferred, fmt.Errorf("invalid log level: %s", app.String("log-level"))
 	}

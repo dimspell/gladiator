@@ -11,6 +11,7 @@ import (
 	"sync"
 
 	"github.com/coder/websocket"
+	"github.com/dimspell/gladiator/internal/app/logger"
 	"github.com/dimspell/gladiator/internal/model"
 	"github.com/dimspell/gladiator/internal/wire"
 	"github.com/google/uuid"
@@ -72,8 +73,8 @@ func (b *Backend) Send(conn net.Conn, packetType PacketType, payload []byte) err
 
 	data := encodePacket(packetType, payload)
 
-	if PacketLogger != nil {
-		PacketLogger.Debug("Sent",
+	if logger.PacketLogger != nil {
+		logger.PacketLogger.Debug("Sent",
 			"packetType", packetType,
 			"remoteAddr", conn.RemoteAddr().String(),
 			"bytes", data,
