@@ -45,6 +45,12 @@ type Offer struct {
 
 type Player struct {
 	ID                 string
+	Username           string
 	CharacterID        string
 	CharacterClassType int
+}
+
+type ChatMessage struct {
+	User string
+	Text string
 }

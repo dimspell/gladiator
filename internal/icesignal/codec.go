@@ -64,3 +64,10 @@ func DecodeTyped[T any](payload []byte) (et EventType, m MessageContent[T], err 
 	}
 	return EventType(payload[0]), m, nil
 }
+
+func ParseEventType(payload []byte) EventType {
+	if len(payload) == 0 {
+		return 0
+	}
+	return EventType(payload[0])
+}

@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"math"
 	"net"
+	"slices"
 	"sync"
 
 	"github.com/coder/websocket"
@@ -22,8 +23,12 @@ type Session struct {
 	CharacterID int64
 	ClassType   model.ClassType
 
-	Conn         net.Conn
-	onceObserver sync.Once
+	Conn net.Conn
+
+	observerConnected bool
+	onceObserver      sync.Once
+
+	LobbyUsers []icesignal.Player
 }
 
 func (b *Backend) AddSession(tcpConn net.Conn) *Session {
@@ -92,40 +97,124 @@ func encodePacket(packetType PacketType, payload []byte) []byte {
 	return packet
 }
 
-func (b *Backend) RegisterNewObserver(session *Session) error {
+func (b *Backend) RegisterNewObserver(session *Session) (err error) {
 	// TODO: make sure the websocket is not kept forever
 	// ctx, done := context.WithCancel(context.TODO())
 	// session.done = done
 
-	wsConn, err := b.ConnectToWebSocket(session)
+	// TODO: Not thread-safe, fix me.
+	if session.observerConnected == true {
+		return nil
+	}
+	observe, err := b.createObserver(session)
 	if err != nil {
 		return err
 	}
-	observer := func(session *Session) {
+	session.onceObserver.Do(func() {
+		session.observerConnected = true
+		// TODO: There should be context passed to stop observing, whether
+		//   backend session also goes offline.
+		go observe()
+	})
+	return nil
+}
+
+func (b *Backend) createObserver(session *Session) (func(), error) {
+	wsConn, err := b.ConnectToWebSocket(session)
+	if err != nil {
+		return nil, err
+	}
+	observer := func() {
 		for {
+			// Read the broadcast & handle them as commands.
 			_, p, err := wsConn.Read(context.TODO())
 			if err != nil {
 				slog.Error("Error reading from WebSocket", "session", session.ID, "error", err)
 				return
 			}
 			slog.Debug("Received packet", "session", session.ID, "packet", p)
+
+			et := icesignal.ParseEventType(p)
+			switch et {
+			case icesignal.Chat:
+				_, msg, err := icesignal.DecodeTyped[icesignal.ChatMessage](p)
+				if err != nil {
+					slog.Warn("Could not decode the message", "session", session.ID, "error", err, "event", et.String(), "payload", p)
+					continue
+				}
+				if _, err := session.Conn.Write(NewGlobalMessage(msg.Content.User, msg.Content.Text)); err != nil {
+					slog.Error("Error writing chat message over the backend wire", "session", session.ID, "error", err)
+					continue
+				}
+			case icesignal.LobbyUsers:
+				// TODO: Handle it. Note: It should be sent only once.
+				_, msg, err := icesignal.DecodeTyped[[]icesignal.Player](p)
+				if err != nil {
+					slog.Warn("Could not decode the message", "session", session.ID, "error", err, "event", et.String(), "payload", p)
+					continue
+				}
+				session.LobbyUsers = msg.Content
+
+				for i, player := range session.LobbyUsers {
+					// TODO: It can panic, whether int value > i32.
+					// TODO: It is not thread-safe.
+					if _, err := session.Conn.Write(
+						AppendCharacterToLobby(player.Username, model.ClassType(player.CharacterClassType), uint32(i)),
+					); err != nil {
+						slog.Warn("Error appending lobby users", "session", session.ID, "error", err)
+						continue
+					}
+				}
+			case icesignal.Join:
+				_, msg, err := icesignal.DecodeTyped[icesignal.Player](p)
+				if err != nil {
+					slog.Warn("Could not decode the message", "session", session.ID, "error", err, "event", et.String(), "payload", p)
+					continue
+				}
+				player := msg.Content
+
+				idx := uint32(len(session.LobbyUsers))
+				if _, err := session.Conn.Write(
+					AppendCharacterToLobby(player.Username, model.ClassType(player.CharacterClassType), idx),
+				); err != nil {
+					slog.Warn("Error appending lobby user", "session", session.ID, "error", err)
+					continue
+				}
+			case icesignal.Leave:
+				_, msg, err := icesignal.DecodeTyped[icesignal.Player](p)
+				if err != nil {
+					slog.Warn("Could not decode the message", "session", session.ID, "error", err, "event", et.String(), "payload", p)
+					continue
+				}
+
+				session.LobbyUsers = slices.DeleteFunc(session.LobbyUsers, func(player icesignal.Player) bool {
+					return msg.Content.ID == player.ID
+				})
+
+				if _, err := session.Conn.Write(
+					RemoveCharacterFromLobby(msg.Content.Username),
+				); err != nil {
+					slog.Warn("Error appending lobby user", "session", session.ID, "error", err)
+					continue
+				}
+			default:
+				// Skip and do not handle it.
+			}
 		}
 	}
-
-	session.onceObserver.Do(func() {
-		go observer(session)
-	})
-	return nil
+	return observer, nil
 }
 
 func (b *Backend) ConnectToWebSocket(session *Session) (*websocket.Conn, error) {
 	ws, err := icesignal.Connect(context.TODO(), b.SignalServerURL, icesignal.Player{
 		ID:                 fmt.Sprintf("%d", session.UserID),
+		Username:           session.Username,
 		CharacterID:        fmt.Sprintf("%d", session.CharacterID),
 		CharacterClassType: int(session.ClassType),
 	})
 	if err != nil {
 		return nil, err
 	}
+	// TODO: Name the websocket version.
 	return ws, nil
 }
