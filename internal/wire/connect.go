@@ -11,7 +11,10 @@ import (
 	"github.com/coder/websocket"
 )
 
-var ProtoVersion = "dev"
+const (
+	ProtoVersion   = "dev"
+	SupportedRealm = "lobby-" + ProtoVersion
+)
 
 func Connect(ctx context.Context, wsURL string, user User) (*websocket.Conn, error) {
 	// Parse the provided signaling server URL
