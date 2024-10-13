@@ -25,10 +25,9 @@ type Session struct {
 
 	Conn net.Conn
 
-	observerConnected bool
-	onceObserver      sync.Once
-
-	LobbyUsers []icesignal.Player
+	LobbyUsers   []icesignal.Player
+	observerMtx  sync.Mutex
+	observerDone context.CancelFunc
 }
 
 func (b *Backend) AddSession(tcpConn net.Conn) *Session {
@@ -51,6 +50,10 @@ func (b *Backend) CloseSession(session *Session) error {
 	slog.Info("Session closed", "session", session.ID)
 
 	b.Proxy.Close()
+
+	if session.observerDone != nil {
+		session.observerDone()
+	}
 
 	b.ConnectedSessions.Delete(session.ID)
 
@@ -98,36 +101,46 @@ func encodePacket(packetType PacketType, payload []byte) []byte {
 }
 
 func (b *Backend) RegisterNewObserver(session *Session) (err error) {
-	// TODO: make sure the websocket is not kept forever
-	// ctx, done := context.WithCancel(context.TODO())
-	// session.done = done
+	// Only one observer at the time per session.
+	session.observerMtx.Lock()
 
-	// TODO: Not thread-safe, fix me.
-	if session.observerConnected == true {
-		return nil
-	}
-	observe, err := b.createObserver(session)
+	ctx, observerDone := context.WithCancel(context.Background())
+
+	wsConn, err := b.ConnectToWebSocket(ctx, session)
 	if err != nil {
+		observerDone()
+		session.observerMtx.Unlock()
 		return err
 	}
-	session.onceObserver.Do(func() {
-		session.observerConnected = true
-		// TODO: There should be context passed to stop observing, whether
-		//   backend session also goes offline.
-		go observe()
-	})
+	observe, err := b.createObserver(wsConn, session)
+	if err != nil {
+		observerDone()
+		session.observerMtx.Unlock()
+		return err
+	}
+
+	session.observerDone = observerDone
+
+	go func() {
+		<-ctx.Done()
+		wsConn.CloseNow()
+		session.observerMtx.Unlock()
+		return
+	}()
+	go observe(ctx)
+
 	return nil
 }
 
-func (b *Backend) createObserver(session *Session) (func(), error) {
-	wsConn, err := b.ConnectToWebSocket(session)
-	if err != nil {
-		return nil, err
-	}
-	observer := func() {
+func (b *Backend) createObserver(wsConn *websocket.Conn, session *Session) (func(context.Context), error) {
+	observer := func(ctx context.Context) {
 		for {
+			if ctx.Err() != nil {
+				return
+			}
+
 			// Read the broadcast & handle them as commands.
-			_, p, err := wsConn.Read(context.TODO())
+			_, p, err := wsConn.Read(ctx)
 			if err != nil {
 				slog.Error("Error reading from WebSocket", "session", session.ID, "error", err)
 				return
@@ -205,8 +218,8 @@ func (b *Backend) createObserver(session *Session) (func(), error) {
 	return observer, nil
 }
 
-func (b *Backend) ConnectToWebSocket(session *Session) (*websocket.Conn, error) {
-	ws, err := icesignal.Connect(context.TODO(), b.SignalServerURL, icesignal.Player{
+func (b *Backend) ConnectToWebSocket(ctx context.Context, session *Session) (*websocket.Conn, error) {
+	ws, err := icesignal.Connect(ctx, b.SignalServerURL, icesignal.Player{
 		ID:                 fmt.Sprintf("%d", session.UserID),
 		Username:           session.Username,
 		CharacterID:        fmt.Sprintf("%d", session.CharacterID),
