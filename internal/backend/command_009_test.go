@@ -40,7 +40,7 @@ func TestBackend_HandleListGames(t *testing.T) {
 
 	t.Run("with one game", func(t *testing.T) {
 		b := &Backend{
-			Proxy: proxy.NewLAN(),
+			Proxy: proxy.NewLAN("127.0.100.1"),
 			gameClient: &mockGameClient{
 				ListGamesResponse: connect.NewResponse(&v1.ListGamesResponse{Games: []*v1.Game{
 					{
@@ -53,7 +53,7 @@ func TestBackend_HandleListGames(t *testing.T) {
 				}}),
 			}}
 		conn := &mockConn{}
-		session := &Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP", LocalIpAddress: "127.0.100.1"}
+		session := &Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
 
 		assert.NoError(t, b.HandleListGames(session, ListGamesRequest{}))
 		assert.Len(t, conn.Written, 21)
@@ -67,7 +67,7 @@ func TestBackend_HandleListGames(t *testing.T) {
 
 	t.Run("with games", func(t *testing.T) {
 		b := &Backend{
-			Proxy: proxy.NewLAN(),
+			Proxy: proxy.NewLAN("127.0.100.1"),
 			gameClient: &mockGameClient{
 				ListGamesResponse: connect.NewResponse(&v1.ListGamesResponse{Games: []*v1.Game{
 					{
@@ -87,7 +87,7 @@ func TestBackend_HandleListGames(t *testing.T) {
 				}}),
 			}}
 		conn := &mockConn{}
-		session := &Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP", LocalIpAddress: "127.0.100.1"}
+		session := &Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
 
 		assert.NoError(t, b.HandleListGames(session, ListGamesRequest{}))
 		assert.Len(t, conn.Written, 39)

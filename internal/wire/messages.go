@@ -43,11 +43,20 @@ type Offer struct {
 	Offer  webrtc.SessionDescription `json:"offer"`
 }
 
+type User struct {
+	UserID   string `json:"userID,omitempty"`
+	Username string `json:"username,omitempty"`
+	Version  string `json:"version,omitempty"`
+}
+
+type Character struct {
+	CharacterID string
+	ClassType   byte
+}
+
 type Player struct {
-	ID                 string
-	Username           string
-	CharacterID        string
-	CharacterClassType int
+	User
+	Character
 }
 
 type ChatMessage struct {

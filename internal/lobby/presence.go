@@ -98,6 +98,11 @@ func (mp *Multiplayer) HandleSession(ctx context.Context, session *UserSession) 
 		return err
 	}
 
+	// Expect the character info, then join and synchronise the state.
+	if err := mp.HandleJoin(ctx, session); err != nil {
+		return err
+	}
+
 	// Add user to the list of connected players.
 	mp.SetPlayerConnected(session)
 
@@ -181,6 +186,25 @@ func (mp *Multiplayer) HandleHello(ctx context.Context, session *UserSession) er
 	if err != nil {
 		return err
 	}
+	et, m, err := wire.DecodeTyped[wire.User](payload)
+	if err != nil {
+		return err
+	}
+	if et != wire.Hello {
+		return fmt.Errorf("inapprioprate event type")
+	}
+
+	session.User = m.Content
+
+	session.Send(ctx, []byte{byte(wire.Welcome)})
+	return nil
+}
+
+func (mp *Multiplayer) HandleJoin(ctx context.Context, session *UserSession) error {
+	payload, err := session.ReadNext(ctx)
+	if err != nil {
+		return err
+	}
 	et, m, err := wire.DecodeTyped[wire.Player](payload)
 	if err != nil {
 		return err
@@ -189,16 +213,16 @@ func (mp *Multiplayer) HandleHello(ctx context.Context, session *UserSession) er
 		return fmt.Errorf("inapprioprate event type")
 	}
 
-	session.Player = m.Content
+	session.Character = m.Content.Character
 
-	session.SendMessage(ctx, wire.Welcome, wire.Message{To: session.UserID})
+	session.Send(ctx, []byte{byte(wire.Joined)})
 	return nil
 }
 
 // SetPlayerConnected notifies the user has connected to the lobby.
 func (mp *Multiplayer) SetPlayerConnected(session *UserSession) {
-	mp.addSession(session.UserID, session)
 	players := mp.listSessions()
+	mp.addSession(session.UserID, session)
 
 	ctx, cancel := context.WithTimeout(context.TODO(), time.Second*3)
 	defer cancel()
@@ -209,9 +233,13 @@ func (mp *Multiplayer) SetPlayerConnected(session *UserSession) {
 		Content: players, // TODO: Map it to some readable form
 	})
 
+	// Notify all the users
 	mp.BroadcastMessage(ctx, wire.ComposeTyped(wire.Join, wire.MessageContent[wire.Player]{
-		Type:    wire.Join,
-		Content: session.Player,
+		Type: wire.Join,
+		Content: wire.Player{
+			User:      session.User,
+			Character: session.Character,
+		},
 	}))
 }
 
@@ -275,7 +303,10 @@ func (mp *Multiplayer) listSessions() []wire.Player {
 	list := make([]wire.Player, len(mp.sessions))
 	i := 0
 	for _, session := range mp.sessions {
-		list[i] = session.Player
+		list[i] = wire.Player{
+			User:      session.User,
+			Character: session.Character,
+		}
 		i++
 	}
 	return list

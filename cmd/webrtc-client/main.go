@@ -10,23 +10,14 @@ import (
 	"os"
 	"time"
 
-	"github.com/lmittmann/tint"
-	"github.com/mattn/go-colorable"
+	"github.com/dimspell/gladiator/internal/app/logger"
 	"github.com/pion/randutil"
 	"github.com/pion/webrtc/v4"
 	"golang.org/x/net/websocket"
 )
 
 func main() {
-	slog.SetDefault(slog.New(
-		tint.NewHandler(
-			colorable.NewColorable(os.Stderr),
-			&tint.Options{
-				Level:      slog.LevelDebug,
-				TimeFormat: time.TimeOnly,
-			},
-		),
-	))
+	logger.SetColoredLogger(os.Stderr, slog.LevelDebug, false)
 
 	// Prepare the configuration
 	config := webrtc.Configuration{

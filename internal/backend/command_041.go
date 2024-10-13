@@ -21,6 +21,7 @@ func (b *Backend) HandleClientAuthentication(session *Session, req ClientAuthent
 		return nil
 	}
 
+	// Authenticate with the password.
 	user, err := b.userClient.AuthenticateUser(context.TODO(), connect.NewRequest(&multiv1.AuthenticateUserRequest{
 		Username: data.Username,
 		Password: data.Password,
@@ -30,15 +31,17 @@ func (b *Backend) HandleClientAuthentication(session *Session, req ClientAuthent
 		return b.Send(session.Conn, ClientAuthentication, []byte{0, 0, 0, 0})
 	}
 
-	// Assign user into session
+	// Assign user into session.
+	session.Lock()
 	session.UserID = user.Msg.User.UserId
 	session.Username = user.Msg.User.Username
+	defer session.Unlock()
+
+	// Connect to the lobby server.
 	if err = b.RegisterNewObserver(session); err != nil {
 		slog.Debug("packet-41: could not register observer", "err", err)
 		return b.Send(session.Conn, ClientAuthentication, []byte{0, 0, 0, 0})
 	}
-
-	// session.Update(user.Msg.User.UserId, user.Msg.User.Username, observer)
 
 	return b.Send(session.Conn, ClientAuthentication, []byte{1, 0, 0, 0})
 }

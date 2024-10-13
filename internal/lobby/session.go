@@ -18,7 +18,8 @@ type UserSession struct {
 
 	wsConn ConnReadWriter
 
-	Player wire.Player
+	User      wire.User
+	Character wire.Character
 }
 
 func NewUserSession(id string, conn ConnReadWriter) *UserSession {
@@ -36,6 +37,7 @@ func (us *UserSession) ReadNext(ctx context.Context) ([]byte, error) {
 	}
 	_, payload, err := us.wsConn.Read(ctx)
 	if err != nil {
+		// TODO: Make the log more clear that the user has disconnected
 		slog.Warn("Could not read the message", "error", err, "closeError", websocket.CloseStatus(err))
 		return nil, err
 	}

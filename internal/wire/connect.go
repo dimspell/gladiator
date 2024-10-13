@@ -10,7 +10,7 @@ import (
 	"github.com/coder/websocket"
 )
 
-func Connect(ctx context.Context, wsURL string, player Player) (*websocket.Conn, error) {
+func Connect(ctx context.Context, wsURL string, user User) (*websocket.Conn, error) {
 	// Parse the provided signaling server URL
 	u, err := url.Parse(wsURL)
 	if err != nil {
@@ -19,13 +19,13 @@ func Connect(ctx context.Context, wsURL string, player Player) (*websocket.Conn,
 
 	// Set query parameters.
 	v := u.Query()
-	v.Set("userID", player.ID)
+	v.Set("userID", user.UserID)
 	v.Set("roomName", "DISPEL")
 	u.RawQuery = v.Encode()
 
 	// Encode the URL to the WebSocket with the query parameters.
 	wsURL = u.String()
-	slog.Debug("Connecting to the signaling server", "userID", player.ID, "url", wsURL)
+	slog.Debug("Connecting to the signaling server", "userID", user.UserID, "url", wsURL)
 
 	// Give 5 seconds to establish WebSocket connection.
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -42,7 +42,7 @@ func Connect(ctx context.Context, wsURL string, player Player) (*websocket.Conn,
 
 	// Send player information.
 	// TODO: that data could be set in the JWT header
-	if err := ws.Write(ctx, websocket.MessageText, Compose(Hello, Message{From: player.ID, Content: player})); err != nil {
+	if err := ws.Write(ctx, websocket.MessageText, ComposeTyped(Hello, MessageContent[User]{From: user.UserID, Content: user})); err != nil {
 		return nil, err
 	}
 
@@ -51,7 +51,7 @@ func Connect(ctx context.Context, wsURL string, player Player) (*websocket.Conn,
 	if err != nil {
 		return nil, err
 	}
-	if len(p) == 0 || EventType(p[0]) != Welcome {
+	if len(p) != 1 || EventType(p[0]) != Welcome {
 		return nil, fmt.Errorf("expected welcome message, got: %s", string(p))
 	}
 

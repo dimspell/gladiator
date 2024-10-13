@@ -6,17 +6,6 @@ package proxy
 // 	})
 // 	StartHost(t)
 
-// 	slog.SetDefault(slog.New(
-// 		tint.NewHandler(
-// 			os.Stderr,
-// 			&tint.Options{
-// 				Level:      slog.LevelDebug,
-// 				TimeFormat: time.TimeOnly,
-// 				AddSource:  true,
-// 			},
-// 		),
-// 	))
-
 // 	const roomName = "test"
 // 	const (
 // 		player1Name = "player1"
@@ -147,18 +136,6 @@ package proxy
 
 // func TestPeerToPeer(t *testing.T) {
 // 	defer goleak.VerifyNone(t)
-
-// 	// slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug, AddSource: true})))
-// 	slog.SetDefault(slog.New(
-// 		tint.NewHandler(
-// 			os.Stderr,
-// 			&tint.Options{
-// 				Level:      slog.LevelDebug,
-// 				TimeFormat: time.TimeOnly,
-// 				AddSource:  true,
-// 			},
-// 		),
-// 	))
 
 // 	t.Run("Hosting a game", func(t *testing.T) {
 // 		const roomName = "room"

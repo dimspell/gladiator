@@ -6,26 +6,15 @@ import (
 	"log"
 	"log/slog"
 	"os"
-	"time"
 
 	"github.com/dimspell/gladiator/cmd/webrtc-chat/internal"
+	"github.com/dimspell/gladiator/internal/app/logger"
 	"github.com/google/uuid"
-	"github.com/lmittmann/tint"
-	"github.com/mattn/go-colorable"
 	"github.com/pion/webrtc/v4"
 )
 
 func main() {
-	slog.SetDefault(slog.New(
-		tint.NewHandler(
-			colorable.NewColorable(os.Stderr),
-			&tint.Options{
-				Level:      slog.LevelDebug,
-				TimeFormat: time.TimeOnly,
-				AddSource:  true,
-			},
-		),
-	))
+	logger.SetColoredLogger(os.Stderr, slog.LevelDebug, false)
 
 	userID := uuid.New().String()[:6]
 	p, err := internal.Dial(&internal.DialParams{

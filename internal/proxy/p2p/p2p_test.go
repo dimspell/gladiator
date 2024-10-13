@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dimspell/gladiator/internal/app/logger"
 	"github.com/dimspell/gladiator/internal/proxy/proxytesthelper"
 	"github.com/dimspell/gladiator/internal/signalserver"
-	"github.com/lmittmann/tint"
 	"go.uber.org/goleak"
 )
 
@@ -23,16 +23,7 @@ const (
 )
 
 func TestWebRTCMock(t *testing.T) {
-	slog.SetDefault(slog.New(
-		tint.NewHandler(
-			os.Stderr,
-			&tint.Options{
-				Level:      slog.LevelDebug,
-				TimeFormat: time.TimeOnly,
-				AddSource:  true,
-			},
-		),
-	))
+	logger.SetDefaultJSONLogger(os.Stderr, slog.LevelDebug)
 
 	proxytesthelper.StartHost(t)
 	// signalServerURL := proxytesthelper.StartSignalServer(t)

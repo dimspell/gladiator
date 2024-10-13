@@ -9,6 +9,7 @@ import (
 	"net"
 	"slices"
 	"sync"
+	"time"
 
 	"github.com/coder/websocket"
 	"github.com/dimspell/gladiator/internal/app/logger"
@@ -18,19 +19,26 @@ import (
 )
 
 type Session struct {
-	ID          string
+	sync.RWMutex
+
+	// ID keeps the session identifier for the backend.
+	ID string
+
 	UserID      int64
 	Username    string
 	CharacterID int64
 	ClassType   model.ClassType
 
+	// Conn stores the TCP connection between the backend and the game client.
 	Conn net.Conn
 
-	LobbyUsers   []wire.Player
-	observerMtx  sync.Mutex
+	// lobbyUsers contains list of players who are connected to lobby server.
+	lobbyUsers []wire.Player
+
 	observerDone context.CancelFunc
-	observerOnce sync.Once
 	wsConn       *websocket.Conn
+
+	onceSelectedCharacter sync.Once
 }
 
 func (b *Backend) AddSession(tcpConn net.Conn) *Session {
@@ -105,20 +113,16 @@ func encodePacket(packetType PacketType, payload []byte) []byte {
 
 func (b *Backend) RegisterNewObserver(session *Session) (err error) {
 	// Only one observer at the time per session.
-	session.observerMtx.Lock()
-
 	ctx, observerDone := context.WithCancel(context.Background())
 
 	wsConn, err := b.ConnectToWebSocket(ctx, session)
 	if err != nil {
 		observerDone()
-		session.observerMtx.Unlock()
 		return err
 	}
 	observe, err := b.createObserver(wsConn, session)
 	if err != nil {
 		observerDone()
-		session.observerMtx.Unlock()
 		return err
 	}
 
@@ -128,7 +132,6 @@ func (b *Backend) RegisterNewObserver(session *Session) (err error) {
 	go func() {
 		<-ctx.Done()
 		wsConn.CloseNow()
-		session.observerMtx.Unlock()
 		return
 	}()
 	go observe(ctx)
@@ -170,13 +173,14 @@ func (b *Backend) createObserver(wsConn *websocket.Conn, session *Session) (func
 					slog.Warn("Could not decode the message", "session", session.ID, "error", err, "event", et.String(), "payload", p)
 					continue
 				}
-				session.LobbyUsers = msg.Content
 
-				for i, player := range session.LobbyUsers {
+				session.lobbyUsers = msg.Content
+
+				for i, player := range session.lobbyUsers {
 					// TODO: It can panic, whether int value > i32.
 					// TODO: It is not thread-safe.
 					if err := b.Send(session.Conn, ReceiveMessage,
-						AppendCharacterToLobby(player.Username, model.ClassType(player.CharacterClassType), uint32(i)),
+						AppendCharacterToLobby(player.Username, model.ClassType(player.ClassType), uint32(i)),
 					); err != nil {
 						slog.Warn("Error appending lobby users", "session", session.ID, "error", err)
 						continue
@@ -188,11 +192,16 @@ func (b *Backend) createObserver(wsConn *websocket.Conn, session *Session) (func
 					slog.Warn("Could not decode the message", "session", session.ID, "error", err, "event", et.String(), "payload", p)
 					continue
 				}
-				player := msg.Content
+				if msg.Content.UserID == session.ID {
+					continue
+				}
 
-				idx := uint32(len(session.LobbyUsers))
+				player := msg.Content
+				session.lobbyUsers = append(session.lobbyUsers, player)
+
+				idx := uint32(len(session.lobbyUsers))
 				if err := b.Send(session.Conn, ReceiveMessage,
-					AppendCharacterToLobby(player.Username, model.ClassType(player.CharacterClassType), idx),
+					AppendCharacterToLobby(player.Username, model.ClassType(player.ClassType), idx),
 				); err != nil {
 					slog.Warn("Error appending lobby user", "session", session.ID, "error", err)
 					continue
@@ -204,8 +213,8 @@ func (b *Backend) createObserver(wsConn *websocket.Conn, session *Session) (func
 					continue
 				}
 
-				session.LobbyUsers = slices.DeleteFunc(session.LobbyUsers, func(player wire.Player) bool {
-					return msg.Content.ID == player.ID
+				session.lobbyUsers = slices.DeleteFunc(session.lobbyUsers, func(player wire.Player) bool {
+					return msg.Content.UserID == player.UserID
 				})
 
 				if err := b.Send(session.Conn, ReceiveMessage,
@@ -223,15 +232,48 @@ func (b *Backend) createObserver(wsConn *websocket.Conn, session *Session) (func
 }
 
 func (b *Backend) ConnectToWebSocket(ctx context.Context, session *Session) (*websocket.Conn, error) {
-	ws, err := wire.Connect(ctx, b.SignalServerURL, wire.Player{
-		ID:                 fmt.Sprintf("%d", session.UserID),
-		Username:           session.Username,
-		CharacterID:        fmt.Sprintf("%d", session.CharacterID),
-		CharacterClassType: int(session.ClassType),
+	ws, err := wire.Connect(ctx, b.SignalServerURL, wire.User{
+		UserID:   fmt.Sprintf("%d", session.UserID),
+		Username: session.Username,
 	})
+	// CharacterID:        fmt.Sprintf("%d", session.CharacterID),
+	// CharacterClassType: int(session.ClassType),
+
 	if err != nil {
 		return nil, err
 	}
 	// TODO: Name the websocket version.
 	return ws, nil
+}
+
+func (b *Backend) UpdateCharacterInfo(session *Session) error {
+	ctx, cancel := context.WithTimeout(context.TODO(), time.Second*3)
+	defer cancel()
+
+	user := wire.User{
+		UserID:   fmt.Sprintf("%d", session.UserID),
+		Username: session.Username,
+	}
+	character := wire.Character{}
+
+	err := session.wsConn.Write(ctx, websocket.MessageText,
+		wire.ComposeTyped[wire.Player](wire.Join, wire.MessageContent[wire.Player]{
+			From:    user.UserID,
+			Type:    wire.Join,
+			Content: wire.Player{User: user, Character: character},
+		}))
+	if err != nil {
+		return err
+	}
+
+	// Expect to receive the joined message.
+	_, p, err := session.wsConn.Read(ctx)
+	if err != nil {
+		return err
+	}
+	if len(p) != 1 || wire.EventType(p[0]) != wire.Joined {
+		return fmt.Errorf("expected joined message, got: %s", string(p))
+	}
+
+	return nil
 }

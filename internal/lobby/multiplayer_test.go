@@ -10,23 +10,13 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
+	"github.com/dimspell/gladiator/internal/app/logger"
 	"github.com/dimspell/gladiator/internal/wire"
-	"github.com/lmittmann/tint"
 )
 
 func helperDebugPrettyPrint(tb testing.TB) {
 	tb.Helper()
-
-	slog.SetDefault(slog.New(
-		tint.NewHandler(
-			os.Stderr,
-			&tint.Options{
-				Level:      slog.LevelDebug,
-				TimeFormat: time.TimeOnly,
-				AddSource:  true,
-			},
-		),
-	))
+	logger.SetColoredLogger(os.Stderr, slog.LevelDebug, false)
 }
 
 // var _ ConnReadWriter = (*mockWebSocket)(nil)

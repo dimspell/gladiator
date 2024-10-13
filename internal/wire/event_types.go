@@ -8,6 +8,7 @@ const (
 	Welcome
 	LobbyUsers
 	Join
+	Joined
 	Leave
 	RTCOffer
 	RTCAnswer
@@ -25,6 +26,8 @@ func (e EventType) String() string {
 		return "LobbyUsers"
 	case Join:
 		return "Join"
+	case Joined:
+		return "Joined"
 	case Leave:
 		return "Leave"
 	case RTCOffer:

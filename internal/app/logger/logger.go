@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/lmittmann/tint"
-	colorable "github.com/mattn/go-colorable"
+	"github.com/mattn/go-colorable"
 	"github.com/mattn/go-isatty"
 	"github.com/urfave/cli/v3"
 )
@@ -56,25 +56,46 @@ func InitDefaultLogger(app *cli.Command) (CleanupFunc, error) {
 
 	switch strings.ToLower(app.String("log-format")) {
 	case "text":
-		slog.SetDefault(slog.New(
-			tint.NewHandler(
-				colorable.NewColorable(w),
-				&tint.Options{
-					Level:      logLevel,
-					TimeFormat: time.TimeOnly,
-					NoColor:    !isatty.IsTerminal(w.Fd()) || os.Getenv("NO_COLOR") != "" || app.Bool("no-color"),
-					AddSource:  true,
-				},
-			),
-		))
+		SetColoredLogger(w, logLevel, app.Bool("no-color"))
 	default:
-		slog.SetDefault(slog.New(
-			slog.NewJSONHandler(w, &slog.HandlerOptions{
-				AddSource: logLevel == slog.LevelDebug,
-				Level:     logLevel,
-			}),
-		))
+		SetDefaultJSONLogger(w, logLevel)
 	}
 
 	return deferred, nil
+}
+
+func SetColoredLogger(w *os.File, logLevel slog.Level, forceNoColor bool) {
+	slog.SetDefault(slog.New(
+		tint.NewHandler(
+			colorable.NewColorable(w),
+			&tint.Options{
+				Level:      logLevel,
+				TimeFormat: time.TimeOnly,
+				NoColor:    !isatty.IsTerminal(w.Fd()) || os.Getenv("NO_COLOR") != "" || forceNoColor,
+				AddSource:  true,
+			},
+		),
+	))
+}
+
+func SetPlainTextLogger(w io.Writer, logLevel slog.Level) {
+	slog.SetDefault(slog.New(
+		tint.NewHandler(
+			w,
+			&tint.Options{
+				Level:      logLevel,
+				TimeFormat: time.TimeOnly,
+				AddSource:  true,
+			},
+		),
+	))
+}
+
+func SetDefaultJSONLogger(w io.Writer, logLevel slog.Level) {
+	slog.SetDefault(slog.New(
+		slog.NewJSONHandler(w, &slog.HandlerOptions{
+			AddSource: logLevel == slog.LevelDebug,
+			Level:     logLevel,
+		}),
+	))
 }
