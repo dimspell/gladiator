@@ -4,11 +4,14 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"net/url"
 	"time"
 
 	"github.com/coder/websocket"
 )
+
+var ProtoVersion = "dev"
 
 func Connect(ctx context.Context, wsURL string, user User) (*websocket.Conn, error) {
 	// Parse the provided signaling server URL
@@ -31,10 +34,16 @@ func Connect(ctx context.Context, wsURL string, user User) (*websocket.Conn, err
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	// Connect to the signaling server and return it.
+	headers := http.Header{}
+	headers.Set("X-Version", ProtoVersion)
+
 	// TODO: Add HTTP Authorization header with bearer token
+	// headers.Set("Authorization", "Bearer {}")
+
+	// Connect to the signaling server and return it.
 	ws, _, err := websocket.Dial(ctx, u.String(), &websocket.DialOptions{
 		Subprotocols: []string{SupportedRealm},
+		HTTPHeader:   headers,
 	})
 	if err != nil {
 		return nil, err

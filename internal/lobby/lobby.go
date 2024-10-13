@@ -67,7 +67,11 @@ func (lb *Lobby) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: Check the proto version from the header
+	version := r.Header.Get("X-Version")
+	if version != wire.ProtoVersion {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
 
 	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{
 		Subprotocols: []string{wire.SupportedRealm},
