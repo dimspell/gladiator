@@ -3,10 +3,11 @@ package lobby
 import (
 	"context"
 	"fmt"
-	"github.com/coder/websocket"
 	"log/slog"
 	"sync"
 	"time"
+
+	"github.com/coder/websocket"
 
 	"github.com/dimspell/gladiator/internal/wire"
 )
