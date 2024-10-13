@@ -2,23 +2,21 @@ package action
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"log/slog"
-	"os"
-
-	"github.com/dimspell/gladiator/internal/app/logger/packetlogger"
 	"github.com/dimspell/gladiator/internal/backend"
 	"github.com/dimspell/gladiator/internal/console"
 	"github.com/dimspell/gladiator/internal/console/database"
 	"github.com/dimspell/gladiator/internal/proxy"
 	"github.com/urfave/cli/v3"
 	"golang.org/x/sync/errgroup"
+	"log/slog"
 )
 
 const (
 	defaultConsoleAddr = "127.0.0.1:2137"
 	defaultBackendAddr = "127.0.0.1:6112"
-	defaultLobbyAddr   = "127.0.0.1:5050"
+	defaultLobbyAddr   = "ws://127.0.0.1:5050"
 	defaultMyIPAddr    = "127.0.0.1"
 )
 
@@ -88,11 +86,15 @@ func ServeCommand() *cli.Command {
 			slog.Warn("Seed queries failed", "error", err)
 		}
 
-		backend.PacketLogger = slog.New(packetlogger.New(os.Stderr, &packetlogger.Options{
-			Level: slog.LevelDebug,
-		}))
+		//logger.PacketLogger = slog.New(packetlogger.New(os.Stderr, &packetlogger.Options{
+		//	Level: slog.LevelDebug,
+		//}))
 
 		bd := backend.NewBackend(backendAddr, consoleAddr, proxy.NewLAN(myIpAddr))
+
+		// TODO: Name the URL in the parameters
+		bd.SignalServerURL = defaultLobbyAddr
+
 		con := console.NewConsole(db, consoleAddr)
 
 		startConsole, stopConsole := con.Handlers()
@@ -111,7 +113,7 @@ func ServeCommand() *cli.Command {
 
 		if err := group.Wait(); err != nil {
 			bd.Shutdown()
-			_ = stopConsole(context.TODO())
+			return errors.Join(err, stopConsole(context.TODO()))
 		}
 		return nil
 	}

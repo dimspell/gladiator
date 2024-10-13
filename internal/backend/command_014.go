@@ -2,7 +2,12 @@ package backend
 
 import (
 	"bytes"
+	"context"
 	"fmt"
+	"github.com/coder/websocket"
+	"github.com/dimspell/gladiator/internal/wire"
+	"log/slog"
+	"time"
 )
 
 func (b *Backend) HandleSendLobbyMessage(session *Session, req SendLobbyMessageRequest) error {
@@ -13,8 +18,25 @@ func (b *Backend) HandleSendLobbyMessage(session *Session, req SendLobbyMessageR
 	if len(message) == 0 || len(message) > 87 {
 		return nil
 	}
-	resp := NewGlobalMessage(session.Username, message)
-	return b.Send(session.Conn, ReceiveMessage, resp)
+
+	ctx, cancel := context.WithTimeout(context.TODO(), 2*time.Second)
+	defer cancel()
+
+	if err := session.wsConn.Write(ctx, websocket.MessageText, wire.MustEncode(
+		wire.ComposeTyped(wire.Chat, wire.MessageContent[wire.ChatMessage]{
+			From: fmt.Sprintf("%d", session.UserID),
+			Type: wire.Chat,
+			Content: wire.ChatMessage{
+				User: session.Username,
+				Text: message,
+			},
+		}),
+	)); err != nil {
+		slog.Warn("Could not send WS message", "error", fmt.Errorf("packet-14: could not send chat message: %w", err))
+	}
+
+	//resp := NewGlobalMessage(session.Username, message)
+	return nil //b.Send(session.Conn, ReceiveMessage, resp)
 }
 
 type SendLobbyMessageRequest []byte

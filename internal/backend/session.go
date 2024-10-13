@@ -29,6 +29,8 @@ type Session struct {
 	LobbyUsers   []wire.Player
 	observerMtx  sync.Mutex
 	observerDone context.CancelFunc
+	observerOnce sync.Once
+	wsConn       *websocket.Conn
 }
 
 func (b *Backend) AddSession(tcpConn net.Conn) *Session {
@@ -120,6 +122,7 @@ func (b *Backend) RegisterNewObserver(session *Session) (err error) {
 		return err
 	}
 
+	session.wsConn = wsConn
 	session.observerDone = observerDone
 
 	go func() {
@@ -156,7 +159,7 @@ func (b *Backend) createObserver(wsConn *websocket.Conn, session *Session) (func
 					slog.Warn("Could not decode the message", "session", session.ID, "error", err, "event", et.String(), "payload", p)
 					continue
 				}
-				if _, err := session.Conn.Write(NewGlobalMessage(msg.Content.User, msg.Content.Text)); err != nil {
+				if err := b.Send(session.Conn, ReceiveMessage, NewGlobalMessage(msg.Content.User, msg.Content.Text)); err != nil {
 					slog.Error("Error writing chat message over the backend wire", "session", session.ID, "error", err)
 					continue
 				}
@@ -172,7 +175,7 @@ func (b *Backend) createObserver(wsConn *websocket.Conn, session *Session) (func
 				for i, player := range session.LobbyUsers {
 					// TODO: It can panic, whether int value > i32.
 					// TODO: It is not thread-safe.
-					if _, err := session.Conn.Write(
+					if err := b.Send(session.Conn, ReceiveMessage,
 						AppendCharacterToLobby(player.Username, model.ClassType(player.CharacterClassType), uint32(i)),
 					); err != nil {
 						slog.Warn("Error appending lobby users", "session", session.ID, "error", err)
@@ -188,7 +191,7 @@ func (b *Backend) createObserver(wsConn *websocket.Conn, session *Session) (func
 				player := msg.Content
 
 				idx := uint32(len(session.LobbyUsers))
-				if _, err := session.Conn.Write(
+				if err := b.Send(session.Conn, ReceiveMessage,
 					AppendCharacterToLobby(player.Username, model.ClassType(player.CharacterClassType), idx),
 				); err != nil {
 					slog.Warn("Error appending lobby user", "session", session.ID, "error", err)
@@ -205,7 +208,7 @@ func (b *Backend) createObserver(wsConn *websocket.Conn, session *Session) (func
 					return msg.Content.ID == player.ID
 				})
 
-				if _, err := session.Conn.Write(
+				if err := b.Send(session.Conn, ReceiveMessage,
 					RemoveCharacterFromLobby(msg.Content.Username),
 				); err != nil {
 					slog.Warn("Error appending lobby user", "session", session.ID, "error", err)

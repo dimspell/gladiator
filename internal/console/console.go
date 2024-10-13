@@ -89,7 +89,7 @@ func (c *Console) HttpRouter() http.Handler {
 
 	{ // Setup gRPC routes for the backend
 		api := chi.NewRouter()
-		api.Use(slogchi.New(slog.Default()))
+		//api.Use(slogchi.New(slog.Default()))
 		api.Use(cors.New(cors.Options{
 			AllowedOrigins:   c.CORSAllowedOrigins,
 			AllowCredentials: false,

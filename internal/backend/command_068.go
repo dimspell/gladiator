@@ -15,6 +15,15 @@ func (b *Backend) HandleGetCharacterInventory(session *Session, req GetCharacter
 	if session.UserID == 0 {
 		return fmt.Errorf("packet-68: user is not logged in")
 	}
+	var err error
+	session.observerOnce.Do(func() {
+		// TODO: It would be better to have it in the 41, but then change the character here.
+		err = b.RegisterNewObserver(session)
+	})
+	if err != nil {
+		slog.Debug("packet-68: could not register observer", "error", err)
+		return b.Send(session.Conn, GetCharacterInventory, []byte{0, 0, 0, 0})
+	}
 
 	data, err := req.Parse()
 	if err != nil {

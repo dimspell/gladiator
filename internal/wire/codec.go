@@ -33,14 +33,27 @@ func NewCBORCodec() *Codec {
 func Compose(msgType EventType, msg Message) []byte {
 	msg.Type = msgType
 
-	// TODO: Use msg.Encode()
-	payload := msg.Encode()
-	// if err != nil {
-	// 	slog.Error("Could not marshal the websocket message", "error", err)
-	// 	return nil
-	// }
+	payload := MustEncode(msg)
 	payload = append([]byte{byte(msgType)}, payload...)
 	return payload
+}
+
+func ComposeTyped[T any](msgType EventType, msg MessageContent[T]) []byte {
+	msg.Type = msgType
+
+	payload := MustEncode(msg)
+	payload = append([]byte{byte(msgType)}, payload...)
+	return payload
+}
+
+func MustEncode(m any) []byte {
+	out, err := DefaultCodec.Marshal(m)
+	if err != nil {
+		panic(err)
+		// slog.Error("Could not marshal the websocket message", "error", err)
+		// return err
+	}
+	return out
 }
 
 func Decode(payload []byte) (et EventType, m Message, err error) {

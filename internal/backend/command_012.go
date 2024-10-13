@@ -10,6 +10,11 @@ func (b *Backend) HandleSelectChannel(session *Session, req SelectChannelRequest
 		//b.Send(session.Conn, ReceiveMessage, NewGlobalMessage("admin", "hello"))
 	}
 
+	b.Send(session.Conn, SelectedChannel, SetChannelName("channel"))
+
+	//b.Send(session.Conn, ReceiveMessage, AppendCharacterToLobby(session.Username, model.ClassTypeKnight, 1))
+	//b.Send(session.Conn, ReceiveMessage, SetChannelName("channel"))
+
 	//b.Proxy.Close()
 
 	return nil

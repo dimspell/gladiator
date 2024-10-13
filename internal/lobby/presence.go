@@ -209,9 +209,9 @@ func (mp *Multiplayer) SetPlayerConnected(session *UserSession) {
 		Content: players, // TODO: Map it to some readable form
 	})
 
-	mp.BroadcastMessage(ctx, wire.Compose(wire.Join, wire.Message{
+	mp.BroadcastMessage(ctx, wire.ComposeTyped(wire.Join, wire.MessageContent[wire.Player]{
 		Type:    wire.Join,
-		Content: session.UserID,
+		Content: session.Player,
 	}))
 }
 

@@ -2,6 +2,7 @@ package action
 
 import (
 	"context"
+	"github.com/dimspell/gladiator/internal/app/logger"
 	"log/slog"
 	"os"
 
@@ -39,7 +40,7 @@ func BackendCommand() *cli.Command {
 		backendAddr := c.String("backend-addr")
 		myIpAddr := c.String("my-ip-addr")
 
-		backend.PacketLogger = slog.New(packetlogger.New(os.Stderr, &packetlogger.Options{
+		logger.PacketLogger = slog.New(packetlogger.New(os.Stderr, &packetlogger.Options{
 			Level: slog.LevelDebug,
 		}))
 
