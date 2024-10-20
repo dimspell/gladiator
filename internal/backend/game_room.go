@@ -91,27 +91,27 @@ func (g *GameRoom) ToWire() wire.LobbyRoom {
 	}
 }
 
-func (us *Session) SendCreateRoom(ctx context.Context, gameRoom *GameRoom) error {
-	if err := wire.Write(ctx, us.wsConn, wire.ComposeTyped(
-		wire.CreateRoom,
-		wire.MessageContent[wire.LobbyRoom]{
-			From:    us.GetUserID(),
-			Type:    wire.CreateRoom,
-			Content: gameRoom.ToWire(),
-		}),
-	); err != nil {
-		return err
-	}
-	return nil
-}
+// func (us *Session) SendCreateRoom(ctx context.Context, gameRoom *GameRoom) error {
+// 	if err := wire.Write(ctx, us.wsConn, wire.ComposeTyped(
+// 		wire.CreateRoom,
+// 		wire.MessageContent[wire.LobbyRoom]{
+// 			From:    us.GetUserID(),
+// 			Type:    wire.CreateRoom,
+// 			Content: gameRoom.ToWire(),
+// 		}),
+// 	); err != nil {
+// 		return err
+// 	}
+// 	return nil
+// }
 
-func (us *Session) SendSetRoomReady(ctx context.Context, gameRoom *GameRoom) error {
-	if err := wire.Write(ctx, us.wsConn, wire.ComposeTyped(
+func (s *Session) SendSetRoomReady(ctx context.Context, gameRoomId string) error {
+	if err := wire.Write(ctx, s.wsConn, wire.ComposeTyped(
 		wire.SetRoomReady,
 		wire.MessageContent[wire.LobbyRoom]{
-			From:    us.GetUserID(),
+			From:    s.GetUserID(),
 			Type:    wire.SetRoomReady,
-			Content: gameRoom.ToWire(),
+			Content: wire.LobbyRoom{Ready: true, Name: gameRoomId, ID: gameRoomId},
 		}),
 	); err != nil {
 		return err
@@ -119,25 +119,25 @@ func (us *Session) SendSetRoomReady(ctx context.Context, gameRoom *GameRoom) err
 	return nil
 }
 
-func (us *Session) SendJoinRoom(ctx context.Context, gameRoom *GameRoom) error {
-	if err := wire.Write(ctx, us.wsConn, wire.ComposeTyped(
-		wire.JoinRoom,
-		wire.MessageContent[wire.LobbyRoom]{
-			From:    us.GetUserID(),
-			Type:    wire.JoinRoom,
-			Content: gameRoom.ToWire(),
-		}),
-	); err != nil {
-		return err
-	}
-	return nil
-}
+// func (us *Session) SendJoinRoom(ctx context.Context, gameRoom *GameRoom) error {
+// 	if err := wire.Write(ctx, us.wsConn, wire.ComposeTyped(
+// 		wire.JoinRoom,
+// 		wire.MessageContent[wire.LobbyRoom]{
+// 			From:    us.GetUserID(),
+// 			Type:    wire.JoinRoom,
+// 			Content: gameRoom.ToWire(),
+// 		}),
+// 	); err != nil {
+// 		return err
+// 	}
+// 	return nil
+// }
 
-func (us *Session) SendLeaveRoom(ctx context.Context, gameRoom *GameRoom) error {
-	if err := wire.Write(ctx, us.wsConn, wire.ComposeTyped(
+func (s *Session) SendLeaveRoom(ctx context.Context, gameRoom *GameRoom) error {
+	if err := wire.Write(ctx, s.wsConn, wire.ComposeTyped(
 		wire.LeaveRoom,
 		wire.MessageContent[wire.LobbyRoom]{
-			From:    us.GetUserID(),
+			From:    s.GetUserID(),
 			Type:    wire.LeaveRoom,
 			Content: gameRoom.ToWire(),
 		}),

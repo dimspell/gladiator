@@ -43,27 +43,41 @@ type Session struct {
 	lobbyUsers []wire.Player
 
 	IpRing *p2p.IpRing
+
+	gameRoom *GameRoom
 }
 
-func (us *Session) GetUserID() string { return fmt.Sprintf("%d", us.UserID) }
+func (s *Session) GameRoom() *GameRoom {
+	s.RLock()
+	defer s.RUnlock()
+	return s.gameRoom
+}
 
-func (us *Session) ToPlayer() wire.Player {
+func (s *Session) SetGameRoom(gameRoom *GameRoom) {
+	s.Lock()
+	s.gameRoom = gameRoom
+	s.Unlock()
+}
+
+func (s *Session) GetUserID() string { return fmt.Sprintf("%d", s.UserID) }
+
+func (s *Session) ToPlayer() wire.Player {
 	return wire.Player{
-		UserID:      us.UserID,
-		Username:    us.Username,
-		CharacterID: us.CharacterID,
-		ClassType:   byte(us.ClassType),
+		UserID:      s.UserID,
+		Username:    s.Username,
+		CharacterID: s.CharacterID,
+		ClassType:   byte(s.ClassType),
 	}
 }
 
-func (us *Session) SendChatMessage(ctx context.Context, text string) error {
-	if err := wire.Write(ctx, us.wsConn, wire.ComposeTyped(
+func (s *Session) SendChatMessage(ctx context.Context, text string) error {
+	if err := wire.Write(ctx, s.wsConn, wire.ComposeTyped(
 		wire.Chat,
 		wire.MessageContent[wire.ChatMessage]{
-			From: us.GetUserID(),
+			From: s.GetUserID(),
 			Type: wire.Chat,
 			Content: wire.ChatMessage{
-				User: us.Username,
+				User: s.Username,
 				Text: text,
 			},
 		}),
