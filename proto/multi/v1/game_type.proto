@@ -3,7 +3,7 @@ syntax = "proto3";
 package multi.v1;
 
 message Game {
-  int64 game_id = 1;
+  string game_id = 1;
   string name = 2;
   string password = 3;
   string host_ip_address = 4;
@@ -15,7 +15,7 @@ message Game {
 message Player {
   int64 user_id = 1;
   string username = 2;
-  string character_name = 3;
-  int64 class_type = 4;
+  int64 character_id = 3;
+  int32 class_type = 4;
   string ip_address = 5;
 }

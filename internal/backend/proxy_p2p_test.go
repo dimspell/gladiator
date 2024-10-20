@@ -147,7 +147,7 @@ package backend
 // 		a := NewPeerToPeer(websocketURL)
 // 		defer a.Close()
 
-// 		if _, err := a.Create(CreateParams{
+// 		if _, err := a.CreateRoom(CreateParams{
 // 			HostUserIP: "",
 // 			HostUserID: "user1",
 // 			GameID:     roomName,

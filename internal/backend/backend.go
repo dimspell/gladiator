@@ -1,6 +1,7 @@
 package backend
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -139,6 +140,9 @@ func (b *Backend) Listen() {
 }
 
 func (b *Backend) handleClient(conn net.Conn) error {
+	// TODO: Use cancellation token
+	ctx := context.Background()
+
 	session, err := b.handshake(conn)
 	if err != nil {
 		if err := conn.Close(); err != nil {
@@ -159,7 +163,7 @@ func (b *Backend) handleClient(conn net.Conn) error {
 	}()
 
 	for {
-		if err := b.handleCommands(session); err != nil {
+		if err := b.handleCommands(ctx, session); err != nil {
 			slog.Warn("Command failed", "err", err)
 			return err
 		}

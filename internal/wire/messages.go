@@ -1,6 +1,8 @@
 package wire
 
 import (
+	"fmt"
+
 	"github.com/pion/webrtc/v4"
 )
 
@@ -40,24 +42,46 @@ type Offer struct {
 }
 
 type User struct {
-	UserID   string `json:"userID"`
+	UserID   int64  `json:"userID"`
 	Username string `json:"username"`
 	Version  string `json:"version"`
 }
 
+func (u *User) ID() string {
+	return fmt.Sprint(u.UserID)
+}
+
 type Character struct {
-	CharacterID string `json:"characterID"`
-	ClassType   byte   `json:"classType"`
+	CharacterID int64 `json:"characterID"`
+	ClassType   byte  `json:"classType"`
 }
 
 type Player struct {
-	UserID      string `json:"userID"`
+	UserID      int64  `json:"userID"`
 	Username    string `json:"username"`
-	CharacterID string `json:"characterID"`
+	CharacterID int64  `json:"characterID"`
 	ClassType   byte   `json:"classType"`
+
+	IPAddress string `json:"ipAddress"`
+}
+
+func (p *Player) ID() string {
+	return fmt.Sprint(p.UserID)
 }
 
 type ChatMessage struct {
 	User string
 	Text string
+}
+
+type LobbyRoom struct {
+	Ready    bool
+	ID       string
+	Name     string
+	Password string // TODO: Yup, game expects the password in plain-text
+	MapID    int64
+
+	HostPlayer Player
+	CreatedBy  Player
+	Players    []Player
 }

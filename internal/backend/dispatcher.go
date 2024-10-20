@@ -1,6 +1,7 @@
 package backend
 
 import (
+	"context"
 	"encoding/binary"
 	"fmt"
 	"net"
@@ -82,7 +83,7 @@ func (b *Backend) handshake(conn net.Conn) (*Session, error) {
 	return session, nil
 }
 
-func (b *Backend) handleCommands(session *Session) error {
+func (b *Backend) handleCommands(ctx context.Context, session *Session) error {
 	buf := make([]byte, 1024)
 	n, err := session.Conn.Read(buf)
 	if err != nil {
@@ -108,6 +109,7 @@ func (b *Backend) handleCommands(session *Session) error {
 			)
 		}
 
+		// TODO: Pass context further
 		switch pt {
 		case CreateNewAccount:
 			if err := b.HandleCreateNewAccount(session, packet[4:]); err != nil {

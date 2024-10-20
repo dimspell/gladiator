@@ -26,6 +26,7 @@ type Console struct {
 	RunMode            model.RunMode
 	DB                 *database.SQLite
 	CORSAllowedOrigins []string
+	Multiplayer        *Multiplayer
 }
 
 func NewConsole(db *database.SQLite, addr string) *Console {
@@ -33,6 +34,7 @@ func NewConsole(db *database.SQLite, addr string) *Console {
 		Addr:               addr,
 		DB:                 db,
 		CORSAllowedOrigins: []string{"*"},
+		Multiplayer:        NewMultiplayer(),
 	}
 }
 
@@ -115,10 +117,12 @@ func (c *Console) HttpRouter() http.Handler {
 		}).Handler)
 
 		api.Mount(multiv1connect.NewCharacterServiceHandler(&characterServiceServer{c.DB}))
-		api.Mount(multiv1connect.NewGameServiceHandler(&gameServiceServer{c.DB}))
+		api.Mount(multiv1connect.NewGameServiceHandler(&gameServiceServer{Multiplayer: c.Multiplayer}))
 		api.Mount(multiv1connect.NewUserServiceHandler(&userServiceServer{c.DB}))
 		api.Mount(multiv1connect.NewRankingServiceHandler(&rankingServiceServer{c.DB}))
 		mux.Mount("/grpc/", http.StripPrefix("/grpc", api))
+
+		api.Mount("/lobby", http.HandlerFunc(c.HandleWebSocket))
 	}
 
 	return mux
@@ -135,11 +139,16 @@ func (c *Console) Handlers() (start GracefulFunc, shutdown GracefulFunc) {
 
 	start = func(ctx context.Context) error {
 		slog.Info("Configured console server", "addr", c.Addr)
+
+		go c.Multiplayer.Run(ctx)
+
 		return httpServer.ListenAndServe()
 	}
 
 	shutdown = func(ctx context.Context) error {
 		slog.Info("Started shutting down the console server")
+
+		c.Multiplayer.Stop()
 
 		if err := httpServer.Shutdown(ctx); err != nil {
 			slog.Error("Failed shutting down the console server", "error", err)

@@ -2,43 +2,39 @@ package console
 
 import (
 	"context"
-	"database/sql"
-	"time"
+	"fmt"
+	"sync"
 
 	"connectrpc.com/connect"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/gen/multi/v1/multiv1connect"
-	"github.com/dimspell/gladiator/internal/console/database"
+	"github.com/dimspell/gladiator/internal/wire"
 )
 
 var _ multiv1connect.GameServiceHandler = (*gameServiceServer)(nil)
 
 type gameServiceServer struct {
-	DB *database.SQLite
+	Multiplayer *Multiplayer
+
+	sync.RWMutex
 }
 
 // ListGames returns a list of all open games.
-func (s *gameServiceServer) ListGames(ctx context.Context, req *connect.Request[multiv1.ListGamesRequest]) (*connect.Response[multiv1.ListGamesResponse], error) {
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
+func (s *gameServiceServer) ListGames(_ context.Context, req *connect.Request[multiv1.ListGamesRequest]) (*connect.Response[multiv1.ListGamesResponse], error) {
+	s.RLock()
+	defer s.RUnlock()
 
-	gameRooms, err := s.DB.Read.ListGameRooms(ctx)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
-	}
-
-	games := make([]*multiv1.Game, len(gameRooms))
-	for i, room := range gameRooms {
-		games[i] = &multiv1.Game{
+	games := make([]*multiv1.Game, 0, len(s.Multiplayer.Rooms))
+	for _, room := range s.Multiplayer.Rooms {
+		games = append(games, &multiv1.Game{
 			GameId:        room.ID,
 			Name:          room.Name,
-			Password:      room.Password.String,
-			HostIpAddress: room.HostIpAddress,
+			Password:      room.Password,
 			MapId:         room.MapID,
-			CreatedBy:     room.CreatedBy,
-			HostUserId:    room.HostUserID,
-		}
+			CreatedBy:     room.CreatedBy.UserID,
+			HostUserId:    room.HostPlayer.UserID,
+			HostIpAddress: room.HostPlayer.IPAddress,
+		})
 	}
 
 	resp := connect.NewResponse(&multiv1.ListGamesResponse{Games: games})
@@ -46,106 +42,123 @@ func (s *gameServiceServer) ListGames(ctx context.Context, req *connect.Request[
 }
 
 // GetGame returns a game by name.
-func (s *gameServiceServer) GetGame(ctx context.Context, req *connect.Request[multiv1.GetGameRequest]) (*connect.Response[multiv1.GetGameResponse], error) {
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
+func (s *gameServiceServer) GetGame(_ context.Context, req *connect.Request[multiv1.GetGameRequest]) (*connect.Response[multiv1.GetGameResponse], error) {
+	s.RLock()
+	defer s.RUnlock()
 
-	room, err := s.DB.Read.GetGameRoom(ctx, req.Msg.GameName)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+	var found bool
+	var room wire.LobbyRoom
+
+	requestedGameID := req.Msg.GetGameRoomId()
+	for id, lobbyRoom := range s.Multiplayer.Rooms {
+		if id == requestedGameID {
+			room = lobbyRoom
+			found = true
+			break
+		}
+	}
+	if !found {
+		return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("game %s not found", requestedGameID))
 	}
 
 	resp := connect.NewResponse(&multiv1.GetGameResponse{Game: &multiv1.Game{
 		GameId:        room.ID,
 		Name:          room.Name,
-		Password:      room.Password.String,
-		HostIpAddress: room.HostIpAddress,
+		Password:      room.Password,
 		MapId:         room.MapID,
-		CreatedBy:     room.CreatedBy,
-		HostUserId:    room.HostUserID,
+		CreatedBy:     room.CreatedBy.UserID,
+		HostUserId:    room.HostPlayer.UserID,
+		HostIpAddress: room.HostPlayer.IPAddress,
 	}})
 	return resp, nil
 }
 
 // CreateGame creates a new game.
-func (s *gameServiceServer) CreateGame(ctx context.Context, req *connect.Request[multiv1.CreateGameRequest]) (*connect.Response[multiv1.CreateGameResponse], error) {
-	input := req.Msg
+func (s *gameServiceServer) CreateGame(_ context.Context, req *connect.Request[multiv1.CreateGameRequest]) (*connect.Response[multiv1.CreateGameResponse], error) {
+	s.Lock()
+	defer s.Unlock()
 
-	game, err := s.DB.Write.CreateGameRoom(ctx, database.CreateGameRoomParams{
-		Name:          input.GameName,
-		Password:      sql.NullString{String: input.Password, Valid: len(input.Password) > 0},
-		HostIpAddress: input.HostIpAddress,
-		MapID:         input.MapId,
-		CreatedBy:     req.Msg.UserId,
-		HostUserID:    req.Msg.UserId,
-	})
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+	gameId := req.Msg.GetGameName()
+	room := wire.LobbyRoom{
+		Ready:    false,
+		ID:       gameId,
+		Name:     req.Msg.GetGameName(),
+		Password: req.Msg.GetPassword(),
+		MapID:    req.Msg.GetMapId(),
+
+		// TODO
+		// HostPlayer: req.Msg.UserId,
+		// CreatedBy:  wire.Player{},
+		// Players:    nil,
 	}
+
+	s.Multiplayer.Rooms[gameId] = room
 
 	resp := connect.NewResponse(&multiv1.CreateGameResponse{
 		Game: &multiv1.Game{
-			GameId:        game.ID,
-			Name:          game.Name,
-			Password:      game.Password.String,
-			HostIpAddress: game.HostIpAddress,
-			MapId:         game.MapID,
-			CreatedBy:     game.CreatedBy,
-			HostUserId:    game.HostUserID,
+			GameId:        room.ID,
+			Name:          room.Name,
+			Password:      room.Password,
+			MapId:         room.MapID,
+			CreatedBy:     room.CreatedBy.UserID,
+			HostUserId:    room.HostPlayer.UserID,
+			HostIpAddress: room.HostPlayer.IPAddress,
 		},
 	})
 	return resp, nil
 }
 
 // JoinGame tries to get the player to join a game.
-func (s *gameServiceServer) JoinGame(ctx context.Context, req *connect.Request[multiv1.JoinGameRequest]) (*connect.Response[multiv1.JoinGameResponse], error) {
-	if err := ctx.Err(); err != nil {
-		return nil, err
+func (s *gameServiceServer) JoinGame(_ context.Context, req *connect.Request[multiv1.JoinGameRequest]) (*connect.Response[multiv1.JoinGameResponse], error) {
+	s.Lock()
+	defer s.Unlock()
+
+	gameId := req.Msg.GetGameRoomId()
+	room, ok := s.Multiplayer.Rooms[gameId]
+	if !ok {
+		return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("game %s not found", gameId))
 	}
 
-	exist, _ := s.DB.Write.ExistPlayerInRoom(ctx, database.ExistPlayerInRoomParams{
-		GameRoomID:  req.Msg.GameRoomId,
-		CharacterID: req.Msg.CharacterId,
-	})
-	if exist == 1 {
-		return connect.NewResponse(&multiv1.JoinGameResponse{}), nil
+	for _, player := range room.Players {
+		if player.UserID == req.Msg.GetUserId() {
+			// return nil, connect.NewError(connect.CodeAlreadyExists, fmt.Errorf("player %s already exists", player.UserID))
+			return connect.NewResponse(&multiv1.JoinGameResponse{}), nil
+		}
 	}
 
-	err := s.DB.Write.AddPlayerToRoom(ctx, database.AddPlayerToRoomParams{
-		GameRoomID:  req.Msg.GameRoomId,
+	player := wire.Player{
 		UserID:      req.Msg.UserId,
+		Username:    req.Msg.CharacterName,
 		CharacterID: req.Msg.CharacterId,
-		IpAddress:   req.Msg.IpAddress,
-		AddedAt:     time.Now().Unix(),
-	})
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		ClassType:   byte(req.Msg.ClassType),
+		IPAddress:   req.Msg.IpAddress,
 	}
+	room.Players = append(room.Players, player)
+	s.Multiplayer.Rooms[gameId] = room
 
 	resp := connect.NewResponse(&multiv1.JoinGameResponse{})
 	return resp, nil
 }
 
 // ListPlayers returns a list of all players in a game.
-func (s *gameServiceServer) ListPlayers(ctx context.Context, req *connect.Request[multiv1.ListPlayersRequest]) (*connect.Response[multiv1.ListPlayersResponse], error) {
-	if err := ctx.Err(); err != nil {
-		return nil, err
+func (s *gameServiceServer) ListPlayers(_ context.Context, req *connect.Request[multiv1.ListPlayersRequest]) (*connect.Response[multiv1.ListPlayersResponse], error) {
+	s.RLock()
+	defer s.RUnlock()
+
+	gameId := req.Msg.GetGameRoomId()
+	room, ok := s.Multiplayer.Rooms[gameId]
+	if !ok {
+		return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("game %s not found", gameId))
 	}
 
-	roomPlayers, err := s.DB.Read.GetGameRoomPlayers(ctx, req.Msg.GameRoomId)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
-	}
-
-	players := make([]*multiv1.Player, len(roomPlayers))
-	for i, player := range roomPlayers {
+	players := make([]*multiv1.Player, len(room.Players))
+	for i, player := range room.Players {
 		players[i] = &multiv1.Player{
-			UserId:        player.UserID,
-			Username:      player.Username,
-			CharacterName: player.CharacterName,
-			ClassType:     player.ClassType,
-			IpAddress:     player.IpAddress,
+			UserId:      player.UserID,
+			Username:    player.Username,
+			CharacterId: player.CharacterID, // TODO: it is a name not the ID
+			ClassType:   int32(player.ClassType),
+			IpAddress:   player.IPAddress,
 		}
 	}
 

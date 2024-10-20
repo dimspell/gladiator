@@ -27,12 +27,9 @@ func (b *Backend) HandleCreateGame(session *Session, req CreateGameRequest) erro
 
 	switch data.State {
 	case uint32(model.GameStateNone):
-		b.Proxy.Close()
+		b.Proxy.Close(session)
 
-		hostIPAddress, err := b.Proxy.Create(CreateParams{
-			HostUserID: fmt.Sprintf("%d", session.UserID),
-			GameID:     data.RoomName,
-		})
+		hostIPAddress, err := b.Proxy.CreateRoom(CreateParams{GameID: data.RoomName}, session)
 		if err != nil {
 			return fmt.Errorf("packet-28: incorrect host address %w", err)
 		}
@@ -62,16 +59,15 @@ func (b *Backend) HandleCreateGame(session *Session, req CreateGameRequest) erro
 		break
 	case uint32(model.GameStateCreating):
 		respGame, err := b.gameClient.GetGame(context.TODO(), connect.NewRequest(&multiv1.GetGameRequest{
-			GameName: data.RoomName,
+			GameRoomId: data.RoomName,
 		}))
 		if err != nil {
 			return err
 		}
 
-		if err := b.Proxy.Host(HostParams{
-			GameID:     respGame.Msg.Game.Name,
-			HostUserID: session.Username,
-		}); err != nil {
+		if err := b.Proxy.HostRoom(HostParams{
+			GameID: respGame.Msg.Game.Name,
+		}, session); err != nil {
 			return err
 		}
 		binary.LittleEndian.PutUint32(response[0:4], uint32(model.GameStateStarted))

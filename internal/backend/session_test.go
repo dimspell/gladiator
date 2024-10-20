@@ -2,18 +2,19 @@ package backend
 
 import (
 	"context"
-	v1 "github.com/dimspell/gladiator/gen/multi/v1"
-	"github.com/dimspell/gladiator/internal/app/logger"
-	"github.com/dimspell/gladiator/internal/lobby"
-	"github.com/dimspell/gladiator/internal/model"
-	"github.com/stretchr/testify/assert"
-	"go.uber.org/goleak"
 	"log/slog"
 	"net"
 	"net/http/httptest"
 	"os"
 	"testing"
 	"time"
+
+	v1 "github.com/dimspell/gladiator/gen/multi/v1"
+	"github.com/dimspell/gladiator/internal/app/logger"
+	"github.com/dimspell/gladiator/internal/console"
+	"github.com/dimspell/gladiator/internal/model"
+	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
 )
 
 func TestBackend_RegisterNewObserver(t *testing.T) {
@@ -23,7 +24,7 @@ func TestBackend_RegisterNewObserver(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	lb := lobby.NewLobby(ctx)
+	lb := console.NewLobby(ctx)
 	ts := httptest.NewServer(lb.Handler())
 	defer ts.Close()
 
@@ -49,7 +50,7 @@ func TestBackend_UpdateCharacterInfo(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	lb := lobby.NewLobby(ctx)
+	lb := console.NewLobby(ctx)
 	ts := httptest.NewServer(lb.Handler())
 	defer ts.Close()
 
@@ -102,16 +103,16 @@ func TestBackend_UpdateCharacterInfo(t *testing.T) {
 	lb.Multiplayer.DebugState()
 }
 
-//type mockWS struct {
+// type mockWS struct {
 //	Written []byte
-//}
+// }
 //
-//func (m *mockWS) Write(ctx context.Context, messageType websocket.MessageType, p []byte) error {
+// func (m *mockWS) Write(ctx context.Context, messageType websocket.MessageType, p []byte) error {
 //	m.Written = append(m.Written, p...)
 //	return nil
-//}
+// }
 //
-//func TestSession_SendChatMessage(t *testing.T) {
+// func TestSession_SendChatMessage(t *testing.T) {
 //	ctx := context.Background()
 //	wsConn := &mockWS{}
 //	session := &Session{UserID: 1, Username: "hello"}
@@ -138,4 +139,4 @@ func TestBackend_UpdateCharacterInfo(t *testing.T) {
 //
 //	fmt.Println(wsConn.Written)
 //	fmt.Println(string(wsConn.Written))
-//}
+// }

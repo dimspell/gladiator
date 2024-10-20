@@ -26,7 +26,7 @@ func (b *Backend) HandleJoinGame(session *Session, req JoinGameRequest) error {
 	}
 
 	respGame, err := b.gameClient.GetGame(context.TODO(), connect.NewRequest(&multiv1.GetGameRequest{
-		GameName: data.RoomName,
+		GameRoomId: data.RoomName,
 	}))
 	if err != nil {
 		return err
@@ -65,13 +65,12 @@ func (b *Backend) HandleJoinGame(session *Session, req JoinGameRequest) error {
 		}
 
 		ps := GetPlayerAddrParams{
-			GameID:        respGame.Msg.GetGame().GetName(),
-			UserID:        fmt.Sprintf("%d", player.UserId),
-			IPAddress:     player.IpAddress,
-			CurrentUserID: fmt.Sprintf("%d", session.UserID),
-			HostUserID:    fmt.Sprintf("%d", respGame.Msg.GetGame().HostUserId),
+			GameID:     respGame.Msg.GetGame().GetName(),
+			UserID:     fmt.Sprintf("%d", player.UserId),
+			IPAddress:  player.IpAddress,
+			HostUserID: fmt.Sprintf("%d", respGame.Msg.GetGame().HostUserId),
 		}
-		proxyIP, err := b.Proxy.GetPlayerAddr(ps)
+		proxyIP, err := b.Proxy.GetPlayerAddr(ps, session)
 		if err != nil {
 			return err
 		}
@@ -94,11 +93,10 @@ func (b *Backend) HandleJoinGame(session *Session, req JoinGameRequest) error {
 	}
 
 	if err = b.Proxy.Join(JoinParams{
-		HostUserID:    fmt.Sprintf("%d", respGame.Msg.GetGame().HostUserId),
-		HostUserIP:    respGame.Msg.GetGame().HostIpAddress,
-		CurrentUserID: fmt.Sprintf("%d", session.UserID),
-		GameID:        respGame.Msg.GetGame().GetName(),
-	}); err != nil {
+		HostUserID: fmt.Sprintf("%d", respGame.Msg.GetGame().HostUserId),
+		HostUserIP: respGame.Msg.GetGame().HostIpAddress,
+		GameID:     respGame.Msg.GetGame().GetName(),
+	}, session); err != nil {
 		return err
 	}
 

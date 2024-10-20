@@ -25,7 +25,7 @@ func Connect(ctx context.Context, wsURL string, user User) (*websocket.Conn, err
 
 	// Set query parameters.
 	v := u.Query()
-	v.Set("userID", user.UserID)
+	v.Set("userID", user.ID())
 	v.Set("roomName", "DISPEL")
 	u.RawQuery = v.Encode()
 
@@ -54,7 +54,10 @@ func Connect(ctx context.Context, wsURL string, user User) (*websocket.Conn, err
 
 	// Send player information.
 	// TODO: that data could be set in the JWT header
-	if err := ws.Write(ctx, websocket.MessageText, ComposeTyped(Hello, MessageContent[User]{From: user.UserID, Content: user})); err != nil {
+	if err := ws.Write(ctx, websocket.MessageText, ComposeTyped(Hello, MessageContent[User]{
+		From:    user.ID(),
+		Content: user,
+	})); err != nil {
 		return nil, err
 	}
 
@@ -80,7 +83,7 @@ func Write(ctx context.Context, wsConn WebSocketWriter, payload []byte) error {
 	return wsConn.Write(ctx, websocket.MessageText, payload)
 }
 
-func EncodeAndWrite(ctx context.Context, wsConn WebSocketWriter, p []byte) error {
+func EncodeAndWrite(ctx context.Context, wsConn WebSocketWriter, p any) error {
 	encoded, err := Encode(p)
 	if err != nil {
 		return err

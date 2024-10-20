@@ -1,4 +1,4 @@
-package lobby
+package console
 
 import (
 	"context"

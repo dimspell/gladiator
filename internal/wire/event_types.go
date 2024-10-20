@@ -10,10 +10,14 @@ const (
 	Join
 	Joined
 	Leave
+	Chat
+	CreateRoom
+	SetRoomReady
+	JoinRoom
+	LeaveRoom
 	RTCOffer
 	RTCAnswer
 	RTCICECandidate
-	Chat
 )
 
 func (e EventType) String() string {
@@ -30,14 +34,22 @@ func (e EventType) String() string {
 		return "Joined"
 	case Leave:
 		return "Leave"
+	case Chat:
+		return "Chat"
+	case CreateRoom:
+		return "CreateRoom"
+	case SetRoomReady:
+		return "SetRoomReady"
+	case JoinRoom:
+		return "JoinRoom"
+	case LeaveRoom:
+		return "LeaveRoom"
 	case RTCOffer:
 		return "RTCOffer"
 	case RTCAnswer:
 		return "RTCAnswer"
 	case RTCICECandidate:
 		return "RTCICECandidate"
-	case Chat:
-		return "Chat"
 	default:
 		return "Unknown"
 	}

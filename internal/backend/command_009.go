@@ -30,7 +30,7 @@ func (b *Backend) HandleListGames(session *Session, req ListGamesRequest) error 
 		lobby := model.LobbyRoom{
 			Name:          room.Name,
 			Password:      room.Password,
-			HostIPAddress: b.Proxy.GetHostIP(room.HostIpAddress).To4(),
+			HostIPAddress: b.Proxy.GetHostIP(room.HostIpAddress, session).To4(),
 		}
 
 		// response = append(response, lobby.ToBytes()...)

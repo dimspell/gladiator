@@ -58,7 +58,7 @@ func TestBackend_HandleSelectGame(t *testing.T) {
 		assert.Equal(t, []byte{'a', 'r', 'c', 'h', 'e', 'r', 0}, conn.Written[16:]) // Player name
 	})
 
-	t.Run("Host only", func(t *testing.T) {
+	t.Run("HostRoom only", func(t *testing.T) {
 		b := &Backend{
 			Proxy: NewLAN("127.0.0.1"),
 			gameClient: &mockGameClient{

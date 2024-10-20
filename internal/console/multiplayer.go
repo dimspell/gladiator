@@ -1,4 +1,4 @@
-package lobby
+package console
 
 import (
 	"context"
@@ -21,22 +21,20 @@ type Multiplayer struct {
 
 	// Presence chan UserSession
 	Messages chan wire.Message
+
+	Rooms map[string]wire.LobbyRoom
 }
 
-func NewMultiplayer(ctx context.Context) *Multiplayer {
-	ctx, done := context.WithCancel(ctx)
-
+func NewMultiplayer() *Multiplayer {
 	mp := &Multiplayer{
 		sessions: make(map[string]*UserSession),
+		Rooms:    make(map[string]wire.LobbyRoom),
 		Messages: make(chan wire.Message),
-		done:     done,
 	}
-
-	go mp.Run(ctx)
 	return mp
 }
 
-func (mp *Multiplayer) Close() { mp.done() }
+func (mp *Multiplayer) Stop() { mp.done() }
 
 func (mp *Multiplayer) Reset() {
 	mp.forEachSession(func(userSession *UserSession) bool {
@@ -48,6 +46,9 @@ func (mp *Multiplayer) Reset() {
 }
 
 func (mp *Multiplayer) Run(ctx context.Context) {
+	ctx, done := context.WithCancel(ctx)
+	mp.done = done
+
 	for {
 		select {
 		case <-ctx.Done():

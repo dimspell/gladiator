@@ -24,10 +24,10 @@ func (b *Backend) HandleSelectGame(session *Session, req SelectGameRequest) erro
 		return nil
 	}
 
-	b.Proxy.Close()
+	b.Proxy.Close(session)
 
 	respGame, err := b.gameClient.GetGame(context.TODO(), connect.NewRequest(&multiv1.GetGameRequest{
-		GameName: data.RoomName,
+		GameRoomId: data.RoomName,
 	}))
 	if err != nil {
 		slog.Warn("No game found", "room", data.RoomName, "error", err)
@@ -61,13 +61,12 @@ func (b *Backend) HandleSelectGame(session *Session, req SelectGameRequest) erro
 		}
 
 		ps := GetPlayerAddrParams{
-			GameID:        respGame.Msg.GetGame().GetName(),
-			UserID:        fmt.Sprintf("%d", player.UserId),
-			IPAddress:     player.IpAddress,
-			CurrentUserID: fmt.Sprintf("%d", session.UserID),
-			HostUserID:    fmt.Sprintf("%d", respGame.Msg.GetGame().HostUserId),
+			GameID:     respGame.Msg.GetGame().GetName(),
+			UserID:     fmt.Sprintf("%d", player.UserId),
+			IPAddress:  player.IpAddress,
+			HostUserID: fmt.Sprintf("%d", respGame.Msg.GetGame().HostUserId),
 		}
-		proxyIP, err := b.Proxy.GetPlayerAddr(ps)
+		proxyIP, err := b.Proxy.GetPlayerAddr(ps, session)
 
 		if err != nil {
 			slog.Warn("Not found a player with the provided ID",

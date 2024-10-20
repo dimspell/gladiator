@@ -1,46 +1,47 @@
 package backend
 
 import (
+	"context"
 	"net"
+
+	"github.com/dimspell/gladiator/internal/wire"
 )
 
 type Proxy interface {
 	// GetHostIP is used when game attempts to list the IP address of the game
 	// room. This function can be used to override the IP address.
-	GetHostIP(hostIpAddress string) net.IP
+	GetHostIP(hostIpAddress string, session *Session) net.IP
 
-	Create(CreateParams) (net.IP, error)
-	Host(HostParams) error
+	CreateRoom(CreateParams, *Session) (net.IP, error)
+	HostRoom(HostParams, *Session) error
 
-	GetPlayerAddr(GetPlayerAddrParams) (net.IP, error)
+	GetPlayerAddr(GetPlayerAddrParams, *Session) (net.IP, error)
 
 	// Join is used to connect to TCP game host
-	Join(JoinParams) error
+	Join(JoinParams, *Session) error
 
-	Close()
+	Close(session *Session)
+
+	ExtendWire(ctx context.Context, session *Session, et wire.EventType, p []byte)
 }
 
 type CreateParams struct {
-	HostUserID string
-	GameID     string
+	GameID string
 }
 
 type HostParams struct {
-	GameID     string
-	HostUserID string
+	GameID string
 }
 
 type JoinParams struct {
-	HostUserID    string
-	GameID        string
-	HostUserIP    string
-	CurrentUserID string
+	HostUserID string
+	GameID     string
+	HostUserIP string
 }
 
 type GetPlayerAddrParams struct {
-	GameID        string
-	UserID        string
-	IPAddress     string
-	CurrentUserID string
-	HostUserID    string
+	GameID     string
+	UserID     string
+	IPAddress  string
+	HostUserID string
 }

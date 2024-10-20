@@ -2,12 +2,7 @@ package action
 
 import (
 	"context"
-	"log/slog"
-	"os"
 
-	"github.com/dimspell/gladiator/internal/app/logger"
-	"github.com/dimspell/gladiator/internal/app/logger/packetlogger"
-	"github.com/dimspell/gladiator/internal/backend"
 	"github.com/urfave/cli/v3"
 )
 
@@ -40,22 +35,22 @@ func BackendP2PCommand() *cli.Command {
 	}
 
 	cmd.Action = func(ctx context.Context, c *cli.Command) error {
-		consoleAddr := c.String("console-addr")
-		backendAddr := c.String("backend-addr")
-		signalingAddr := c.String("signaling-addr")
+		// consoleAddr := c.String("console-addr")
+		// backendAddr := c.String("backend-addr")
+		// signalingAddr := c.String("signaling-addr")
 		// turnPublicAddr := c.String("turn-public-addr")
 
-		logger.PacketLogger = slog.New(packetlogger.New(os.Stderr, &packetlogger.Options{
-			Level: slog.LevelDebug,
-		}))
+		// logger.PacketLogger = slog.New(packetlogger.New(os.Stderr, &packetlogger.Options{
+		// 	Level: slog.LevelDebug,
+		// }))
 
-		bd := backend.NewBackend(backendAddr, consoleAddr, backend.NewPeerToPeer(signalingAddr))
-
-		if err := bd.Start(); err != nil {
-			return err
-		}
-		defer bd.Shutdown()
-		bd.Listen()
+		// bd := backend.NewBackend(backendAddr, consoleAddr, backend.NewPeerToPeer(signalingAddr))
+		//
+		// if err := bd.Start(); err != nil {
+		// 	return err
+		// }
+		// defer bd.Shutdown()
+		// bd.Listen()
 		return nil
 	}
 	return cmd
