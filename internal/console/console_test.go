@@ -3,12 +3,13 @@ package console
 import (
 	"context"
 	"fmt"
-	"github.com/dimspell/gladiator/internal/console/database"
-	"github.com/dimspell/gladiator/internal/wire"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"github.com/dimspell/gladiator/internal/console/database"
+	"github.com/dimspell/gladiator/internal/wire"
 )
 
 func TestConsole_Handlers(t *testing.T) {

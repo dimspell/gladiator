@@ -53,9 +53,8 @@ func (c *Console) HttpRouter() http.Handler {
 
 	mux.Use(middleware.Recoverer)
 	mux.Use(middleware.Throttle(100))
-	//mux.Use(middleware.Timeout(5 * time.Second))
 
-	{ // Setup meta routes (readiness, liveness, metrics etc.)
+	{ // Set up meta routes (readiness, liveness, metrics etc.)
 		mux.Get("/_health", func(w http.ResponseWriter, r *http.Request) {
 			if err := c.DB.Ping(); err != nil {
 				w.WriteHeader(http.StatusServiceUnavailable)
@@ -73,7 +72,7 @@ func (c *Console) HttpRouter() http.Handler {
 		// mux.Get("/_metrics", promhttp.Handler().ServeHTTP)
 	}
 
-	{ // Setup routes used by the launcher
+	{ // Set up routes used by the launcher
 		wellKnown := chi.NewRouter()
 		wellKnown.Use(slogchi.New(slog.Default()))
 		wellKnown.Use(cors.New(cors.Options{
@@ -89,8 +88,9 @@ func (c *Console) HttpRouter() http.Handler {
 		mux.Mount("/.well-known/", wellKnown)
 	}
 
-	{ // Setup gRPC routes for the backend
+	{ // Set up gRPC routes for the backend
 		api := chi.NewRouter()
+		api.Use(middleware.Timeout(5 * time.Second))
 		// api.Use(slogchi.New(slog.Default()))
 		api.Use(cors.New(cors.Options{
 			AllowedOrigins:   c.CORSAllowedOrigins,
@@ -123,7 +123,7 @@ func (c *Console) HttpRouter() http.Handler {
 		mux.Mount("/grpc/", http.StripPrefix("/grpc", api))
 	}
 
-	{
+	{ // Set up the lobby (websocket) routes for the backend
 		lobby := chi.NewRouter()
 		lobby.Use(middleware.Timeout(24 * time.Hour))
 		lobby.Mount("/", http.HandlerFunc(c.HandleWebSocket))
