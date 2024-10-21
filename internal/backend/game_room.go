@@ -19,7 +19,9 @@ type GameRoom struct {
 }
 
 func NewGameRoom() *GameRoom {
-	return &GameRoom{}
+	return &GameRoom{
+		Players: make(map[string]wire.Player),
+	}
 }
 
 func (g *GameRoom) SetHost(player wire.Player) {
