@@ -41,7 +41,9 @@ message JoinGameRequest {
   int32 class_type = 7;
 }
 
-message JoinGameResponse {}
+message JoinGameResponse {
+  repeated Player players = 1;
+}
 
 service GameService {
   rpc GetGame(GetGameRequest) returns (GetGameResponse) {}

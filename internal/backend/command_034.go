@@ -39,7 +39,7 @@ func (b *Backend) HandleJoinGame(session *Session, req JoinGameRequest) error {
 		ipAddr = gameProxy.MyIPAddress
 	}
 
-	_, err = b.gameClient.JoinGame(context.TODO(), connect.NewRequest(&multiv1.JoinGameRequest{
+	respJoin, err := b.gameClient.JoinGame(context.TODO(), connect.NewRequest(&multiv1.JoinGameRequest{
 		UserId:      session.UserID,
 		CharacterId: session.CharacterID,
 		GameRoomId:  respGame.Msg.Game.GetGameId(),
@@ -50,16 +50,8 @@ func (b *Backend) HandleJoinGame(session *Session, req JoinGameRequest) error {
 		return nil
 	}
 
-	respPlayers, err := b.gameClient.ListPlayers(context.TODO(), connect.NewRequest(&multiv1.ListPlayersRequest{
-		GameRoomId: respGame.Msg.Game.GameId,
-	}))
-	if err != nil {
-		slog.Error("Cannot list players", "error", err)
-		return nil
-	}
-
 	response := []byte{model.GameStateStarted, 0}
-	for _, player := range respPlayers.Msg.GetPlayers() {
+	for _, player := range respJoin.Msg.GetPlayers() {
 		if player.UserId == session.UserID {
 			continue
 		}

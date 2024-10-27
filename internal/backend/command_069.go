@@ -34,14 +34,6 @@ func (b *Backend) HandleSelectGame(session *Session, req SelectGameRequest) erro
 		return nil
 	}
 
-	respPlayers, err := b.gameClient.ListPlayers(context.TODO(), connect.NewRequest(&multiv1.ListPlayersRequest{
-		GameRoomId: respGame.Msg.Game.GameId,
-	}))
-	if err != nil {
-		slog.Error("Cannot list players", "err", err.Error())
-		return nil
-	}
-
 	// gameRoom := SelectGameResponse{
 	// 	Lobby: model.LobbyRoom{
 	// 		HostIPAddress: hostIP.To4(),
@@ -55,7 +47,7 @@ func (b *Backend) HandleSelectGame(session *Session, req SelectGameRequest) erro
 	response := []byte{}
 	response = binary.LittleEndian.AppendUint32(response, uint32(respGame.Msg.Game.GetMapId()))
 
-	for _, player := range respPlayers.Msg.GetPlayers() {
+	for _, player := range respGame.Msg.GetPlayers() {
 		if player.UserId == session.UserID {
 			continue
 		}

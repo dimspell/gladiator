@@ -173,7 +173,7 @@ func TestGameServiceServer_JoinGame(t *testing.T) {
 		return
 	}
 
-	if _, err := g.JoinGame(context.Background(), connect.NewRequest(&multiv1.JoinGameRequest{
+	resp, err := g.JoinGame(context.Background(), connect.NewRequest(&multiv1.JoinGameRequest{
 		UserId:        5,
 		UserName:      "other",
 		CharacterId:   40,
@@ -181,26 +181,11 @@ func TestGameServiceServer_JoinGame(t *testing.T) {
 		GameRoomId:    gameId,
 		IpAddress:     "192.168.100.201",
 		ClassType:     int32(model.ClassTypeWarrior),
-	})); err != nil {
-		t.Error(err)
-		return
-	}
-
-	resp, err := g.GetGame(context.Background(), connect.NewRequest(&multiv1.GetGameRequest{
-		GameRoomId: gameId,
 	}))
 	if err != nil {
 		t.Error(err)
 		return
 	}
-
-	room := resp.Msg.GetGame()
-	assert.Equal(t, gameId, room.GameId)
-	assert.Equal(t, gameId, room.Name)
-	assert.Equal(t, "secret", room.Password)
-	assert.Equal(t, int64(3), room.MapId)
-	assert.Equal(t, int64(10), room.HostUserId)
-	assert.Equal(t, "192.168.100.1", room.HostIpAddress)
 
 	players := resp.Msg.GetPlayers()
 	assert.Equal(t, 2, len(players))

@@ -35,11 +35,16 @@ func (b *Backend) HandleCreateGame(session *Session, req CreateGameRequest) erro
 		}
 
 		respGame, err := b.gameClient.CreateGame(context.TODO(), connect.NewRequest(&multiv1.CreateGameRequest{
-			UserId:        session.UserID,
-			GameName:      data.RoomName,
-			Password:      data.Password,
-			HostIpAddress: hostIPAddress.String(),
-			MapId:         int64(data.MapID),
+			GameName: data.RoomName,
+			Password: data.Password,
+			MapId:    int64(data.MapID),
+			Host: &multiv1.Player{
+				UserId:      session.UserID,
+				Username:    session.Username,
+				CharacterId: session.CharacterID,
+				ClassType:   int32(session.ClassType),
+				IpAddress:   hostIPAddress.String(),
+			},
 		}))
 		if err != nil {
 			return err

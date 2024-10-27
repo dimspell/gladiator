@@ -153,6 +153,16 @@ func (s *gameServiceServer) JoinGame(_ context.Context, req *connect.Request[mul
 	room.Players = append(room.Players, player)
 	s.Multiplayer.Rooms[gameId] = room
 
-	resp := connect.NewResponse(&multiv1.JoinGameResponse{})
+	players := make([]*multiv1.Player, 0, len(room.Players))
+	for _, player := range room.Players {
+		players = append(players, &multiv1.Player{
+			UserId:      player.UserID,
+			Username:    player.Username,
+			CharacterId: player.CharacterID,
+			ClassType:   int32(player.ClassType),
+			IpAddress:   player.IPAddress,
+		})
+	}
+	resp := connect.NewResponse(&multiv1.JoinGameResponse{Players: players})
 	return resp, nil
 }
