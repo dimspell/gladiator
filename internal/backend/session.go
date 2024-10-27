@@ -164,6 +164,7 @@ func (b *Backend) ConnectToLobby(ctx context.Context, user *multiv1.User, sessio
 	ws, err := wire.Connect(ctx, b.SignalServerURL, wire.User{
 		UserID:   user.UserId,
 		Username: user.Username,
+		Version:  wire.ProtoVersion,
 	})
 	if err != nil {
 		return err

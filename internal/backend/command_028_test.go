@@ -38,7 +38,7 @@ func TestBackend_HandleCreateGame(t *testing.T) {
 		gameClient: &mockGameClient{
 			CreateGameResponse: connect.NewResponse(&v1.CreateGameResponse{
 				Game: &v1.Game{
-					GameId:        1,
+					GameId:        "gameId",
 					Name:          "room",
 					Password:      "",
 					HostIpAddress: "127.0.0.1",

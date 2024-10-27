@@ -16,20 +16,18 @@ func TestBackend_HandleSelectGame(t *testing.T) {
 			gameClient: &mockGameClient{
 				GetGameResponse: connect.NewResponse(&v1.GetGameResponse{
 					Game: &v1.Game{
-						GameId:        100,
+						GameId:        "gameId",
 						Name:          "retreat",
 						Password:      "",
 						HostIpAddress: "192.168.121.212",
 						MapId:         2,
 					},
-				}),
-				ListPlayersResponse: connect.NewResponse(&v1.ListPlayersResponse{
 					Players: []*v1.Player{
 						{
-							CharacterName: "archer",
-							ClassType:     int64(model.ClassTypeArcher),
-							IpAddress:     "192.168.121.212",
-							Username:      "archer",
+							// CharacterName: "archer",
+							ClassType: int32(model.ClassTypeArcher),
+							IpAddress: "192.168.121.212",
+							Username:  "archer",
 						},
 						// {
 						//	CharacterName: "mage",
@@ -64,20 +62,18 @@ func TestBackend_HandleSelectGame(t *testing.T) {
 			gameClient: &mockGameClient{
 				GetGameResponse: connect.NewResponse(&v1.GetGameResponse{
 					Game: &v1.Game{
-						GameId:        100,
+						GameId:        "gameId",
 						Name:          "gameRoom",
 						Password:      "",
 						HostIpAddress: "127.0.0.28",
 						MapId:         2,
 					},
-				}),
-				ListPlayersResponse: connect.NewResponse(&v1.ListPlayersResponse{
 					Players: []*v1.Player{
 						{
-							CharacterName: "hostMagician",
-							ClassType:     int64(model.ClassTypeMage),
-							IpAddress:     "127.0.0.28",
-							Username:      "playerA",
+							// CharacterName: "hostMagician",
+							ClassType: int32(model.ClassTypeMage),
+							IpAddress: "127.0.0.28",
+							Username:  "playerA",
 						},
 					},
 				}),

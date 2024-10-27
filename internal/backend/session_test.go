@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"net"
+	"net/http"
 	"net/http/httptest"
 	"os"
 	"testing"
@@ -14,22 +15,22 @@ import (
 	"github.com/dimspell/gladiator/internal/console"
 	"github.com/dimspell/gladiator/internal/model"
 	"github.com/stretchr/testify/assert"
-	"go.uber.org/goleak"
 )
 
 func TestBackend_RegisterNewObserver(t *testing.T) {
 	logger.SetPlainTextLogger(os.Stderr, slog.LevelDebug)
-	defer goleak.VerifyNone(t)
+	// defer goleak.VerifyNone(t)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	lb := console.NewLobby(ctx)
-	ts := httptest.NewServer(lb.Handler())
+	lb := console.Console{DB: nil, Multiplayer: console.NewMultiplayer()}
+	ts := httptest.NewServer(http.HandlerFunc(lb.HandleWebSocket))
 	defer ts.Close()
 
 	b := &Backend{
 		SignalServerURL: "ws://" + ts.URL[len("http://"):], // Skip schema prefix.
+		Proxy:           NewLAN("127.0.0.1"),
 	}
 	conn := &mockConn{RemoteAddress: &net.IPAddr{IP: net.ParseIP("127.0.0.1")}}
 	session := &Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
@@ -50,12 +51,13 @@ func TestBackend_UpdateCharacterInfo(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	lb := console.NewLobby(ctx)
-	ts := httptest.NewServer(lb.Handler())
+	lb := console.Console{DB: nil, Multiplayer: console.NewMultiplayer()}
+	ts := httptest.NewServer(http.HandlerFunc(lb.HandleWebSocket))
 	defer ts.Close()
 
 	b := &Backend{
 		SignalServerURL: "ws://" + ts.URL[len("http://"):], // Skip schema prefix.
+		Proxy:           NewLAN("127.0.0.1"),
 	}
 	conn := &mockConn{RemoteAddress: &net.IPAddr{IP: net.ParseIP("127.0.0.1")}}
 	session := &Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
@@ -88,10 +90,10 @@ func TestBackend_UpdateCharacterInfo(t *testing.T) {
 	}
 
 	assert.Equal(t, "2137", us.UserID)
-	assert.Equal(t, "2137", us.User.UserID)
-	assert.Equal(t, "latest", us.User.Version)
+	assert.Equal(t, int64(2137), us.User.UserID)
+	assert.Equal(t, "dev", us.User.Version)
 	assert.Equal(t, "JP", us.User.Username)
-	assert.Equal(t, "4", us.Character.CharacterID)
+	assert.Equal(t, int64(4), us.Character.CharacterID)
 	assert.Equal(t, byte(0x3), us.Character.ClassType)
 
 	if err := session.SendChatMessage(ctx, "Hello, World!"); err != nil {

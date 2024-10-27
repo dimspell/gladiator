@@ -42,7 +42,7 @@ func TestBackend_HandleListGames(t *testing.T) {
 			gameClient: &mockGameClient{
 				ListGamesResponse: connect.NewResponse(&v1.ListGamesResponse{Games: []*v1.Game{
 					{
-						GameId:        1,
+						GameId:        "gameId",
 						Name:          "retreat",
 						Password:      "",
 						HostIpAddress: "127.0.21.37",
@@ -69,14 +69,14 @@ func TestBackend_HandleListGames(t *testing.T) {
 			gameClient: &mockGameClient{
 				ListGamesResponse: connect.NewResponse(&v1.ListGamesResponse{Games: []*v1.Game{
 					{
-						GameId:        1,
+						GameId:        "gameId",
 						Name:          "RoomName",
 						Password:      "secret",
 						HostIpAddress: "127.0.21.37",
 						MapId:         2,
 					},
 					{
-						GameId:        1,
+						GameId:        "gameId",
 						Name:          "Other",
 						Password:      "",
 						HostIpAddress: "127.0.13.37",
