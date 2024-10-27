@@ -79,6 +79,13 @@ func (s *gameServiceServer) CreateGame(_ context.Context, req *connect.Request[m
 	defer s.Unlock()
 
 	gameId := req.Msg.GetGameName()
+	player := wire.Player{
+		UserID:      req.Msg.GetHost().UserId,
+		Username:    req.Msg.GetHost().Username,
+		CharacterID: req.Msg.GetHost().CharacterId,
+		ClassType:   byte(req.Msg.GetHost().ClassType),
+		IPAddress:   req.Msg.GetHost().IpAddress,
+	}
 	room := wire.LobbyRoom{
 		Ready:    false,
 		ID:       gameId,
@@ -87,9 +94,9 @@ func (s *gameServiceServer) CreateGame(_ context.Context, req *connect.Request[m
 		MapID:    req.Msg.GetMapId(),
 
 		// TODO
-		// HostPlayer: req.Msg.UserId,
-		// CreatedBy:  wire.Player{},
-		// Players:    nil,
+		HostPlayer: player,
+		CreatedBy:  player,
+		Players:    []wire.Player{player},
 	}
 
 	s.Multiplayer.Rooms[gameId] = room
