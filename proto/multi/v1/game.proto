@@ -7,9 +7,9 @@ import "multi/v1/game_type.proto";
 message CreateGameRequest {
   string game_name = 1;
   string password = 2;
-  int64 map_id = 4;
+  int64 map_id = 3;
 
-  Player host = 5;
+  Player host = 4;
 }
 
 message CreateGameResponse {
@@ -22,6 +22,7 @@ message GetGameRequest {
 
 message GetGameResponse {
   Game game = 1;
+  repeated Player players = 2;
 }
 
 message ListGamesRequest {}
@@ -42,21 +43,11 @@ message JoinGameRequest {
 
 message JoinGameResponse {}
 
-message ListPlayersRequest {
-  string game_room_id = 1;
-}
-
-message ListPlayersResponse {
-  repeated Player players = 1;
-}
-
 service GameService {
   rpc GetGame(GetGameRequest) returns (GetGameResponse) {}
   rpc ListGames(ListGamesRequest) returns (ListGamesResponse) {}
 
   rpc CreateGame(CreateGameRequest) returns (CreateGameResponse) {}
   rpc JoinGame(JoinGameRequest) returns (JoinGameResponse) {}
-
-  rpc ListPlayers(ListPlayersRequest) returns (ListPlayersResponse) {}
 }
 

@@ -31,7 +31,6 @@ func (s *gameServiceServer) ListGames(_ context.Context, req *connect.Request[mu
 			Name:          room.Name,
 			Password:      room.Password,
 			MapId:         room.MapID,
-			CreatedBy:     room.CreatedBy.UserID,
 			HostUserId:    room.HostPlayer.UserID,
 			HostIpAddress: room.HostPlayer.IPAddress,
 		})
@@ -61,15 +60,27 @@ func (s *gameServiceServer) GetGame(_ context.Context, req *connect.Request[mult
 		return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("game %s not found", requestedGameID))
 	}
 
-	resp := connect.NewResponse(&multiv1.GetGameResponse{Game: &multiv1.Game{
-		GameId:        room.ID,
-		Name:          room.Name,
-		Password:      room.Password,
-		MapId:         room.MapID,
-		CreatedBy:     room.CreatedBy.UserID,
-		HostUserId:    room.HostPlayer.UserID,
-		HostIpAddress: room.HostPlayer.IPAddress,
-	}})
+	players := make([]*multiv1.Player, 0, len(room.Players))
+	for _, player := range room.Players {
+		players = append(players, &multiv1.Player{
+			UserId:      player.UserID,
+			Username:    player.Username,
+			CharacterId: player.CharacterID,
+			ClassType:   int32(player.ClassType),
+			IpAddress:   player.IPAddress,
+		})
+	}
+	resp := connect.NewResponse(&multiv1.GetGameResponse{
+		Game: &multiv1.Game{
+			GameId:        room.ID,
+			Name:          room.Name,
+			Password:      room.Password,
+			MapId:         room.MapID,
+			HostUserId:    room.HostPlayer.UserID,
+			HostIpAddress: room.HostPlayer.IPAddress,
+		},
+		Players: players,
+	})
 	return resp, nil
 }
 
@@ -107,7 +118,6 @@ func (s *gameServiceServer) CreateGame(_ context.Context, req *connect.Request[m
 			Name:          room.Name,
 			Password:      room.Password,
 			MapId:         room.MapID,
-			CreatedBy:     room.CreatedBy.UserID,
 			HostUserId:    room.HostPlayer.UserID,
 			HostIpAddress: room.HostPlayer.IPAddress,
 		},
@@ -144,31 +154,5 @@ func (s *gameServiceServer) JoinGame(_ context.Context, req *connect.Request[mul
 	s.Multiplayer.Rooms[gameId] = room
 
 	resp := connect.NewResponse(&multiv1.JoinGameResponse{})
-	return resp, nil
-}
-
-// ListPlayers returns a list of all players in a game.
-func (s *gameServiceServer) ListPlayers(_ context.Context, req *connect.Request[multiv1.ListPlayersRequest]) (*connect.Response[multiv1.ListPlayersResponse], error) {
-	s.RLock()
-	defer s.RUnlock()
-
-	gameId := req.Msg.GetGameRoomId()
-	room, ok := s.Multiplayer.Rooms[gameId]
-	if !ok {
-		return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("game %s not found", gameId))
-	}
-
-	players := make([]*multiv1.Player, len(room.Players))
-	for i, player := range room.Players {
-		players[i] = &multiv1.Player{
-			UserId:      player.UserID,
-			Username:    player.Username,
-			CharacterId: player.CharacterID, // TODO: it is a name not the ID
-			ClassType:   int32(player.ClassType),
-			IpAddress:   player.IPAddress,
-		}
-	}
-
-	resp := connect.NewResponse(&multiv1.ListPlayersResponse{Players: players})
 	return resp, nil
 }

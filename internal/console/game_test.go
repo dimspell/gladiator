@@ -10,10 +10,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestGameServiceServer_(t *testing.T) {
-	//
-}
-
 func TestGameServiceServer_CreateGame(t *testing.T) {
 	g := &gameServiceServer{
 		Multiplayer: NewMultiplayer(),
@@ -70,7 +66,6 @@ func TestGameServiceServer_ListGames(t *testing.T) {
 	}
 
 	gameId := "Game Room"
-
 	_, err := g.CreateGame(context.Background(), connect.NewRequest(&multiv1.CreateGameRequest{
 		GameName: gameId,
 		Password: "secret",
@@ -106,8 +101,113 @@ func TestGameServiceServer_ListGames(t *testing.T) {
 	assert.Equal(t, gameId, room.Name)
 	assert.Equal(t, "secret", room.Password)
 	assert.Equal(t, int64(3), room.MapId)
+	assert.Equal(t, "192.168.100.1", room.HostIpAddress)
 
 	assert.Equal(t, int64(10), room.HostUserId)
-	assert.Equal(t, int64(10), room.CreatedBy)
-	// assert.Equal(t, int64(10), room.Players[0].UserID)
+}
+
+func TestGameServiceServer_GetGame(t *testing.T) {
+	g := &gameServiceServer{
+		Multiplayer: NewMultiplayer(),
+	}
+
+	gameId := "Game Room"
+	_, err := g.CreateGame(context.Background(), connect.NewRequest(&multiv1.CreateGameRequest{
+		GameName: gameId,
+		Password: "secret",
+		MapId:    3,
+
+		Host: &multiv1.Player{
+			UserId:      10,
+			Username:    "user",
+			CharacterId: 12,
+			ClassType:   int32(model.ClassTypeMage),
+			IpAddress:   "192.168.100.1",
+		},
+	}))
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	resp, err := g.GetGame(context.Background(), connect.NewRequest(&multiv1.GetGameRequest{
+		GameRoomId: gameId,
+	}))
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	room := resp.Msg.GetGame()
+	assert.Equal(t, gameId, room.GameId)
+	assert.Equal(t, gameId, room.Name)
+	assert.Equal(t, "secret", room.Password)
+	assert.Equal(t, int64(3), room.MapId)
+	assert.Equal(t, int64(10), room.HostUserId)
+	assert.Equal(t, "192.168.100.1", room.HostIpAddress)
+
+	players := resp.Msg.GetPlayers()
+	assert.Equal(t, 1, len(players))
+	assert.Equal(t, int64(10), players[0].UserId)
+}
+
+func TestGameServiceServer_JoinGame(t *testing.T) {
+	g := &gameServiceServer{
+		Multiplayer: NewMultiplayer(),
+	}
+
+	gameId := "Game Room"
+	if _, err := g.CreateGame(context.Background(), connect.NewRequest(&multiv1.CreateGameRequest{
+		GameName: gameId,
+		Password: "secret",
+		MapId:    3,
+
+		Host: &multiv1.Player{
+			UserId:      10,
+			Username:    "user",
+			CharacterId: 12,
+			ClassType:   int32(model.ClassTypeMage),
+			IpAddress:   "192.168.100.1",
+		},
+	})); err != nil {
+		t.Error(err)
+		return
+	}
+
+	if _, err := g.JoinGame(context.Background(), connect.NewRequest(&multiv1.JoinGameRequest{
+		UserId:        5,
+		UserName:      "other",
+		CharacterId:   40,
+		CharacterName: "warrior",
+		GameRoomId:    gameId,
+		IpAddress:     "192.168.100.201",
+		ClassType:     int32(model.ClassTypeWarrior),
+	})); err != nil {
+		t.Error(err)
+		return
+	}
+
+	resp, err := g.GetGame(context.Background(), connect.NewRequest(&multiv1.GetGameRequest{
+		GameRoomId: gameId,
+	}))
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	room := resp.Msg.GetGame()
+	assert.Equal(t, gameId, room.GameId)
+	assert.Equal(t, gameId, room.Name)
+	assert.Equal(t, "secret", room.Password)
+	assert.Equal(t, int64(3), room.MapId)
+	assert.Equal(t, int64(10), room.HostUserId)
+	assert.Equal(t, "192.168.100.1", room.HostIpAddress)
+
+	players := resp.Msg.GetPlayers()
+	assert.Equal(t, 2, len(players))
+
+	assert.Equal(t, int64(10), players[0].UserId)
+	assert.Equal(t, "192.168.100.1", players[0].IpAddress)
+
+	assert.Equal(t, int64(5), players[1].UserId)
+	assert.Equal(t, "192.168.100.201", players[1].IpAddress)
 }
