@@ -176,7 +176,7 @@ func TestE2E_LAN(t *testing.T) {
 
 	// Ensure the response is correct
 	assert.Equal(t, []byte{
-		model.GameStateStarted, 0, // Map ID
+		model.GameStateStarted, 0, // Game state
 		byte(v1.ClassType_Archer), 0, 0, 0, // Host's character class type
 		198, 51, 100, 1, // IP address of host
 		'a', 'r', 'c', 'h', 'e', 'r', 0, // Player name
