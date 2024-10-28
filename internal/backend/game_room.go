@@ -2,6 +2,7 @@ package backend
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/dimspell/gladiator/internal/wire"
@@ -108,15 +109,16 @@ func (g *GameRoom) ToWire() wire.LobbyRoom {
 // }
 
 func (s *Session) SendSetRoomReady(ctx context.Context, gameRoomId string) error {
-	if err := wire.Write(ctx, s.wsConn, wire.ComposeTyped(
+	err := wire.Write(ctx, s.wsConn, wire.ComposeTyped(
 		wire.SetRoomReady,
-		wire.MessageContent[wire.LobbyRoom]{
+		wire.MessageContent[string]{
 			From:    s.GetUserID(),
 			Type:    wire.SetRoomReady,
-			Content: wire.LobbyRoom{Ready: true, Name: gameRoomId, ID: gameRoomId},
+			Content: gameRoomId,
 		}),
-	); err != nil {
-		return err
+	)
+	if err != nil {
+		return fmt.Errorf("failed to send SetRoomReady: %w", err)
 	}
 	return nil
 }

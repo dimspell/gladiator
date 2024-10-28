@@ -321,9 +321,9 @@ func (b *Backend) RegisterNewObserver(ctx context.Context, session *Session) err
 				slog.Error("Error reading from WebSocket", "session", session.ID, "error", err)
 				return
 			}
-			slog.Debug("Received packet", "session", session.ID, "packet", p)
 
 			et := wire.ParseEventType(p)
+			// slog.Debug("Signal from lobby", "type", et.String(), "session", session.ID, "payload", string(p[1:]))
 
 			handleWireEvent(et, p)
 

@@ -15,20 +15,21 @@ import (
 type Multiplayer struct {
 	done context.CancelFunc
 
-	// Sessions
+	// Presence in lobby
 	sessionMutex sync.RWMutex
 	sessions     map[string]*UserSession
 
-	// Presence chan UserSession
 	Messages chan wire.Message
 
-	Rooms map[string]wire.LobbyRoom
+	// Game rooms
+	roomsMutex sync.RWMutex
+	Rooms      map[string]*wire.LobbyRoom
 }
 
 func NewMultiplayer() *Multiplayer {
 	mp := &Multiplayer{
 		sessions: make(map[string]*UserSession),
-		Rooms:    make(map[string]wire.LobbyRoom),
+		Rooms:    make(map[string]*wire.LobbyRoom),
 		Messages: make(chan wire.Message),
 	}
 	return mp
@@ -43,6 +44,7 @@ func (mp *Multiplayer) Reset() {
 	})
 	clear(mp.sessions)
 	close(mp.Messages)
+	clear(mp.Rooms)
 }
 
 func (mp *Multiplayer) Run(ctx context.Context) {
@@ -131,7 +133,7 @@ const (
 // HandleIncomingMessage handles the incoming message pump by dispatching
 // commands based on the message type.
 func (mp *Multiplayer) HandleIncomingMessage(ctx context.Context, msg wire.Message) {
-	slog.Debug("Received a signal message", "type", msg.Type.String(), "from", msg.From, "to", msg.To)
+	// slog.Debug("Received a signal message", "type", msg.Type.String(), "from", msg.From, "to", msg.To)
 
 	switch msg.Type {
 	case wire.Chat:
@@ -141,8 +143,11 @@ func (mp *Multiplayer) HandleIncomingMessage(ctx context.Context, msg wire.Messa
 		}))
 	case wire.RTCOffer, wire.RTCAnswer, wire.RTCICECandidate:
 		mp.ForwardRTCMessage(ctx, msg)
+	case wire.SetRoomReady:
+		mp.SetRoomReady(ctx, msg)
 	default:
-		// Do nothing
+		// Do nothing but log the event type
+		slog.Error("Unhandled event type", "type", msg.Type.String())
 	}
 }
 
@@ -219,22 +224,25 @@ func (mp *Multiplayer) DestroyRoom() {
 
 // JoinRoom adds a player to an existing lobby room.
 func (mp *Multiplayer) JoinRoom() {
-
-}
-
-// ListRooms lists & query all lobbies.
-func (mp *Multiplayer) ListRooms() {
-
-}
-
-// GetRoom returns information about the LobbyRoom.
-func (mp *Multiplayer) GetRoom() {
-
+	fmt.Println("Joining room")
 }
 
 // SetRoomReady notifies the LobbyRoom that it can start accepting players.
-func (mp *Multiplayer) SetRoomReady() {
+func (mp *Multiplayer) SetRoomReady(ctx context.Context, msg wire.Message) {
+	mp.roomsMutex.Lock()
+	defer mp.roomsMutex.Unlock()
 
+	roomId, ok := msg.Content.(string)
+	if !ok {
+		return
+	}
+
+	lobbyRoom, ok := mp.Rooms[roomId]
+	if !ok {
+		return
+	}
+
+	lobbyRoom.Ready = true
 }
 
 func (mp *Multiplayer) HandleHello(ctx context.Context, session *UserSession) error {
@@ -313,7 +321,7 @@ func (mp *Multiplayer) SetPlayerDisconnected(session *UserSession) {
 
 // BroadcastMessage sends a message to all connected users.
 func (mp *Multiplayer) BroadcastMessage(ctx context.Context, payload []byte) {
-	slog.Info("Broadcasting message", "type", wire.EventType(payload[0]).String(), "payload", string(payload[1:]))
+	// slog.Info("Broadcasting message", "type", wire.EventType(payload[0]).String(), "payload", string(payload[1:]))
 
 	mp.forEachSession(func(session *UserSession) bool {
 		session.Send(ctx, payload)

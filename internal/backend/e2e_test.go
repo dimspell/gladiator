@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"testing"
+	"time"
 
 	v1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/internal/app/logger"
@@ -31,12 +32,17 @@ func TestE2E_LAN(t *testing.T) {
 		return
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	cs := &console.Console{
 		Multiplayer: console.NewMultiplayer(),
 		DB:          db,
 	}
 	ts := httptest.NewServer(cs.HttpRouter())
 	defer ts.Close()
+
+	go cs.Multiplayer.Run(ctx)
 
 	// Remove the HTTP schema prefix
 	cs.Addr = ts.URL[len("http://"):]
@@ -88,13 +94,18 @@ func TestE2E_LAN(t *testing.T) {
 		0, // Password
 	}))
 
+	// TODO: Add channel to read & handle all messages on the channel
+	time.Sleep(100 * time.Millisecond)
+
 	room, ok := cs.Multiplayer.Rooms["room"]
 	if !ok {
 		t.Errorf("failed to find room")
 		return
 	}
-
-	// assert.True(t, room.Ready)
+	if !room.Ready {
+		t.Errorf("failed to create new room - it is unready")
+		return
+	}
 	assert.Equal(t, "room", room.Name)
 	assert.Equal(t, session1.UserID, room.CreatedBy.UserID)
 	assert.Equal(t, session1.UserID, room.HostPlayer.UserID)
@@ -181,6 +192,22 @@ func TestE2E_LAN(t *testing.T) {
 		198, 51, 100, 1, // IP address of host
 		'a', 'r', 'c', 'h', 'e', 'r', 0, // Player name
 	}, findPacket(conn2.Written, JoinGame))
+
+	room, ok = cs.Multiplayer.Rooms["room"]
+	if !ok {
+		t.Errorf("failed to find room")
+		return
+	}
+	if !room.Ready {
+		t.Errorf("failed to join room - it is unready")
+		return
+	}
+	assert.Equal(t, "room", room.Name)
+	assert.Equal(t, session1.UserID, room.CreatedBy.UserID)
+	assert.Equal(t, session1.UserID, room.HostPlayer.UserID)
+	assert.Equal(t, 2, len(room.Players))
+	assert.Equal(t, session1.UserID, room.Players[0].UserID)
+	assert.Equal(t, session2.UserID, room.Players[1].UserID)
 }
 
 func findPacket(buf []byte, packetType PacketType) []byte {
