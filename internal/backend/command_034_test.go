@@ -3,44 +3,41 @@ package backend
 import (
 	"testing"
 
-	"github.com/dimspell/gladiator/internal/model"
-
 	"connectrpc.com/connect"
 	v1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestBackend_HandleJoinGame(t *testing.T) {
-	b := &Backend{
-		Proxy: NewLAN("127.0.100.1"),
-		gameClient: &mockGameClient{
-			GetGameResponse: connect.NewResponse(&v1.GetGameResponse{
-				Game: &v1.Game{
-					GameId:        "gameId",
-					Name:          "retreat",
-					Password:      "",
-					HostIpAddress: "192.168.121.212",
-					MapId:         2,
+	b, _ := helperNewBackend(t)
+	b.gameClient = &mockGameClient{
+		GetGameResponse: connect.NewResponse(&v1.GetGameResponse{
+			Game: &v1.Game{
+				GameId:        "gameId",
+				Name:          "retreat",
+				Password:      "",
+				HostIpAddress: "192.168.121.212",
+				MapId:         v1.GameMap_UnderworldRetreat,
+			},
+		}),
+		JoinGameResponse: connect.NewResponse(&v1.JoinGameResponse{
+			Players: []*v1.Player{
+				{
+					// CharacterName: "archer",
+					ClassType: v1.ClassType_Archer,
+					IpAddress: "192.168.121.212",
+					Username:  "archer",
 				},
-			}),
-			JoinGameResponse: connect.NewResponse(&v1.JoinGameResponse{
-				Players: []*v1.Player{
-					{
-						// CharacterName: "archer",
-						ClassType: int32(model.ClassTypeArcher),
-						IpAddress: "192.168.121.212",
-						Username:  "archer",
-					},
-					{
-						// CharacterName: "mage",
-						ClassType: int32(model.ClassTypeMage),
-						IpAddress: "192.168.121.169",
-						Username:  "mage",
-					},
+				{
+					// CharacterName: "mage",
+					ClassType: v1.ClassType_Mage,
+					IpAddress: "192.168.121.169",
+					Username:  "mage",
 				},
-			}),
-		},
+			},
+		}),
 	}
+
 	conn := &mockConn{}
 	session := &Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
 

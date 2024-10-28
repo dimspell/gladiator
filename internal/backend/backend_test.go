@@ -3,11 +3,15 @@ package backend
 import (
 	"context"
 	"net"
+	"net/http"
+	"net/http/httptest"
+	"testing"
 	"time"
 
 	"connectrpc.com/connect"
 	v1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/gen/multi/v1/multiv1connect"
+	"github.com/dimspell/gladiator/internal/console"
 )
 
 type mockConn struct {
@@ -67,7 +71,7 @@ func (m *mockConn) CloseWithError(err error) {
 	// Set CloseError
 	m.CloseError = err
 
-	// Optionally close any channels, etc
+	// Optionally close any channels, etc.
 	// to simulate closed connection
 }
 
@@ -127,4 +131,27 @@ func (m *mockCharacterClient) GetCharacter(context.Context, *connect.Request[v1.
 
 func (m *mockCharacterClient) ListCharacters(context.Context, *connect.Request[v1.ListCharactersRequest]) (*connect.Response[v1.ListCharactersResponse], error) {
 	return m.ListCharactersResponse, nil
+}
+
+func helperNewBackend(tb testing.TB) (bd *Backend, cs *console.Console) {
+	tb.Helper()
+
+	cs = &console.Console{
+		Multiplayer: console.NewMultiplayer(),
+	}
+	ts := httptest.NewServer(http.HandlerFunc(cs.HandleWebSocket))
+
+	bd = &Backend{
+		// Replace the HTTP schema prefix for websocket connection.
+		SignalServerURL: "ws://" + ts.URL[len("http://"):],
+
+		// Use bogon IP addressing for tests (https://datatracker.ietf.org/doc/rfc6752/).
+		Proxy: NewLAN("198.51.100.1"),
+	}
+
+	tb.Cleanup(func() {
+		ts.Close()
+	})
+
+	return bd, cs
 }

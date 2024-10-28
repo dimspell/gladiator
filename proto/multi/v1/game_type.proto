@@ -2,11 +2,13 @@ syntax = "proto3";
 
 package multi.v1;
 
+import "multi/v1/character_type.proto";
+
 message Game {
   string game_id = 1;
   string name = 2;
   string password = 3;
-  int64 map_id = 4;
+  GameMap map_id = 4;
   int64 host_user_id = 5;
   string host_ip_address = 6;
 }
@@ -15,6 +17,14 @@ message Player {
   int64 user_id = 1;
   string username = 2;
   int64 character_id = 3;
-  int32 class_type = 4;
+  ClassType class_type = 4;
   string ip_address = 5;
+}
+
+enum GameMap {
+  ScatteredShelter = 0;
+  AbandonedRealm = 1;
+  UnderworldRetreat = 2;
+  FrozenLabyrinth = 3;
+  CrimsonAshes = 4;
 }

@@ -3,6 +3,7 @@ package wire
 import (
 	"fmt"
 
+	v1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/pion/webrtc/v4"
 )
 
@@ -79,7 +80,7 @@ type LobbyRoom struct {
 	ID       string
 	Name     string
 	Password string // TODO: Yup, game expects the password in plain-text
-	MapID    int64
+	MapID    v1.GameMap
 
 	HostPlayer Player
 	CreatedBy  Player

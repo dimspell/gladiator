@@ -4,15 +4,12 @@ import (
 	"context"
 	"log/slog"
 	"net"
-	"net/http"
-	"net/http/httptest"
 	"os"
 	"testing"
 	"time"
 
 	v1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/internal/app/logger"
-	"github.com/dimspell/gladiator/internal/console"
 	"github.com/dimspell/gladiator/internal/model"
 	"github.com/stretchr/testify/assert"
 )
@@ -24,14 +21,7 @@ func TestBackend_RegisterNewObserver(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	lb := console.Console{DB: nil, Multiplayer: console.NewMultiplayer()}
-	ts := httptest.NewServer(http.HandlerFunc(lb.HandleWebSocket))
-	defer ts.Close()
-
-	b := &Backend{
-		SignalServerURL: "ws://" + ts.URL[len("http://"):], // Skip schema prefix.
-		Proxy:           NewLAN("127.0.0.1"),
-	}
+	b, _ := helperNewBackend(t)
 	conn := &mockConn{RemoteAddress: &net.IPAddr{IP: net.ParseIP("127.0.0.1")}}
 	session := &Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
 
@@ -51,15 +41,8 @@ func TestBackend_UpdateCharacterInfo(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	lb := console.Console{DB: nil, Multiplayer: console.NewMultiplayer()}
-	ts := httptest.NewServer(http.HandlerFunc(lb.HandleWebSocket))
-	defer ts.Close()
-
-	b := &Backend{
-		SignalServerURL: "ws://" + ts.URL[len("http://"):], // Skip schema prefix.
-		Proxy:           NewLAN("127.0.0.1"),
-	}
-	conn := &mockConn{RemoteAddress: &net.IPAddr{IP: net.ParseIP("127.0.0.1")}}
+	b, cs := helperNewBackend(t)
+	conn := &mockConn{}
 	session := &Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
 
 	// Authentication
@@ -83,7 +66,7 @@ func TestBackend_UpdateCharacterInfo(t *testing.T) {
 	}
 	defer session.observerDone()
 
-	us, ok := lb.Multiplayer.GetUserSession("2137")
+	us, ok := cs.Multiplayer.GetUserSession("2137")
 	if !ok {
 		t.Error("expected user session connected to the lobby")
 		return
@@ -102,7 +85,7 @@ func TestBackend_UpdateCharacterInfo(t *testing.T) {
 	}
 
 	time.Sleep(1 * time.Second)
-	lb.Multiplayer.DebugState()
+	cs.Multiplayer.DebugState()
 }
 
 // type mockWS struct {

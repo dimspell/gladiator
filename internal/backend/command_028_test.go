@@ -1,7 +1,7 @@
 package backend
 
 import (
-	"net"
+	"context"
 	"testing"
 
 	"connectrpc.com/connect"
@@ -33,24 +33,55 @@ func TestCreateGameRequest(t *testing.T) {
 }
 
 func TestBackend_HandleCreateGame(t *testing.T) {
-	b := &Backend{
-		Proxy: NewLAN("127.0.0.1"),
-		gameClient: &mockGameClient{
-			CreateGameResponse: connect.NewResponse(&v1.CreateGameResponse{
-				Game: &v1.Game{
-					GameId:        "gameId",
-					Name:          "room",
-					Password:      "",
-					HostIpAddress: "127.0.0.1",
-					MapId:         3,
+	b, _ := helperNewBackend(t)
+	b.gameClient = &mockGameClient{
+		CreateGameResponse: connect.NewResponse(&v1.CreateGameResponse{
+			Game: &v1.Game{
+				GameId:        "room",
+				Name:          "room",
+				Password:      "",
+				HostIpAddress: "127.0.0.1",
+				MapId:         v1.GameMap_FrozenLabyrinth,
+				HostUserId:    2137,
+			},
+		}),
+		GetGameResponse: connect.NewResponse(&v1.GetGameResponse{
+			Game: &v1.Game{
+				GameId:        "room",
+				Name:          "room",
+				Password:      "",
+				HostIpAddress: "127.0.0.1",
+				MapId:         v1.GameMap_FrozenLabyrinth,
+				HostUserId:    2137,
+			},
+			Players: []*v1.Player{
+				{
+					UserId:      2137,
+					Username:    "TEST",
+					CharacterId: 0,
+					ClassType:   0,
+					IpAddress:   "127.0.0.1",
 				},
-			}),
-		}}
-	conn := &mockConn{RemoteAddress: &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 12137}}
-	session := &Session{ID: "TEST",
-		Conn:     conn,
-		UserID:   2137,
-		Username: "JP",
+			},
+		}),
+	}
+
+	conn := &mockConn{}
+	session := b.AddSession(conn)
+	session.ID = "TEST"
+	session.UserID = 2137
+	session.Username = "JP"
+
+	ctx := context.Background()
+
+	// Authentication
+	if err := b.ConnectToLobby(ctx, &v1.User{UserId: session.UserID, Username: session.Username}, session); err != nil {
+		t.Error(err)
+		return
+	}
+	if err := b.RegisterNewObserver(ctx, session); err != nil {
+		t.Errorf("error registering observer: %v", err)
+		return
 	}
 
 	// State = 0

@@ -135,7 +135,6 @@ func (b *Backend) Send(conn net.Conn, packetType PacketType, payload []byte) err
 	if logger.PacketLogger != nil {
 		logger.PacketLogger.Debug("Sent",
 			"packetType", packetType,
-			"remoteAddr", conn.RemoteAddr().String(),
 			"bytes", data,
 			"length", len(data),
 		)

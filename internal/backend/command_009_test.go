@@ -46,7 +46,7 @@ func TestBackend_HandleListGames(t *testing.T) {
 						Name:          "retreat",
 						Password:      "",
 						HostIpAddress: "127.0.21.37",
-						MapId:         2,
+						MapId:         v1.GameMap_UnderworldRetreat,
 					},
 				}}),
 			}}
@@ -73,14 +73,14 @@ func TestBackend_HandleListGames(t *testing.T) {
 						Name:          "RoomName",
 						Password:      "secret",
 						HostIpAddress: "127.0.21.37",
-						MapId:         2,
+						MapId:         v1.GameMap_UnderworldRetreat,
 					},
 					{
 						GameId:        "gameId",
 						Name:          "Other",
 						Password:      "",
 						HostIpAddress: "127.0.13.37",
-						MapId:         5,
+						MapId:         v1.GameMap_AbandonedRealm,
 					},
 				}}),
 			}}

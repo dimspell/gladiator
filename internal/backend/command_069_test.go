@@ -5,40 +5,38 @@ import (
 
 	"connectrpc.com/connect"
 	v1 "github.com/dimspell/gladiator/gen/multi/v1"
-	"github.com/dimspell/gladiator/internal/model"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestBackend_HandleSelectGame(t *testing.T) {
-	t.Run("Sample game", func(t *testing.T) {
-		b := &Backend{
-			Proxy: NewLAN("127.0.100.1"),
-			gameClient: &mockGameClient{
-				GetGameResponse: connect.NewResponse(&v1.GetGameResponse{
-					Game: &v1.Game{
-						GameId:        "gameId",
-						Name:          "retreat",
-						Password:      "",
-						HostIpAddress: "192.168.121.212",
-						MapId:         2,
+	t.Run("Sample mocked game", func(t *testing.T) {
+		b, _ := helperNewBackend(t)
+		b.gameClient = &mockGameClient{
+			GetGameResponse: connect.NewResponse(&v1.GetGameResponse{
+				Game: &v1.Game{
+					GameId:        "gameId",
+					Name:          "retreat",
+					Password:      "",
+					HostIpAddress: "192.168.121.212",
+					MapId:         2,
+				},
+				Players: []*v1.Player{
+					{
+						// CharacterName: "archer",
+						ClassType: v1.ClassType_Archer,
+						IpAddress: "192.168.121.212",
+						Username:  "archer",
 					},
-					Players: []*v1.Player{
-						{
-							// CharacterName: "archer",
-							ClassType: int32(model.ClassTypeArcher),
-							IpAddress: "192.168.121.212",
-							Username:  "archer",
-						},
-						// {
-						//	CharacterName: "mage",
-						//	ClassType:     int64(model.ClassTypeMage),
-						//	IpAddress:     "192.168.121.169",
-						//	Username:      "mage",
-						// },
-					},
-				}),
-			},
+					// {
+					//	CharacterName: "mage",
+					//	ClassType:     int64(model.ClassTypeMage),
+					//	IpAddress:     "192.168.121.169",
+					//	Username:      "mage",
+					// },
+				},
+			}),
 		}
+
 		conn := &mockConn{}
 		session := &Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "mage"}
 
@@ -57,27 +55,25 @@ func TestBackend_HandleSelectGame(t *testing.T) {
 	})
 
 	t.Run("HostRoom only", func(t *testing.T) {
-		b := &Backend{
-			Proxy: NewLAN("127.0.0.1"),
-			gameClient: &mockGameClient{
-				GetGameResponse: connect.NewResponse(&v1.GetGameResponse{
-					Game: &v1.Game{
-						GameId:        "gameId",
-						Name:          "gameRoom",
-						Password:      "",
-						HostIpAddress: "127.0.0.28",
-						MapId:         2,
+		b, _ := helperNewBackend(t)
+		b.gameClient = &mockGameClient{
+			GetGameResponse: connect.NewResponse(&v1.GetGameResponse{
+				Game: &v1.Game{
+					GameId:        "gameId",
+					Name:          "gameRoom",
+					Password:      "",
+					HostIpAddress: "127.0.0.28",
+					MapId:         2,
+				},
+				Players: []*v1.Player{
+					{
+						// CharacterName: "hostMagician",
+						ClassType: v1.ClassType_Mage,
+						IpAddress: "127.0.0.28",
+						Username:  "playerA",
 					},
-					Players: []*v1.Player{
-						{
-							// CharacterName: "hostMagician",
-							ClassType: int32(model.ClassTypeMage),
-							IpAddress: "127.0.0.28",
-							Username:  "playerA",
-						},
-					},
-				}),
-			},
+				},
+			}),
 		}
 		conn := &mockConn{}
 		session := &Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}

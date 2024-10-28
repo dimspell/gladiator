@@ -37,12 +37,12 @@ func (b *Backend) HandleCreateGame(session *Session, req CreateGameRequest) erro
 		respGame, err := b.gameClient.CreateGame(context.TODO(), connect.NewRequest(&multiv1.CreateGameRequest{
 			GameName: data.RoomName,
 			Password: data.Password,
-			MapId:    int64(data.MapID),
+			MapId:    multiv1.GameMap(data.MapID),
 			Host: &multiv1.Player{
 				UserId:      session.UserID,
 				Username:    session.Username,
 				CharacterId: session.CharacterID,
-				ClassType:   int32(session.ClassType),
+				ClassType:   multiv1.ClassType(session.ClassType),
 				IpAddress:   hostIPAddress.String(),
 			},
 		}))
@@ -70,9 +70,7 @@ func (b *Backend) HandleCreateGame(session *Session, req CreateGameRequest) erro
 			return err
 		}
 
-		if err := b.Proxy.HostRoom(HostParams{
-			GameID: respGame.Msg.Game.Name,
-		}, session); err != nil {
+		if err := b.Proxy.HostRoom(HostParams{GameID: respGame.Msg.GetGame().Name}, session); err != nil {
 			return err
 		}
 		binary.LittleEndian.PutUint32(response[0:4], uint32(model.GameStateStarted))

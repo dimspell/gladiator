@@ -66,7 +66,7 @@ func (s *gameServiceServer) GetGame(_ context.Context, req *connect.Request[mult
 			UserId:      player.UserID,
 			Username:    player.Username,
 			CharacterId: player.CharacterID,
-			ClassType:   int32(player.ClassType),
+			ClassType:   multiv1.ClassType(player.ClassType),
 			IpAddress:   player.IPAddress,
 		})
 	}
@@ -102,7 +102,7 @@ func (s *gameServiceServer) CreateGame(_ context.Context, req *connect.Request[m
 		ID:       gameId,
 		Name:     req.Msg.GetGameName(),
 		Password: req.Msg.GetPassword(),
-		MapID:    req.Msg.GetMapId(),
+		MapID:    multiv1.GameMap(req.Msg.MapId),
 
 		// TODO
 		HostPlayer: player,
@@ -159,7 +159,7 @@ func (s *gameServiceServer) JoinGame(_ context.Context, req *connect.Request[mul
 			UserId:      player.UserID,
 			Username:    player.Username,
 			CharacterId: player.CharacterID,
-			ClassType:   int32(player.ClassType),
+			ClassType:   multiv1.ClassType(player.ClassType),
 			IpAddress:   player.IPAddress,
 		})
 	}
