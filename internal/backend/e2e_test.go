@@ -7,7 +7,6 @@ import (
 	"net/http/httptest"
 	"os"
 	"testing"
-	"time"
 
 	v1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/internal/app/logger"
@@ -42,7 +41,7 @@ func TestE2E_LAN(t *testing.T) {
 	ts := httptest.NewServer(cs.HttpRouter())
 	defer ts.Close()
 
-	go cs.Multiplayer.Run(ctx)
+	// go cs.Multiplayer.Run(ctx)
 
 	// Remove the HTTP schema prefix
 	cs.Addr = ts.URL[len("http://"):]
@@ -94,8 +93,7 @@ func TestE2E_LAN(t *testing.T) {
 		0, // Password
 	}))
 
-	// TODO: Add channel to read & handle all messages on the channel
-	time.Sleep(100 * time.Millisecond)
+	cs.Multiplayer.HandleIncomingMessage(ctx, <-cs.Multiplayer.Messages)
 
 	room, ok := cs.Multiplayer.Rooms["room"]
 	if !ok {
@@ -208,6 +206,11 @@ func TestE2E_LAN(t *testing.T) {
 	assert.Equal(t, 2, len(room.Players))
 	assert.Equal(t, session1.UserID, room.Players[0].UserID)
 	assert.Equal(t, session2.UserID, room.Players[1].UserID)
+
+	// close(cs.Multiplayer.Messages)
+	// for message := range cs.Multiplayer.Messages {
+	// 	fmt.Println("unhandled message", message)
+	// }
 }
 
 func findPacket(buf []byte, packetType PacketType) []byte {
