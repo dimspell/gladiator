@@ -68,13 +68,10 @@ func TestBackend_HandleCreateGame(t *testing.T) {
 
 	conn := &mockConn{}
 	session := b.AddSession(conn)
+	session.SetLogonData(&v1.User{UserId: 2137, Username: "JP"})
 	session.ID = "TEST"
-	session.UserID = 2137
-	session.Username = "JP"
 
 	ctx := context.Background()
-
-	// Authentication
 	if err := b.ConnectToLobby(ctx, &v1.User{UserId: session.UserID, Username: session.Username}, session); err != nil {
 		t.Error(err)
 		return
@@ -88,7 +85,7 @@ func TestBackend_HandleCreateGame(t *testing.T) {
 	assert.NoError(t, b.HandleCreateGame(session, CreateGameRequest{
 		0, 0, 0, 0, // State
 		3, 0, 0, 0, // Map ID
-		114, 111, 111, 109, 0, // Game room name
+		'r', 'o', 'o', 'm', 0, // Game room name
 		0, // Password
 	}))
 	assert.Equal(t, []byte{255, 28, 8, 0}, conn.Written[0:4]) // Header
@@ -101,7 +98,7 @@ func TestBackend_HandleCreateGame(t *testing.T) {
 	assert.NoError(t, b.HandleCreateGame(session, CreateGameRequest{
 		1, 0, 0, 0, // State
 		3, 0, 0, 0, // Map ID
-		114, 111, 111, 109, 0, // Game room name
+		'r', 'o', 'o', 'm', 0, // Game room name
 		0, // Password
 	}))
 	assert.Equal(t, []byte{255, 28, 8, 0}, conn.Written[0:4]) // Header

@@ -47,6 +47,22 @@ type Session struct {
 	gameRoom *GameRoom
 }
 
+func (s *Session) SetLogonData(user *multiv1.User) {
+	s.Lock()
+	s.UserID = user.UserId
+	s.Username = user.Username
+	s.Unlock()
+}
+
+func (s *Session) UpdateCharacter(character *multiv1.Character) {
+	s.Lock()
+	info := model.ParseCharacterInfo(character.Stats)
+
+	s.CharacterID = character.CharacterId
+	s.ClassType = info.ClassType
+	s.Unlock()
+}
+
 func (s *Session) GameRoom() *GameRoom {
 	s.RLock()
 	defer s.RUnlock()
@@ -160,6 +176,9 @@ func encodePacket(packetType PacketType, payload []byte) []byte {
 }
 
 func (b *Backend) ConnectToLobby(ctx context.Context, user *multiv1.User, session *Session) error {
+	session.Lock()
+	defer session.Unlock()
+
 	ws, err := wire.Connect(ctx, b.SignalServerURL, wire.User{
 		UserID:   user.UserId,
 		Username: user.Username,
@@ -185,9 +204,9 @@ func (b *Backend) JoinLobby(ctx context.Context, session *Session) error {
 	defer cancel()
 
 	err := session.wsConn.Write(ctx, websocket.MessageText,
-		wire.ComposeTyped[wire.Player](wire.Join, wire.MessageContent[wire.Player]{
+		wire.ComposeTyped[wire.Player](wire.JoinLobby, wire.MessageContent[wire.Player]{
 			From: session.GetUserID(),
-			Type: wire.Join,
+			Type: wire.JoinLobby,
 			Content: wire.Player{
 				UserID:      session.UserID,
 				Username:    session.Username,
@@ -204,7 +223,7 @@ func (b *Backend) JoinLobby(ctx context.Context, session *Session) error {
 	if err != nil {
 		return err
 	}
-	if len(p) != 1 || wire.EventType(p[0]) != wire.Joined {
+	if len(p) != 1 || wire.EventType(p[0]) != wire.JoinedLobby {
 		return fmt.Errorf("expected joined message, got: %s", string(p))
 	}
 	return nil
@@ -247,7 +266,7 @@ func (b *Backend) RegisterNewObserver(ctx context.Context, session *Session) err
 					continue
 				}
 			}
-		case wire.Join:
+		case wire.JoinLobby:
 			_, msg, err := wire.DecodeTyped[wire.Player](p)
 			if err != nil {
 				slog.Warn("Could not decode the message", "session", session.ID, "error", err, "event", et.String(), "payload", p)
@@ -267,7 +286,7 @@ func (b *Backend) RegisterNewObserver(ctx context.Context, session *Session) err
 				slog.Warn("Error appending lobby user", "session", session.ID, "error", err)
 				return
 			}
-		case wire.Leave:
+		case wire.LeaveLobby:
 			_, msg, err := wire.DecodeTyped[wire.Player](p)
 			if err != nil {
 				slog.Warn("Could not decode the message", "session", session.ID, "error", err, "event", et.String(), "payload", p)

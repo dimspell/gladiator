@@ -107,7 +107,7 @@ func (c *Client) Run(onUDP MessageHandler) {
 		}
 
 		switch wire.EventType(buf[0]) {
-		case wire.Join:
+		case wire.JoinLobby:
 			slog.Warn("JOIN")
 			msg, err := decodeJSON[wire.MessageContent[wire.Member]](buf[1:n])
 			if err != nil {
@@ -116,7 +116,7 @@ func (c *Client) Run(onUDP MessageHandler) {
 			}
 			c.handleJoin(msg, onUDP)
 			break
-		case wire.Leave:
+		case wire.LeaveLobby:
 			slog.Warn("LEAVE")
 			msg, err := decodeJSON[wire.MessageContent[any]](buf[1:n])
 			if err != nil {

@@ -32,6 +32,25 @@ type Backend struct {
 }
 
 func NewBackend(backendAddr, consoleAddr string, gameProxy Proxy) *Backend {
+	characterClient, gameClient, userClient, rankingClient := createServiceClients(consoleAddr)
+
+	return &Backend{
+		Addr:  backendAddr,
+		Proxy: gameProxy,
+
+		characterClient: characterClient,
+		gameClient:      gameClient,
+		userClient:      userClient,
+		rankingClient:   rankingClient,
+	}
+}
+
+func createServiceClients(consoleAddr string) (
+	multiv1connect.CharacterServiceClient,
+	multiv1connect.GameServiceClient,
+	multiv1connect.UserServiceClient,
+	multiv1connect.RankingServiceClient,
+) {
 	httpClient := &http.Client{
 		Timeout: 5 * time.Second,
 		Transport: &http.Transport{
@@ -48,15 +67,12 @@ func NewBackend(backendAddr, consoleAddr string, gameProxy Proxy) *Backend {
 	// TODO: Name the schema as parameter
 	consoleUri := fmt.Sprintf("%s://%s/grpc", "http", consoleAddr)
 
-	return &Backend{
-		Addr:  backendAddr,
-		Proxy: gameProxy,
+	characterClient := multiv1connect.NewCharacterServiceClient(httpClient, consoleUri)
+	gameClient := multiv1connect.NewGameServiceClient(httpClient, consoleUri)
+	userClient := multiv1connect.NewUserServiceClient(httpClient, consoleUri)
+	rankingClient := multiv1connect.NewRankingServiceClient(httpClient, consoleUri)
 
-		characterClient: multiv1connect.NewCharacterServiceClient(httpClient, consoleUri),
-		gameClient:      multiv1connect.NewGameServiceClient(httpClient, consoleUri),
-		userClient:      multiv1connect.NewUserServiceClient(httpClient, consoleUri),
-		rankingClient:   multiv1connect.NewRankingServiceClient(httpClient, consoleUri),
-	}
+	return characterClient, gameClient, userClient, rankingClient
 }
 
 func (b *Backend) Start() error {

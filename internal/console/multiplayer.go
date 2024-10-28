@@ -268,14 +268,14 @@ func (mp *Multiplayer) HandleJoin(ctx context.Context, session *UserSession) err
 	if err != nil {
 		return err
 	}
-	if et != wire.Join {
+	if et != wire.JoinLobby {
 		return fmt.Errorf("inapprioprate event type")
 	}
 
 	session.Character.CharacterID = m.Content.CharacterID
 	session.Character.ClassType = m.Content.ClassType
 
-	session.Send(ctx, []byte{byte(wire.Joined)})
+	session.Send(ctx, []byte{byte(wire.JoinedLobby)})
 	return nil
 }
 
@@ -294,8 +294,8 @@ func (mp *Multiplayer) SetPlayerConnected(session *UserSession) {
 	})
 
 	// Notify all the users
-	mp.BroadcastMessage(ctx, wire.ComposeTyped(wire.Join, wire.MessageContent[wire.Player]{
-		Type:    wire.Join,
+	mp.BroadcastMessage(ctx, wire.ComposeTyped(wire.JoinLobby, wire.MessageContent[wire.Player]{
+		Type:    wire.JoinLobby,
 		Content: session.ToPlayer(),
 	}))
 }
@@ -308,7 +308,7 @@ func (mp *Multiplayer) SetPlayerDisconnected(session *UserSession) {
 		slog.Debug("Could not close the connection", "user", session.UserID, "error", err)
 	}
 	mp.DeleteUserSession(session.UserID)
-	mp.BroadcastMessage(context.TODO(), wire.Compose(wire.Leave, wire.Message{Type: wire.Leave, From: session.UserID}))
+	mp.BroadcastMessage(context.TODO(), wire.Compose(wire.LeaveLobby, wire.Message{Type: wire.LeaveLobby, From: session.UserID}))
 }
 
 // BroadcastMessage sends a message to all connected users.

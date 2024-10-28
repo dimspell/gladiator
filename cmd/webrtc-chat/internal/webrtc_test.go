@@ -85,7 +85,7 @@ func TestWebRTCMock(t *testing.T) {
 
 	player1.handleJoin(wire.MessageContent[wire.Member]{
 		From:    player2.ID,
-		Type:    wire.Join,
+		Type:    wire.JoinLobby,
 		Content: wire.Member{UserID: player2.ID},
 		To:      player1.ID,
 	}, onMessage)

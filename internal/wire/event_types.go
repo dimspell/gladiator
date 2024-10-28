@@ -7,9 +7,9 @@ const (
 	Hello
 	Welcome
 	LobbyUsers
-	Join
-	Joined
-	Leave
+	JoinLobby
+	JoinedLobby
+	LeaveLobby
 	Chat
 	CreateRoom
 	SetRoomReady
@@ -28,12 +28,12 @@ func (e EventType) String() string {
 		return "Welcome"
 	case LobbyUsers:
 		return "LobbyUsers"
-	case Join:
-		return "Join"
-	case Joined:
-		return "Joined"
-	case Leave:
-		return "Leave"
+	case JoinLobby:
+		return "JoinLobby"
+	case JoinedLobby:
+		return "JoinedLobby"
+	case LeaveLobby:
+		return "LeaveLobby"
 	case Chat:
 		return "Chat"
 	case CreateRoom:

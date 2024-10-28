@@ -42,7 +42,7 @@ func TestBackend_HandleJoinGame(t *testing.T) {
 	session := &Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
 
 	assert.NoError(t, b.HandleJoinGame(session, JoinGameRequest{
-		103, 97, 109, 101, 82, 111, 111, 109, 0, // Game name
+		'r', 'e', 't', 'r', 'e', 'a', 't', 0, // Game name
 		0, // Password
 	}))
 

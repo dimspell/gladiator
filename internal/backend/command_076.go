@@ -41,7 +41,7 @@ func (b *Backend) HandleSelectCharacter(session *Session, req SelectCharacterReq
 	response[0] = 1 // Exist, flag - first 4 bytes
 	copy(response[4:], respChar.Msg.Character.Stats)
 
-	session.CharacterID = respChar.Msg.Character.CharacterId
+	session.UpdateCharacter(respChar.Msg.Character)
 
 	return b.Send(session.Conn, SelectCharacter, response)
 }

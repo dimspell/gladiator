@@ -117,7 +117,7 @@ func Seed(queries *Queries) error {
 		ExperiencePoints:     0,
 		Money:                300,
 		ScorePoints:          0,
-		ClassType:            int64(model.ClassTypeKnight),
+		ClassType:            int64(model.ClassTypeArcher),
 		SkinCarnation:        int64(model.SkinCarnationMaleBeige),
 		HairStyle:            int64(model.HairStyleMaleShortWhite),
 		LightArmourLegs:      2,
