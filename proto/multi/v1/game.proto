@@ -10,7 +10,8 @@ message CreateGameRequest {
   string password = 2;
   GameMap map_id = 3;
 
-  Player host = 4;
+  int64 host_user_id = 4;
+  string host_ip_address = 5;
 }
 
 message CreateGameResponse {
@@ -34,12 +35,8 @@ message ListGamesResponse {
 
 message JoinGameRequest {
   int64 user_id = 1;
-  string user_name = 2;
-  int64 character_id = 3;
-  string character_name = 4;
-  string game_room_id = 5;
-  string ip_address = 6;
-  ClassType class_type = 7;
+  string game_room_id = 2;
+  string ip_address = 3;
 }
 
 message JoinGameResponse {

@@ -3,6 +3,7 @@ package backend
 import (
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"log/slog"
 	"math"
@@ -318,6 +319,9 @@ func (b *Backend) RegisterNewObserver(ctx context.Context, session *Session) err
 			// Read the broadcast & handle them as commands.
 			_, p, err := wsConn.Read(ctx)
 			if err != nil {
+				if errors.Is(err, context.Canceled) {
+					return
+				}
 				slog.Error("Error reading from WebSocket", "session", session.ID, "error", err)
 				return
 			}

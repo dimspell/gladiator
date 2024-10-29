@@ -70,13 +70,12 @@ func (s *gameServiceServer) GetGame(_ context.Context, req *connect.Request[mult
 func (s *gameServiceServer) CreateGame(_ context.Context, req *connect.Request[multiv1.CreateGameRequest]) (*connect.Response[multiv1.CreateGameResponse], error) {
 	gameId := req.Msg.GetGameName()
 
-	hostUser := req.Msg.GetHost()
-	hostSession, found := s.Multiplayer.GetUserSession(hostUser.UserId)
+	hostSession, found := s.Multiplayer.GetUserSession(req.Msg.HostUserId)
 	if !found {
-		return nil, connect.NewError(connect.CodeUnauthenticated, fmt.Errorf("user session %d not found", hostUser.UserId))
+		return nil, connect.NewError(connect.CodeUnauthenticated, fmt.Errorf("user session %d not found", req.Msg.HostUserId))
 	}
 
-	hostSession.IPAddress = req.Msg.GetHost().IpAddress
+	hostSession.IPAddress = req.Msg.HostIpAddress
 
 	room := s.Multiplayer.CreateRoom(GameRoom{
 		Ready:    false,

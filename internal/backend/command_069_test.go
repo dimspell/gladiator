@@ -45,8 +45,6 @@ func TestBackend_HandleSelectGame(t *testing.T) {
 			0, // Password
 		}))
 
-		t.Log(conn.Written, string(conn.Written))
-
 		assert.Equal(t, []byte{255, 69, 23, 0}, conn.Written[0:4])                  // Header
 		assert.Equal(t, []byte{2, 0, 0, 0}, conn.Written[4:8])                      // Map ID
 		assert.Equal(t, []byte{2, 0, 0, 0}, conn.Written[8:12])                     // Class type

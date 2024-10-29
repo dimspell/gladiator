@@ -69,12 +69,12 @@ func TestE2E_LAN(t *testing.T) {
 		'a', 'r', 'c', 'h', 'e', 'r', 0, // User name
 		'a', 'r', 'c', 'h', 'e', 'r', 0, // Character name
 	}))
-	err = bd.JoinLobby(context.TODO(), session1)
+	err = bd.JoinLobby(ctx, session1)
 	if err != nil {
 		t.Errorf("failed to join lobby: %v", err)
 		return
 	}
-	err = bd.RegisterNewObserver(context.TODO(), session1)
+	err = bd.RegisterNewObserver(ctx, session1)
 	if err != nil {
 		t.Errorf("failed to register new observer: %v", err)
 		return
@@ -110,6 +110,8 @@ func TestE2E_LAN(t *testing.T) {
 	assert.Equal(t, session1.UserID, room.HostPlayer.UserID)
 	assert.Equal(t, 1, len(room.Players))
 	assert.Equal(t, session1.UserID, room.Players[1].UserID)
+	assert.Equal(t, "archer", room.Players[1].User.Username)
+	assert.Equal(t, byte(v1.ClassType_Archer), room.Players[1].Character.ClassType)
 
 	// Other user
 	conn2 := &mockConn{}
@@ -131,12 +133,12 @@ func TestE2E_LAN(t *testing.T) {
 		'm', 'a', 'g', 'e', 0, // User name
 		'm', 'a', 'g', 'e', 0, // Character name
 	}))
-	err = bd.JoinLobby(context.TODO(), session2)
+	err = bd.JoinLobby(ctx, session2)
 	if err != nil {
 		t.Errorf("failed to join lobby: %v", err)
 		return
 	}
-	err = bd.RegisterNewObserver(context.TODO(), session2)
+	err = bd.RegisterNewObserver(ctx, session2)
 	if err != nil {
 		t.Errorf("failed to register new observer: %v", err)
 		return
@@ -206,7 +208,11 @@ func TestE2E_LAN(t *testing.T) {
 	assert.Equal(t, session1.UserID, room.HostPlayer.UserID)
 	assert.Equal(t, 2, len(room.Players))
 	assert.Equal(t, session1.UserID, room.Players[1].UserID)
+	assert.Equal(t, "archer", room.Players[1].User.Username)
+	assert.Equal(t, byte(v1.ClassType_Archer), room.Players[1].Character.ClassType)
 	assert.Equal(t, session2.UserID, room.Players[2].UserID)
+	assert.Equal(t, "mage", room.Players[2].User.Username)
+	assert.Equal(t, byte(v1.ClassType_Mage), room.Players[2].Character.ClassType)
 
 	// close(cs.Multiplayer.Messages)
 	// for message := range cs.Multiplayer.Messages {

@@ -35,22 +35,17 @@ func (b *Backend) HandleCreateGame(session *Session, req CreateGameRequest) erro
 		}
 
 		respGame, err := b.gameClient.CreateGame(context.TODO(), connect.NewRequest(&multiv1.CreateGameRequest{
-			GameName: data.RoomName,
-			Password: data.Password,
-			MapId:    multiv1.GameMap(data.MapID),
-			Host: &multiv1.Player{
-				UserId:      session.UserID,
-				Username:    session.Username,
-				CharacterId: session.CharacterID,
-				ClassType:   multiv1.ClassType(session.ClassType),
-				IpAddress:   hostIPAddress.String(),
-			},
+			GameName:      data.RoomName,
+			Password:      data.Password,
+			MapId:         multiv1.GameMap(data.MapID),
+			HostUserId:    session.UserID,
+			HostIpAddress: hostIPAddress.String(),
 		}))
 		if err != nil {
 			return err
 		}
 		slog.Info("packet-28: created game room", "id", respGame.Msg.Game.GameId, "name", respGame.Msg.Game.Name)
-		
+
 		binary.LittleEndian.PutUint32(response[0:4], uint32(model.GameStateCreating))
 		break
 	case uint32(model.GameStateCreating):
