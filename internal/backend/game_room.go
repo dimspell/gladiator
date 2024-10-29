@@ -77,37 +77,6 @@ func (g *GameRoom) DeletePlayer(player wire.Player) {
 // 	}
 // }
 
-func (g *GameRoom) ToWire() wire.LobbyRoom {
-	g.RLock()
-	defer g.RUnlock()
-
-	players := make([]wire.Player, 0, len(g.Players))
-	for _, player := range g.Players {
-		players = append(players, player)
-	}
-
-	return wire.LobbyRoom{
-		Ready:      g.Ready,
-		Name:       g.Name,
-		HostPlayer: g.Host,
-		Players:    players,
-	}
-}
-
-// func (us *Session) SendCreateRoom(ctx context.Context, gameRoom *GameRoom) error {
-// 	if err := wire.Write(ctx, us.wsConn, wire.ComposeTyped(
-// 		wire.CreateRoom,
-// 		wire.MessageContent[wire.LobbyRoom]{
-// 			From:    us.GetUserID(),
-// 			Type:    wire.CreateRoom,
-// 			Content: gameRoom.ToWire(),
-// 		}),
-// 	); err != nil {
-// 		return err
-// 	}
-// 	return nil
-// }
-
 func (s *Session) SendSetRoomReady(ctx context.Context, gameRoomId string) error {
 	err := wire.Write(ctx, s.wsConn, wire.ComposeTyped(
 		wire.SetRoomReady,
@@ -123,27 +92,13 @@ func (s *Session) SendSetRoomReady(ctx context.Context, gameRoomId string) error
 	return nil
 }
 
-// func (us *Session) SendJoinRoom(ctx context.Context, gameRoom *GameRoom) error {
-// 	if err := wire.Write(ctx, us.wsConn, wire.ComposeTyped(
-// 		wire.JoinRoom,
-// 		wire.MessageContent[wire.LobbyRoom]{
-// 			From:    us.GetUserID(),
-// 			Type:    wire.JoinRoom,
-// 			Content: gameRoom.ToWire(),
-// 		}),
-// 	); err != nil {
-// 		return err
-// 	}
-// 	return nil
-// }
-
 func (s *Session) SendLeaveRoom(ctx context.Context, gameRoom *GameRoom) error {
 	if err := wire.Write(ctx, s.wsConn, wire.ComposeTyped(
 		wire.LeaveRoom,
-		wire.MessageContent[wire.LobbyRoom]{
+		wire.MessageContent[string]{
 			From:    s.GetUserID(),
 			Type:    wire.LeaveRoom,
-			Content: gameRoom.ToWire(),
+			Content: gameRoom.ID,
 		}),
 	); err != nil {
 		return err

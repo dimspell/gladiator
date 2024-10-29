@@ -3,7 +3,6 @@ package wire
 import (
 	"fmt"
 
-	v1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/pion/webrtc/v4"
 )
 
@@ -73,16 +72,4 @@ func (p *Player) ID() string {
 type ChatMessage struct {
 	User string
 	Text string
-}
-
-type LobbyRoom struct {
-	Ready    bool
-	ID       string
-	Name     string
-	Password string // TODO: Yup, game expects the password in plain-text
-	MapID    v1.GameMap
-
-	HostPlayer Player
-	CreatedBy  Player
-	Players    []Player
 }
