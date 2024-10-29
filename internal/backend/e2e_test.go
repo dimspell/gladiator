@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"testing"
+	"time"
 
 	v1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/internal/app/logger"
@@ -31,7 +32,7 @@ func TestE2E_LAN(t *testing.T) {
 		return
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	cs := &console.Console{
@@ -108,7 +109,7 @@ func TestE2E_LAN(t *testing.T) {
 	assert.Equal(t, session1.UserID, room.CreatedBy.UserID)
 	assert.Equal(t, session1.UserID, room.HostPlayer.UserID)
 	assert.Equal(t, 1, len(room.Players))
-	assert.Equal(t, session1.UserID, room.Players[0].UserID)
+	assert.Equal(t, session1.UserID, room.Players[1].UserID)
 
 	// Other user
 	conn2 := &mockConn{}
@@ -204,8 +205,8 @@ func TestE2E_LAN(t *testing.T) {
 	assert.Equal(t, session1.UserID, room.CreatedBy.UserID)
 	assert.Equal(t, session1.UserID, room.HostPlayer.UserID)
 	assert.Equal(t, 2, len(room.Players))
-	assert.Equal(t, session1.UserID, room.Players[0].UserID)
-	assert.Equal(t, session2.UserID, room.Players[1].UserID)
+	assert.Equal(t, session1.UserID, room.Players[1].UserID)
+	assert.Equal(t, session2.UserID, room.Players[2].UserID)
 
 	// close(cs.Multiplayer.Messages)
 	// for message := range cs.Multiplayer.Messages {

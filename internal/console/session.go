@@ -11,10 +11,13 @@ import (
 )
 
 type UserSession struct {
-	UserID    string    `json:"userID,omitempty"`
+	UserID    int64     `json:"userID,omitempty"`
 	GameID    string    `json:"gameID,omitempty"`
 	Connected bool      `json:"connected,omitempty"`
 	LastSeen  time.Time `json:"lastSeen"`
+
+	// TODO: It is never provided
+	IPAddress string `json:"ip"`
 
 	wsConn ConnReadWriter
 
@@ -22,7 +25,7 @@ type UserSession struct {
 	Character wire.Character
 }
 
-func NewUserSession(id string, conn ConnReadWriter) *UserSession {
+func NewUserSession(id int64, conn ConnReadWriter) *UserSession {
 	return &UserSession{
 		UserID:    id,
 		Connected: true,

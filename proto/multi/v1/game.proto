@@ -3,6 +3,7 @@ syntax = "proto3";
 package multi.v1;
 
 import "multi/v1/game_type.proto";
+import "multi/v1/character_type.proto";
 
 message CreateGameRequest {
   string game_name = 1;
@@ -38,7 +39,7 @@ message JoinGameRequest {
   string character_name = 4;
   string game_room_id = 5;
   string ip_address = 6;
-  int32 class_type = 7;
+  ClassType class_type = 7;
 }
 
 message JoinGameResponse {

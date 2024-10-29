@@ -4,11 +4,12 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"sync"
 	"time"
 
 	"github.com/coder/websocket"
-
+	v1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/internal/wire"
 )
 
@@ -17,19 +18,19 @@ type Multiplayer struct {
 
 	// Presence in lobby
 	sessionMutex sync.RWMutex
-	sessions     map[string]*UserSession
+	sessions     map[int64]*UserSession
 
 	Messages chan wire.Message
 
 	// Game rooms
 	roomsMutex sync.RWMutex
-	Rooms      map[string]*wire.LobbyRoom
+	Rooms      map[string]*GameRoom
 }
 
 func NewMultiplayer() *Multiplayer {
 	mp := &Multiplayer{
-		sessions: make(map[string]*UserSession),
-		Rooms:    make(map[string]*wire.LobbyRoom),
+		sessions: make(map[int64]*UserSession),
+		Rooms:    make(map[string]*GameRoom),
 		Messages: make(chan wire.Message),
 	}
 	return mp
@@ -199,7 +200,12 @@ func (mp *Multiplayer) ForwardRTCMessage(ctx context.Context, msg wire.Message) 
 	ctx, cancel := context.WithTimeout(ctx, time.Second*5)
 	defer cancel()
 
-	if user, ok := mp.GetUserSession(msg.To); ok {
+	userId, err := strconv.ParseInt(msg.To, 10, 64)
+	if err != nil {
+		return
+	}
+
+	if user, ok := mp.GetUserSession(userId); ok {
 		user.SendMessage(ctx, msg.Type, msg)
 	}
 }
@@ -212,19 +218,84 @@ func (mp *Multiplayer) DebugState() {
 	}
 }
 
-// CreateRoom creates new lobby room.
-func (mp *Multiplayer) CreateRoom() {
+type GameRoom struct {
+	Ready    bool
+	ID       string
+	Name     string
+	Password string // TODO: Yup, game expects the password in plain-text
+	MapID    v1.GameMap
 
+	HostPlayer *UserSession
+	CreatedBy  *UserSession
+
+	Players map[int64]*UserSession
 }
 
-// DestroyRoom deletes an existing lobby room.
+// ListRooms returns list of all created game rooms.
+func (mp *Multiplayer) ListRooms() map[string]*GameRoom {
+	mp.roomsMutex.RLock()
+	defer mp.roomsMutex.RUnlock()
+
+	return mp.Rooms
+}
+
+func (mp *Multiplayer) GetRoom(roomId string) (GameRoom, bool) {
+	mp.roomsMutex.RLock()
+	defer mp.roomsMutex.RUnlock()
+
+	room, found := mp.Rooms[roomId]
+	if !found {
+		return GameRoom{}, false
+	}
+	return *room, found
+}
+
+// CreateRoom creates new game room.
+func (mp *Multiplayer) CreateRoom(room GameRoom) GameRoom {
+	mp.roomsMutex.Lock()
+	defer mp.roomsMutex.Unlock()
+
+	mp.Rooms[room.ID] = &room
+	return room
+}
+
+// DestroyRoom deletes an existing game room.
 func (mp *Multiplayer) DestroyRoom() {
 
 }
 
-// JoinRoom adds a player to an existing lobby room.
-func (mp *Multiplayer) JoinRoom() {
-	fmt.Println("Joining room")
+// JoinRoom adds a player to an existing game room.
+func (mp *Multiplayer) JoinRoom(roomId string, userId int64, ipAddr string) (GameRoom, error) {
+	mp.roomsMutex.Lock()
+	defer mp.roomsMutex.Unlock()
+
+	mp.sessionMutex.Lock()
+	defer mp.sessionMutex.Unlock()
+
+	// Finding the user session of the player who joins
+	joiningPlayer, found := mp.sessions[userId]
+	if !found {
+		return GameRoom{}, fmt.Errorf("user session %d not found", userId)
+	}
+
+	// Find the game room
+	room, found := mp.Rooms[roomId]
+	if !found {
+		return GameRoom{}, fmt.Errorf("room %s not found", roomId)
+	}
+
+	// Check if player was already added to game room
+	if _, ok := room.Players[userId]; ok {
+		return GameRoom{}, fmt.Errorf("user session %d already joined", userId)
+	}
+
+	// Override the IP address
+	joiningPlayer.IPAddress = ipAddr
+
+	// Update the game room
+	room.Players[userId] = joiningPlayer
+
+	return *room, nil
 }
 
 // SetRoomReady notifies the LobbyRoom that it can start accepting players.
@@ -297,7 +368,7 @@ func (mp *Multiplayer) SetPlayerConnected(session *UserSession) {
 
 	session.SendMessage(ctx, wire.LobbyUsers, wire.Message{
 		Type:    wire.LobbyUsers,
-		To:      session.UserID,
+		To:      strconv.FormatInt(session.UserID, 10),
 		Content: players,
 	})
 
@@ -316,7 +387,10 @@ func (mp *Multiplayer) SetPlayerDisconnected(session *UserSession) {
 		slog.Debug("Could not close the connection", "user", session.UserID, "error", err)
 	}
 	mp.DeleteUserSession(session.UserID)
-	mp.BroadcastMessage(context.TODO(), wire.Compose(wire.LeaveLobby, wire.Message{Type: wire.LeaveLobby, From: session.UserID}))
+	mp.BroadcastMessage(context.TODO(), wire.Compose(wire.LeaveLobby, wire.Message{
+		Type: wire.LeaveLobby,
+		From: strconv.FormatInt(session.UserID, 10),
+	}))
 }
 
 // BroadcastMessage sends a message to all connected users.
@@ -330,7 +404,7 @@ func (mp *Multiplayer) BroadcastMessage(ctx context.Context, payload []byte) {
 }
 
 // GetUserSession is a thread-safe method to receive a session by ID.
-func (mp *Multiplayer) GetUserSession(id string) (*UserSession, bool) {
+func (mp *Multiplayer) GetUserSession(id int64) (*UserSession, bool) {
 	mp.sessionMutex.RLock()
 	member, ok := mp.sessions[id]
 	mp.sessionMutex.RUnlock()
@@ -338,7 +412,7 @@ func (mp *Multiplayer) GetUserSession(id string) (*UserSession, bool) {
 }
 
 // AddUserSession is a thread-safe operation to add a session identified by ID.
-func (mp *Multiplayer) AddUserSession(id string, session *UserSession) {
+func (mp *Multiplayer) AddUserSession(id int64, session *UserSession) {
 	if _, exists := mp.GetUserSession(id); exists {
 		return
 	}
@@ -348,7 +422,7 @@ func (mp *Multiplayer) AddUserSession(id string, session *UserSession) {
 }
 
 // DeleteUserSession is a thread-safe operation to delete a session by ID.
-func (mp *Multiplayer) DeleteUserSession(id string) {
+func (mp *Multiplayer) DeleteUserSession(id int64) {
 	mp.sessionMutex.Lock()
 	delete(mp.sessions, id)
 	mp.sessionMutex.Unlock()

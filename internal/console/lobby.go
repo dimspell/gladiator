@@ -3,6 +3,7 @@ package console
 import (
 	"log/slog"
 	"net/http"
+	"strconv"
 
 	"github.com/coder/websocket"
 	"github.com/dimspell/gladiator/internal/wire"
@@ -11,12 +12,16 @@ import (
 func (c *Console) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	params := r.URL.Query()
 	roomName := params.Get("roomName")
-	userID := params.Get("userID")
+	userID, err := strconv.ParseInt(params.Get("userID"), 10, 64)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
 	// version := params.Get("version")
 
 	// FIXME: Improve validation.
 	// For now only the DISPEL channel is available to use.
-	if roomName != "DISPEL" || userID == "" {
+	if roomName != "DISPEL" || userID == 0 {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}

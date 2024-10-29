@@ -66,13 +66,13 @@ func TestBackend_UpdateCharacterInfo(t *testing.T) {
 	}
 	defer session.observerDone()
 
-	us, ok := cs.Multiplayer.GetUserSession("2137")
+	us, ok := cs.Multiplayer.GetUserSession(2137)
 	if !ok {
 		t.Error("expected user session connected to the lobby")
 		return
 	}
 
-	assert.Equal(t, "2137", us.UserID)
+	assert.Equal(t, int64(2137), us.UserID)
 	assert.Equal(t, int64(2137), us.User.UserID)
 	assert.Equal(t, "dev", us.User.Version)
 	assert.Equal(t, "JP", us.User.Username)

@@ -6,7 +6,6 @@ import (
 
 	"connectrpc.com/connect"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
-	"github.com/dimspell/gladiator/internal/model"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -14,19 +13,20 @@ func TestGameServiceServer_CreateGame(t *testing.T) {
 	g := &gameServiceServer{
 		Multiplayer: NewMultiplayer(),
 	}
+	g.Multiplayer.AddUserSession(10, NewUserSession(10, nil))
 
 	gameId := "Game Room"
 
 	resp, err := g.CreateGame(context.Background(), connect.NewRequest(&multiv1.CreateGameRequest{
 		GameName: gameId,
 		Password: "secret",
-		MapId:    3,
+		MapId:    multiv1.GameMap_FrozenLabyrinth,
 
 		Host: &multiv1.Player{
 			UserId:      10,
 			Username:    "user",
 			CharacterId: 12,
-			ClassType:   int32(model.ClassTypeMage),
+			ClassType:   multiv1.ClassType_Mage,
 			IpAddress:   "192.168.100.1",
 		},
 	}))
@@ -53,29 +53,31 @@ func TestGameServiceServer_CreateGame(t *testing.T) {
 	assert.Equal(t, gameId, room.ID)
 	assert.Equal(t, gameId, room.Name)
 	assert.Equal(t, "secret", room.Password)
-	assert.Equal(t, int64(3), room.MapID)
+	assert.Equal(t, multiv1.GameMap_FrozenLabyrinth, room.MapID)
 
 	assert.Equal(t, int64(10), room.HostPlayer.UserID)
 	assert.Equal(t, int64(10), room.CreatedBy.UserID)
-	assert.Equal(t, int64(10), room.Players[0].UserID)
+	assert.Equal(t, int64(10), room.Players[10].UserID)
+	assert.Equal(t, "user", room.Players[10].User.Username)
 }
 
 func TestGameServiceServer_ListGames(t *testing.T) {
 	g := &gameServiceServer{
 		Multiplayer: NewMultiplayer(),
 	}
+	g.Multiplayer.AddUserSession(10, NewUserSession(10, nil))
 
 	gameId := "Game Room"
 	_, err := g.CreateGame(context.Background(), connect.NewRequest(&multiv1.CreateGameRequest{
 		GameName: gameId,
 		Password: "secret",
-		MapId:    3,
+		MapId:    multiv1.GameMap_FrozenLabyrinth,
 
 		Host: &multiv1.Player{
 			UserId:      10,
 			Username:    "user",
 			CharacterId: 12,
-			ClassType:   int32(model.ClassTypeMage),
+			ClassType:   multiv1.ClassType_Mage,
 			IpAddress:   "192.168.100.1",
 		},
 	}))
@@ -100,7 +102,7 @@ func TestGameServiceServer_ListGames(t *testing.T) {
 	assert.Equal(t, gameId, room.GameId)
 	assert.Equal(t, gameId, room.Name)
 	assert.Equal(t, "secret", room.Password)
-	assert.Equal(t, int64(3), room.MapId)
+	assert.Equal(t, multiv1.GameMap_FrozenLabyrinth, room.MapId)
 	assert.Equal(t, "192.168.100.1", room.HostIpAddress)
 
 	assert.Equal(t, int64(10), room.HostUserId)
@@ -110,18 +112,19 @@ func TestGameServiceServer_GetGame(t *testing.T) {
 	g := &gameServiceServer{
 		Multiplayer: NewMultiplayer(),
 	}
+	g.Multiplayer.AddUserSession(10, NewUserSession(10, nil))
 
 	gameId := "Game Room"
 	_, err := g.CreateGame(context.Background(), connect.NewRequest(&multiv1.CreateGameRequest{
 		GameName: gameId,
 		Password: "secret",
-		MapId:    3,
+		MapId:    multiv1.GameMap_FrozenLabyrinth,
 
 		Host: &multiv1.Player{
 			UserId:      10,
 			Username:    "user",
 			CharacterId: 12,
-			ClassType:   int32(model.ClassTypeMage),
+			ClassType:   multiv1.ClassType_Mage,
 			IpAddress:   "192.168.100.1",
 		},
 	}))
@@ -141,7 +144,7 @@ func TestGameServiceServer_GetGame(t *testing.T) {
 	assert.Equal(t, gameId, room.GameId)
 	assert.Equal(t, gameId, room.Name)
 	assert.Equal(t, "secret", room.Password)
-	assert.Equal(t, int64(3), room.MapId)
+	assert.Equal(t, multiv1.GameMap_FrozenLabyrinth, room.MapId)
 	assert.Equal(t, int64(10), room.HostUserId)
 	assert.Equal(t, "192.168.100.1", room.HostIpAddress)
 
@@ -154,18 +157,20 @@ func TestGameServiceServer_JoinGame(t *testing.T) {
 	g := &gameServiceServer{
 		Multiplayer: NewMultiplayer(),
 	}
+	g.Multiplayer.AddUserSession(10, NewUserSession(10, nil))
+	g.Multiplayer.AddUserSession(5, NewUserSession(5, nil))
 
 	gameId := "Game Room"
 	if _, err := g.CreateGame(context.Background(), connect.NewRequest(&multiv1.CreateGameRequest{
 		GameName: gameId,
 		Password: "secret",
-		MapId:    3,
+		MapId:    multiv1.GameMap_FrozenLabyrinth,
 
 		Host: &multiv1.Player{
 			UserId:      10,
 			Username:    "user",
 			CharacterId: 12,
-			ClassType:   int32(model.ClassTypeMage),
+			ClassType:   multiv1.ClassType_Mage,
 			IpAddress:   "192.168.100.1",
 		},
 	})); err != nil {
@@ -180,7 +185,7 @@ func TestGameServiceServer_JoinGame(t *testing.T) {
 		CharacterName: "warrior",
 		GameRoomId:    gameId,
 		IpAddress:     "192.168.100.201",
-		ClassType:     int32(model.ClassTypeWarrior),
+		ClassType:     multiv1.ClassType_Warrior,
 	}))
 	if err != nil {
 		t.Error(err)

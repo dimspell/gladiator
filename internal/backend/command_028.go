@@ -50,16 +50,7 @@ func (b *Backend) HandleCreateGame(session *Session, req CreateGameRequest) erro
 			return err
 		}
 		slog.Info("packet-28: created game room", "id", respGame.Msg.Game.GameId, "name", respGame.Msg.Game.Name)
-
-		_, err = b.gameClient.JoinGame(context.TODO(), connect.NewRequest(&multiv1.JoinGameRequest{
-			UserId:      session.UserID,
-			CharacterId: session.CharacterID,
-			GameRoomId:  respGame.Msg.Game.GetGameId(),
-			IpAddress:   hostIPAddress.String(),
-		}))
-		if err != nil {
-			return err
-		}
+		
 		binary.LittleEndian.PutUint32(response[0:4], uint32(model.GameStateCreating))
 		break
 	case uint32(model.GameStateCreating):
