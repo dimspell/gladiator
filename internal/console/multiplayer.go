@@ -296,11 +296,45 @@ func (mp *Multiplayer) JoinRoom(roomId string, userId int64, ipAddr string) (Gam
 
 	// Override the IP address
 	joiningPlayer.IPAddress = ipAddr
+	joiningPlayer.GameID = room.ID
 
 	// Update the game room
 	room.Players[userId] = joiningPlayer
 
 	return *room, nil
+}
+
+func (mp *Multiplayer) AnnounceJoin(room GameRoom, userId int64) {
+	mp.sessionMutex.Lock()
+
+	// Finding the user session of the player who joins
+	joinedPlayer, found := mp.sessions[userId]
+	if !found {
+		mp.sessionMutex.Unlock()
+		return
+	}
+	mp.sessionMutex.Unlock()
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+
+	for id, session := range room.Players {
+		if id == userId {
+			continue
+		}
+		session.Send(ctx, wire.Compose(wire.JoinRoom, wire.Message{
+			To:   strconv.Itoa(int(id)),
+			From: strconv.Itoa(int(userId)),
+			Type: wire.JoinRoom,
+			Content: wire.Player{
+				UserID:      joinedPlayer.UserID,
+				Username:    joinedPlayer.User.Username,
+				CharacterID: joinedPlayer.Character.CharacterID,
+				ClassType:   joinedPlayer.Character.ClassType,
+				IPAddress:   joinedPlayer.IPAddress,
+			},
+		}))
+	}
 }
 
 // SetRoomReady notifies the LobbyRoom that it can start accepting players.

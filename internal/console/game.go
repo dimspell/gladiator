@@ -114,6 +114,11 @@ func (s *gameServiceServer) JoinGame(_ context.Context, req *connect.Request[mul
 		return nil, connect.NewError(connect.CodeCanceled, err)
 	}
 
+	s.Multiplayer.AnnounceJoin(
+		room,
+		req.Msg.UserId,
+	)
+
 	// for _, session := range s.Multiplayer.sessions {
 	// 	wire.Compose(wire.JoinRoom, wire.Message{
 	// 		Type:    wire.JoinRoom,
@@ -133,7 +138,7 @@ func (s *gameServiceServer) JoinGame(_ context.Context, req *connect.Request[mul
 			IpAddress:   player.IPAddress,
 		})
 	}
-	resp := connect.NewResponse(&multiv1.JoinGameResponse{Players: players})
 
+	resp := connect.NewResponse(&multiv1.JoinGameResponse{Players: players})
 	return resp, nil
 }
