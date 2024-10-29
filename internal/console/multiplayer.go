@@ -2,6 +2,7 @@ package console
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strconv"
@@ -175,11 +176,15 @@ func (mp *Multiplayer) HandleSession(ctx context.Context, session *UserSession) 
 		session.LastSeen = time.Now().In(time.UTC)
 
 		payload, err := session.ReadNext(ctx)
-		if websocket.CloseStatus(err) == websocket.StatusNormalClosure {
-			slog.Debug("Closing because of", "error", err)
-			return err
-		}
 		if err != nil {
+			if errors.Is(err, context.Canceled) {
+				return err
+			}
+			if websocket.CloseStatus(err) == websocket.StatusNormalClosure {
+				slog.Debug("Closing because of", "error", err)
+				return err
+			}
+
 			slog.Error("Could not handle the message", "error", err)
 			return err
 		}
