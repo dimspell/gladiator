@@ -42,12 +42,19 @@ func (p *LAN) CreateRoom(params CreateParams, session *Session) (net.IP, error) 
 		return net.IP{}, fmt.Errorf("incorrect host IP address: %s", p.MyIPAddress)
 	}
 
+	player := wire.Player{
+		UserID:      session.UserID,
+		Username:    session.Username,
+		CharacterID: session.CharacterID,
+		ClassType:   byte(session.ClassType),
+		IPAddress:   p.MyIPAddress,
+	}
+
 	gameRoom := NewGameRoom()
 	gameRoom.ID = params.GameID
 	gameRoom.Name = params.GameID
-	gameRoom.Ready = false
-	gameRoom.SetHost(session.ToPlayer())
-	gameRoom.SetPlayer(session.ToPlayer())
+	gameRoom.SetHost(player)
+	gameRoom.SetPlayer(player)
 
 	session.SetGameRoom(gameRoom)
 
@@ -65,7 +72,14 @@ func (p *LAN) HostRoom(params HostParams, session *Session) error {
 	return nil
 }
 
-func (p *LAN) Join(_ JoinParams, _ *Session) error { return nil }
+func (p *LAN) Join(params JoinParams, session *Session) (net.IP, error) {
+	ip := net.ParseIP(p.MyIPAddress)
+	if ip == nil {
+		return nil, fmt.Errorf("incorrect IP address: %s", p.MyIPAddress)
+	}
+
+	return ip, nil
+}
 
 func (p *LAN) GetPlayerAddr(params GetPlayerAddrParams, session *Session) (net.IP, error) {
 	ip := net.ParseIP(params.IPAddress)
@@ -95,8 +109,8 @@ func (p *LAN) ExtendWire(ctx context.Context, session *Session, et wire.EventTyp
 		player := msg.Content
 		slog.Info("Other player is joining", "playerId", player.ID())
 
-		// p.RoomPlayers.Store(player.UserID, player)
-	case wire.LeaveRoom:
+		session.gameRoom.SetPlayer(player)
+	case wire.LeaveRoom, wire.LeaveLobby:
 		_, msg, err := wire.DecodeTyped[wire.Player](payload)
 		if err != nil {
 			return
@@ -104,7 +118,8 @@ func (p *LAN) ExtendWire(ctx context.Context, session *Session, et wire.EventTyp
 
 		player := msg.Content
 		slog.Info("Other player is leaving", "playerId", player.ID())
-		// p.RoomPlayers.Delete(player.UserID)
+
+		session.gameRoom.DeletePlayer(player)
 	default:
 		//	Ignore
 	}

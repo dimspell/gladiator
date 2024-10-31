@@ -194,6 +194,7 @@ func TestE2E_LAN(t *testing.T) {
 		'a', 'r', 'c', 'h', 'e', 'r', 0, // Player name
 	}, findPacket(conn2.Written, JoinGame))
 
+	// Room contains all data
 	room, ok = cs.Multiplayer.Rooms["room"]
 	if !ok {
 		t.Errorf("failed to find room")
@@ -213,6 +214,26 @@ func TestE2E_LAN(t *testing.T) {
 	assert.Equal(t, session2.UserID, room.Players[2].UserID)
 	assert.Equal(t, "mage", room.Players[2].User.Username)
 	assert.Equal(t, byte(v1.ClassType_Mage), room.Players[2].Character.ClassType)
+
+	// Host user has correct data
+	assert.Equal(t, int64(1), session1.UserID)
+	assert.Equal(t, "archer", session1.Username)
+	assert.Equal(t, "archer", session1.gameRoom.Players["1"].Username)
+	assert.Equal(t, byte(v1.ClassType_Archer), session1.gameRoom.Players["1"].ClassType)
+	assert.Equal(t, "198.51.100.1", session1.gameRoom.Players["1"].IPAddress)
+	assert.Equal(t, "mage", session1.gameRoom.Players["2"].Username)
+	assert.Equal(t, byte(v1.ClassType_Mage), session1.gameRoom.Players["2"].ClassType)
+	assert.Equal(t, "198.51.100.1", session1.gameRoom.Players["2"].IPAddress)
+
+	// Joining user has also the same data
+	assert.Equal(t, int64(2), session2.UserID)
+	assert.Equal(t, "mage", session2.Username)
+	assert.Equal(t, "archer", session2.gameRoom.Players["1"].Username)
+	assert.Equal(t, byte(v1.ClassType_Archer), session2.gameRoom.Players["1"].ClassType)
+	assert.Equal(t, "198.51.100.1", session2.gameRoom.Players["1"].IPAddress)
+	assert.Equal(t, "mage", session2.gameRoom.Players["2"].Username)
+	assert.Equal(t, byte(v1.ClassType_Mage), session2.gameRoom.Players["2"].ClassType)
+	assert.Equal(t, "198.51.100.1", session2.gameRoom.Players["2"].IPAddress)
 
 	// close(cs.Multiplayer.Messages)
 	// for message := range cs.Multiplayer.Messages {

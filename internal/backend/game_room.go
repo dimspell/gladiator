@@ -11,9 +11,8 @@ import (
 type GameRoom struct {
 	sync.RWMutex
 
-	ID    string
-	Name  string
-	Ready bool
+	ID   string
+	Name string
 
 	Host    wire.Player
 	Players map[string]wire.Player
@@ -28,12 +27,6 @@ func NewGameRoom() *GameRoom {
 func (g *GameRoom) SetHost(player wire.Player) {
 	g.Lock()
 	g.Host = player
-	g.Unlock()
-}
-
-func (g *GameRoom) SetReady() {
-	g.Lock()
-	g.Ready = true
 	g.Unlock()
 }
 

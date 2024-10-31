@@ -11,6 +11,7 @@ import (
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/internal/backend/packet"
 	"github.com/dimspell/gladiator/internal/model"
+	"github.com/dimspell/gladiator/internal/wire"
 )
 
 // HandleJoinGame handles 0x22ff (255-34) command
@@ -32,17 +33,49 @@ func (b *Backend) HandleJoinGame(session *Session, req JoinGameRequest) error {
 		return err
 	}
 
-	// TODO: Refactor me
-	var ipAddr string
-	gameProxy, ok := b.Proxy.(*LAN)
-	if ok {
-		ipAddr = gameProxy.MyIPAddress
+	myIpAddr, err := b.Proxy.Join(JoinParams{
+		HostUserID: fmt.Sprintf("%d", respGame.Msg.GetGame().HostUserId),
+		HostUserIP: respGame.Msg.GetGame().HostIpAddress,
+		GameID:     respGame.Msg.GetGame().GetName(),
+	}, session)
+	if err != nil {
+		return err
 	}
+
+	gameRoom := NewGameRoom()
+	gameRoom.ID = respGame.Msg.GetGame().GetName()
+	gameRoom.Name = respGame.Msg.GetGame().GetName()
+	for _, player := range respGame.Msg.Players {
+		gameRoom.SetPlayer(wire.Player{
+			UserID:      player.UserId,
+			Username:    player.Username,
+			CharacterID: player.CharacterId,
+			ClassType:   byte(player.ClassType),
+			IPAddress:   player.IpAddress,
+		})
+		if respGame.Msg.Game.HostUserId == player.UserId {
+			gameRoom.SetHost(wire.Player{
+				UserID:      player.UserId,
+				Username:    player.Username,
+				CharacterID: player.CharacterId,
+				ClassType:   byte(player.ClassType),
+				IPAddress:   player.IpAddress,
+			})
+		}
+	}
+	gameRoom.SetPlayer(wire.Player{
+		UserID:      session.UserID,
+		Username:    session.Username,
+		CharacterID: session.CharacterID,
+		ClassType:   byte(session.ClassType),
+		IPAddress:   myIpAddr.To4().String(),
+	})
+	session.SetGameRoom(gameRoom)
 
 	respJoin, err := b.gameClient.JoinGame(context.TODO(), connect.NewRequest(&multiv1.JoinGameRequest{
 		UserId:     session.UserID,
 		GameRoomId: respGame.Msg.Game.GetGameId(),
-		IpAddress:  ipAddr,
+		IpAddress:  myIpAddr.To4().String(),
 	}))
 	if err != nil {
 		slog.Error("Could not join game room", "error", err)
@@ -81,14 +114,6 @@ func (b *Backend) HandleJoinGame(session *Session, req JoinGameRequest) error {
 		response = append(response, proxyIP.To4()[:]...)             // IP Address (4 bytes)
 		response = append(response, player.Username...)              // Player name (null terminated string)
 		response = append(response, byte(0))                         // Null byte
-	}
-
-	if err = b.Proxy.Join(JoinParams{
-		HostUserID: fmt.Sprintf("%d", respGame.Msg.GetGame().HostUserId),
-		HostUserIP: respGame.Msg.GetGame().HostIpAddress,
-		GameID:     respGame.Msg.GetGame().GetName(),
-	}, session); err != nil {
-		return err
 	}
 
 	return b.Send(session.Conn, JoinGame, response)

@@ -78,15 +78,6 @@ func (s *Session) SetGameRoom(gameRoom *GameRoom) {
 
 func (s *Session) GetUserID() string { return fmt.Sprintf("%d", s.UserID) }
 
-func (s *Session) ToPlayer() wire.Player {
-	return wire.Player{
-		UserID:      s.UserID,
-		Username:    s.Username,
-		CharacterID: s.CharacterID,
-		ClassType:   byte(s.ClassType),
-	}
-}
-
 func (s *Session) SendChatMessage(ctx context.Context, text string) error {
 	if err := wire.Write(ctx, s.wsConn, wire.ComposeTyped(
 		wire.Chat,

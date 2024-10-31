@@ -18,7 +18,7 @@ type Proxy interface {
 	GetPlayerAddr(GetPlayerAddrParams, *Session) (net.IP, error)
 
 	// Join is used to connect to TCP game host
-	Join(JoinParams, *Session) error
+	Join(JoinParams, *Session) (net.IP, error)
 
 	Close(session *Session)
 
