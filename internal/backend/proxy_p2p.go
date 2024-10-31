@@ -334,7 +334,6 @@ func (p *PeerToPeer) setUpChannels(session *Session, playerId int64, sendRTCOffe
 
 	peer, isHost, ok := p.getPeer(session, player.ID())
 	if !ok {
-		// TODO: Always guest is created, but should be checked if the user is a host
 		peer = session.IpRing.NextPeerAddress(player.ID(), false, isHost)
 	}
 	peer.Connection = peerConnection
@@ -343,7 +342,7 @@ func (p *PeerToPeer) setUpChannels(session *Session, playerId int64, sendRTCOffe
 		p.setPeer(session, peer)
 	}
 
-	guestTCP, guestUDP, err := redirect.NewNoop(peer.Mode, peer.Addr)
+	guestTCP, guestUDP, err := redirect.New(peer.Mode, peer.Addr)
 	if err != nil {
 		return nil, fmt.Errorf("could not create guest proxy for %d: %v", player.UserID, err)
 	}
