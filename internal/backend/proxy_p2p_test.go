@@ -1,213 +1,238 @@
 package backend
 
-// func TestPeerTopeerManual(t *testing.T) {
-// 	t.Cleanup(func() {
-// 		defer goleak.VerifyNone(t)
-// 	})
-// 	StartHost(t)
+import (
+	"bytes"
+	"context"
+	"log/slog"
+	"net/http/httptest"
+	"os"
+	"testing"
+	"time"
 
-// 	const roomName = "test"
-// 	const (
-// 		player1Name = "player1"
-// 		player2Name = "player2"
-// 		player3Name = "player3"
-// 		player4Name = "player4"
+	v1 "github.com/dimspell/gladiator/gen/multi/v1"
+	"github.com/dimspell/gladiator/internal/app/logger"
+	"github.com/dimspell/gladiator/internal/console"
+	"github.com/dimspell/gladiator/internal/console/database"
+	"github.com/dimspell/gladiator/internal/model"
+	"github.com/stretchr/testify/assert"
+)
 
-// 		hostRole  = Role(signalserver.RoleHost)
-// 		guestRole = Role(signalserver.RoleGuest)
-// 	)
+func TestE2E_P2P(t *testing.T) {
+	logger.SetColoredLogger(os.Stderr, slog.LevelDebug, false)
 
-// 	ws := &FakeWebsocket{Buffer: make([][]byte, 0)}
+	db, err := database.NewMemory()
+	if err != nil {
+		t.Fatalf("failed to create database: %v", err)
+		return
+	}
+	defer db.Close()
 
-// 	player1 := &PeerToPeer{
-// 		Peers:  p2p.NewPeers(),
-// 		IpRing: NewIpRing(),
-// 		ws:     ws,
-// 	} // Host called "player1"
-// 	player1HandlePackets := player1.handlePackets(hostRole, player1Name, roomName)
+	if err := database.Seed(db.Write); err != nil {
+		t.Fatalf("failed to seed database: %v", err)
+		return
+	}
 
-// 	player2 := &PeerToPeer{
-// 		Peers:  p2p.NewPeers(),
-// 		IpRing: NewIpRing(),
-// 		ws:     ws,
-// 	} // Guest, called "player2", joining to "player1"
-// 	player2HandlePackets := player2.handlePackets(guestRole, player2Name, roomName)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-// 	if err := player1.handleJoin(signalserver.MessageContent[signalserver.Member]{
-// 		Type: signalserver.Join,
-// 		Content: signalserver.Member{
-// 			UserID: player2Name,
-// 			Role:   signalserver.RoleGuest,
-// 		},
-// 		From: "",
-// 		To:   "",
-// 	}, player1Name, roomName, hostRole); err != nil {
-// 		t.Error(err)
-// 		return
-// 	}
+	cs := &console.Console{
+		Multiplayer: console.NewMultiplayer(),
+		DB:          db,
+	}
+	ts := httptest.NewServer(cs.HttpRouter())
+	defer ts.Close()
 
-// 	player1.Peers.Range(func(_ string, peer *p2p.Peer) {
-// 		<-webrtc.GatheringCompletePromise(peer.Connection)
-// 	})
+	// go cs.Multiplayer.Run(ctx)
 
-// 	{
-// 		var arr []byte
-// 		arr = make([]byte, 1024)
-// 		n, err := ws.Read(arr)
-// 		if err != nil {
-// 			t.Error(err)
-// 			return
-// 		}
-// 		if err := player1HandlePackets(arr[:n]); err != nil {
-// 			t.Error(err)
-// 			return
-// 		}
-// 	}
+	// Remove the HTTP schema prefix
+	cs.Addr = ts.URL[len("http://"):]
 
-// 	if err := player2.handleJoin(signalserver.MessageContent[signalserver.Member]{
-// 		Type: signalserver.Join,
-// 		Content: signalserver.Member{
-// 			UserID: player1Name,
-// 			Role:   signalserver.RoleHost,
-// 		},
-// 		From: "",
-// 		To:   "",
-// 	}, player2Name, roomName, guestRole); err != nil {
-// 		t.Error(err)
-// 		return
-// 	}
+	proxy := NewPeerToPeer()
 
-// 	{
-// 		var arr []byte
-// 		arr = make([]byte, 1024)
-// 		n, err := ws.Read(arr)
-// 		if err != nil {
-// 			t.Error(err)
-// 			return
-// 		}
-// 		if err := player2HandlePackets(arr[:n]); err != nil {
-// 			t.Error(err)
-// 			return
-// 		}
-// 	}
+	bd := NewBackend("", cs.Addr, proxy)
+	bd.SignalServerURL = "ws://" + cs.Addr + "/lobby"
 
-// 	player2.Peers.Range(func(_ string, peer *p2p.Peer) {
-// 		<-webrtc.GatheringCompletePromise(peer.Connection)
-// 	})
+	conn1 := &mockConn{}
+	session1 := bd.AddSession(conn1)
 
-// 	{
-// 		var arr []byte
-// 		arr = make([]byte, 1024)
-// 		n, err := ws.Read(arr)
-// 		if err != nil {
-// 			t.Error(err)
-// 			return
-// 		}
-// 		if err := player2HandlePackets(arr[:n]); err != nil {
-// 			t.Error(err)
-// 			return
-// 		}
-// 	}
+	// Sign-in
+	assert.NoError(t, bd.HandleClientAuthentication(session1, ClientAuthenticationRequest{
+		2, 0, 0, 0, // Unknown
+		't', 'e', 's', 't', 0, // Password
+		'a', 'r', 'c', 'h', 'e', 'r', 0, // Username
+	}))
+	if !bytes.Equal([]byte{255, 41, 8, 0, 1, 0, 0, 0}, conn1.Written) {
+		t.Errorf("Not logged in, got: %v", conn1.Written)
+		return
+	}
 
-// 	{
-// 		var arr []byte
-// 		arr = make([]byte, 1024)
-// 		n, err := ws.Read(arr)
-// 		if err != nil {
-// 			t.Error(err)
-// 			return
-// 		}
-// 		if err := player1HandlePackets(arr[:n]); err != nil {
-// 			t.Error(err)
-// 			return
-// 		}
-// 	}
+	// Select character
+	assert.NoError(t, bd.HandleSelectCharacter(session1, SelectCharacterRequest{
+		'a', 'r', 'c', 'h', 'e', 'r', 0, // User name
+		'a', 'r', 'c', 'h', 'e', 'r', 0, // Character name
+	}))
+	err = bd.JoinLobby(ctx, session1)
+	if err != nil {
+		t.Errorf("failed to join lobby: %v", err)
+		return
+	}
+	err = bd.RegisterNewObserver(ctx, session1)
+	if err != nil {
+		t.Errorf("failed to register new observer: %v", err)
+		return
+	}
 
-// 	fmt.Println(player1.Peers.Get(player2Name))
-// 	fmt.Println(player2.Peers.Get(player1Name))
-// 	fmt.Println("Done")
+	// Create new game room
+	assert.NoError(t, bd.HandleCreateGame(session1, CreateGameRequest{
+		0, 0, 0, 0, // State
+		byte(v1.GameMap_FrozenLabyrinth), 0, 0, 0, // Map ID
+		'r', 'o', 'o', 'm', 0, // Game room name
+		0, // Password
+	}))
+	assert.NoError(t, bd.HandleCreateGame(session1, CreateGameRequest{
+		1, 0, 0, 0, // State
+		byte(v1.GameMap_FrozenLabyrinth), 0, 0, 0, // Map ID
+		'r', 'o', 'o', 'm', 0, // Game room name
+		0, // Password
+	}))
 
-// 	player1.Close()
-// 	player2.Close()
+	cs.Multiplayer.HandleIncomingMessage(ctx, <-cs.Multiplayer.Messages)
 
-// 	// assert.NoError(t, err)
+	room, ok := cs.Multiplayer.Rooms["room"]
+	if !ok {
+		t.Errorf("failed to find room")
+		return
+	}
+	if !room.Ready {
+		t.Errorf("failed to create new room - it is unready")
+		return
+	}
+	assert.Equal(t, "room", room.Name)
+	assert.Equal(t, session1.UserID, room.CreatedBy.UserID)
+	assert.Equal(t, session1.UserID, room.HostPlayer.UserID)
+	assert.Equal(t, 1, len(room.Players))
+	assert.Equal(t, session1.UserID, room.Players[1].UserID)
+	assert.Equal(t, "archer", room.Players[1].User.Username)
+	assert.Equal(t, byte(v1.ClassType_Archer), room.Players[1].Character.ClassType)
 
-// }
+	// Other user
+	conn2 := &mockConn{}
+	session2 := bd.AddSession(conn2)
 
-// func TestPeerToPeer(t *testing.T) {
-// 	defer goleak.VerifyNone(t)
+	// Sign-in by player2
+	assert.NoError(t, bd.HandleClientAuthentication(session2, ClientAuthenticationRequest{
+		2, 0, 0, 0, // Unknown
+		't', 'e', 's', 't', 0, // Password
+		'm', 'a', 'g', 'e', 0, // Username
+	}))
+	if !bytes.Equal([]byte{255, 41, 8, 0, 1, 0, 0, 0}, conn2.Written) {
+		t.Errorf("Not logged in, got: %v", conn2.Written)
+		return
+	}
 
-// 	t.Run("Hosting a game", func(t *testing.T) {
-// 		const roomName = "room"
+	// Select character by player2
+	assert.NoError(t, bd.HandleSelectCharacter(session2, SelectCharacterRequest{
+		'm', 'a', 'g', 'e', 0, // User name
+		'm', 'a', 'g', 'e', 0, // Character name
+	}))
+	err = bd.JoinLobby(ctx, session2)
+	if err != nil {
+		t.Errorf("failed to join lobby: %v", err)
+		return
+	}
+	err = bd.RegisterNewObserver(ctx, session2)
+	if err != nil {
+		t.Errorf("failed to register new observer: %v", err)
+		return
+	}
 
-// 		// StartHost(t)
-// 		websocketURL := StartSignalServer(t)
-// 		// websocketURL := "ws://localhost:5050"
+	// Truncate
+	conn2.Written = nil
 
-// 		a := NewPeerToPeer(websocketURL)
-// 		defer a.Close()
+	// List games
+	assert.NoError(t, bd.HandleListGames(session2, ListGamesRequest{}))
 
-// 		if _, err := a.CreateRoom(CreateParams{
-// 			HostUserIP: "",
-// 			HostUserID: "user1",
-// 			GameID:     roomName,
-// 		}); err != nil {
-// 			t.Error(err)
-// 			return
-// 		}
-// 		if err := a.Host(HostParams{
-// 			GameID:     roomName,
-// 			HostUserID: "user1",
-// 		}); err != nil {
-// 			t.Error(err)
-// 			return
-// 		}
+	// Check if user has received the game list with corresponding payload
+	assert.Equal(t, []byte{
+		1, 0, 0, 0, // Number of games
+		127, 0, 1, 2, // IP address of host
+		'r', 'o', 'o', 'm', 0, // Room name
+		0, // Password
+	}, findPacket(conn2.Written, ListGames))
 
-// 		b := NewPeerToPeer(websocketURL)
-// 		defer b.Close()
+	// Truncate
+	conn2.Written = nil
 
-// 		if _, err := b.Join(JoinParams{
-// 			HostUserID:    "user1",
-// 			GameID:        roomName,
-// 			HostUserIP: "",
-// 			CurrentUserID: "user2",
-// 		}); err != nil {
-// 			t.Error(err)
-// 			return
-// 		}
+	// Select game
+	assert.NoError(t, bd.HandleSelectGame(session2, SelectGameRequest{
+		'r', 'o', 'o', 'm', 0, // Game name
+		0, // Password
+	}))
 
-// 		time.Sleep(2 * time.Second)
+	// Check if the game is correct
+	assert.Equal(t, []byte{
+		byte(v1.GameMap_FrozenLabyrinth), 0, 0, 0, // Map ID
+		byte(v1.ClassType_Archer), 0, 0, 0, // Host's character class type
+		127, 0, 1, 2, // IP address of host
+		'a', 'r', 'c', 'h', 'e', 'r', 0, // Player name
+	}, findPacket(conn2.Written, SelectGame))
 
-// 		fmt.Println(a.Peers)
-// 		fmt.Println(b.Peers)
+	// Truncate
+	conn2.Written = nil
 
-// 		if _, err := b.GetPlayerAddr(GetPlayerAddrParams{
-// 			GameID:    roomName,
-// 			UserID:    "user1",
-// 			IPAddress: "127.0.0.1",
-// 		}); err != nil {
-// 			t.Error(err)
-// 			return
-// 		}
-// 	})
-// }
+	// Join to host
+	assert.NoError(t, bd.HandleJoinGame(session2, JoinGameRequest{
+		'r', 'o', 'o', 'm', 0, // Game name
+		0, // Password
+	}))
 
-// func StartSignalServer(t testing.TB) string {
-// 	t.Helper()
+	// Ensure the response is correct
+	assert.Equal(t, []byte{
+		model.GameStateStarted, 0, // Game state
+		byte(v1.ClassType_Archer), 0, 0, 0, // Host's character class type
+		127, 0, 1, 2, // IP address of host
+		'a', 'r', 'c', 'h', 'e', 'r', 0, // Player name
+	}, findPacket(conn2.Written, JoinGame))
 
-// 	h, err := signalserver.NewServer()
-// 	if err != nil {
-// 		t.Fatal(err)
-// 		return ""
-// 	}
-// 	ts := httptest.NewServer(h)
+	// Room contains all data
+	room, ok = cs.Multiplayer.Rooms["room"]
+	if !ok {
+		t.Errorf("failed to find room")
+		return
+	}
+	if !room.Ready {
+		t.Errorf("failed to join room - it is unready")
+		return
+	}
+	assert.Equal(t, "room", room.Name)
+	assert.Equal(t, session1.UserID, room.CreatedBy.UserID)
+	assert.Equal(t, session1.UserID, room.HostPlayer.UserID)
+	assert.Equal(t, 2, len(room.Players))
+	assert.Equal(t, session1.UserID, room.Players[1].UserID)
+	assert.Equal(t, "archer", room.Players[1].User.Username)
+	assert.Equal(t, byte(v1.ClassType_Archer), room.Players[1].Character.ClassType)
+	assert.Equal(t, session2.UserID, room.Players[2].UserID)
+	assert.Equal(t, "mage", room.Players[2].User.Username)
+	assert.Equal(t, byte(v1.ClassType_Mage), room.Players[2].Character.ClassType)
 
-// 	t.Cleanup(func() {
-// 		ts.Close()
-// 	})
+	// Host user has correct data
+	assert.Equal(t, int64(1), session1.UserID)
+	assert.Equal(t, "archer", session1.Username)
+	assert.Equal(t, "archer", session1.gameRoom.Players["1"].Username)
+	assert.Equal(t, byte(v1.ClassType_Archer), session1.gameRoom.Players["1"].ClassType)
+	assert.Equal(t, "mage", session1.gameRoom.Players["2"].Username)
+	assert.Equal(t, byte(v1.ClassType_Mage), session1.gameRoom.Players["2"].ClassType)
 
-// 	wsURI, _ := url.Parse(ts.URL)
-// 	wsURI.Scheme = "ws"
+	// Joining user has also the same data
+	assert.Equal(t, int64(2), session2.UserID)
+	assert.Equal(t, "mage", session2.Username)
+	assert.Equal(t, "archer", session2.gameRoom.Players["1"].Username)
+	assert.Equal(t, byte(v1.ClassType_Archer), session2.gameRoom.Players["1"].ClassType)
+	assert.Equal(t, "mage", session2.gameRoom.Players["2"].Username)
+	assert.Equal(t, byte(v1.ClassType_Mage), session2.gameRoom.Players["2"].ClassType)
 
-// 	return wsURI.String()
-// }
+	// // close(cs.Multiplayer.Messages)
+	// // for message := range cs.Multiplayer.Messages {
+	// // 	fmt.Println("unhandled message", message)
+	// // }
+}

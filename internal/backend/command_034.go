@@ -42,27 +42,7 @@ func (b *Backend) HandleJoinGame(session *Session, req JoinGameRequest) error {
 		return err
 	}
 
-	gameRoom := NewGameRoom()
-	gameRoom.ID = respGame.Msg.GetGame().GetName()
-	gameRoom.Name = respGame.Msg.GetGame().GetName()
-	for _, player := range respGame.Msg.Players {
-		gameRoom.SetPlayer(wire.Player{
-			UserID:      player.UserId,
-			Username:    player.Username,
-			CharacterID: player.CharacterId,
-			ClassType:   byte(player.ClassType),
-			IPAddress:   player.IpAddress,
-		})
-		if respGame.Msg.Game.HostUserId == player.UserId {
-			gameRoom.SetHost(wire.Player{
-				UserID:      player.UserId,
-				Username:    player.Username,
-				CharacterID: player.CharacterId,
-				ClassType:   byte(player.ClassType),
-				IPAddress:   player.IpAddress,
-			})
-		}
-	}
+	gameRoom := session.gameRoom
 	gameRoom.SetPlayer(wire.Player{
 		UserID:      session.UserID,
 		Username:    session.Username,

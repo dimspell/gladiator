@@ -10,6 +10,7 @@ import (
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/internal/backend/packet"
 	"github.com/dimspell/gladiator/internal/model"
+	"github.com/dimspell/gladiator/internal/wire"
 )
 
 // HandleSelectGame handles 0x45ff (255-69) command
@@ -33,6 +34,29 @@ func (b *Backend) HandleSelectGame(session *Session, req SelectGameRequest) erro
 		slog.Warn("No game found", "room", data.RoomName, "error", err)
 		return nil
 	}
+
+	gameRoom := NewGameRoom()
+	gameRoom.ID = respGame.Msg.GetGame().GetName()
+	gameRoom.Name = respGame.Msg.GetGame().GetName()
+	for _, player := range respGame.Msg.Players {
+		gameRoom.SetPlayer(wire.Player{
+			UserID:      player.UserId,
+			Username:    player.Username,
+			CharacterID: player.CharacterId,
+			ClassType:   byte(player.ClassType),
+			IPAddress:   player.IpAddress,
+		})
+		if respGame.Msg.Game.HostUserId == player.UserId {
+			gameRoom.SetHost(wire.Player{
+				UserID:      player.UserId,
+				Username:    player.Username,
+				CharacterID: player.CharacterId,
+				ClassType:   byte(player.ClassType),
+				IPAddress:   player.IpAddress,
+			})
+		}
+	}
+	session.SetGameRoom(gameRoom)
 
 	// gameRoom := SelectGameResponse{
 	// 	Lobby: model.LobbyRoom{
@@ -70,7 +94,7 @@ func (b *Backend) HandleSelectGame(session *Session, req SelectGameRequest) erro
 				"ipAddress", ps.IPAddress,
 			)
 			// return err
-			continue
+			// continue
 		}
 
 		// TODO: make sure the host is the first one

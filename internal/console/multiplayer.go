@@ -135,7 +135,7 @@ const (
 // HandleIncomingMessage handles the incoming message pump by dispatching
 // commands based on the message type.
 func (mp *Multiplayer) HandleIncomingMessage(ctx context.Context, msg wire.Message) {
-	// slog.Debug("Received a signal message", "type", msg.Type.String(), "from", msg.From, "to", msg.To)
+	slog.Debug("Received a signal message", "type", msg.Type.String(), "from", msg.From, "to", msg.To)
 
 	switch msg.Type {
 	case wire.Chat:

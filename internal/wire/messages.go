@@ -29,15 +29,8 @@ func (m Message) Encode() []byte {
 	return out
 }
 
-type Member struct {
-	// UserID is the identifier used by the console to identify the user.
-	UserID string `json:"userID"`
-
-	IsHost bool `json:"isHost"`
-}
-
 type Offer struct {
-	Member Member                    `json:"member"`
+	UserID int64                     `json:"userID"`
 	Offer  webrtc.SessionDescription `json:"offer"`
 }
 
