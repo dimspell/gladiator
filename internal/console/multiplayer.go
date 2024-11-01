@@ -427,8 +427,9 @@ func (mp *Multiplayer) SetPlayerDisconnected(session *UserSession) {
 	}
 	mp.DeleteUserSession(session.UserID)
 	mp.BroadcastMessage(context.TODO(), wire.Compose(wire.LeaveLobby, wire.Message{
-		Type: wire.LeaveLobby,
-		From: strconv.FormatInt(session.UserID, 10),
+		Type:    wire.LeaveLobby,
+		From:    strconv.Itoa(int(session.UserID)),
+		Content: session.ToPlayer(),
 	}))
 }
 

@@ -90,7 +90,11 @@ func (p *LAN) GetPlayerAddr(params GetPlayerAddrParams, session *Session) (net.I
 }
 
 func (p *LAN) Close(session *Session) {
-	session.gameRoom = nil
+	if session.gameRoom != nil {
+		session.SendLeaveRoom(context.TODO(), session.gameRoom)
+		session.gameRoom = nil
+	}
+
 	// p.RoomPlayers.Clear()
 }
 
