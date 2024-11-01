@@ -312,10 +312,33 @@ func (mp *Multiplayer) HandleLeaveRoom(ctx context.Context, msg wire.Message) {
 		return
 	}
 
-	mp.BroadcastMessage(ctx, wire.ComposeTyped(wire.LeaveRoom, wire.MessageContent[wire.Player]{
-		Type:    wire.LeaveRoom,
-		Content: player,
-	}))
+	joinedPlayer, found := mp.sessions[player.UserID]
+	if !found {
+		return
+	}
+
+	room, ok := mp.Rooms[joinedPlayer.GameID]
+	if ok {
+		return
+	}
+	
+	for id, session := range room.Players {
+		if id == joinedPlayer.UserID {
+			continue
+		}
+		session.Send(ctx, wire.Compose(wire.LeaveRoom, wire.Message{
+			To:   strconv.Itoa(int(id)),
+			From: strconv.Itoa(int(joinedPlayer.UserID)),
+			Type: wire.LeaveRoom,
+			Content: wire.Player{
+				UserID:      joinedPlayer.UserID,
+				Username:    joinedPlayer.User.Username,
+				CharacterID: joinedPlayer.Character.CharacterID,
+				ClassType:   joinedPlayer.Character.ClassType,
+				IPAddress:   joinedPlayer.IPAddress,
+			},
+		}))
+	}
 }
 
 func (mp *Multiplayer) AnnounceJoin(room GameRoom, userId int64) {
