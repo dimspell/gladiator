@@ -147,6 +147,8 @@ func (mp *Multiplayer) HandleIncomingMessage(ctx context.Context, msg wire.Messa
 		mp.ForwardRTCMessage(ctx, msg)
 	case wire.SetRoomReady:
 		mp.SetRoomReady(ctx, msg)
+	case wire.LeaveRoom:
+		mp.HandleLeaveRoom(ctx, msg)
 	default:
 		// Do nothing but log the event type
 		slog.Error("Unhandled event type", "type", msg.Type.String())
@@ -302,6 +304,18 @@ func (mp *Multiplayer) JoinRoom(roomId string, userId int64, ipAddr string) (Gam
 	room.Players[userId] = joiningPlayer
 
 	return *room, nil
+}
+
+func (mp *Multiplayer) HandleLeaveRoom(ctx context.Context, msg wire.Message) {
+	player, ok := msg.Content.(wire.Player)
+	if !ok {
+		return
+	}
+
+	mp.BroadcastMessage(ctx, wire.ComposeTyped(wire.LeaveRoom, wire.MessageContent[wire.Player]{
+		Type:    wire.LeaveRoom,
+		Content: player,
+	}))
 }
 
 func (mp *Multiplayer) AnnounceJoin(room GameRoom, userId int64) {
