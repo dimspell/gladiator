@@ -321,11 +321,10 @@ func (mp *Multiplayer) HandleLeaveRoom(ctx context.Context, msg wire.Message) {
 	if ok {
 		return
 	}
-	
+
+	delete(room.Players, joinedPlayer.UserID)
+
 	for id, session := range room.Players {
-		if id == joinedPlayer.UserID {
-			continue
-		}
 		session.Send(ctx, wire.Compose(wire.LeaveRoom, wire.Message{
 			To:   strconv.Itoa(int(id)),
 			From: strconv.Itoa(int(joinedPlayer.UserID)),
