@@ -234,7 +234,8 @@ func (b *Backend) RegisterNewObserver(ctx context.Context, session *Session) err
 				slog.Warn("Could not decode the message", "session", session.ID, "error", err, "event", et.String(), "payload", p)
 				return
 			}
-			if err := b.Send(session.Conn, ReceiveMessage, NewGlobalMessage(msg.Content.User, msg.Content.Text)); err != nil {
+			//if err := b.Send(session.Conn, ReceiveMessage, NewGlobalMessage(msg.Content.User, msg.Content.Text)); err != nil {
+			if err := b.Send(session.Conn, ReceiveMessage, NewSystemMessage(msg.Content.User, msg.Content.Text, "???")); err != nil {
 				slog.Error("Error writing chat message over the backend wire", "session", session.ID, "error", err)
 				return
 			}
