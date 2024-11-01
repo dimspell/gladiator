@@ -267,8 +267,8 @@ func (mp *Multiplayer) CreateRoom(room GameRoom) GameRoom {
 }
 
 // DestroyRoom deletes an existing game room.
-func (mp *Multiplayer) DestroyRoom() {
-
+func (mp *Multiplayer) DestroyRoom(roomId string) {
+	delete(mp.Rooms, roomId)
 }
 
 // JoinRoom adds a player to an existing game room.
@@ -312,6 +312,12 @@ func (mp *Multiplayer) HandleLeaveRoom(ctx context.Context, msg wire.Message) {
 		return
 	}
 
+	mp.roomsMutex.Lock()
+	defer mp.roomsMutex.Unlock()
+
+	mp.sessionMutex.Lock()
+	defer mp.sessionMutex.Unlock()
+
 	joinedPlayer, found := mp.sessions[player.UserID]
 	if !found {
 		return
@@ -337,6 +343,10 @@ func (mp *Multiplayer) HandleLeaveRoom(ctx context.Context, msg wire.Message) {
 				IPAddress:   joinedPlayer.IPAddress,
 			},
 		}))
+	}
+
+	if len(room.Players) == 0 {
+		mp.DestroyRoom(room.ID)
 	}
 }
 
