@@ -183,14 +183,11 @@ func (c *Controller) StartBackend(consoleAddr, myIPAddress string) error {
 		}
 	}()
 
-	c.Backend = backend.NewBackend("127.0.0.1:6112", consoleAddr, myIPAddress)
+	c.Backend = backend.NewBackend("127.0.0.1:6112", consoleAddr, backend.NewLAN(myIPAddress))
 	if err := c.Backend.Start(); err != nil {
 		cancel()
 		return err
 	}
-
-	// By default make log all packets
-	c.Backend.PacketLogger = slog.Default()
 
 	// Healthcheck
 	c.backendProbe.Signal(probe.StatusRunning)
