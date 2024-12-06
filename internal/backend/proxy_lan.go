@@ -14,8 +14,6 @@ var _ Proxy = (*LAN)(nil)
 
 type LAN struct {
 	MyIPAddress string
-
-	Rooms map[string]*GameRoom
 }
 
 func NewLAN(myIPAddress string) *LAN {
