@@ -240,7 +240,7 @@ func TestE2E_LAN(t *testing.T) {
 
 	close(cs.Multiplayer.Messages)
 	for message := range cs.Multiplayer.Messages {
-		fmt.Println("unhandled message", message)
+		t.Error("unhandled message", message)
 	}
 }
 
