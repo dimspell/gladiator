@@ -9,7 +9,6 @@ import (
 	"connectrpc.com/connect"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/internal/backend/packet"
-	"github.com/dimspell/gladiator/internal/model"
 	"github.com/dimspell/gladiator/internal/wire"
 )
 
@@ -57,16 +56,6 @@ func (b *Backend) HandleSelectGame(session *Session, req SelectGameRequest) erro
 		}
 	}
 	session.SetGameRoom(gameRoom)
-
-	// gameRoom := SelectGameResponse{
-	// 	Lobby: model.LobbyRoom{
-	// 		HostIPAddress: hostIP.To4(),
-	// 		Name:          respGame.Msg.Game.Name,
-	// 		Password:      "",
-	// 	},
-	// 	MapID: uint32(respGame.Msg.Game.GetMapId()),
-	// 	// Players: []model.LobbyPlayer{}, // Unused
-	// }
 
 	response := []byte{}
 	response = binary.LittleEndian.AppendUint32(response, uint32(respGame.Msg.Game.GetMapId()))
@@ -129,8 +118,17 @@ func (r SelectGameRequest) Parse() (data SelectGameRequestData, err error) {
 	return data, rd.Close()
 }
 
-type SelectGameResponse struct {
-	Lobby   model.LobbyRoom
-	MapID   uint32
-	Players []model.LobbyPlayer
-}
+//	gameRoom := SelectGameResponse{
+//		Lobby: model.LobbyRoom{
+//			HostIPAddress: hostIP.To4(),
+//			Name:          respGame.Msg.Game.Name,
+//			Password:      "",
+//		},
+//		MapID: uint32(respGame.Msg.Game.GetMapId()),
+//		// Players: []model.LobbyPlayer{}, // Unused
+//	}
+//type SelectGameResponse struct {
+//	Lobby   model.LobbyRoom
+//	MapID   uint32
+//	Players []model.LobbyPlayer
+//}
