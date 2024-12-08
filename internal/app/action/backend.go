@@ -53,7 +53,11 @@ func BackendCommand() *cli.Command {
 			),
 		)
 
-		bd := backend.NewBackend(backendAddr, consoleAddr, backend.NewLAN(myIpAddr))
+		//bd := backend.NewBackend(backendAddr, consoleAddr, backend.NewLAN(myIpAddr))
+		bd := backend.NewBackend(backendAddr, consoleAddr, backend.NewPeerToPeer())
+
+		// TODO: Name the URL in the parameters
+		bd.SignalServerURL = defaultLobbyAddr
 
 		if err := bd.Start(); err != nil {
 			return err
