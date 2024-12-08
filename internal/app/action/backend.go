@@ -2,14 +2,13 @@ package action
 
 import (
 	"context"
+	"github.com/dimspell/gladiator/internal/app/logger"
+	"github.com/dimspell/gladiator/internal/backend"
+	"github.com/lmittmann/tint"
+	"github.com/urfave/cli/v3"
 	"log/slog"
 	"os"
-
-	"github.com/dimspell/gladiator/internal/app/logger"
-
-	"github.com/dimspell/gladiator/internal/app/logger/packetlogger"
-	"github.com/dimspell/gladiator/internal/backend"
-	"github.com/urfave/cli/v3"
+	"time"
 )
 
 func BackendCommand() *cli.Command {
@@ -40,9 +39,19 @@ func BackendCommand() *cli.Command {
 		backendAddr := c.String("backend-addr")
 		myIpAddr := c.String("my-ip-addr")
 
-		logger.PacketLogger = slog.New(packetlogger.New(os.Stderr, &packetlogger.Options{
-			Level: slog.LevelDebug,
-		}))
+		//logger.PacketLogger = slog.New(packetlogger.New(os.Stderr, &packetlogger.Options{
+		//	Level: slog.LevelDebug,
+		//}))
+		logger.PacketLogger = slog.New(
+			tint.NewHandler(
+				os.Stderr,
+				&tint.Options{
+					Level:      slog.LevelDebug,
+					TimeFormat: time.TimeOnly,
+					AddSource:  true,
+				},
+			),
+		)
 
 		bd := backend.NewBackend(backendAddr, consoleAddr, backend.NewLAN(myIpAddr))
 
