@@ -111,6 +111,10 @@ func (p *LAN) ExtendWire(ctx context.Context, session *Session, et wire.EventTyp
 		player := msg.Content
 		slog.Info("Other player is joining", "playerId", player.ID())
 
+		if session.gameRoom == nil {
+			return
+		}
+
 		session.gameRoom.SetPlayer(player)
 	case wire.LeaveRoom, wire.LeaveLobby:
 		_, msg, err := wire.DecodeTyped[wire.Player](payload)
@@ -120,6 +124,10 @@ func (p *LAN) ExtendWire(ctx context.Context, session *Session, et wire.EventTyp
 
 		player := msg.Content
 		slog.Info("Other player is leaving", "playerId", player.ID())
+
+		if session.gameRoom == nil {
+			return
+		}
 
 		session.gameRoom.DeletePlayer(player)
 	default:
