@@ -398,6 +398,13 @@ func (mp *Multiplayer) SetRoomReady(ctx context.Context, msg wire.Message) {
 		return
 	}
 
+	fromUserId, _ := strconv.ParseInt(msg.From, 10, 64)
+	user, ok := mp.GetUserSession(fromUserId)
+	if !ok {
+		return
+	}
+
+	user.GameID = roomId
 	lobbyRoom.Ready = true
 }
 

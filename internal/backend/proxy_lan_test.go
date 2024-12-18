@@ -218,6 +218,16 @@ func TestE2E_LAN(t *testing.T) {
 	assert.Equal(t, "mage", room.Players[2].User.Username)
 	assert.Equal(t, byte(v1.ClassType_Mage), room.Players[2].Character.ClassType)
 
+	mpSession1, ok := cs.Multiplayer.GetUserSession(1)
+	assert.True(t, ok)
+	assert.Equal(t, session1.UserID, mpSession1.UserID)
+	assert.Equal(t, "room", mpSession1.GameID)
+
+	mpSession2, ok := cs.Multiplayer.GetUserSession(2)
+	assert.True(t, ok)
+	assert.Equal(t, session2.UserID, mpSession2.UserID)
+	assert.Equal(t, "room", mpSession2.GameID)
+
 	// Host user has correct data
 	assert.Equal(t, int64(1), session1.UserID)
 	assert.Equal(t, "archer", session1.Username)
