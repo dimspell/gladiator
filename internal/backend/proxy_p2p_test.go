@@ -24,6 +24,10 @@ import (
 func TestE2E_P2P(t *testing.T) {
 	logger.SetColoredLogger(os.Stderr, slog.LevelDebug, false)
 
+	helperStartGameServer(t)
+
+	redirectFunc := redirect.New
+
 	db, err := database.NewMemory()
 	if err != nil {
 		t.Fatalf("failed to create database: %v", err)
@@ -53,7 +57,7 @@ func TestE2E_P2P(t *testing.T) {
 	cs.Addr = ts.URL[len("http://"):]
 
 	proxy1 := NewPeerToPeer()
-	proxy1.NewRedirect = redirect.New
+	proxy1.NewRedirect = redirectFunc
 	bd1 := NewBackend("", cs.Addr, proxy1)
 	bd1.SignalServerURL = "ws://" + cs.Addr + "/lobby"
 
@@ -123,7 +127,7 @@ func TestE2E_P2P(t *testing.T) {
 
 	// Other user
 	proxy2 := NewPeerToPeer()
-	proxy2.NewRedirect = redirect.New
+	proxy2.NewRedirect = redirectFunc
 	bd2 := NewBackend("", cs.Addr, proxy2)
 	bd2.SignalServerURL = "ws://" + cs.Addr + "/lobby"
 

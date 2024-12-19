@@ -13,7 +13,9 @@ type IpRing struct {
 	Ring *ring.Ring
 	mtx  sync.Mutex
 
-	IsTesting bool
+	TcpPortPrefix int
+	UdpPortPrefix int
+	IsTesting     bool
 }
 
 func NewIpRing() *IpRing {
@@ -23,7 +25,11 @@ func NewIpRing() *IpRing {
 		r.Value = i + 2
 		r = r.Next()
 	}
-	return &IpRing{Ring: r}
+	return &IpRing{
+		Ring:          r,
+		TcpPortPrefix: 6114,
+		UdpPortPrefix: 6113,
+	}
 }
 
 func (r *IpRing) NextInt() int {
@@ -34,20 +40,17 @@ func (r *IpRing) NextInt() int {
 	return d
 }
 
-func (r *IpRing) NextIP() net.IP {
-	return net.IPv4(127, 0, 1, byte(r.NextInt()))
-}
-
 func (r *IpRing) NextAddr() (ip net.IP, portTCP string, portUDP string) {
 	if !r.IsTesting {
-		return r.NextIP(), "", ""
+		ip = net.IPv4(127, 0, 1, byte(r.NextInt()))
+		return ip, "", ""
 	}
 
 	ip = net.IPv4(127, 0, 0, 1)
 
 	next := r.NextInt()
-	portTCP = fmt.Sprintf("6114%d", next)
-	portUDP = fmt.Sprintf("6113%d", next)
+	portTCP = fmt.Sprintf("%d%d", r.TcpPortPrefix, next)
+	portUDP = fmt.Sprintf("%d%d", r.UdpPortPrefix, next)
 
 	return ip, portTCP, portUDP
 }
