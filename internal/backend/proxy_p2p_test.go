@@ -136,8 +136,8 @@ func TestE2E_P2P(t *testing.T) {
 	conn2 := &mockConn{}
 	session2 := bd2.AddSession(conn2)
 	session2.IpRing.IsTesting = true
-	session1.IpRing.UdpPortPrefix = 2300
-	session1.IpRing.TcpPortPrefix = 2400
+	session2.IpRing.UdpPortPrefix = 2300
+	session2.IpRing.TcpPortPrefix = 2400
 
 	// Sign-in by player2
 	assert.NoError(t, bd2.HandleClientAuthentication(session2, ClientAuthenticationRequest{
@@ -377,6 +377,8 @@ func helperStartGameServer(t testing.TB) {
 	}()
 
 	t.Cleanup(func() {
+		t.Log("Shutting down the game server")
+
 		cancel()
 		udpConn.Close()
 		tcpListener.Close()
