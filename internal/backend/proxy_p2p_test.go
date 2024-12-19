@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"log"
 	"log/slog"
 	"net"
 	"net/http/httptest"
@@ -278,7 +277,7 @@ func TestE2E_P2P(t *testing.T) {
 		t.Error("unhandled message", message)
 	}
 
-	// select {}
+	select {}
 }
 
 func helperStartGameServer(t testing.TB) {
@@ -289,17 +288,17 @@ func helperStartGameServer(t testing.TB) {
 	// Listen for incoming connections.
 	tcpListener, err := net.Listen("tcp", net.JoinHostPort("127.0.0.1", "6114"))
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 
 	udpAddr, err := net.ResolveUDPAddr("udp", net.JoinHostPort("127.0.0.1", "6113"))
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 
 	udpConn, err := net.ListenUDP("udp", udpAddr)
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 
 	// Listen UDP
@@ -320,10 +319,10 @@ func helperStartGameServer(t testing.TB) {
 				resp := append([]byte{27, 0}, buf[1:n]...)
 				_, err := udpConn.WriteToUDP(resp, udpAddr)
 				if err != nil {
-					log.Println(err)
+					slog.Debug("Failed to write to UDP", "error", err)
 					return
 				}
-				log.Println("UDP response", string(resp))
+				slog.Debug("UDP response", "response", string(resp))
 			}
 		}
 	}()
@@ -342,7 +341,7 @@ func helperStartGameServer(t testing.TB) {
 					if !ok {
 						return
 					}
-					log.Println("Message received", string(msg))
+					slog.Debug("message received", "msg", string(msg))
 					conn.Write([]byte{35, 35, 116, 101, 115, 116, 0})
 				}
 			}

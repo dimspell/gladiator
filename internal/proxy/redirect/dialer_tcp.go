@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"log/slog"
 	"net"
 	"time"
@@ -37,7 +36,7 @@ func (p *DialerTCP) Run(ctx context.Context, rw io.ReadWriteCloser) error {
 	g, ctx := errgroup.WithContext(ctx)
 	g.Go(func() error {
 		if _, err := io.Copy(rw, p.tcpConn); err != nil {
-			log.Println(err)
+			slog.Error("Could not copy the payload", "error", err)
 			return err
 		}
 		return nil
@@ -54,11 +53,15 @@ func (p *DialerTCP) Run(ctx context.Context, rw io.ReadWriteCloser) error {
 			buf := make([]byte, 1024)
 			n, err := p.tcpConn.Read(buf)
 			if err != nil {
-				log.Println("(tcp): Error reading from server: ", err)
+				if err == io.EOF {
+					slog.Debug("Connection closed to the game client", "proto", "tcp", "addr", p.tcpConn.LocalAddr())
+					return err
+				}
+				slog.Debug("Error reading from server", "error", err, "proto", "tcp")
 				return err
 			}
 
-			slog.Debug("Received TCP message", "message", buf[0:n], "length", n)
+			slog.Debug("Received TCP message", "message", buf[0:n], "length", n, "proto", "tcp")
 			if _, err := rw.Write(buf[0:n]); err != nil {
 				return err
 			}
@@ -71,10 +74,10 @@ func (p *DialerTCP) Run(ctx context.Context, rw io.ReadWriteCloser) error {
 func (p *DialerTCP) Write(msg []byte) (n int, err error) {
 	n, err = p.tcpConn.Write(msg)
 	if err != nil {
-		log.Println("(tcp): Error writing to server: ", err)
+		slog.Error("(tcp): Error writing to server", "error", err)
 		return n, err
 	}
-	log.Println("(tcp): wrote to server", msg)
+	slog.Debug("(tcp): wrote to server", "msg", msg)
 	return n, err
 }
 

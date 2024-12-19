@@ -23,3 +23,33 @@ func ExampleIpRing_NextAddr() {
 	// 127.0.0.1 12342 61132
 	// 127.0.0.1 12343 61133
 }
+
+// func TestRedirects(t *testing.T) {
+// 	// User 1 - Host
+// 	// - User2 - OtherPlayerHasJoined
+// 	// User 2 - Client
+// 	// - User1 - OtherPlayerIsHost
+//
+// 	helperStartGameServer(t)
+//
+// 	r1 := p2p.NewIpRing()
+// 	r1.IsTesting = true
+// 	r1.UdpPortPrefix = 1300
+// 	r1.TcpPortPrefix = 1400
+//
+// 	r2 := p2p.NewIpRing()
+// 	r2.IsTesting = true
+// 	r2.UdpPortPrefix = 2300
+// 	r2.TcpPortPrefix = 2400
+//
+// 	host := r1.NextPeerAddress("2", true, true)
+// 	hostTcp, hostUdp, err := redirect.New(host.Mode, host.Addr)
+// 	if err != nil {
+// 		t.Fatal(err)
+// 		return
+// 	}
+// 	fmt.Println(hostTcp, hostUdp)
+//
+// 	// select {}
+// 	// guest := r2.NextPeerAddress("1", false, true)
+// }

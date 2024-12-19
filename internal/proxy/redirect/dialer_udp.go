@@ -46,7 +46,7 @@ func (p *DialerUDP) Run(ctx context.Context, rw io.ReadWriteCloser) error {
 			buf := make([]byte, 1024)
 			n, err := rw.Read(buf)
 			if err != nil {
-				log.Println(err)
+				slog.Error("Failed to read", "error", err)
 				return err
 			}
 			if _, err := p.udpConn.WriteToUDP(buf[:n], p.udpAddr); err != nil {
@@ -86,7 +86,7 @@ func (p *DialerUDP) Write(msg []byte) (n int, err error) {
 	if err != nil {
 		return n, fmt.Errorf("could not write UDP message: %s", err.Error())
 	}
-	log.Println("(udp): wrote to server", msg)
+	slog.Debug("(udp): wrote to server", "msg", msg)
 	return n, err
 }
 

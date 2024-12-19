@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"log/slog"
 	"net"
 
@@ -43,7 +42,7 @@ func (p *ListenerTCP) Run(ctx context.Context, rw io.ReadWriteCloser) error {
 
 		conn, err := p.connTCP.Accept()
 		if err != nil {
-			log.Println("Error accepting: ", err.Error())
+			slog.Error("error accepting", "error", err)
 			continue
 		}
 		slog.Debug("Accepted connection on port", "port", conn.RemoteAddr(), "protocol", "tcp")

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"io"
-	"log"
 )
 
 const nullTerminator byte = 0x00
@@ -54,7 +53,6 @@ func (r *Reader) ReadNBytes(n int) ([]byte, error) {
 
 func (r *Reader) ReadUint8() (uint8, error) {
 	b, err := r.ReadNBytes(1)
-	log.Println(b)
 	if err != nil {
 		return 0, err
 	}

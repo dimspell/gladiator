@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"log/slog"
 	"net"
 	"sync"
@@ -42,7 +41,7 @@ func ListenUDP(ipv4 string, portNumber string) (*ListenerUDP, error) {
 
 func (p *ListenerUDP) Run(ctx context.Context, rw io.ReadWriteCloser) error {
 	defer func() {
-		log.Println(p.connUDP.Close())
+		slog.Warn("Closing udp connnection", "error", p.connUDP.Close())
 		close(p.writeUDP)
 	}()
 
