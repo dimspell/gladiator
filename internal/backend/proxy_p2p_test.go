@@ -13,6 +13,7 @@ import (
 	"github.com/dimspell/gladiator/internal/console"
 	"github.com/dimspell/gladiator/internal/console/database"
 	"github.com/dimspell/gladiator/internal/model"
+	"github.com/dimspell/gladiator/internal/proxy/redirect"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -48,11 +49,13 @@ func TestE2E_P2P(t *testing.T) {
 	cs.Addr = ts.URL[len("http://"):]
 
 	proxy1 := NewPeerToPeer()
+	proxy1.NewRedirect = redirect.NewNoop
 	bd1 := NewBackend("", cs.Addr, proxy1)
 	bd1.SignalServerURL = "ws://" + cs.Addr + "/lobby"
 
 	conn1 := &mockConn{}
 	session1 := bd1.AddSession(conn1)
+	session1.IpRing.IsTesting = true
 
 	// Sign-in
 	assert.NoError(t, bd1.HandleClientAuthentication(session1, ClientAuthenticationRequest{
@@ -116,11 +119,13 @@ func TestE2E_P2P(t *testing.T) {
 
 	// Other user
 	proxy2 := NewPeerToPeer()
+	proxy2.NewRedirect = redirect.NewNoop
 	bd2 := NewBackend("", cs.Addr, proxy2)
 	bd2.SignalServerURL = "ws://" + cs.Addr + "/lobby"
 
 	conn2 := &mockConn{}
 	session2 := bd2.AddSession(conn2)
+	session2.IpRing.IsTesting = true
 
 	// Sign-in by player2
 	assert.NoError(t, bd2.HandleClientAuthentication(session2, ClientAuthenticationRequest{
@@ -246,17 +251,18 @@ func TestE2E_P2P(t *testing.T) {
 
 	// RTCICECandidate
 	cs.Multiplayer.HandleIncomingMessage(ctx, <-cs.Multiplayer.Messages)
-
-	// RTCICECandidate
+	cs.Multiplayer.HandleIncomingMessage(ctx, <-cs.Multiplayer.Messages)
 	cs.Multiplayer.HandleIncomingMessage(ctx, <-cs.Multiplayer.Messages)
 
 	// RTCICECandidate
 	cs.Multiplayer.HandleIncomingMessage(ctx, <-cs.Multiplayer.Messages)
+	cs.Multiplayer.HandleIncomingMessage(ctx, <-cs.Multiplayer.Messages)
+	cs.Multiplayer.HandleIncomingMessage(ctx, <-cs.Multiplayer.Messages)
 
-	// close(cs.Multiplayer.Messages)
+	close(cs.Multiplayer.Messages)
 	for message := range cs.Multiplayer.Messages {
 		t.Error("unhandled message", message)
 	}
 
-	select {}
+	// select {}
 }

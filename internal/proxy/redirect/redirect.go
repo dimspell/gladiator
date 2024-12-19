@@ -48,6 +48,8 @@ type Addressing struct {
 	UDPPort string
 }
 
+type NewRedirect func(joinType Mode, addr *Addressing) (tcpProxy Redirect, udpProxy Redirect, err error)
+
 func New(joinType Mode, addr *Addressing) (tcpProxy Redirect, udpProxy Redirect, err error) {
 	slog.Info("Creating redirect", "joinType", joinType.String(), "ip", addr.IP)
 

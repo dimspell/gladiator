@@ -14,7 +14,7 @@ func TestNewPipe(t *testing.T) {
 		proxytesthelper.StartHost(t)
 
 		r := NewIpRing()
-		r.isTesting = true
+		r.IsTesting = true
 
 		dc := proxytesthelper.NewFakeDataChannel(fmt.Sprint(roomName, "/udp"))
 

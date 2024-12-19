@@ -13,7 +13,7 @@ type IpRing struct {
 	Ring *ring.Ring
 	mtx  sync.Mutex
 
-	isTesting bool
+	IsTesting bool
 }
 
 func NewIpRing() *IpRing {
@@ -39,7 +39,7 @@ func (r *IpRing) NextIP() net.IP {
 }
 
 func (r *IpRing) NextAddr() (ip net.IP, portTCP string, portUDP string) {
-	if !r.isTesting {
+	if !r.IsTesting {
 		return r.NextIP(), "", ""
 	}
 

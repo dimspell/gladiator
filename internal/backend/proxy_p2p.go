@@ -27,6 +27,8 @@ type PeerToPeer struct {
 	Games map[string]*GameRoom
 
 	Peers map[*Session]*PeersToSessionMapping
+
+	NewRedirect redirect.NewRedirect
 }
 
 type PeersToSessionMapping struct {
@@ -52,6 +54,7 @@ func NewPeerToPeer() *PeerToPeer {
 		hostIPAddress: net.IPv4(127, 0, 1, 2),
 		WebRTCConfig:  config,
 		Peers:         make(map[*Session]*PeersToSessionMapping),
+		NewRedirect:   redirect.New,
 	}
 }
 
@@ -357,7 +360,7 @@ func (p *PeerToPeer) setUpChannels(session *Session, playerId int64, sendRTCOffe
 		p.setPeer(session, peer)
 	}
 
-	guestTCP, guestUDP, err := redirect.New(peer.Mode, peer.Addr)
+	guestTCP, guestUDP, err := p.NewRedirect(peer.Mode, peer.Addr)
 	if err != nil {
 		return nil, fmt.Errorf("could not create guest proxy for %d: %v", player.UserID, err)
 	}
