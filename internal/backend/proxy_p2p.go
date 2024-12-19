@@ -153,7 +153,7 @@ func (p *PeerToPeer) Join(params JoinParams, session *Session) (net.IP, error) {
 }
 
 func (p *PeerToPeer) Close(session *Session) {
-	session.IpRing = p2p.NewIpRing()
+	session.IpRing.Reset()
 	delete(p.Peers, session)
 }
 

@@ -32,6 +32,10 @@ func NewIpRing() *IpRing {
 	}
 }
 
+func (r *IpRing) Reset() {
+	// Noop
+}
+
 func (r *IpRing) NextInt() int {
 	r.mtx.Lock()
 	defer r.mtx.Unlock()

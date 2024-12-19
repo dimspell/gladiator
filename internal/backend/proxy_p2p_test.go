@@ -64,6 +64,8 @@ func TestE2E_P2P(t *testing.T) {
 	conn1 := &mockConn{}
 	session1 := bd1.AddSession(conn1)
 	session1.IpRing.IsTesting = true
+	session1.IpRing.UdpPortPrefix = 1300
+	session1.IpRing.TcpPortPrefix = 1400
 
 	// Sign-in
 	assert.NoError(t, bd1.HandleClientAuthentication(session1, ClientAuthenticationRequest{
@@ -134,6 +136,8 @@ func TestE2E_P2P(t *testing.T) {
 	conn2 := &mockConn{}
 	session2 := bd2.AddSession(conn2)
 	session2.IpRing.IsTesting = true
+	session1.IpRing.UdpPortPrefix = 2300
+	session1.IpRing.TcpPortPrefix = 2400
 
 	// Sign-in by player2
 	assert.NoError(t, bd2.HandleClientAuthentication(session2, ClientAuthenticationRequest{
@@ -189,7 +193,8 @@ func TestE2E_P2P(t *testing.T) {
 	assert.Equal(t, []byte{
 		byte(v1.GameMap_FrozenLabyrinth), 0, 0, 0, // Map ID
 		byte(v1.ClassType_Archer), 0, 0, 0, // Host's character class type
-		127, 0, 1, 2, // IP address of host
+		// 127, 0, 1, 2, // IP address of host
+		127, 0, 0, 1, // IP address of host
 		'a', 'r', 'c', 'h', 'e', 'r', 0, // Player name
 	}, findPacket(conn2.Written, SelectGame))
 
@@ -206,7 +211,8 @@ func TestE2E_P2P(t *testing.T) {
 	assert.Equal(t, []byte{
 		model.GameStateStarted, 0, // Game state
 		byte(v1.ClassType_Archer), 0, 0, 0, // Host's character class type
-		127, 0, 1, 2, // IP address of host
+		// 127, 0, 1, 2, // IP address of host
+		127, 0, 0, 1, // IP address of host
 		'a', 'r', 'c', 'h', 'e', 'r', 0, // Player name
 	}, findPacket(conn2.Written, JoinGame))
 
