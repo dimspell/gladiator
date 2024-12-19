@@ -101,7 +101,7 @@ func (b *Backend) AddSession(tcpConn net.Conn) *Session {
 	}
 	b.SessionCounter++
 	id := fmt.Sprintf("%s-%d", uuid.New().String(), b.SessionCounter)
-	slog.Debug("New session", "session", id)
+	slog.Debug("New session", "session", id, "backend", fmt.Sprintf("%p", b.Proxy))
 
 	session := &Session{
 		Conn: tcpConn,
@@ -234,7 +234,7 @@ func (b *Backend) RegisterNewObserver(ctx context.Context, session *Session) err
 				slog.Warn("Could not decode the message", "session", session.ID, "error", err, "event", et.String(), "payload", p)
 				return
 			}
-			//if err := b.Send(session.Conn, ReceiveMessage, NewGlobalMessage(msg.Content.User, msg.Content.Text)); err != nil {
+			// if err := b.Send(session.Conn, ReceiveMessage, NewGlobalMessage(msg.Content.User, msg.Content.Text)); err != nil {
 			if err := b.Send(session.Conn, ReceiveMessage, NewSystemMessage(msg.Content.User, msg.Content.Text, "???")); err != nil {
 				slog.Error("Error writing chat message over the backend wire", "session", session.ID, "error", err)
 				return

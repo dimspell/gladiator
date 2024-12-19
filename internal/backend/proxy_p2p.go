@@ -87,8 +87,13 @@ func (p *PeerToPeer) HostRoom(params HostParams, session *Session) (err error) {
 		Mode:       redirect.CurrentUserIsHost,
 	}
 
+	room := session.GameRoom()
+	if room == nil || room.ID != params.GameID {
+		return fmt.Errorf("no game room found")
+	}
+
 	p.Peers[session] = &PeersToSessionMapping{
-		Game: session.GameRoom(),
+		Game: room,
 		Peers: map[string]*p2p.Peer{
 			host.PeerUserID: host,
 		},
@@ -214,18 +219,17 @@ func (p *PeerToPeer) ExtendWire(ctx context.Context, session *Session, et wire.E
 	}
 }
 
-func (p *PeerToPeer) getPeer(session *Session, peerID string) (*p2p.Peer, bool, bool) {
+func (p *PeerToPeer) getPeer(session *Session, peerID string) (*p2p.Peer, bool) {
 	mapping, ok := p.Peers[session]
 	if !ok {
-		return nil, false, false
+		return nil, false
 	}
 	peer, ok := mapping.Peers[peerID]
 	if !ok {
-		return nil, false, false
+		return nil, false
 	}
 
-	isHost := session.gameRoom.Host.ID() == peer.PeerUserID
-	return peer, isHost, true
+	return peer, true
 }
 
 func (p *PeerToPeer) setPeer(session *Session, peer *p2p.Peer) {
@@ -250,13 +254,13 @@ func (p *PeerToPeer) handleJoinRoom(m wire.MessageContent[wire.Player], session 
 		return nil
 	}
 
-	peer, isHost, connected := p.getPeer(session, m.Content.ID())
+	peer, connected := p.getPeer(session, m.Content.ID())
 	if connected && peer.Connection != nil {
-		slog.Debug("Peer already exist, ignoring join", "userId", m.Content.UserID, "host", isHost)
+		slog.Debug("Peer already exist, ignoring join", "userId", m.Content.UserID)
 		return nil
 	}
 
-	slog.Debug("JOIN", "id", m.Content.UserID, "host", isHost, "data", m)
+	slog.Debug("JOIN", "id", m.Content.UserID, "data", m)
 
 	// Add the peer to the list of peers, and start the WebRTC connection
 	if _, err := p.setUpChannels(session, m.Content.UserID, true, true); err != nil {
@@ -270,7 +274,7 @@ func (p *PeerToPeer) handleJoinRoom(m wire.MessageContent[wire.Player], session 
 func (p *PeerToPeer) handleLeaveRoom(m wire.MessageContent[wire.Player], session *Session) error {
 	slog.Debug("LEAVE", "from", m.From, "to", m.To)
 
-	peer, _, ok := p.getPeer(session, m.From)
+	peer, ok := p.getPeer(session, m.From)
 	if !ok {
 		// fmt.Errorf("could not find peer %q", m.From)
 		return nil
@@ -329,7 +333,7 @@ func (p *PeerToPeer) handleRTCAnswer(m wire.MessageContent[wire.Offer], session 
 		Type: webrtc.SDPTypeAnswer,
 		SDP:  m.Content.Offer.SDP,
 	}
-	peer, _, ok := p.getPeer(session, m.From)
+	peer, ok := p.getPeer(session, m.From)
 	if !ok {
 		return fmt.Errorf("could not find peer %q that sent the RTC answer", m.From)
 	}
@@ -350,9 +354,11 @@ func (p *PeerToPeer) setUpChannels(session *Session, playerId int64, sendRTCOffe
 		return nil, fmt.Errorf("could not find player in game room")
 	}
 
-	peer, isHost, ok := p.getPeer(session, player.ID())
+	peer, ok := p.getPeer(session, player.ID())
 	if !ok {
-		peer = session.IpRing.NextPeerAddress(player.ID(), false, isHost)
+		isHost := session.gameRoom.Host.UserID == player.UserID
+		isCurrentUser := session.gameRoom.Host.UserID == session.UserID
+		peer = session.IpRing.NextPeerAddress(player.ID(), isCurrentUser, isHost)
 	}
 	peer.Connection = peerConnection
 
@@ -360,6 +366,7 @@ func (p *PeerToPeer) setUpChannels(session *Session, playerId int64, sendRTCOffe
 		p.setPeer(session, peer)
 	}
 
+	slog.Debug("Setting up redirect", "user", session.UserID, "mode", peer.Mode, "addr", peer.Addr)
 	guestTCP, guestUDP, err := p.NewRedirect(peer.Mode, peer.Addr)
 	if err != nil {
 		return nil, fmt.Errorf("could not create guest proxy for %d: %v", player.UserID, err)
@@ -467,7 +474,7 @@ func (p *PeerToPeer) setUpChannels(session *Session, playerId int64, sendRTCOffe
 func (p *PeerToPeer) handleRTCCandidate(m wire.MessageContent[webrtc.ICECandidateInit], session *Session) error {
 	slog.Debug("RTC_ICE_CANDIDATE", "from", m.From, "to", m.To)
 
-	peer, _, ok := p.getPeer(session, m.From)
+	peer, ok := p.getPeer(session, m.From)
 	if !ok {
 		return fmt.Errorf("could not find peer %q", m.From)
 	}
