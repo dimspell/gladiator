@@ -82,11 +82,3 @@ type WebSocketWriter interface {
 func Write(ctx context.Context, wsConn WebSocketWriter, payload []byte) error {
 	return wsConn.Write(ctx, websocket.MessageText, payload)
 }
-
-func EncodeAndWrite(ctx context.Context, wsConn WebSocketWriter, p any) error {
-	encoded, err := Encode(p)
-	if err != nil {
-		return err
-	}
-	return wsConn.Write(ctx, websocket.MessageText, encoded)
-}

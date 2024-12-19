@@ -368,6 +368,9 @@ func (mp *Multiplayer) AnnounceJoin(room GameRoom, userId int64) {
 		if id == userId {
 			continue
 		}
+		if userId == 0 {
+			panic("userId is zero")
+		}
 		session.Send(ctx, wire.Compose(wire.JoinRoom, wire.Message{
 			To:   strconv.Itoa(int(id)),
 			From: strconv.Itoa(int(userId)),
@@ -466,6 +469,7 @@ func (mp *Multiplayer) SetPlayerConnected(session *UserSession) {
 
 	// Notify all the users
 	mp.BroadcastMessage(ctx, wire.ComposeTyped(wire.JoinLobby, wire.MessageContent[wire.Player]{
+		From:    strconv.Itoa(int(session.UserID)),
 		Type:    wire.JoinLobby,
 		Content: session.ToPlayer(),
 	}))

@@ -156,6 +156,7 @@ func (p *PeerToPeer) Close(session *Session) {
 
 func (p *PeerToPeer) ExtendWire(ctx context.Context, session *Session, et wire.EventType, payload []byte) {
 	var err error
+
 	switch et {
 	case wire.JoinRoom:
 		_, msg, err := wire.DecodeTyped[wire.Player](payload)
@@ -168,14 +169,28 @@ func (p *PeerToPeer) ExtendWire(ctx context.Context, session *Session, et wire.E
 
 		session.gameRoom.SetPlayer(player)
 
-		err = wire.DecodeAndRun(payload, p.handleJoinRoom, session)
-
+		err = p.handleJoinRoom(msg, session)
 	case wire.RTCOffer:
-		err = wire.DecodeAndRun(payload, p.handleRTCOffer, session)
+		_, msg, err := wire.DecodeTyped[wire.Offer](payload)
+		if err != nil {
+			return
+		}
+
+		err = p.handleRTCOffer(msg, session)
 	case wire.RTCAnswer:
-		err = wire.DecodeAndRun(payload, p.handleRTCAnswer, session)
+		_, msg, err := wire.DecodeTyped[wire.Offer](payload)
+		if err != nil {
+			return
+		}
+
+		err = p.handleRTCAnswer(msg, session)
 	case wire.RTCICECandidate:
-		err = wire.DecodeAndRun(payload, p.handleRTCCandidate, session)
+		_, msg, err := wire.DecodeTyped[webrtc.ICECandidateInit](payload)
+		if err != nil {
+			return
+		}
+
+		err = p.handleRTCCandidate(msg, session)
 	case wire.LeaveRoom, wire.LeaveLobby:
 		_, msg, err := wire.DecodeTyped[wire.Player](payload)
 		if err != nil {
@@ -187,7 +202,7 @@ func (p *PeerToPeer) ExtendWire(ctx context.Context, session *Session, et wire.E
 
 		session.gameRoom.DeletePlayer(player)
 
-		err = wire.DecodeAndRun(payload, p.handleLeaveRoom, session)
+		err = p.handleLeaveRoom(msg, session)
 	default:
 		//	Ignore
 	}
@@ -238,7 +253,7 @@ func (p *PeerToPeer) handleJoinRoom(m wire.MessageContent[wire.Player], session 
 		return nil
 	}
 
-	slog.Debug("JOIN", "id", m.Content.UserID, "host", isHost)
+	slog.Debug("JOIN", "id", m.Content.UserID, "host", isHost, "data", m)
 
 	// Add the peer to the list of peers, and start the WebRTC connection
 	if _, err := p.setUpChannels(session, m.Content.UserID, true, true); err != nil {
@@ -249,7 +264,7 @@ func (p *PeerToPeer) handleJoinRoom(m wire.MessageContent[wire.Player], session 
 	return nil
 }
 
-func (p *PeerToPeer) handleLeaveRoom(m wire.MessageContent[any], session *Session) error {
+func (p *PeerToPeer) handleLeaveRoom(m wire.MessageContent[wire.Player], session *Session) error {
 	slog.Debug("LEAVE", "from", m.From, "to", m.To)
 
 	peer, _, ok := p.getPeer(session, m.From)
@@ -272,6 +287,7 @@ func (p *PeerToPeer) handleRTCOffer(m wire.MessageContent[wire.Offer], session *
 
 	peer, err := p.setUpChannels(session, m.Content.UserID, false, false)
 	if err != nil {
+		panic(err)
 		return err
 	}
 
@@ -288,7 +304,7 @@ func (p *PeerToPeer) handleRTCOffer(m wire.MessageContent[wire.Offer], session *
 		return fmt.Errorf("could not set local description: %v", err)
 	}
 
-	response := &wire.Message{
+	response := wire.ComposeTyped[wire.Offer](wire.RTCAnswer, wire.MessageContent[wire.Offer]{
 		From: session.GetUserID(),
 		To:   m.From,
 		Type: wire.RTCAnswer,
@@ -296,9 +312,8 @@ func (p *PeerToPeer) handleRTCOffer(m wire.MessageContent[wire.Offer], session *
 			UserID: session.UserID, // TODO: Unused data
 			Offer:  answer,
 		},
-	}
-
-	if err := wire.EncodeAndWrite(context.TODO(), session.wsConn, response); err != nil {
+	})
+	if err := wire.Write(context.TODO(), session.wsConn, response); err != nil {
 		return fmt.Errorf("could not send answer: %v", err)
 	}
 	return nil
@@ -324,7 +339,7 @@ func (p *PeerToPeer) handleRTCAnswer(m wire.MessageContent[wire.Offer], session 
 func (p *PeerToPeer) setUpChannels(session *Session, playerId int64, sendRTCOffer bool, createChannels bool) (*p2p.Peer, error) {
 	peerConnection, err := webrtc.NewPeerConnection(p.WebRTCConfig)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	player, found := session.gameRoom.GetPlayer(strconv.FormatInt(playerId, 10))
@@ -355,14 +370,15 @@ func (p *PeerToPeer) setUpChannels(session *Session, playerId int64, sendRTCOffe
 		if candidate == nil {
 			return
 		}
-		reply := &wire.Message{
+		reply := wire.ComposeTyped[webrtc.ICECandidateInit](wire.RTCICECandidate, wire.MessageContent[webrtc.ICECandidateInit]{
 			From:    session.GetUserID(),
 			To:      player.ID(),
 			Type:    wire.RTCICECandidate,
 			Content: candidate.ToJSON(),
-		}
-		if err := wire.EncodeAndWrite(context.TODO(), session.wsConn, reply); err != nil {
-			panic(err)
+		})
+		if err := wire.Write(context.TODO(), session.wsConn, reply); err != nil {
+			slog.Error("Could not send ICE candidate", "from", session.GetUserID(), "to", player.UserID, "error", err)
+			// TODO: Here likely is the connection closed, so it can't be sent further
 		}
 	})
 
@@ -382,7 +398,7 @@ func (p *PeerToPeer) setUpChannels(session *Session, playerId int64, sendRTCOffe
 			return
 		}
 
-		reply := &wire.Message{
+		reply := wire.ComposeTyped[wire.Offer](wire.RTCOffer, wire.MessageContent[wire.Offer]{
 			From: session.GetUserID(),
 			To:   player.ID(),
 			Type: wire.RTCOffer,
@@ -390,8 +406,8 @@ func (p *PeerToPeer) setUpChannels(session *Session, playerId int64, sendRTCOffe
 				UserID: session.UserID,
 				Offer:  offer,
 			},
-		}
-		if err := wire.EncodeAndWrite(context.TODO(), session.wsConn, reply); err != nil {
+		})
+		if err := wire.Write(context.TODO(), session.wsConn, reply); err != nil {
 			panic(err)
 		}
 	})

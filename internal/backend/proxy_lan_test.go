@@ -3,12 +3,10 @@ package backend
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"log/slog"
 	"net/http/httptest"
 	"os"
 	"testing"
-	"time"
 
 	v1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/internal/app/logger"
@@ -33,7 +31,8 @@ func TestE2E_LAN(t *testing.T) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	// ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	cs := &console.Console{

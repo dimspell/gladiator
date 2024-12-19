@@ -7,7 +7,6 @@ import (
 	"net/http/httptest"
 	"os"
 	"testing"
-	"time"
 
 	v1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/internal/app/logger"
@@ -32,7 +31,8 @@ func TestE2E_P2P(t *testing.T) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	// ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	cs := &console.Console{
@@ -244,8 +244,19 @@ func TestE2E_P2P(t *testing.T) {
 	assert.Equal(t, "mage", session2.gameRoom.Players["2"].Username)
 	assert.Equal(t, byte(v1.ClassType_Mage), session2.gameRoom.Players["2"].ClassType)
 
-	close(cs.Multiplayer.Messages)
+	// RTCICECandidate
+	cs.Multiplayer.HandleIncomingMessage(ctx, <-cs.Multiplayer.Messages)
+
+	// RTCICECandidate
+	cs.Multiplayer.HandleIncomingMessage(ctx, <-cs.Multiplayer.Messages)
+
+	// RTCICECandidate
+	cs.Multiplayer.HandleIncomingMessage(ctx, <-cs.Multiplayer.Messages)
+
+	// close(cs.Multiplayer.Messages)
 	for message := range cs.Multiplayer.Messages {
 		t.Error("unhandled message", message)
 	}
+
+	select {}
 }
