@@ -461,6 +461,9 @@ func (mp *Multiplayer) SetPlayerConnected(session *UserSession) {
 	ctx, cancel := context.WithTimeout(context.TODO(), time.Second*3)
 	defer cancel()
 
+	// Include in response also the player who has just joined
+	players = append(players, session.ToPlayer())
+
 	session.SendMessage(ctx, wire.LobbyUsers, wire.Message{
 		Type:    wire.LobbyUsers,
 		To:      strconv.FormatInt(session.UserID, 10),
