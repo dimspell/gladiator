@@ -6,22 +6,22 @@ import (
 	"github.com/dimspell/gladiator/internal/model"
 )
 
-func AppendCharacterToLobby(characterName string, classType model.ClassType, idx uint32) []byte {
-	buf := make([]byte, 4+4+4+len(characterName)+1)
+func AppendCharacterToLobby(userName string, classType model.ClassType, idx uint32) []byte {
+	buf := make([]byte, 4+4+4+len(userName)+1)
 
 	buf[0] = 2                                    // Message type
 	buf[4] = byte(classType)                      // Class of character
-	binary.LittleEndian.PutUint32(buf[8:12], idx) // Unknown 28?
-	copy(buf[12:], characterName)                 // Character name
+	binary.LittleEndian.PutUint32(buf[8:12], idx) // Index?
+	copy(buf[12:], userName)                      // Character name
 
 	return buf
 }
 
-func RemoveCharacterFromLobby(characterName string) []byte {
-	buf := make([]byte, 4+4+4+len(characterName)+1)
+func RemoveCharacterFromLobby(userName string) []byte {
+	buf := make([]byte, 4+4+4+len(userName)+1)
 
-	buf[0] = 3                    // Message type
-	copy(buf[12:], characterName) // Character name
+	buf[0] = 3               // Message type
+	copy(buf[12:], userName) // Character name
 
 	return buf
 }
