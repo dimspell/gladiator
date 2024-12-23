@@ -247,18 +247,10 @@ func (b *Backend) RegisterNewObserver(ctx context.Context, session *Session) err
 				return
 			}
 
+			session.Lock()
 			session.lobbyUsers = msg.Content
+			session.Unlock()
 
-			for i, player := range session.lobbyUsers {
-				// TODO: It can panic, whether int value > i32.
-				// TODO: It is not thread-safe.
-				if err := b.Send(session.Conn, ReceiveMessage,
-					AppendCharacterToLobby(player.Username, model.ClassType(player.ClassType), uint32(i)),
-				); err != nil {
-					slog.Warn("Error appending lobby users", "session", session.ID, "error", err)
-					continue
-				}
-			}
 		case wire.JoinLobby:
 			_, msg, err := wire.DecodeTyped[wire.Player](p)
 			if err != nil {
