@@ -111,7 +111,8 @@ func (s *gameServiceServer) JoinGame(_ context.Context, req *connect.Request[mul
 		req.Msg.IpAddress,
 	)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeCanceled, err)
+		// TODO: Fixme
+		//return nil, connect.NewError(connect.CodeCanceled, err)
 	}
 
 	s.Multiplayer.AnnounceJoin(

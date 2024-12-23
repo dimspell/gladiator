@@ -149,7 +149,7 @@ func (p *PeerToPeer) Join(params JoinParams, session *Session) (net.IP, error) {
 
 	mapping, exist := p.Peers[session]
 	if !exist {
-		return nil, fmt.Errorf("no game mapping found")
+		return nil, fmt.Errorf("could not find current session among the peers")
 	}
 
 	mapping.Peers[peer.PeerUserID] = peer

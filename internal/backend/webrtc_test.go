@@ -1,213 +1,159 @@
 package backend
 
-// func TestPeerTopeerManual(t *testing.T) {
-// 	t.Cleanup(func() {
-// 		defer goleak.VerifyNone(t)
-// 	})
-// 	StartHost(t)
+import (
+	"connectrpc.com/connect"
+	"context"
+	v1 "github.com/dimspell/gladiator/gen/multi/v1"
+	"github.com/dimspell/gladiator/internal/console"
+	"github.com/dimspell/gladiator/internal/console/database"
+	"github.com/dimspell/gladiator/internal/model"
+	"github.com/dimspell/gladiator/internal/proxy/p2p"
+	"github.com/dimspell/gladiator/internal/proxy/redirect"
+	"net/http/httptest"
+	"testing"
+)
 
-// 	const roomName = "test"
-// 	const (
-// 		player1Name = "player1"
-// 		player2Name = "player2"
-// 		player3Name = "player3"
-// 		player4Name = "player4"
+func TestWebRTC(t *testing.T) {
+	redirectFunc := redirect.New
 
-// 		hostRole  = Role(signalserver.RoleHost)
-// 		guestRole = Role(signalserver.RoleGuest)
-// 	)
+	db, err := database.NewMemory()
+	if err != nil {
+		t.Fatalf("failed to create database: %v", err)
+		return
+	}
+	defer db.Close()
 
-// 	ws := &FakeWebsocket{Buffer: make([][]byte, 0)}
+	if err := database.Seed(db.Write); err != nil {
+		t.Fatalf("failed to seed database: %v", err)
+		return
+	}
 
-// 	player1 := &PeerToPeer{
-// 		Peers:  p2p.NewPeers(),
-// 		IpRing: NewIpRing(),
-// 		ws:     ws,
-// 	} // Host called "player1"
-// 	player1HandlePackets := player1.handlePackets(hostRole, player1Name, roomName)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-// 	player2 := &PeerToPeer{
-// 		Peers:  p2p.NewPeers(),
-// 		IpRing: NewIpRing(),
-// 		ws:     ws,
-// 	} // Guest, called "player2", joining to "player1"
-// 	player2HandlePackets := player2.handlePackets(guestRole, player2Name, roomName)
+	cs := &console.Console{
+		Multiplayer: console.NewMultiplayer(),
+		DB:          db,
+	}
+	ts := httptest.NewServer(cs.HttpRouter())
+	defer ts.Close()
 
-// 	if err := player1.handleJoin(signalserver.MessageContent[signalserver.Member]{
-// 		Type: signalserver.Join,
-// 		Content: signalserver.Member{
-// 			UserID: player2Name,
-// 			Role:   signalserver.RoleGuest,
-// 		},
-// 		From: "",
-// 		To:   "",
-// 	}, player1Name, roomName, hostRole); err != nil {
-// 		t.Error(err)
-// 		return
-// 	}
+	// Remove the HTTP schema prefix
+	cs.Addr = ts.URL[len("http://"):]
 
-// 	player1.Peers.Range(func(_ string, peer *p2p.Peer) {
-// 		<-webrtc.GatheringCompletePromise(peer.Connection)
-// 	})
+	proxy1 := NewPeerToPeer()
+	proxy1.NewRedirect = redirectFunc
+	bd1 := NewBackend("", cs.Addr, proxy1)
+	bd1.SignalServerURL = "ws://" + cs.Addr + "/lobby"
 
-// 	{
-// 		var arr []byte
-// 		arr = make([]byte, 1024)
-// 		n, err := ws.Read(arr)
-// 		if err != nil {
-// 			t.Error(err)
-// 			return
-// 		}
-// 		if err := player1HandlePackets(arr[:n]); err != nil {
-// 			t.Error(err)
-// 			return
-// 		}
-// 	}
+	conn1 := &mockConn{}
+	session1 := bd1.AddSession(conn1)
+	session1.UserID = 1
+	session1.CharacterID = 1
+	session1.ClassType = model.ClassTypeArcher
+	session1.IpRing.IsTesting = true
+	session1.IpRing.UdpPortPrefix = 1300
+	session1.IpRing.TcpPortPrefix = 1400
 
-// 	if err := player2.handleJoin(signalserver.MessageContent[signalserver.Member]{
-// 		Type: signalserver.Join,
-// 		Content: signalserver.Member{
-// 			UserID: player1Name,
-// 			Role:   signalserver.RoleHost,
-// 		},
-// 		From: "",
-// 		To:   "",
-// 	}, player2Name, roomName, guestRole); err != nil {
-// 		t.Error(err)
-// 		return
-// 	}
+	if err := bd1.ConnectToLobby(ctx, &v1.User{UserId: 1, Username: "user1"}, session1); err != nil {
+		t.Fatalf("failed to connect to lobby: %v", err)
+		return
+	}
+	if err := bd1.JoinLobby(ctx, session1); err != nil {
+		t.Fatalf("failed to join lobby: %v", err)
+		return
+	}
 
-// 	{
-// 		var arr []byte
-// 		arr = make([]byte, 1024)
-// 		n, err := ws.Read(arr)
-// 		if err != nil {
-// 			t.Error(err)
-// 			return
-// 		}
-// 		if err := player2HandlePackets(arr[:n]); err != nil {
-// 			t.Error(err)
-// 			return
-// 		}
-// 	}
+	roomId := "room"
+	if _, err := proxy1.CreateRoom(CreateParams{GameID: roomId}, session1); err != nil {
+		t.Fatalf("failed to create room: %v", err)
+		return
+	}
+
+	if _, err := bd1.gameClient.CreateGame(context.TODO(), connect.NewRequest(&v1.CreateGameRequest{
+		GameName:      roomId,
+		MapId:         v1.GameMap_AbandonedRealm,
+		HostUserId:    1,
+		HostIpAddress: "192.168.1.1",
+	})); err != nil {
+		t.Fatalf("failed to create game: %v", err)
+	}
+
+	if err := session1.SendSetRoomReady(ctx, roomId); err != nil {
+		t.Fatalf("failed to send set room ready: %v", err)
+		return
+	}
+	if len(cs.Multiplayer.Rooms) != 1 {
+		t.Fatalf("multiplayer should have 1 room")
+		return
+	}
+
+	// SetRoomReady
+	cs.Multiplayer.HandleIncomingMessage(ctx, <-cs.Multiplayer.Messages)
+
+	// Other user
+	proxy2 := NewPeerToPeer()
+	proxy2.NewRedirect = redirectFunc
+	bd2 := NewBackend("", cs.Addr, proxy2)
+	bd2.SignalServerURL = "ws://" + cs.Addr + "/lobby"
+
+	conn2 := &mockConn{}
+	session2 := bd2.AddSession(conn2)
+	session2.UserID = 2
+	session2.CharacterID = 2
+	session2.ClassType = model.ClassTypeMage
+	session2.IpRing.IsTesting = true
+	session2.IpRing.UdpPortPrefix = 2300
+	session2.IpRing.TcpPortPrefix = 2400
+
+	if err := bd2.ConnectToLobby(ctx, &v1.User{UserId: 2, Username: "user2"}, session2); err != nil {
+		t.Fatalf("failed to connect to lobby: %v", err)
+		return
+	}
+	if err := bd2.JoinLobby(ctx, session2); err != nil {
+		t.Fatalf("failed to join lobby: %v", err)
+		return
+	}
+
+	//params := GetPlayerAddrParams{
+	//	GameID:     roomId,
+	//	UserID:     "2",
+	//	IPAddress:  "",
+	//	HostUserID: "1",
+	//}
+	//peer := session2.IpRing.NextPeerAddress(
+	//	params.UserID,
+	//	params.UserID == session2.GetUserID(),
+	//	params.UserID == params.HostUserID,
+	//)
+	//ip, err := proxy2.Join(JoinParams{
+	//	HostUserID: "1",
+	//	GameID:     roomId,
+	//	HostUserIP: "127.0.0.1",
+	//}, session2)
+
+	ip, portTCP, portUDP := session2.IpRing.NextAddr()
+	peer := &p2p.Peer{
+		PeerUserID: session2.GetUserID(),
+		Addr:       &redirect.Addressing{IP: ip, TCPPort: portTCP, UDPPort: portUDP},
+		Mode:       redirect.OtherUserIsHost,
+	}
+
+	gameRoom := NewGameRoom()
+	session2.SetGameRoom(gameRoom)
+
+	peers := map[string]*p2p.Peer{peer.PeerUserID: peer}
+	proxy2.Peers[session2] = &PeersToSessionMapping{
+		Game:  gameRoom,
+		Peers: peers,
+	}
+
+	//close(cs.Multiplayer.Messages)
+	//for message := range cs.Multiplayer.Messages {
+	//	t.Error("unhandled message", message)
+	//}
+}
 
 // 	player2.Peers.Range(func(_ string, peer *p2p.Peer) {
 // 		<-webrtc.GatheringCompletePromise(peer.Connection)
 // 	})
-
-// 	{
-// 		var arr []byte
-// 		arr = make([]byte, 1024)
-// 		n, err := ws.Read(arr)
-// 		if err != nil {
-// 			t.Error(err)
-// 			return
-// 		}
-// 		if err := player2HandlePackets(arr[:n]); err != nil {
-// 			t.Error(err)
-// 			return
-// 		}
-// 	}
-
-// 	{
-// 		var arr []byte
-// 		arr = make([]byte, 1024)
-// 		n, err := ws.Read(arr)
-// 		if err != nil {
-// 			t.Error(err)
-// 			return
-// 		}
-// 		if err := player1HandlePackets(arr[:n]); err != nil {
-// 			t.Error(err)
-// 			return
-// 		}
-// 	}
-
-// 	fmt.Println(player1.Peers.Get(player2Name))
-// 	fmt.Println(player2.Peers.Get(player1Name))
-// 	fmt.Println("Done")
-
-// 	player1.Close()
-// 	player2.Close()
-
-// 	// assert.NoError(t, err)
-
-// }
-
-// func TestPeerToPeer(t *testing.T) {
-// 	defer goleak.VerifyNone(t)
-
-// 	t.Run("Hosting a game", func(t *testing.T) {
-// 		const roomName = "room"
-
-// 		// StartHost(t)
-// 		websocketURL := StartSignalServer(t)
-// 		// websocketURL := "ws://localhost:5050"
-
-// 		a := NewPeerToPeer(websocketURL)
-// 		defer a.Close()
-
-// 		if _, err := a.CreateRoom(CreateParams{
-// 			HostUserIP: "",
-// 			HostUserID: "user1",
-// 			GameID:     roomName,
-// 		}); err != nil {
-// 			t.Error(err)
-// 			return
-// 		}
-// 		if err := a.Host(HostParams{
-// 			GameID:     roomName,
-// 			HostUserID: "user1",
-// 		}); err != nil {
-// 			t.Error(err)
-// 			return
-// 		}
-
-// 		b := NewPeerToPeer(websocketURL)
-// 		defer b.Close()
-
-// 		if _, err := b.Join(JoinParams{
-// 			HostUserID:    "user1",
-// 			GameID:        roomName,
-// 			HostUserIP: "",
-// 			CurrentUserID: "user2",
-// 		}); err != nil {
-// 			t.Error(err)
-// 			return
-// 		}
-
-// 		time.Sleep(2 * time.Second)
-
-// 		fmt.Println(a.Peers)
-// 		fmt.Println(b.Peers)
-
-// 		if _, err := b.GetPlayerAddr(GetPlayerAddrParams{
-// 			GameID:    roomName,
-// 			UserID:    "user1",
-// 			IPAddress: "127.0.0.1",
-// 		}); err != nil {
-// 			t.Error(err)
-// 			return
-// 		}
-// 	})
-// }
-
-// func StartSignalServer(t testing.TB) string {
-// 	t.Helper()
-
-// 	h, err := signalserver.NewServer()
-// 	if err != nil {
-// 		t.Fatal(err)
-// 		return ""
-// 	}
-// 	ts := httptest.NewServer(h)
-
-// 	t.Cleanup(func() {
-// 		ts.Close()
-// 	})
-
-// 	wsURI, _ := url.Parse(ts.URL)
-// 	wsURI.Scheme = "ws"
-
-// 	return wsURI.String()
-// }
