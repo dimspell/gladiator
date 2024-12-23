@@ -17,7 +17,7 @@ func TestSelectChannelRequest(t *testing.T) {
 
 	// Act
 	req := SelectChannelRequest(packet[4:])
-	channelName, err := req.Parse()
+	channelName, _, err := req.Parse()
 
 	// Assert
 	assert.NoError(t, err)
