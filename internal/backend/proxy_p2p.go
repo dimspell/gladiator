@@ -3,7 +3,6 @@ package backend
 import (
 	"context"
 	"fmt"
-	"log"
 	"log/slog"
 	"net"
 	"strconv"
@@ -508,18 +507,22 @@ func (p *PeerToPeer) createDataChannels(peerConnection *webrtc.PeerConnection, s
 	return nil
 }
 
-func (p *PeerToPeer) createDataChannel(peerConnection *webrtc.PeerConnection, label string, guest interface{}) error {
+func (p *PeerToPeer) createDataChannel(peerConnection *webrtc.PeerConnection, label string, redir redirect.Redirect) error {
 	dc, err := peerConnection.CreateDataChannel(label, nil)
 	if err != nil {
 		return fmt.Errorf("could not create data channel %q: %v", label, err)
 	}
 
+	pipe := p2p.NewPipe(dc, redir)
+
 	dc.OnOpen(func() {
-		slog.Debug("Opened WebRTC channel", "label", dc.Label(), "peer", guest)
+		slog.Debug("Opened WebRTC channel", "label", dc.Label())
 	})
 
 	dc.OnClose(func() {
-		log.Printf("dataChannel for %s has closed", guest)
+		slog.Info("dataChannel has closed", "label", label)
+
+		pipe.Close()
 	})
 
 	return nil
