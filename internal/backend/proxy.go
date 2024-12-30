@@ -1,10 +1,7 @@
 package backend
 
 import (
-	"context"
 	"net"
-
-	"github.com/dimspell/gladiator/internal/wire"
 )
 
 type Proxy interface {
@@ -22,7 +19,7 @@ type Proxy interface {
 
 	Close(session *Session)
 
-	ExtendWire(ctx context.Context, session *Session, et wire.EventType, p []byte)
+	ExtendWire(session *Session) MessageHandler
 }
 
 type CreateParams struct {

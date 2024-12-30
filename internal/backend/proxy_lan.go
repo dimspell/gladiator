@@ -96,41 +96,49 @@ func (p *LAN) Close(session *Session) {
 	// p.RoomPlayers.Clear()
 }
 
-func (p *LAN) ExtendWire(ctx context.Context, session *Session, et wire.EventType, payload []byte) {
-	// if err != nil {
-	// 	slog.Debug("failed to decode wire", slog.String("type", et.String()), slog.String("payload", string(payload)))
-	// }
+func (p *LAN) ExtendWire(session *Session) MessageHandler {
+	return &LanMessageHandler{session: session}
+}
+
+type LanMessageHandler struct {
+	session *Session
+}
+
+func (l *LanMessageHandler) Handle(ctx context.Context, payload []byte) error {
+	et := wire.ParseEventType(payload)
 
 	switch et {
 	case wire.JoinRoom:
 		_, msg, err := wire.DecodeTyped[wire.Player](payload)
 		if err != nil {
-			return
+			return nil
 		}
 
 		player := msg.Content
 		slog.Info("Other player is joining", "playerId", player.ID())
 
-		if session.State.GameRoom() == nil {
-			return
+		if l.session.State.GameRoom() == nil {
+			return nil
 		}
 
-		session.State.GameRoom().SetPlayer(player)
+		l.session.State.GameRoom().SetPlayer(player)
 	case wire.LeaveRoom, wire.LeaveLobby:
 		_, msg, err := wire.DecodeTyped[wire.Player](payload)
 		if err != nil {
-			return
+			return nil
 		}
 
 		player := msg.Content
 		slog.Info("Other player is leaving", "playerId", player.ID())
 
-		if session.State.GameRoom() == nil {
-			return
+		if l.session.State.GameRoom() == nil {
+			return nil
 		}
 
-		session.State.GameRoom().DeletePlayer(player)
+		l.session.State.GameRoom().DeletePlayer(player)
 	default:
 		//	Ignore
 	}
+
+	return nil
 }
