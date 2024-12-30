@@ -249,18 +249,18 @@ func TestE2E_P2P(t *testing.T) {
 	// Host user has correct data
 	assert.Equal(t, int64(1), session1.UserID)
 	assert.Equal(t, "archer", session1.Username)
-	assert.Equal(t, "archer", session1.gameRoom.Players["1"].Username)
-	assert.Equal(t, byte(v1.ClassType_Archer), session1.gameRoom.Players["1"].ClassType)
-	assert.Equal(t, "mage", session1.gameRoom.Players["2"].Username)
-	assert.Equal(t, byte(v1.ClassType_Mage), session1.gameRoom.Players["2"].ClassType)
+	assert.Equal(t, "archer", session1.State.gameRoom.Players["1"].Username)
+	assert.Equal(t, byte(v1.ClassType_Archer), session1.State.gameRoom.Players["1"].ClassType)
+	assert.Equal(t, "mage", session1.State.gameRoom.Players["2"].Username)
+	assert.Equal(t, byte(v1.ClassType_Mage), session1.State.gameRoom.Players["2"].ClassType)
 
 	// Joining user has also the same data
 	assert.Equal(t, int64(2), session2.UserID)
 	assert.Equal(t, "mage", session2.Username)
-	assert.Equal(t, "archer", session2.gameRoom.Players["1"].Username)
-	assert.Equal(t, byte(v1.ClassType_Archer), session2.gameRoom.Players["1"].ClassType)
-	assert.Equal(t, "mage", session2.gameRoom.Players["2"].Username)
-	assert.Equal(t, byte(v1.ClassType_Mage), session2.gameRoom.Players["2"].ClassType)
+	assert.Equal(t, "archer", session2.State.gameRoom.Players["1"].Username)
+	assert.Equal(t, byte(v1.ClassType_Archer), session2.State.gameRoom.Players["1"].ClassType)
+	assert.Equal(t, "mage", session2.State.gameRoom.Players["2"].Username)
+	assert.Equal(t, byte(v1.ClassType_Mage), session2.State.gameRoom.Players["2"].ClassType)
 
 	// RTCICECandidate
 	// cs.Multiplayer.HandleIncomingMessage(ctx, <-cs.Multiplayer.Messages)

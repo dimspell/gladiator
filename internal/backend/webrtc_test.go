@@ -150,7 +150,7 @@ func TestWebRTC(t *testing.T) {
 	}
 
 	gameRoom := NewGameRoom()
-	session2.SetGameRoom(gameRoom)
+	session2.State.SetGameRoom(gameRoom)
 
 	peers := map[string]*p2p.Peer{peer.PeerUserID: peer}
 	proxy2.Peers[session2] = &PeersToSessionMapping{
