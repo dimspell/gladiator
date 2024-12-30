@@ -1,21 +1,29 @@
 package backend
 
 import (
-	"connectrpc.com/connect"
 	"context"
+	"log/slog"
+	"net/http/httptest"
+	"os"
+	"testing"
+	"time"
+
+	"connectrpc.com/connect"
 	v1 "github.com/dimspell/gladiator/gen/multi/v1"
+	"github.com/dimspell/gladiator/internal/app/logger"
 	"github.com/dimspell/gladiator/internal/console"
 	"github.com/dimspell/gladiator/internal/console/database"
 	"github.com/dimspell/gladiator/internal/model"
 	"github.com/dimspell/gladiator/internal/proxy/p2p"
 	"github.com/dimspell/gladiator/internal/proxy/redirect"
-	"net/http/httptest"
-	"testing"
 )
 
 func TestWebRTC(t *testing.T) {
+	logger.SetColoredLogger(os.Stderr, slog.LevelDebug, false)
+
 	redirectFunc := redirect.New
 
+	// Create in-memory database
 	db, err := database.NewMemory()
 	if err != nil {
 		t.Fatalf("failed to create database: %v", err)
@@ -31,6 +39,7 @@ func TestWebRTC(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	// Create console instance and serve the HTTP
 	cs := &console.Console{
 		Multiplayer: console.NewMultiplayer(),
 		DB:          db,
@@ -41,6 +50,7 @@ func TestWebRTC(t *testing.T) {
 	// Remove the HTTP schema prefix
 	cs.Addr = ts.URL[len("http://"):]
 
+	// Mock the hosting user's proxy - player1
 	proxy1 := NewPeerToPeer()
 	proxy1.NewRedirect = redirectFunc
 	bd1 := NewBackend("", cs.Addr, proxy1)
@@ -59,17 +69,23 @@ func TestWebRTC(t *testing.T) {
 		t.Fatalf("failed to connect to lobby: %v", err)
 		return
 	}
+	if err := bd1.RegisterNewObserver(ctx, session1); err != nil {
+		t.Fatalf("failed to register observer: %v", err)
+		return
+	}
+	cs.Multiplayer.HandleIncomingMessage(ctx, <-cs.Multiplayer.Messages)
+	
 	if err := bd1.JoinLobby(ctx, session1); err != nil {
 		t.Fatalf("failed to join lobby: %v", err)
 		return
 	}
 
+	// Create new game room by the player1
 	roomId := "room"
 	if _, err := proxy1.CreateRoom(CreateParams{GameID: roomId}, session1); err != nil {
 		t.Fatalf("failed to create room: %v", err)
 		return
 	}
-
 	if _, err := bd1.gameClient.CreateGame(context.TODO(), connect.NewRequest(&v1.CreateGameRequest{
 		GameName:      roomId,
 		MapId:         v1.GameMap_AbandonedRealm,
@@ -91,7 +107,7 @@ func TestWebRTC(t *testing.T) {
 	// SetRoomReady
 	cs.Multiplayer.HandleIncomingMessage(ctx, <-cs.Multiplayer.Messages)
 
-	// Other user
+	// Create a joining user, a guest - player2
 	proxy2 := NewPeerToPeer()
 	proxy2.NewRedirect = redirectFunc
 	bd2 := NewBackend("", cs.Addr, proxy2)
@@ -110,28 +126,16 @@ func TestWebRTC(t *testing.T) {
 		t.Fatalf("failed to connect to lobby: %v", err)
 		return
 	}
+	if err := bd2.RegisterNewObserver(ctx, session2); err != nil {
+		t.Fatalf("failed to register observer: %v", err)
+		return
+	}
 	if err := bd2.JoinLobby(ctx, session2); err != nil {
 		t.Fatalf("failed to join lobby: %v", err)
 		return
 	}
 
-	//params := GetPlayerAddrParams{
-	//	GameID:     roomId,
-	//	UserID:     "2",
-	//	IPAddress:  "",
-	//	HostUserID: "1",
-	//}
-	//peer := session2.IpRing.NextPeerAddress(
-	//	params.UserID,
-	//	params.UserID == session2.GetUserID(),
-	//	params.UserID == params.HostUserID,
-	//)
-	//ip, err := proxy2.Join(JoinParams{
-	//	HostUserID: "1",
-	//	GameID:     roomId,
-	//	HostUserIP: "127.0.0.1",
-	//}, session2)
-
+	// Make the packet redirect
 	ip, portTCP, portUDP := session2.IpRing.NextAddr()
 	peer := &p2p.Peer{
 		PeerUserID: session2.GetUserID(),
@@ -148,12 +152,32 @@ func TestWebRTC(t *testing.T) {
 		Peers: peers,
 	}
 
-	//close(cs.Multiplayer.Messages)
-	//for message := range cs.Multiplayer.Messages {
-	//	t.Error("unhandled message", message)
-	//}
+	go func() {
+		<-time.After(3 * time.Second)
+		close(cs.Multiplayer.Messages)
+	}()
+	for message := range cs.Multiplayer.Messages {
+		t.Error("unhandled message", message)
+	}
 }
 
 // 	player2.Peers.Range(func(_ string, peer *p2p.Peer) {
 // 		<-webrtc.GatheringCompletePromise(peer.Connection)
 // 	})
+
+// params := GetPlayerAddrParams{
+//	GameID:     roomId,
+//	UserID:     "2",
+//	IPAddress:  "",
+//	HostUserID: "1",
+// }
+// peer := session2.IpRing.NextPeerAddress(
+//	params.UserID,
+//	params.UserID == session2.GetUserID(),
+//	params.UserID == params.HostUserID,
+// )
+// ip, err := proxy2.Join(JoinParams{
+//	HostUserID: "1",
+//	GameID:     roomId,
+//	HostUserIP: "127.0.0.1",
+// }, session2)

@@ -39,9 +39,9 @@ type PeersToSessionMapping struct {
 func NewPeerToPeer() *PeerToPeer {
 	config := webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{
-			{
-				URLs: []string{"stun:stun.l.google.com:19302"},
-			},
+			// {
+			// 	URLs: []string{"stun:stun.l.google.com:19302"},
+			// },
 			// {
 			// 	URLs:       []string{"turn:127.0.0.1:3478"},
 			// 	Username:   "username1",
@@ -51,10 +51,12 @@ func NewPeerToPeer() *PeerToPeer {
 	}
 
 	return &PeerToPeer{
+		// TODO: Test it
 		hostIPAddress: net.IPv4(127, 0, 1, 2),
-		WebRTCConfig:  config,
-		Peers:         make(map[*Session]*PeersToSessionMapping),
-		NewRedirect:   redirect.New,
+
+		WebRTCConfig: config,
+		Peers:        make(map[*Session]*PeersToSessionMapping),
+		NewRedirect:  redirect.New,
 	}
 }
 
@@ -163,12 +165,13 @@ func (p *PeerToPeer) Close(session *Session) {
 }
 
 func (p *PeerToPeer) ExtendWire(ctx context.Context, session *Session, et wire.EventType, payload []byte) {
-	var err error
+	// slog.Debug("Received extend wire event", "session", session, "payload", payload, "event", et.String())
 
 	switch et {
 	case wire.JoinRoom:
 		_, msg, err := wire.DecodeTyped[wire.Player](payload)
 		if err != nil {
+			slog.Error("failed to decode join room payload", "error", err, "payload", string(payload))
 			return
 		}
 
@@ -177,31 +180,47 @@ func (p *PeerToPeer) ExtendWire(ctx context.Context, session *Session, et wire.E
 
 		session.gameRoom.SetPlayer(player)
 
-		err = p.handleJoinRoom(msg, session)
+		if err := p.handleJoinRoom(msg, session); err != nil {
+			slog.Warn("Failed to join room", "error", err, "session", session)
+			return
+		}
 	case wire.RTCOffer:
 		_, msg, err := wire.DecodeTyped[wire.Offer](payload)
 		if err != nil {
+			slog.Error("failed to decode RTC Offer payload", "error", err, "payload", string(payload))
 			return
 		}
 
-		err = p.handleRTCOffer(msg, session)
+		if err := p.handleRTCOffer(msg, session); err != nil {
+			slog.Warn("Failed to handle RTC Offer", "error", err, "session", session)
+			return
+		}
 	case wire.RTCAnswer:
 		_, msg, err := wire.DecodeTyped[wire.Offer](payload)
 		if err != nil {
+			slog.Error("failed to decode RTC Answer payload", "error", err, "payload", string(payload))
 			return
 		}
 
-		err = p.handleRTCAnswer(msg, session)
+		if err := p.handleRTCAnswer(msg, session); err != nil {
+			slog.Warn("Failed to handle rtc answer", "error", err, "session", session)
+			return
+		}
 	case wire.RTCICECandidate:
 		_, msg, err := wire.DecodeTyped[webrtc.ICECandidateInit](payload)
 		if err != nil {
+			slog.Error("failed to decode RTC ICE Candidate payload", "error", err, "payload", string(payload))
 			return
 		}
 
-		err = p.handleRTCCandidate(msg, session)
+		if err := p.handleRTCCandidate(msg, session); err != nil {
+			slog.Warn("RTCC init error", "error", err, "session", session)
+			return
+		}
 	case wire.LeaveRoom, wire.LeaveLobby:
 		_, msg, err := wire.DecodeTyped[wire.Player](payload)
 		if err != nil {
+			slog.Error("failed to decode leave-room/leave-lobby payload", "error", err, "payload", string(payload))
 			return
 		}
 
@@ -210,12 +229,13 @@ func (p *PeerToPeer) ExtendWire(ctx context.Context, session *Session, et wire.E
 
 		session.gameRoom.DeletePlayer(player)
 
-		err = p.handleLeaveRoom(msg, session)
+		if err := p.handleLeaveRoom(msg, session); err != nil {
+			slog.Warn("Failed to leave room", "error", err, "playerId", player.ID(), "session", session)
+			return
+		}
 	default:
 		//	Ignore
-	}
-	if err != nil {
-		slog.Debug("failed to decode wire", slog.String("type", et.String()), slog.String("payload", string(payload)))
+		slog.Debug("unknown wire message", slog.String("type", et.String()), slog.String("payload", string(payload)))
 	}
 }
 
