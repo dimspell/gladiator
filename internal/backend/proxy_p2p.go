@@ -60,6 +60,7 @@ func NewPeerToPeer() *PeerToPeer {
 func (p *PeerToPeer) CreateRoom(params CreateParams, session *Session) (net.IP, error) {
 	ipAddr := net.IPv4(127, 0, 0, 1)
 
+	// Create player from session data
 	player := wire.Player{
 		UserID:      session.UserID,
 		Username:    session.Username,
@@ -98,14 +99,18 @@ func (p *PeerToPeer) HostRoom(params HostParams, session *Session) (err error) {
 		},
 	}
 
-	ctx, cancel := context.WithTimeout(context.TODO(), 3*time.Second)
-	defer cancel()
-
-	if err := session.SendSetRoomReady(ctx, params.GameID); err != nil {
-		return err
+	if err := p.sendRoomReadyNotification(session, params.GameID); err != nil {
+		return fmt.Errorf("could not send set room ready: %w", err)
 	}
 
 	return nil
+}
+
+func (p *PeerToPeer) sendRoomReadyNotification(session *Session, gameID string) error {
+	ctx, cancel := context.WithTimeout(context.TODO(), 3*time.Second)
+	defer cancel()
+
+	return session.SendSetRoomReady(ctx, gameID)
 }
 
 func (p *PeerToPeer) GetHostIP(hostIpAddress string, session *Session) net.IP {
@@ -157,6 +162,14 @@ func (p *PeerToPeer) Join(params JoinParams, session *Session) (net.IP, error) {
 }
 
 func (p *PeerToPeer) Close(session *Session) {
+	mapping, exists := p.Peers[session]
+	if exists {
+		for _, peer := range mapping.Peers {
+			if peer.Connection != nil {
+				peer.Connection.Close()
+			}
+		}
+	}
 	session.IpRing.Reset()
 	delete(p.Peers, session)
 }
@@ -174,81 +187,81 @@ type PeerToPeerMessageHandler struct {
 }
 
 func (p *PeerToPeerMessageHandler) Handle(ctx context.Context, payload []byte) error {
-	// slog.Debug("Received extend wire event", "session", session, "payload", payload, "event", et.String())
 	et := wire.ParseEventType(payload)
 
 	switch et {
 	case wire.JoinRoom:
-		_, msg, err := wire.DecodeTyped[wire.Player](payload)
-		if err != nil {
-			slog.Error("failed to decode join room payload", "error", err, "payload", string(payload))
-			return nil
-		}
-
-		player := msg.Content
-		slog.Info("Other player is joining", "playerId", player.ID())
-
-		p.session.State.GameRoom().SetPlayer(player)
-
-		if err := p.proxy.handleJoinRoom(msg, p.session); err != nil {
-			slog.Warn("Failed to join room", "error", err, "session", p.session)
-			return nil
-		}
+		return p.handleJoinRoom(payload)
 	case wire.RTCOffer:
-		_, msg, err := wire.DecodeTyped[wire.Offer](payload)
-		if err != nil {
-			slog.Error("failed to decode RTC Offer payload", "error", err, "payload", string(payload))
-			return nil
-		}
-
-		if err := p.proxy.handleRTCOffer(msg, p.session); err != nil {
-			slog.Warn("Failed to handle RTC Offer", "error", err, "session", p.session)
-			return nil
-		}
+		return p.handleRTCOffer(payload)
 	case wire.RTCAnswer:
-		_, msg, err := wire.DecodeTyped[wire.Offer](payload)
-		if err != nil {
-			slog.Error("failed to decode RTC Answer payload", "error", err, "payload", string(payload))
-			return nil
-		}
-
-		if err := p.proxy.handleRTCAnswer(msg, p.session); err != nil {
-			slog.Warn("Failed to handle rtc answer", "error", err, "session", p.session)
-			return nil
-		}
+		return p.handleRTCAnswer(payload)
 	case wire.RTCICECandidate:
-		_, msg, err := wire.DecodeTyped[webrtc.ICECandidateInit](payload)
-		if err != nil {
-			slog.Error("failed to decode RTC ICE Candidate payload", "error", err, "payload", string(payload))
-			return nil
-		}
-
-		if err := p.proxy.handleRTCCandidate(msg, p.session); err != nil {
-			slog.Warn("RTCC init error", "error", err, "session", p.session)
-			return nil
-		}
+		return p.handleRTCCandidate(payload)
 	case wire.LeaveRoom, wire.LeaveLobby:
-		_, msg, err := wire.DecodeTyped[wire.Player](payload)
-		if err != nil {
-			slog.Error("failed to decode leave-room/leave-lobby payload", "error", err, "payload", string(payload))
-			return nil
-		}
-
-		player := msg.Content
-		slog.Info("Other player is leaving", "playerId", player.ID())
-
-		p.session.State.GameRoom().DeletePlayer(player)
-
-		if err := p.proxy.handleLeaveRoom(msg, p.session); err != nil {
-			slog.Warn("Failed to leave room", "error", err, "playerId", player.ID(), "session", p.session)
-			return nil
-		}
+		return p.handleLeaveRoom(payload)
 	default:
-		//	Ignore
 		slog.Debug("unknown wire message", slog.String("type", et.String()), slog.String("payload", string(payload)))
+		return nil
+	}
+}
+
+func (p *PeerToPeerMessageHandler) handleJoinRoom(payload []byte) error {
+	_, msg, err := wire.DecodeTyped[wire.Player](payload)
+	if err != nil {
+		slog.Error("failed to decode join room payload", "error", err, "payload", string(payload))
+		return nil
 	}
 
-	return nil
+	player := msg.Content
+	slog.Info("Other player is joining", "playerId", player.ID())
+	p.session.State.GameRoom().SetPlayer(player)
+
+	return p.proxy.handleJoinRoom(msg, p.session)
+}
+
+func (p *PeerToPeerMessageHandler) handleRTCOffer(payload []byte) error {
+	_, msg, err := wire.DecodeTyped[wire.Offer](payload)
+	if err != nil {
+		slog.Error("failed to decode RTC Offer payload", "error", err, "payload", string(payload))
+		return nil
+	}
+
+	return p.proxy.handleRTCOffer(msg, p.session)
+}
+
+func (p *PeerToPeerMessageHandler) handleRTCAnswer(payload []byte) error {
+	_, msg, err := wire.DecodeTyped[wire.Offer](payload)
+	if err != nil {
+		slog.Error("failed to decode RTC Answer payload", "error", err, "payload", string(payload))
+		return nil
+	}
+
+	return p.proxy.handleRTCAnswer(msg, p.session)
+}
+
+func (p *PeerToPeerMessageHandler) handleRTCCandidate(payload []byte) error {
+	_, msg, err := wire.DecodeTyped[webrtc.ICECandidateInit](payload)
+	if err != nil {
+		slog.Error("failed to decode RTC ICE Candidate payload", "error", err, "payload", string(payload))
+		return nil
+	}
+
+	return p.proxy.handleRTCCandidate(msg, p.session)
+}
+
+func (p *PeerToPeerMessageHandler) handleLeaveRoom(payload []byte) error {
+	_, msg, err := wire.DecodeTyped[wire.Player](payload)
+	if err != nil {
+		slog.Error("failed to decode leave-room/leave-lobby payload", "error", err, "payload", string(payload))
+		return nil
+	}
+
+	player := msg.Content
+	slog.Info("Other player is leaving", "playerId", player.ID())
+	p.session.State.GameRoom().DeletePlayer(player)
+
+	return p.proxy.handleLeaveRoom(msg, p.session)
 }
 
 func (p *PeerToPeer) getPeer(session *Session, peerID string) (*p2p.Peer, bool) {
@@ -429,11 +442,13 @@ func (p *PeerToPeer) setUpChannels(session *Session, playerId int64, sendRTCOffe
 	peerConnection.OnNegotiationNeeded(func() {
 		offer, err := peerConnection.CreateOffer(nil)
 		if err != nil {
-			panic(err)
+			slog.Error("failed to create offer", "error", err)
+			return
 		}
 
 		if err := peerConnection.SetLocalDescription(offer); err != nil {
-			panic(err)
+			slog.Error("failed to set local description", "error", err)
+			return
 		}
 
 		if !sendRTCOffer {
