@@ -39,7 +39,7 @@ func TestBackend_HandleJoinGame(t *testing.T) {
 	}
 
 	conn := &mockConn{}
-	session := &Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
+	session := &Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP", State: &SessionState{}}
 
 	assert.NoError(t, b.HandleJoinGame(session, JoinGameRequest{
 		'r', 'e', 't', 'r', 'e', 'a', 't', 0, // Game name

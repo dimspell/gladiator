@@ -164,6 +164,7 @@ func (p *PeerToPeer) Close(session *Session) {
 func (p *PeerToPeer) ExtendWire(session *Session) MessageHandler {
 	return &PeerToPeerMessageHandler{
 		session: session,
+		proxy:   p,
 	}
 }
 
