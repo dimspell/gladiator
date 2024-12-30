@@ -80,7 +80,7 @@ func (p *PeerToPeer) CreateRoom(params CreateParams, session *Session) (net.IP, 
 	return ipAddr, nil
 }
 
-func (p *PeerToPeer) HostRoom(params HostParams, session *Session) (err error) {
+func (p *PeerToPeer) HostRoom(params HostParams, session *Session) error {
 	host := &p2p.Peer{
 		PeerUserID: session.GetUserID(),
 		Addr:       &redirect.Addressing{IP: p.hostIPAddress},
@@ -107,7 +107,7 @@ func (p *PeerToPeer) HostRoom(params HostParams, session *Session) (err error) {
 }
 
 func (p *PeerToPeer) sendRoomReadyNotification(session *Session, gameID string) error {
-	ctx, cancel := context.WithTimeout(context.TODO(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	return session.SendSetRoomReady(ctx, gameID)
@@ -162,8 +162,7 @@ func (p *PeerToPeer) Join(params JoinParams, session *Session) (net.IP, error) {
 }
 
 func (p *PeerToPeer) Close(session *Session) {
-	mapping, exists := p.Peers[session]
-	if exists {
+	if mapping, exists := p.Peers[session]; exists {
 		for _, peer := range mapping.Peers {
 			if peer.Connection != nil {
 				peer.Connection.Close()
@@ -301,7 +300,7 @@ func (p *PeerToPeer) handleJoinRoom(m wire.MessageContent[wire.Player], session 
 
 	peer, connected := p.getPeer(session, m.Content.ID())
 	if connected && peer.Connection != nil {
-		slog.Debug("Peer already exist, ignoring join", "userId", m.Content.UserID)
+		slog.Debug("Peer already exists, ignoring join", "userId", m.Content.UserID)
 		return nil
 	}
 
@@ -339,7 +338,6 @@ func (p *PeerToPeer) handleRTCOffer(m wire.MessageContent[wire.Offer], session *
 
 	peer, err := p.setUpChannels(session, m.Content.UserID, false, false)
 	if err != nil {
-		panic(err)
 		return err
 	}
 
@@ -395,30 +393,47 @@ func (p *PeerToPeer) setUpChannels(session *Session, playerId int64, sendRTCOffe
 	}
 
 	gameRoom := session.State.GameRoom()
-
 	player, found := gameRoom.GetPlayer(strconv.FormatInt(playerId, 10))
 	if !found {
 		return nil, fmt.Errorf("could not find player in game room")
 	}
 
-	peer, ok := p.getPeer(session, player.ID())
-	if !ok {
-		isHost := gameRoom.Host.UserID == player.UserID
-		isCurrentUser := gameRoom.Host.UserID == session.UserID
-		peer = session.IpRing.NextPeerAddress(player.ID(), isCurrentUser, isHost)
-	}
+	peer := p.getOrCreatePeer(session, &player)
 	peer.Connection = peerConnection
 
-	if !ok {
+	if !p.isPeerExisting(session, &player) {
 		p.setPeer(session, peer)
 	}
 
-	slog.Debug("Setting up redirect", "user", session.UserID, "mode", peer.Mode, "addr", peer.Addr)
-	guestTCP, guestUDP, err := p.NewRedirect(peer.Mode, peer.Addr)
-	if err != nil {
-		return nil, fmt.Errorf("could not create guest proxy for %d: %v", player.UserID, err)
+	if err := p.setupPeerConnection(peerConnection, session, &player, sendRTCOffer); err != nil {
+		return nil, err
 	}
 
+	if createChannels {
+		if err := p.createDataChannels(peerConnection, session, peer); err != nil {
+			return nil, err
+		}
+	}
+
+	return peer, nil
+}
+
+func (p *PeerToPeer) getOrCreatePeer(session *Session, player *wire.Player) *p2p.Peer {
+	peer, ok := p.getPeer(session, player.ID())
+	if !ok {
+		isHost := session.State.GameRoom().Host.UserID == player.UserID
+		isCurrentUser := session.State.GameRoom().Host.UserID == session.UserID
+		return session.IpRing.NextPeerAddress(player.ID(), isCurrentUser, isHost)
+	}
+	return peer
+}
+
+func (p *PeerToPeer) isPeerExisting(session *Session, player *wire.Player) bool {
+	_, ok := p.getPeer(session, player.ID())
+	return ok
+}
+
+func (p *PeerToPeer) setupPeerConnection(peerConnection *webrtc.PeerConnection, session *Session, player *wire.Player, sendRTCOffer bool) error {
 	peerConnection.OnICEConnectionStateChange(func(connectionState webrtc.ICEConnectionState) {
 		slog.Debug("ICE Connection State has changed", "peer", player.UserID, "state", connectionState.String())
 	})
@@ -433,9 +448,8 @@ func (p *PeerToPeer) setUpChannels(session *Session, playerId int64, sendRTCOffe
 			Type:    wire.RTCICECandidate,
 			Content: candidate.ToJSON(),
 		})
-		if err := wire.Write(context.TODO(), session.wsConn, reply); err != nil {
+		if err := wire.Write(context.Background(), session.wsConn, reply); err != nil {
 			slog.Error("Could not send ICE candidate", "from", session.GetUserID(), "to", player.UserID, "error", err)
-			// TODO: Here likely is the connection closed, so it can't be sent further
 		}
 	})
 
@@ -471,53 +485,44 @@ func (p *PeerToPeer) setUpChannels(session *Session, playerId int64, sendRTCOffe
 		}
 	})
 
-	peerConnection.OnDataChannel(func(dc *webrtc.DataChannel) {
-		dc.OnOpen(func() {
-			slog.Debug("Opened WebRTC channel", "label", dc.Label(), "peer", player.UserID)
+	return nil
+}
 
-			switch {
-			case isTCPChannel(dc, session.State.GameRoom().ID):
-				p2p.NewPipe(dc, guestTCP)
-			case isUDPChannel(dc, session.State.GameRoom().ID):
-				p2p.NewPipe(dc, guestUDP)
-			}
-		})
-	})
+func (p *PeerToPeer) createDataChannels(peerConnection *webrtc.PeerConnection, session *Session, peer *p2p.Peer) error {
+	roomId := session.State.GameRoom().Name
 
-	if createChannels {
-		roomId := session.State.GameRoom().Name
-
+	if guestTCP, guestUDP, err := p.NewRedirect(peer.Mode, peer.Addr); err == nil {
 		if guestTCP != nil {
-			dcTCP, err := peer.Connection.CreateDataChannel(fmt.Sprintf("%s/tcp", roomId), nil)
-			if err != nil {
-				return nil, fmt.Errorf("could not create data channel %q: %v", roomId, err)
+			if err := p.createDataChannel(peerConnection, fmt.Sprintf("%s/tcp", roomId), guestTCP); err != nil {
+				return err
 			}
-			pipeTCP := p2p.NewPipe(dcTCP, guestTCP)
-
-			dcTCP.OnClose(func() {
-				log.Printf("dataChannel for %s has closed", peer.PeerUserID)
-				// session.RoomPlayers.Delete(peer.PeerUserID)
-				pipeTCP.Close()
-			})
 		}
 
 		if guestUDP != nil {
-			// UDP
-			dcUDP, err := peer.Connection.CreateDataChannel(fmt.Sprintf("%s/udp", roomId), nil)
-			if err != nil {
-				return nil, fmt.Errorf("could not create data channel %q: %v", roomId, err)
+			if err := p.createDataChannel(peerConnection, fmt.Sprintf("%s/udp", roomId), guestUDP); err != nil {
+				return err
 			}
-			pipeUDP := p2p.NewPipe(dcUDP, guestUDP)
-
-			dcUDP.OnClose(func() {
-				log.Printf("dataChannel for %s has closed", peer.PeerUserID)
-				// session.RoomPlayers.Delete(peer.PeerUserID)
-				pipeUDP.Close()
-			})
 		}
 	}
 
-	return peer, nil
+	return nil
+}
+
+func (p *PeerToPeer) createDataChannel(peerConnection *webrtc.PeerConnection, label string, guest interface{}) error {
+	dc, err := peerConnection.CreateDataChannel(label, nil)
+	if err != nil {
+		return fmt.Errorf("could not create data channel %q: %v", label, err)
+	}
+
+	dc.OnOpen(func() {
+		slog.Debug("Opened WebRTC channel", "label", dc.Label(), "peer", guest)
+	})
+
+	dc.OnClose(func() {
+		log.Printf("dataChannel for %s has closed", guest)
+	})
+
+	return nil
 }
 
 func (p *PeerToPeer) handleRTCCandidate(m wire.MessageContent[webrtc.ICECandidateInit], session *Session) error {
@@ -527,16 +532,5 @@ func (p *PeerToPeer) handleRTCCandidate(m wire.MessageContent[webrtc.ICECandidat
 	if !ok {
 		return fmt.Errorf("could not find peer %q", m.From)
 	}
-	if err := peer.Connection.AddICECandidate(m.Content); err != nil {
-		return fmt.Errorf("could not add ICE candidate: %w", err)
-	}
-	return nil
-}
-
-func isTCPChannel(dc *webrtc.DataChannel, room string) bool {
-	return dc.Label() == fmt.Sprintf("%s/tcp", room)
-}
-
-func isUDPChannel(dc *webrtc.DataChannel, room string) bool {
-	return dc.Label() == fmt.Sprintf("%s/udp", room)
+	return peer.Connection.AddICECandidate(m.Content)
 }
