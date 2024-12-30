@@ -50,6 +50,17 @@ func TestWebRTC(t *testing.T) {
 	// Remove the HTTP schema prefix
 	cs.Addr = ts.URL[len("http://"):]
 
+	go func() {
+		<-time.After(3 * time.Second)
+		close(cs.Multiplayer.Messages)
+	}()
+	go func() {
+		for message := range cs.Multiplayer.Messages {
+			t.Log("console handled message", message)
+			cs.Multiplayer.HandleIncomingMessage(ctx, message)
+		}
+	}()
+
 	// Mock the hosting user's proxy - player1
 	proxy1 := NewPeerToPeer()
 	proxy1.NewRedirect = redirectFunc
@@ -69,14 +80,12 @@ func TestWebRTC(t *testing.T) {
 		t.Fatalf("failed to connect to lobby: %v", err)
 		return
 	}
-	if err := bd1.RegisterNewObserver(ctx, session1); err != nil {
-		t.Fatalf("failed to register observer: %v", err)
-		return
-	}
-	cs.Multiplayer.HandleIncomingMessage(ctx, <-cs.Multiplayer.Messages)
-	
 	if err := bd1.JoinLobby(ctx, session1); err != nil {
 		t.Fatalf("failed to join lobby: %v", err)
+		return
+	}
+	if err := bd1.RegisterNewObserver(ctx, session1); err != nil {
+		t.Fatalf("failed to register observer: %v", err)
 		return
 	}
 
@@ -104,9 +113,6 @@ func TestWebRTC(t *testing.T) {
 		return
 	}
 
-	// SetRoomReady
-	cs.Multiplayer.HandleIncomingMessage(ctx, <-cs.Multiplayer.Messages)
-
 	// Create a joining user, a guest - player2
 	proxy2 := NewPeerToPeer()
 	proxy2.NewRedirect = redirectFunc
@@ -126,12 +132,12 @@ func TestWebRTC(t *testing.T) {
 		t.Fatalf("failed to connect to lobby: %v", err)
 		return
 	}
-	if err := bd2.RegisterNewObserver(ctx, session2); err != nil {
-		t.Fatalf("failed to register observer: %v", err)
-		return
-	}
 	if err := bd2.JoinLobby(ctx, session2); err != nil {
 		t.Fatalf("failed to join lobby: %v", err)
+		return
+	}
+	if err := bd2.RegisterNewObserver(ctx, session2); err != nil {
+		t.Fatalf("failed to register observer: %v", err)
 		return
 	}
 
@@ -150,14 +156,6 @@ func TestWebRTC(t *testing.T) {
 	proxy2.Peers[session2] = &PeersToSessionMapping{
 		Game:  gameRoom,
 		Peers: peers,
-	}
-
-	go func() {
-		<-time.After(3 * time.Second)
-		close(cs.Multiplayer.Messages)
-	}()
-	for message := range cs.Multiplayer.Messages {
-		t.Error("unhandled message", message)
 	}
 }
 

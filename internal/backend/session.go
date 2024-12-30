@@ -207,13 +207,13 @@ func (b *Backend) JoinLobby(ctx context.Context, session *Session) error {
 			},
 		}))
 	if err != nil {
-		return err
+		return fmt.Errorf("backend: failed send a join lobby message: %w for %d", err, session.UserID)
 	}
 
 	// Expect to receive the joined message.
 	_, response, err := session.wsConn.Read(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("backend: failed receive a join lobby message: %w", err)
 	}
 	if len(response) != 1 || wire.EventType(response[0]) != wire.JoinedLobby {
 		return fmt.Errorf("expected joined message, got: %s (len=%d)", string(response), len(response))
