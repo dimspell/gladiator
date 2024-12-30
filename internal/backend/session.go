@@ -40,12 +40,9 @@ type Session struct {
 	observerDone          context.CancelFunc
 	wsConn                *websocket.Conn
 
-	// lobbyUsers contains list of players who are connected to lobby server.
-	lobbyUsers []wire.Player
-
 	IpRing *p2p.IpRing
 
-	gameRoom *GameRoom
+	State *SessionState
 }
 
 func (s *Session) SetLogonData(user *multiv1.User) {
@@ -61,18 +58,6 @@ func (s *Session) UpdateCharacter(character *multiv1.Character) {
 
 	s.CharacterID = character.CharacterId
 	s.ClassType = info.ClassType
-	s.Unlock()
-}
-
-func (s *Session) GameRoom() *GameRoom {
-	s.RLock()
-	defer s.RUnlock()
-	return s.gameRoom
-}
-
-func (s *Session) SetGameRoom(gameRoom *GameRoom) {
-	s.Lock()
-	s.gameRoom = gameRoom
 	s.Unlock()
 }
 
@@ -108,6 +93,8 @@ func (b *Backend) AddSession(tcpConn net.Conn) *Session {
 		ID:   id,
 
 		IpRing: p2p.NewIpRing(),
+
+		State: &SessionState{},
 		// RoomPlayers: p2p.NewPeers(),
 	}
 	b.ConnectedSessions.Store(session.ID, session)
@@ -247,10 +234,7 @@ func (b *Backend) RegisterNewObserver(ctx context.Context, session *Session) err
 				return
 			}
 
-			session.Lock()
-			session.lobbyUsers = msg.Content
-			session.Unlock()
-
+			session.State.UpdateLobbyUsers(msg.Content)
 		case wire.JoinLobby:
 			_, msg, err := wire.DecodeTyped[wire.Player](p)
 			if err != nil {
@@ -262,9 +246,10 @@ func (b *Backend) RegisterNewObserver(ctx context.Context, session *Session) err
 			}
 
 			player := msg.Content
-			session.lobbyUsers = append(session.lobbyUsers, player)
+			lobbyUsers := append(session.State.GetLobbyUsers(), player)
+			session.State.UpdateLobbyUsers(lobbyUsers)
+			idx := uint32(len(lobbyUsers))
 
-			idx := uint32(len(session.lobbyUsers))
 			if err := b.Send(session.Conn, ReceiveMessage,
 				AppendCharacterToLobby(player.Username, model.ClassType(player.ClassType), idx),
 			); err != nil {
@@ -278,11 +263,7 @@ func (b *Backend) RegisterNewObserver(ctx context.Context, session *Session) err
 				return
 			}
 
-			session.Lock()
-			session.lobbyUsers = slices.DeleteFunc(session.lobbyUsers, func(player wire.Player) bool {
-				return msg.Content.UserID == player.UserID
-			})
-			session.Unlock()
+			session.State.DeleteLobbyUser(msg.Content.UserID)
 
 			if err := b.Send(session.Conn, ReceiveMessage,
 				RemoveCharacterFromLobby(msg.Content.Username),
@@ -320,4 +301,45 @@ func (b *Backend) RegisterNewObserver(ctx context.Context, session *Session) err
 	}
 	go observe(ctx, session.wsConn)
 	return nil
+}
+
+type SessionState struct {
+	sync.RWMutex
+
+	gameRoom *GameRoom
+
+	// lobbyUsers contains list of players who are connected to lobby server.
+	lobbyUsers []wire.Player
+}
+
+func (s *SessionState) GameRoom() *GameRoom {
+	s.RLock()
+	defer s.RUnlock()
+	return s.gameRoom
+}
+
+func (s *SessionState) SetGameRoom(gameRoom *GameRoom) {
+	s.Lock()
+	s.gameRoom = gameRoom
+	s.Unlock()
+}
+
+func (s *SessionState) UpdateLobbyUsers(users []wire.Player) {
+	s.Lock()
+	s.lobbyUsers = users
+	s.Unlock()
+}
+
+func (s *SessionState) GetLobbyUsers() []wire.Player {
+	s.RLock()
+	defer s.RUnlock()
+	return s.lobbyUsers
+}
+
+func (s *SessionState) DeleteLobbyUser(userIdToDelete int64) {
+	s.Lock()
+	s.lobbyUsers = slices.DeleteFunc(s.lobbyUsers, func(player wire.Player) bool {
+		return userIdToDelete == player.UserID
+	})
+	s.Unlock()
 }

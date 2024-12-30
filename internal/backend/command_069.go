@@ -55,7 +55,7 @@ func (b *Backend) HandleSelectGame(session *Session, req SelectGameRequest) erro
 			})
 		}
 	}
-	session.SetGameRoom(gameRoom)
+	session.State.SetGameRoom(gameRoom)
 
 	response := []byte{}
 	response = binary.LittleEndian.AppendUint32(response, uint32(respGame.Msg.Game.GetMapId()))
@@ -127,8 +127,8 @@ func (r SelectGameRequest) Parse() (data SelectGameRequestData, err error) {
 //		MapID: uint32(respGame.Msg.Game.GetMapId()),
 //		// Players: []model.LobbyPlayer{}, // Unused
 //	}
-//type SelectGameResponse struct {
+// type SelectGameResponse struct {
 //	Lobby   model.LobbyRoom
 //	MapID   uint32
 //	Players []model.LobbyPlayer
-//}
+// }

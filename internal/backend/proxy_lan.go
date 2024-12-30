@@ -54,7 +54,7 @@ func (p *LAN) CreateRoom(params CreateParams, session *Session) (net.IP, error) 
 	gameRoom.SetHost(player)
 	gameRoom.SetPlayer(player)
 
-	session.SetGameRoom(gameRoom)
+	session.State.SetGameRoom(gameRoom)
 
 	return ip, nil
 }
@@ -88,9 +88,9 @@ func (p *LAN) GetPlayerAddr(params GetPlayerAddrParams, session *Session) (net.I
 }
 
 func (p *LAN) Close(session *Session) {
-	if session.gameRoom != nil {
-		session.SendLeaveRoom(context.TODO(), session.gameRoom)
-		session.gameRoom = nil
+	if gameRoom := session.State.GameRoom(); gameRoom != nil {
+		session.SendLeaveRoom(context.TODO(), gameRoom)
+		session.State.SetGameRoom(nil)
 	}
 
 	// p.RoomPlayers.Clear()
@@ -111,11 +111,11 @@ func (p *LAN) ExtendWire(ctx context.Context, session *Session, et wire.EventTyp
 		player := msg.Content
 		slog.Info("Other player is joining", "playerId", player.ID())
 
-		if session.gameRoom == nil {
+		if session.State.GameRoom() == nil {
 			return
 		}
 
-		session.gameRoom.SetPlayer(player)
+		session.State.GameRoom().SetPlayer(player)
 	case wire.LeaveRoom, wire.LeaveLobby:
 		_, msg, err := wire.DecodeTyped[wire.Player](payload)
 		if err != nil {
@@ -125,11 +125,11 @@ func (p *LAN) ExtendWire(ctx context.Context, session *Session, et wire.EventTyp
 		player := msg.Content
 		slog.Info("Other player is leaving", "playerId", player.ID())
 
-		if session.gameRoom == nil {
+		if session.State.GameRoom() == nil {
 			return
 		}
 
-		session.gameRoom.DeletePlayer(player)
+		session.State.GameRoom().DeletePlayer(player)
 	default:
 		//	Ignore
 	}

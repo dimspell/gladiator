@@ -42,7 +42,7 @@ func (b *Backend) HandleJoinGame(session *Session, req JoinGameRequest) error {
 		return err
 	}
 
-	gameRoom := session.gameRoom
+	gameRoom := session.State.GameRoom()
 	gameRoom.SetPlayer(wire.Player{
 		UserID:      session.UserID,
 		Username:    session.Username,
@@ -50,7 +50,7 @@ func (b *Backend) HandleJoinGame(session *Session, req JoinGameRequest) error {
 		ClassType:   byte(session.ClassType),
 		IPAddress:   myIpAddr.To4().String(),
 	})
-	session.SetGameRoom(gameRoom)
+	session.State.SetGameRoom(gameRoom)
 
 	respJoin, err := b.gameClient.JoinGame(context.TODO(), connect.NewRequest(&multiv1.JoinGameRequest{
 		UserId:     session.UserID,

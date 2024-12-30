@@ -77,7 +77,7 @@ func (p *PeerToPeer) CreateRoom(params CreateParams, session *Session) (net.IP, 
 	gameRoom.SetHost(player)
 	gameRoom.SetPlayer(player)
 
-	session.SetGameRoom(gameRoom)
+	session.State.SetGameRoom(gameRoom)
 
 	return ipAddr, nil
 }
@@ -89,7 +89,7 @@ func (p *PeerToPeer) HostRoom(params HostParams, session *Session) (err error) {
 		Mode:       redirect.CurrentUserIsHost,
 	}
 
-	room := session.GameRoom()
+	room := session.State.GameRoom()
 	if room == nil || room.ID != params.GameID {
 		return fmt.Errorf("no game room found")
 	}
@@ -134,7 +134,7 @@ func (p *PeerToPeer) GetPlayerAddr(params GetPlayerAddrParams, session *Session)
 		mapping.Peers[peer.PeerUserID] = peer
 	} else {
 		p.Peers[session] = &PeersToSessionMapping{
-			Game:  session.GameRoom(),
+			Game:  session.State.GameRoom(),
 			Peers: map[string]*p2p.Peer{peer.PeerUserID: peer},
 		}
 	}
@@ -178,7 +178,7 @@ func (p *PeerToPeer) ExtendWire(ctx context.Context, session *Session, et wire.E
 		player := msg.Content
 		slog.Info("Other player is joining", "playerId", player.ID())
 
-		session.gameRoom.SetPlayer(player)
+		session.State.GameRoom().SetPlayer(player)
 
 		if err := p.handleJoinRoom(msg, session); err != nil {
 			slog.Warn("Failed to join room", "error", err, "session", session)
@@ -227,7 +227,7 @@ func (p *PeerToPeer) ExtendWire(ctx context.Context, session *Session, et wire.E
 		player := msg.Content
 		slog.Info("Other player is leaving", "playerId", player.ID())
 
-		session.gameRoom.DeletePlayer(player)
+		session.State.GameRoom().DeletePlayer(player)
 
 		if err := p.handleLeaveRoom(msg, session); err != nil {
 			slog.Warn("Failed to leave room", "error", err, "playerId", player.ID(), "session", session)
@@ -369,15 +369,17 @@ func (p *PeerToPeer) setUpChannels(session *Session, playerId int64, sendRTCOffe
 		return nil, err
 	}
 
-	player, found := session.gameRoom.GetPlayer(strconv.FormatInt(playerId, 10))
+	gameRoom := session.State.GameRoom()
+
+	player, found := gameRoom.GetPlayer(strconv.FormatInt(playerId, 10))
 	if !found {
 		return nil, fmt.Errorf("could not find player in game room")
 	}
 
 	peer, ok := p.getPeer(session, player.ID())
 	if !ok {
-		isHost := session.gameRoom.Host.UserID == player.UserID
-		isCurrentUser := session.gameRoom.Host.UserID == session.UserID
+		isHost := gameRoom.Host.UserID == player.UserID
+		isCurrentUser := gameRoom.Host.UserID == session.UserID
 		peer = session.IpRing.NextPeerAddress(player.ID(), isCurrentUser, isHost)
 	}
 	peer.Connection = peerConnection
@@ -447,16 +449,16 @@ func (p *PeerToPeer) setUpChannels(session *Session, playerId int64, sendRTCOffe
 			slog.Debug("Opened WebRTC channel", "label", dc.Label(), "peer", player.UserID)
 
 			switch {
-			case isTCPChannel(dc, session.GameRoom().ID):
+			case isTCPChannel(dc, session.State.GameRoom().ID):
 				p2p.NewPipe(dc, guestTCP)
-			case isUDPChannel(dc, session.GameRoom().ID):
+			case isUDPChannel(dc, session.State.GameRoom().ID):
 				p2p.NewPipe(dc, guestUDP)
 			}
 		})
 	})
 
 	if createChannels {
-		roomId := session.GameRoom().Name
+		roomId := session.State.GameRoom().Name
 
 		if guestTCP != nil {
 			dcTCP, err := peer.Connection.CreateDataChannel(fmt.Sprintf("%s/tcp", roomId), nil)
