@@ -7,16 +7,14 @@ import (
 	"log/slog"
 	"math"
 	"net"
-	"slices"
 	"sync"
 	"time"
 
-	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
-	"github.com/dimspell/gladiator/internal/proxy/p2p"
-
 	"github.com/coder/websocket"
+	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/internal/app/logger"
 	"github.com/dimspell/gladiator/internal/model"
+	"github.com/dimspell/gladiator/internal/proxy/p2p"
 	"github.com/dimspell/gladiator/internal/wire"
 	"github.com/google/uuid"
 )
@@ -202,13 +200,17 @@ func (b *Backend) JoinLobby(ctx context.Context, session *Session) error {
 	return nil
 }
 
+type MessageHandler interface {
+	Handle(ctx context.Context, payload []byte) error
+}
+
 func (b *Backend) RegisterNewObserver(ctx context.Context, session *Session) error {
 	if session.wsConn == nil {
 		return fmt.Errorf("backend: invalid websocket client connection")
 	}
 
 	handlers := []MessageHandler{
-		&WireMessageHandler{session: session},
+		&SessionMessageHandler{session: session},
 		b.Proxy.ExtendWire(session),
 	}
 	observe := func(ctx context.Context, wsConn *websocket.Conn) {
@@ -240,49 +242,4 @@ func (b *Backend) RegisterNewObserver(ctx context.Context, session *Session) err
 	}
 	go observe(ctx, session.wsConn)
 	return nil
-}
-
-type SessionState struct {
-	sync.RWMutex
-
-	gameRoom *GameRoom
-
-	// lobbyUsers contains list of players who are connected to lobby server.
-	lobbyUsers []wire.Player
-}
-
-func (s *SessionState) GameRoom() *GameRoom {
-	s.RLock()
-	defer s.RUnlock()
-	return s.gameRoom
-}
-
-func (s *SessionState) SetGameRoom(gameRoom *GameRoom) {
-	s.Lock()
-	s.gameRoom = gameRoom
-	s.Unlock()
-}
-
-func (s *SessionState) UpdateLobbyUsers(users []wire.Player) {
-	s.Lock()
-	s.lobbyUsers = users
-	s.Unlock()
-}
-
-func (s *SessionState) GetLobbyUsers() []wire.Player {
-	s.RLock()
-	defer s.RUnlock()
-	return s.lobbyUsers
-}
-
-func (s *SessionState) DeleteLobbyUser(userIdToDelete int64) {
-	s.Lock()
-	s.lobbyUsers = slices.DeleteFunc(s.lobbyUsers, func(player wire.Player) bool {
-		return userIdToDelete == player.UserID
-	})
-	s.Unlock()
-}
-
-type MessageHandler interface {
-	Handle(ctx context.Context, payload []byte) error
 }

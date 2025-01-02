@@ -8,11 +8,11 @@ import (
 	"github.com/dimspell/gladiator/internal/wire"
 )
 
-type WireMessageHandler struct {
+type SessionMessageHandler struct {
 	session *Session
 }
 
-func (h *WireMessageHandler) Handle(ctx context.Context, payload []byte) error {
+func (h *SessionMessageHandler) Handle(ctx context.Context, payload []byte) error {
 	et := wire.ParseEventType(payload)
 	// msg := wire.ParseTyped[wire.ChatMessage](payload)
 
