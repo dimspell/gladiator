@@ -86,13 +86,13 @@ func DecodeTyped[T any](payload []byte) (et EventType, m MessageContent[T], err 
 	return EventType(payload[0]), m, nil
 }
 
-func DecodeAndRun[T any, S any](data []byte, f func(T, S) error, s S) error {
-	_, v, err := DecodeTyped[T](data)
-	if err != nil {
-		return err
-	}
-	return f(v.Content, s)
-}
+// func DecodeAndRun[T any, S any](data []byte, f func(T, S) error, s S) error {
+// 	_, v, err := DecodeTyped[T](data)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	return f(v.Content, s)
+// }
 
 func ParseEventType(payload []byte) EventType {
 	if len(payload) == 0 {

@@ -1,7 +1,6 @@
 package backend
 
 import (
-	"errors"
 	"slices"
 	"sync"
 
@@ -17,15 +16,16 @@ type SessionState struct {
 	lobbyUsers []wire.Player
 }
 
-var ErrGameRoomNotSet error = errors.New("game room not set")
+// var ErrGameRoomNotSet error = errors.New("game room not set")
 
-func (s *SessionState) GameRoom() (*GameRoom, error) {
+func (s *SessionState) GameRoom() *GameRoom {
 	s.RLock()
 	defer s.RUnlock()
-	if s.gameRoom == nil {
-		return nil, ErrGameRoomNotSet
-	}
-	return s.gameRoom, nil
+	// if s.gameRoom == nil {
+	// 	return nil, ErrGameRoomNotSet
+	// }
+	// FIXME: It panics on nil, but it shouldn't - handle the error.
+	return s.gameRoom
 }
 
 func (s *SessionState) SetGameRoom(gameRoom *GameRoom) {

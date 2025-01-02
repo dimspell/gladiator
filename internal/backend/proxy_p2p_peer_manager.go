@@ -129,13 +129,8 @@ func (p *PeerToPeerPeerManager) setupPeerConnection(peerConnection *webrtc.PeerC
 		if candidate == nil {
 			return
 		}
-		reply := wire.ComposeTyped[webrtc.ICECandidateInit](wire.RTCICECandidate, wire.MessageContent[webrtc.ICECandidateInit]{
-			From:    session.GetUserID(),
-			To:      player.ID(),
-			Type:    wire.RTCICECandidate,
-			Content: candidate.ToJSON(),
-		})
-		if err := wire.Write(context.Background(), session.wsConn, reply); err != nil {
+
+		if err := session.SendRTCICECandidate(context.TODO(), candidate.ToJSON(), player.ID()); err != nil {
 			slog.Error("Could not send ICE candidate", "from", session.GetUserID(), "to", player.UserID, "error", err)
 		}
 	})
@@ -158,16 +153,7 @@ func (p *PeerToPeerPeerManager) setupPeerConnection(peerConnection *webrtc.PeerC
 			return
 		}
 
-		reply := wire.ComposeTyped[wire.Offer](wire.RTCOffer, wire.MessageContent[wire.Offer]{
-			From: session.GetUserID(),
-			To:   player.ID(),
-			Type: wire.RTCOffer,
-			Content: wire.Offer{
-				UserID: session.UserID,
-				Offer:  offer,
-			},
-		})
-		if err := wire.Write(context.TODO(), session.wsConn, reply); err != nil {
+		if err := session.SendRTCOffer(context.TODO(), offer, player.ID()); err != nil {
 			panic(err)
 		}
 	})

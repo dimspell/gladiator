@@ -102,16 +102,7 @@ func (h *PeerToPeerMessageHandler) handleRTCOffer(payload []byte) error {
 		return fmt.Errorf("could not set local description: %v", err)
 	}
 
-	response := wire.ComposeTyped[wire.Offer](wire.RTCAnswer, wire.MessageContent[wire.Offer]{
-		From: h.session.GetUserID(),
-		To:   msg.From,
-		Type: wire.RTCAnswer,
-		Content: wire.Offer{
-			UserID: h.session.UserID, // TODO: Unused data
-			Offer:  answer,
-		},
-	})
-	if err := wire.Write(context.TODO(), h.session.wsConn, response); err != nil {
+	if err := h.session.SendRTCAnswer(context.TODO(), answer, msg.From); err != nil {
 		return fmt.Errorf("could not send answer: %v", err)
 	}
 	return nil

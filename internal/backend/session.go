@@ -17,6 +17,7 @@ import (
 	"github.com/dimspell/gladiator/internal/proxy/p2p"
 	"github.com/dimspell/gladiator/internal/wire"
 	"github.com/google/uuid"
+	"github.com/pion/webrtc/v4"
 )
 
 type Session struct {
@@ -158,24 +159,6 @@ func (b *Backend) ConnectToLobby(ctx context.Context, user *multiv1.User, sessio
 	return nil
 }
 
-func (s *Session) SendEvent(ctx context.Context, eventType wire.EventType, content any) error {
-	return wire.Write(ctx, s.wsConn, wire.Compose(
-		eventType,
-		wire.Message{
-			From:    s.GetUserID(),
-			Type:    eventType,
-			Content: content,
-		}),
-	)
-}
-
-func (s *Session) SendChatMessage(ctx context.Context, text string) error {
-	return s.SendEvent(ctx, wire.Chat, wire.ChatMessage{
-		User: s.Username,
-		Text: text,
-	})
-}
-
 func (b *Backend) JoinLobby(ctx context.Context, session *Session) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Second*3)
 	defer cancel()
@@ -242,4 +225,66 @@ func (b *Backend) RegisterNewObserver(ctx context.Context, session *Session) err
 	}
 	go observe(ctx, session.wsConn)
 	return nil
+}
+
+func (s *Session) SendEvent(ctx context.Context, eventType wire.EventType, content any) error {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+	defer cancel()
+
+	return wire.Write(ctx, s.wsConn, wire.Compose(
+		eventType,
+		wire.Message{
+			From:    s.GetUserID(),
+			Type:    eventType,
+			Content: content,
+		}),
+	)
+}
+
+func (s *Session) SendEventTo(ctx context.Context, eventType wire.EventType, content any, recipientId string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+	defer cancel()
+
+	return wire.Write(ctx, s.wsConn, wire.Compose(
+		eventType,
+		wire.Message{
+			From:    s.GetUserID(),
+			To:      recipientId,
+			Type:    eventType,
+			Content: content,
+		}),
+	)
+}
+
+func (s *Session) SendChatMessage(ctx context.Context, text string) error {
+	return s.SendEvent(ctx, wire.Chat, wire.ChatMessage{
+		User: s.Username,
+		Text: text,
+	})
+}
+
+func (s *Session) SendSetRoomReady(ctx context.Context, gameRoomId string) error {
+	return s.SendEvent(ctx, wire.SetRoomReady, gameRoomId)
+}
+
+func (s *Session) SendLeaveRoom(ctx context.Context, gameRoom *GameRoom) error {
+	return s.SendEvent(ctx, wire.LeaveRoom, gameRoom.ID)
+}
+
+func (s *Session) SendRTCICECandidate(ctx context.Context, candidate webrtc.ICECandidateInit, recipientId string) error {
+	return s.SendEventTo(ctx, wire.RTCICECandidate, candidate, recipientId)
+}
+
+func (s *Session) SendRTCOffer(ctx context.Context, offer webrtc.SessionDescription, recipientId string) error {
+	return s.SendEventTo(ctx, wire.RTCOffer, wire.Offer{
+		UserID: s.UserID,
+		Offer:  offer,
+	}, recipientId)
+}
+
+func (s *Session) SendRTCAnswer(ctx context.Context, answer webrtc.SessionDescription, recipientId string) error {
+	return s.SendEventTo(ctx, wire.RTCAnswer, wire.Offer{
+		UserID: s.UserID,
+		Offer:  answer,
+	}, recipientId)
 }
