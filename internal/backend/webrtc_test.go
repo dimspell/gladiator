@@ -63,7 +63,7 @@ func TestWebRTC(t *testing.T) {
 
 	// Mock the hosting user's proxy - player1
 	proxy1 := NewPeerToPeer()
-	proxy1.NewRedirect = redirectFunc
+	proxy1.manager.NewRedirect = redirectFunc
 	bd1 := NewBackend("", cs.Addr, proxy1)
 	bd1.SignalServerURL = "ws://" + cs.Addr + "/lobby"
 
@@ -115,7 +115,7 @@ func TestWebRTC(t *testing.T) {
 
 	// Create a joining user, a guest - player2
 	proxy2 := NewPeerToPeer()
-	proxy2.NewRedirect = redirectFunc
+	proxy2.manager.NewRedirect = redirectFunc
 	bd2 := NewBackend("", cs.Addr, proxy2)
 	bd2.SignalServerURL = "ws://" + cs.Addr + "/lobby"
 
@@ -153,7 +153,7 @@ func TestWebRTC(t *testing.T) {
 	session2.State.SetGameRoom(gameRoom)
 
 	peers := map[string]*p2p.Peer{peer.PeerUserID: peer}
-	proxy2.Peers[session2] = &PeersToSessionMapping{
+	proxy2.manager.Peers[session2] = &PeersToSessionMapping{
 		Game:  gameRoom,
 		Peers: peers,
 	}
