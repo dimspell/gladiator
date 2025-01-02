@@ -101,7 +101,7 @@ func (b *Backend) Shutdown() {
 		// TODO: Send a system message "(system) The server is going to close in less than 30 seconds"
 		_ = session.Send(
 			ReceiveMessage,
-			NewGlobalMessage("system-info", "The server is going to close..."))
+			NewGlobalMessage("system-info", "The server is going to shut down..."))
 
 		// TODO: Send a packet to trigger stats saving
 		// TODO: Send a system message "(system): Your stats were saving, your game client might close in the next 10 seconds"
