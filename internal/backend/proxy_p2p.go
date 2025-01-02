@@ -30,12 +30,7 @@ func (p *PeerToPeer) CreateRoom(params CreateParams, session *Session) (net.IP, 
 	ipAddr := net.IPv4(127, 0, 0, 1)
 	player := session.ToPlayer(ipAddr)
 
-	gameRoom := NewGameRoom()
-	gameRoom.ID = params.GameID
-	gameRoom.Name = params.GameID
-	gameRoom.SetHost(player)
-	gameRoom.SetPlayer(player)
-
+	gameRoom := NewGameRoom(params.GameID, player)
 	session.State.SetGameRoom(gameRoom)
 
 	return ipAddr, nil

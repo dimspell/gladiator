@@ -40,20 +40,9 @@ func (p *LAN) CreateRoom(params CreateParams, session *Session) (net.IP, error) 
 		return net.IP{}, fmt.Errorf("incorrect host IP address: %s", p.MyIPAddress)
 	}
 
-	player := wire.Player{
-		UserID:      session.UserID,
-		Username:    session.Username,
-		CharacterID: session.CharacterID,
-		ClassType:   byte(session.ClassType),
-		IPAddress:   p.MyIPAddress,
-	}
+	player := session.ToPlayer(ip)
 
-	gameRoom := NewGameRoom()
-	gameRoom.ID = params.GameID
-	gameRoom.Name = params.GameID
-	gameRoom.SetHost(player)
-	gameRoom.SetPlayer(player)
-
+	gameRoom := NewGameRoom(params.GameID, player)
 	session.State.SetGameRoom(gameRoom)
 
 	return ip, nil

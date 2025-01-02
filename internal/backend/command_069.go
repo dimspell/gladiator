@@ -34,9 +34,11 @@ func (b *Backend) HandleSelectGame(session *Session, req SelectGameRequest) erro
 		return nil
 	}
 
-	gameRoom := NewGameRoom()
-	gameRoom.ID = respGame.Msg.GetGame().GetName()
-	gameRoom.Name = respGame.Msg.GetGame().GetName()
+	gameRoom := &GameRoom{
+		Players: map[string]wire.Player{},
+		ID:      respGame.Msg.GetGame().GetName(),
+		Name:    respGame.Msg.GetGame().GetName(),
+	}
 	for _, player := range respGame.Msg.Players {
 		gameRoom.SetPlayer(wire.Player{
 			UserID:      player.UserId,

@@ -99,7 +99,7 @@ func (b *Backend) Shutdown() {
 		session := v.(*Session)
 
 		// TODO: Send a system message "(system) The server is going to close in less than 30 seconds"
-		_ = b.Send(session.Conn,
+		_ = session.Send(
 			ReceiveMessage,
 			NewGlobalMessage("system-info", "The server is going to close..."))
 

@@ -1,8 +1,6 @@
 package backend
 
 import (
-	"context"
-	"fmt"
 	"sync"
 
 	"github.com/dimspell/gladiator/internal/wire"
@@ -18,9 +16,14 @@ type GameRoom struct {
 	Players map[string]wire.Player
 }
 
-func NewGameRoom() *GameRoom {
+func NewGameRoom(name string, host wire.Player) *GameRoom {
 	return &GameRoom{
-		Players: make(map[string]wire.Player),
+		Players: map[string]wire.Player{
+			host.ID(): host,
+		},
+		Host: host,
+		ID:   name,
+		Name: name,
 	}
 }
 
@@ -69,32 +72,3 @@ func (g *GameRoom) DeletePlayer(player wire.Player) {
 // 		f(id, peer)
 // 	}
 // }
-
-func (s *Session) SendSetRoomReady(ctx context.Context, gameRoomId string) error {
-	err := wire.Write(ctx, s.wsConn, wire.ComposeTyped(
-		wire.SetRoomReady,
-		wire.MessageContent[string]{
-			From:    s.GetUserID(),
-			Type:    wire.SetRoomReady,
-			Content: gameRoomId,
-		}),
-	)
-	if err != nil {
-		return fmt.Errorf("failed to send SetRoomReady: %w", err)
-	}
-	return nil
-}
-
-func (s *Session) SendLeaveRoom(ctx context.Context, gameRoom *GameRoom) error {
-	if err := wire.Write(ctx, s.wsConn, wire.ComposeTyped(
-		wire.LeaveRoom,
-		wire.MessageContent[string]{
-			From:    s.GetUserID(),
-			Type:    wire.LeaveRoom,
-			Content: gameRoom.ID,
-		}),
-	); err != nil {
-		return err
-	}
-	return nil
-}
