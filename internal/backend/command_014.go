@@ -23,9 +23,9 @@ func (b *Backend) HandleSendLobbyMessage(session *Session, req SendLobbyMessageR
 	if err := session.SendChatMessage(ctx, message); err != nil {
 		slog.Warn("Could not send WS message", "error", fmt.Errorf("packet-14: could not send chat message: %w", err))
 	}
-	
-	//resp := NewGlobalMessage(session.Username, message)
-	return nil //b.Send(session.Conn, ReceiveMessage, resp)
+
+	// resp := NewGlobalMessage(session.Username, message)
+	return nil // session.Send(ReceiveMessage, resp)
 }
 
 type SendLobbyMessageRequest []byte

@@ -33,7 +33,7 @@ func (b *Backend) HandleDeleteCharacter(session *Session, req DeleteCharacterReq
 	response := make([]byte, len(data.CharacterName)+1)
 	copy(response, data.CharacterName)
 
-	return b.Send(session.Conn, DeleteCharacter, response)
+	return session.Send(DeleteCharacter, response)
 }
 
 type DeleteCharacterRequest []byte

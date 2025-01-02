@@ -27,7 +27,7 @@ func (b *Backend) HandleAuthorizationHandshake(session *Session, req Authorizati
 		return nil
 	}
 	if string(data.AuthKey) != "68XIPSID" {
-		if err := b.Send(session.Conn, AuthorizationHandshake, []byte{0, 0, 0, 0}); err != nil {
+		if err := session.Send(AuthorizationHandshake, []byte{0, 0, 0, 0}); err != nil {
 			return err
 		}
 
@@ -35,7 +35,7 @@ func (b *Backend) HandleAuthorizationHandshake(session *Session, req Authorizati
 		return fmt.Errorf("packet-6: wrong auth key: %q", data.AuthKey)
 	}
 
-	return b.Send(session.Conn, AuthorizationHandshake, []byte("ENET\x00"))
+	return session.Send(AuthorizationHandshake, []byte("ENET\x00"))
 }
 
 type AuthorizationHandshakeRequest []byte

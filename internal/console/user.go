@@ -64,15 +64,15 @@ func (s *userServiceServer) AuthenticateUser(ctx context.Context, req *connect.R
 
 	user, err := s.DB.Read.GetUserByName(ctx, req.Msg.Username)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeNotFound, err)
+		return nil, connect.NewError(connect.CodeUnauthenticated, fmt.Errorf("incorrect password or username"))
 		// slog.Debug("packet-41: could not find a user", "username", data.Username)
-		// return b.Send(session.Conn, ClientAuthentication, []byte{0, 0, 0, 0})
+		// return session.Send(ClientAuthentication, []byte{0, 0, 0, 0})
 	}
 
 	if !auth.CheckPassword(req.Msg.Password, user.Password) {
 		// slog.Debug("packet-41: incorrect password")
-		// return b.Send(session.Conn, ClientAuthentication, []byte{0, 0, 0, 0})
-		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("incorrect password"))
+		// return session.Send(ClientAuthentication, []byte{0, 0, 0, 0})
+		return nil, connect.NewError(connect.CodeUnauthenticated, fmt.Errorf("incorrect password or username"))
 	}
 
 	resp := connect.NewResponse(&multiv1.AuthenticateUserResponse{

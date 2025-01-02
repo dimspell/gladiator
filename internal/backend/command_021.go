@@ -7,7 +7,7 @@ import (
 )
 
 func (b *Backend) HandlePing(session *Session, req PingRequest) error {
-	return b.Send(session.Conn, PingClockTime, []byte{1, 0, 0, 0})
+	return session.Send(PingClockTime, []byte{1, 0, 0, 0})
 }
 
 type PingRequest []byte

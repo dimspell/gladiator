@@ -30,14 +30,14 @@ func (b *Backend) HandleCreateCharacter(session *Session, req CreateCharacterReq
 		}))
 	if err != nil {
 		slog.Error("Could not create a character", "err", err)
-		return b.Send(session.Conn, CreateCharacter, []byte{0, 0, 0, 0})
+		return session.Send(CreateCharacter, []byte{0, 0, 0, 0})
 	}
 
 	slog.Info("packet-92: new character created",
 		"character", respChar.Msg.Character.CharacterName,
 		"username", data.Username)
 
-	return b.Send(session.Conn, CreateCharacter, []byte{1, 0, 0, 0})
+	return session.Send(CreateCharacter, []byte{1, 0, 0, 0})
 }
 
 // TODO: check if there is any additional not recognised byte at the end like slot number

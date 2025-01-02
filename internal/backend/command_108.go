@@ -36,7 +36,7 @@ func (b *Backend) HandleUpdateCharacterStats(session *Session, req UpdateCharact
 		return err
 	}
 
-	return b.Send(session.Conn, UpdateCharacterStats, []byte{})
+	return session.Send(UpdateCharacterStats, []byte{})
 }
 
 type UpdateCharacterStatsRequest []byte

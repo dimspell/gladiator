@@ -8,7 +8,7 @@ import (
 
 // HandleClientHostAndUsername handles 0x1eff (255-30) command
 func (b *Backend) HandleClientHostAndUsername(session *Session, req ClientHostAndUsernameRequest) error {
-	return b.Send(session.Conn, ClientHostAndUsername, []byte{1, 0, 0, 0})
+	return session.Send(ClientHostAndUsername, []byte{1, 0, 0, 0})
 }
 
 type ClientHostAndUsernameRequest []byte

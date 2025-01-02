@@ -25,7 +25,7 @@ func (b *Backend) HandleGetCharacters(session *Session, req GetCharactersRequest
 	}
 
 	if len(resp.Msg.GetCharacters()) == 0 {
-		return b.Send(session.Conn, GetCharacters, []byte{0, 0, 0, 0})
+		return session.Send(GetCharacters, []byte{0, 0, 0, 0})
 	}
 
 	response := []byte{1, 0, 0, 0}
@@ -34,7 +34,7 @@ func (b *Backend) HandleGetCharacters(session *Session, req GetCharactersRequest
 		response = append(response, character.CharacterName...)
 		response = append(response, 0)
 	}
-	return b.Send(session.Conn, GetCharacters, response)
+	return session.Send(GetCharacters, response)
 }
 
 type GetCharactersRequest []byte

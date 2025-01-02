@@ -96,7 +96,7 @@ func (b *Backend) HandleJoinGame(session *Session, req JoinGameRequest) error {
 		response = append(response, byte(0))                         // Null byte
 	}
 
-	return b.Send(session.Conn, JoinGame, response)
+	return session.Send(JoinGame, response)
 }
 
 type JoinGameRequest []byte

@@ -28,19 +28,19 @@ func (b *Backend) HandleClientAuthentication(session *Session, req ClientAuthent
 	}))
 	if err != nil {
 		slog.Debug("packet-41: could not sign in", "err", err)
-		return b.Send(session.Conn, ClientAuthentication, []byte{0, 0, 0, 0})
+		return session.Send(ClientAuthentication, []byte{0, 0, 0, 0})
 	}
 
 	// Connect to the lobby server.
 	if err = b.ConnectToLobby(context.TODO(), user.Msg.User, session); err != nil {
 		slog.Debug("packet-41: could not connect to lobby", "err", err)
-		return b.Send(session.Conn, ClientAuthentication, []byte{0, 0, 0, 0})
+		return session.Send(ClientAuthentication, []byte{0, 0, 0, 0})
 	}
 
 	// Assign user into session.
 	session.SetLogonData(user.Msg.User)
 
-	return b.Send(session.Conn, ClientAuthentication, []byte{1, 0, 0, 0})
+	return session.Send(ClientAuthentication, []byte{1, 0, 0, 0})
 }
 
 type ClientAuthenticationRequest []byte

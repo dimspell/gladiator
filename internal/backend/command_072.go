@@ -41,7 +41,7 @@ func (b *Backend) HandleGetCharacterSpells(session *Session, req GetCharacterSpe
 		}
 	}
 
-	return b.Send(session.Conn, GetCharacterSpells, character.Spells)
+	return session.Send(GetCharacterSpells, character.Spells)
 }
 
 type GetCharacterSpellsRequest []byte

@@ -31,7 +31,7 @@ func (b *Backend) HandleUpdateCharacterSpells(session *Session, req UpdateCharac
 		return fmt.Errorf("packet-73: could not update character spells: %s", err)
 	}
 
-	return b.Send(session.Conn, UpdateCharacterSpells, []byte{1, 0, 0, 0})
+	return session.Send(UpdateCharacterSpells, []byte{1, 0, 0, 0})
 }
 
 type UpdateCharacterSpellsRequest []byte

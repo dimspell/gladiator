@@ -11,7 +11,7 @@ func (b *Backend) HandleListChannels(session *Session, req ListChannelsRequest) 
 		response = append(response, channel...)
 		response = append(response, 0)
 	}
-	return b.Send(session.Conn, ListChannels, response)
+	return session.Send(ListChannels, response)
 }
 
 type ListChannelsRequest []byte

@@ -30,7 +30,7 @@ func (b *Backend) HandleUpdateCharacterInventory(session *Session, req UpdateCha
 		return err
 	}
 
-	return b.Send(session.Conn, UpdateCharacterInventory, []byte{1, 0, 0, 0})
+	return session.Send(UpdateCharacterInventory, []byte{1, 0, 0, 0})
 }
 
 type UpdateCharacterInventoryRequest []byte

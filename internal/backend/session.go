@@ -2,7 +2,6 @@ package backend
 
 import (
 	"context"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -63,23 +62,6 @@ func (s *Session) UpdateCharacter(character *multiv1.Character) {
 
 func (s *Session) GetUserID() string { return fmt.Sprintf("%d", s.UserID) }
 
-func (s *Session) SendChatMessage(ctx context.Context, text string) error {
-	if err := wire.Write(ctx, s.wsConn, wire.ComposeTyped(
-		wire.Chat,
-		wire.MessageContent[wire.ChatMessage]{
-			From: s.GetUserID(),
-			Type: wire.Chat,
-			Content: wire.ChatMessage{
-				User: s.Username,
-				Text: text,
-			},
-		}),
-	); err != nil {
-		return err
-	}
-	return nil
-}
-
 func (b *Backend) AddSession(tcpConn net.Conn) *Session {
 	if b.SessionCounter == math.MaxUint64 {
 		b.SessionCounter = 0
@@ -120,13 +102,8 @@ func (b *Backend) CloseSession(session *Session) error {
 	return nil
 }
 
-// Deprecated
-func (s *Backend) Send(conn net.Conn, packetType PacketType, payload []byte) error {
-	return sendPacket(conn, packetType, payload)
-}
-
-func (s *Session) Send(conn net.Conn, packetType PacketType, payload []byte) error {
-	return sendPacket(conn, packetType, payload)
+func (s *Session) Send(packetType PacketType, payload []byte) error {
+	return sendPacket(s.Conn, packetType, payload)
 }
 
 func sendPacket(conn net.Conn, packetType PacketType, payload []byte) error {
@@ -148,19 +125,15 @@ func sendPacket(conn net.Conn, packetType PacketType, payload []byte) error {
 	return err
 }
 
-func encodePacket(packetType PacketType, payload []byte) []byte {
-	length := len(payload) + 4
-	packet := make([]byte, length)
-
-	// Header
-	packet[0] = 255
-	packet[1] = byte(packetType)
-	binary.LittleEndian.PutUint16(packet[2:4], uint16(length))
-
-	// Data
-	copy(packet[4:], payload)
-
-	return packet
+// ToPlayer creates a Player data object from the session data
+func (s *Session) ToPlayer(ipAddr net.IP) wire.Player {
+	return wire.Player{
+		UserID:      s.UserID,
+		Username:    s.Username,
+		CharacterID: s.CharacterID,
+		ClassType:   byte(s.ClassType),
+		IPAddress:   ipAddr.To4().String(),
+	}
 }
 
 func (b *Backend) ConnectToLobby(ctx context.Context, user *multiv1.User, session *Session) error {
@@ -187,22 +160,34 @@ func (b *Backend) ConnectToLobby(ctx context.Context, user *multiv1.User, sessio
 	return nil
 }
 
+func (s *Session) SendEvent(ctx context.Context, eventType wire.EventType, content any) error {
+	return wire.Write(ctx, s.wsConn, wire.Compose(
+		eventType,
+		wire.Message{
+			From:    s.GetUserID(),
+			Type:    eventType,
+			Content: content,
+		}),
+	)
+}
+
+func (s *Session) SendChatMessage(ctx context.Context, text string) error {
+	return s.SendEvent(ctx, wire.Chat, wire.ChatMessage{
+		User: s.Username,
+		Text: text,
+	})
+}
+
 func (b *Backend) JoinLobby(ctx context.Context, session *Session) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Second*3)
 	defer cancel()
 
-	err := session.wsConn.Write(ctx, websocket.MessageText,
-		wire.ComposeTyped[wire.Player](wire.JoinLobby, wire.MessageContent[wire.Player]{
-			From: session.GetUserID(),
-			Type: wire.JoinLobby,
-			Content: wire.Player{
-				UserID:      session.UserID,
-				Username:    session.Username,
-				CharacterID: session.CharacterID,
-				ClassType:   byte(session.ClassType),
-			},
-		}))
-	if err != nil {
+	if err := session.SendEvent(ctx, wire.JoinLobby, wire.Player{
+		UserID:      session.UserID,
+		Username:    session.Username,
+		CharacterID: session.CharacterID,
+		ClassType:   byte(session.ClassType),
+	}); err != nil {
 		return fmt.Errorf("backend: failed send a join lobby message: %w for %d", err, session.UserID)
 	}
 
@@ -300,77 +285,4 @@ func (s *SessionState) DeleteLobbyUser(userIdToDelete int64) {
 
 type MessageHandler interface {
 	Handle(ctx context.Context, payload []byte) error
-}
-
-type WireMessageHandler struct {
-	session *Session
-}
-
-func (h *WireMessageHandler) Handle(ctx context.Context, payload []byte) error {
-	et := wire.ParseEventType(payload)
-	// msg := wire.ParseTyped[wire.ChatMessage](payload)
-
-	// handleWireEvent := func(et wire.EventType, p []byte) {
-	switch et {
-	case wire.Chat:
-		_, msg, err := wire.DecodeTyped[wire.ChatMessage](payload)
-		if err != nil {
-			slog.Warn("Could not decode the message", "session", h.session.ID, "error", err, "event", et.String(), "payload", payload)
-			return nil
-		}
-		// if err := b.Send(session.Conn, ReceiveMessage, NewGlobalMessage(msg.Content.User, msg.Content.Text)); err != nil {
-		if err := h.session.Send(h.session.Conn, ReceiveMessage, NewSystemMessage(msg.Content.User, msg.Content.Text, "???")); err != nil {
-			slog.Error("Error writing chat message over the backend wire", "session", h.session.ID, "error", err)
-			return nil
-		}
-	case wire.LobbyUsers:
-		// TODO: Handle it. Note: It should be sent only once.
-		_, msg, err := wire.DecodeTyped[[]wire.Player](payload)
-		if err != nil {
-			slog.Warn("Could not decode the message", "session", h.session.ID, "error", err, "event", et.String(), "payload", payload)
-			return nil
-		}
-
-		h.session.State.UpdateLobbyUsers(msg.Content)
-	case wire.JoinLobby:
-		_, msg, err := wire.DecodeTyped[wire.Player](payload)
-		if err != nil {
-			slog.Warn("Could not decode the message", "session", h.session.ID, "error", err, "event", et.String(), "payload", payload)
-			return nil
-		}
-		if msg.Content.UserID == h.session.UserID {
-			return nil
-		}
-
-		player := msg.Content
-		lobbyUsers := append(h.session.State.GetLobbyUsers(), player)
-		h.session.State.UpdateLobbyUsers(lobbyUsers)
-		idx := uint32(len(lobbyUsers))
-
-		if err := h.session.Send(h.session.Conn, ReceiveMessage,
-			AppendCharacterToLobby(player.Username, model.ClassType(player.ClassType), idx),
-		); err != nil {
-			slog.Warn("Error appending lobby user", "session", h.session.ID, "error", err)
-			return nil
-		}
-	case wire.LeaveLobby:
-		_, msg, err := wire.DecodeTyped[wire.Player](payload)
-		if err != nil {
-			slog.Warn("Could not decode the message", "session", h.session.ID, "error", err, "event", et.String(), "payload", payload)
-			return nil
-		}
-
-		h.session.State.DeleteLobbyUser(msg.Content.UserID)
-
-		if err := h.session.Send(h.session.Conn, ReceiveMessage,
-			RemoveCharacterFromLobby(msg.Content.Username),
-		); err != nil {
-			slog.Warn("Error appending lobby user", "session", h.session.ID, "error", err)
-			return nil
-		}
-	default:
-		// Skip and do not handle it.
-	}
-
-	return nil
 }

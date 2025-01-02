@@ -24,12 +24,12 @@ func (b *Backend) HandleCreateNewAccount(session *Session, req CreateNewAccountR
 	}))
 	if err != nil {
 		slog.Warn("packet-42: could not save new user into database", "err", err)
-		return b.Send(session.Conn, CreateNewAccount, []byte{0, 0, 0, 0})
+		return session.Send(CreateNewAccount, []byte{0, 0, 0, 0})
 	}
 
 	slog.Info("packet-42: new user created", "user", respUser.Msg.User.Username)
 
-	return b.Send(session.Conn, CreateNewAccount, []byte{1, 0, 0, 0})
+	return session.Send(CreateNewAccount, []byte{1, 0, 0, 0})
 }
 
 type CreateNewAccountRequest []byte

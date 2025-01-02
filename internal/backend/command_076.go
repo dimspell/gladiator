@@ -31,7 +31,7 @@ func (b *Backend) HandleSelectCharacter(session *Session, req SelectCharacterReq
 		var connectError *connect.Error
 		if errors.As(err, &connectError) {
 			if connectError.Code() == connect.CodeNotFound {
-				return b.Send(session.Conn, SelectCharacter, []byte{0, 0, 0, 0})
+				return session.Send(SelectCharacter, []byte{0, 0, 0, 0})
 			}
 		}
 		return fmt.Errorf("packet-76: no characters found owned by player: %s", err)
@@ -43,7 +43,7 @@ func (b *Backend) HandleSelectCharacter(session *Session, req SelectCharacterReq
 
 	session.UpdateCharacter(respChar.Msg.Character)
 
-	return b.Send(session.Conn, SelectCharacter, response)
+	return session.Send(SelectCharacter, response)
 }
 
 type SelectCharacterRequest []byte

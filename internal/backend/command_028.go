@@ -63,7 +63,7 @@ func (b *Backend) HandleCreateGame(session *Session, req CreateGameRequest) erro
 		break
 	}
 
-	return b.Send(session.Conn, CreateGame, response)
+	return session.Send(CreateGame, response)
 }
 
 type CreateGameRequest []byte

@@ -13,5 +13,5 @@ func (b *Backend) SendHostMigration(session *Session, isHost bool, newHostIP [4]
 	// IP address in 4 bytes
 	payload = append(payload, newHostIP[:]...)
 
-	return b.Send(session.Conn, ChangeHost, payload)
+	return session.Send(ChangeHost, payload)
 }

@@ -211,3 +211,18 @@ func splitMultiPacket(buf []byte) [][]byte {
 	}
 	return packets
 }
+
+func encodePacket(packetType PacketType, payload []byte) []byte {
+	length := len(payload) + 4
+	packet := make([]byte, length)
+
+	// Header
+	packet[0] = 255
+	packet[1] = byte(packetType)
+	binary.LittleEndian.PutUint16(packet[2:4], uint16(length))
+
+	// Data
+	copy(packet[4:], payload)
+
+	return packet
+}

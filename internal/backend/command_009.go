@@ -42,7 +42,7 @@ func (b *Backend) HandleListGames(session *Session, req ListGamesRequest) error 
 		response = append(response, byte(0))                   // Null byte
 	}
 
-	return b.Send(session.Conn, ListGames, response)
+	return session.Send(ListGames, response)
 }
 
 type ListGamesRequest []byte

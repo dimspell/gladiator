@@ -37,7 +37,7 @@ func (b *Backend) HandleShowRanking(session *Session, req RankingRequest) error 
 
 	ranking := model.RankingToBytes(respRanking.Msg)
 
-	return b.Send(session.Conn, ShowRanking, ranking)
+	return session.Send(ShowRanking, ranking)
 }
 
 type RankingRequest []byte

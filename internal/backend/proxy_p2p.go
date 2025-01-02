@@ -8,7 +8,6 @@ import (
 
 	"github.com/dimspell/gladiator/internal/proxy/p2p"
 	"github.com/dimspell/gladiator/internal/proxy/redirect"
-	"github.com/dimspell/gladiator/internal/wire"
 )
 
 var _ Proxy = (*PeerToPeer)(nil)
@@ -29,15 +28,7 @@ func NewPeerToPeer() *PeerToPeer {
 
 func (p *PeerToPeer) CreateRoom(params CreateParams, session *Session) (net.IP, error) {
 	ipAddr := net.IPv4(127, 0, 0, 1)
-
-	// Create player from session data
-	player := wire.Player{
-		UserID:      session.UserID,
-		Username:    session.Username,
-		CharacterID: session.CharacterID,
-		ClassType:   byte(session.ClassType),
-		IPAddress:   ipAddr.To4().String(),
-	}
+	player := session.ToPlayer(ipAddr)
 
 	gameRoom := NewGameRoom()
 	gameRoom.ID = params.GameID

@@ -100,7 +100,7 @@ func (b *Backend) HandleSelectGame(session *Session, req SelectGameRequest) erro
 		response = append(response, byte(0))                         // Null byte
 	}
 
-	return b.Send(session.Conn, SelectGame, response)
+	return session.Send(SelectGame, response)
 }
 
 type SelectGameRequest []byte
