@@ -127,7 +127,7 @@ func (p *PeerToPeer) Join(params JoinParams, session *Session) (net.IP, error) {
 	// FIXME: Use function instead
 	mapping, exist := p.manager.Peers[session]
 	if !exist {
-		return nil, fmt.Errorf("could not find current session among the peers")
+		return nil, fmt.Errorf("could not find current session among the peers for user ID: %s", session.GetUserID())
 	}
 
 	mapping.Peers[peer.PeerUserID] = peer

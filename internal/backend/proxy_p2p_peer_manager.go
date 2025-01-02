@@ -18,6 +18,11 @@ type PeerToPeerPeerManager struct {
 	Peers        map[*Session]*PeersToSessionMapping
 }
 
+type PeersToSessionMapping struct {
+	Game  *GameRoom
+	Peers map[string]*p2p.Peer
+}
+
 func NewPeerToPeerManager() *PeerToPeerPeerManager {
 	config := webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{
@@ -50,6 +55,11 @@ func (p *PeerToPeerPeerManager) getPeer(session *Session, peerID string) (*p2p.P
 	}
 
 	return peer, true
+}
+
+func (p *PeerToPeerPeerManager) isPeerExisting(session *Session, player *wire.Player) bool {
+	_, ok := p.getPeer(session, player.ID())
+	return ok
 }
 
 func (p *PeerToPeerPeerManager) setPeer(session *Session, peer *p2p.Peer) {
@@ -108,11 +118,6 @@ func (p *PeerToPeerPeerManager) getOrCreatePeer(session *Session, player *wire.P
 		return session.IpRing.NextPeerAddress(player.ID(), isCurrentUser, isHost)
 	}
 	return peer
-}
-
-func (p *PeerToPeerPeerManager) isPeerExisting(session *Session, player *wire.Player) bool {
-	_, ok := p.getPeer(session, player.ID())
-	return ok
 }
 
 func (p *PeerToPeerPeerManager) setupPeerConnection(peerConnection *webrtc.PeerConnection, session *Session, player *wire.Player, sendRTCOffer bool) error {
@@ -209,9 +214,4 @@ func (p *PeerToPeerPeerManager) createDataChannel(peerConnection *webrtc.PeerCon
 	})
 
 	return nil
-}
-
-type PeersToSessionMapping struct {
-	Game  *GameRoom
-	Peers map[string]*p2p.Peer
 }
