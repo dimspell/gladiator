@@ -3,6 +3,7 @@ package backend
 import (
 	"context"
 	"log/slog"
+	"net"
 	"net/http/httptest"
 	"os"
 	"testing"
@@ -149,7 +150,7 @@ func TestWebRTC(t *testing.T) {
 		Mode:       redirect.OtherUserIsHost,
 	}
 
-	gameRoom := NewGameRoom()
+	gameRoom := NewGameRoom(roomId, session2.ToPlayer(net.IPv4(127, 0, 0, 21)))
 	session2.State.SetGameRoom(gameRoom)
 
 	peers := map[string]*p2p.Peer{peer.PeerUserID: peer}
