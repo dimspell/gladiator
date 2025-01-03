@@ -58,7 +58,7 @@ func TestE2E_P2P(t *testing.T) {
 	cs.Addr = ts.URL[len("http://"):]
 
 	proxy1 := proxy.NewPeerToPeer()
-	proxy1.Manager.NewRedirect = redirectFunc
+	proxy1.NewRedirect = redirectFunc
 	bd1 := NewBackend("", cs.Addr, proxy1)
 	bd1.SignalServerURL = "ws://" + cs.Addr + "/lobby"
 
@@ -132,7 +132,7 @@ func TestE2E_P2P(t *testing.T) {
 
 	// Other user
 	proxy2 := proxy.NewPeerToPeer()
-	proxy2.Manager.NewRedirect = redirectFunc
+	proxy2.NewRedirect = redirectFunc
 	bd2 := NewBackend("", cs.Addr, proxy2)
 	bd2.SignalServerURL = "ws://" + cs.Addr + "/lobby"
 
