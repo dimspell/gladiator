@@ -66,6 +66,8 @@ func (h *PeerToPeerMessageHandler) Handle(ctx context.Context, payload []byte) e
 			return nil
 		}
 		return h.handleLeaveRoom(ctx, msg.Content)
+	case wire.LobbyUsers, wire.JoinLobby:
+		return nil
 	default:
 		slog.Debug("unknown wire message", slog.String("type", eventType.String()), slog.String("payload", string(payload)))
 		return nil
