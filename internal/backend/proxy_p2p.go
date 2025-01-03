@@ -42,8 +42,11 @@ func (p *PeerToPeer) HostRoom(params HostParams, session *Session) error {
 		Mode:       redirect.CurrentUserIsHost,
 	}
 
-	room := session.State.GameRoom()
-	if room == nil || room.ID != params.GameID {
+	room, err := session.State.GameRoom()
+	if err != nil {
+		return fmt.Errorf("could not get game room: %w", err)
+	}
+	if room.ID != params.GameID {
 		return fmt.Errorf("no game room found")
 	}
 
@@ -93,8 +96,13 @@ func (p *PeerToPeer) GetPlayerAddr(params GetPlayerAddrParams, session *Session)
 		mapping.Peers[peer.PeerUserID] = peer
 	} else {
 		// FIXME: Use function instead
+		game, err := session.State.GameRoom()
+		if err != nil {
+			panic(err)
+		}
+
 		p.manager.Peers[session] = &PeersToSessionMapping{
-			Game:  session.State.GameRoom(),
+			Game:  game,
 			Peers: map[string]*Peer{peer.PeerUserID: peer},
 		}
 	}

@@ -53,7 +53,11 @@ func (p *PeerToPeerPeerManager) setUpChannels(session *Session, playerId int64, 
 		return nil, err
 	}
 
-	player, found := session.State.GameRoom().GetPlayer(strconv.FormatInt(playerId, 10))
+	gameRoom, err := session.State.GameRoom()
+	if err != nil {
+		return nil, err
+	}
+	player, found := gameRoom.GetPlayer(strconv.FormatInt(playerId, 10))
 	if !found {
 		return nil, fmt.Errorf("could not find player in game room")
 	}
@@ -115,8 +119,12 @@ func (p *PeerToPeerPeerManager) deletePeer(session *Session, peerID string) {
 func (p *PeerToPeerPeerManager) getOrCreatePeer(session *Session, player *wire.Player) *Peer {
 	peer, ok := p.getPeer(session, player.ID())
 	if !ok {
-		isHost := session.State.GameRoom().Host.UserID == player.UserID
-		isCurrentUser := session.State.GameRoom().Host.UserID == session.UserID
+		gameRoom, err := session.State.GameRoom()
+		if err != nil {
+			panic(err)
+		}
+		isHost := gameRoom.Host.UserID == player.UserID
+		isCurrentUser := gameRoom.Host.UserID == session.UserID
 		return session.IpRing.NextPeerAddress(player.ID(), isCurrentUser, isHost)
 	}
 	return peer
@@ -166,7 +174,12 @@ func (p *PeerToPeerPeerManager) handleNegotiation(peerConnection *webrtc.PeerCon
 }
 
 func (p *PeerToPeerPeerManager) createDataChannels(peerConnection *webrtc.PeerConnection, session *Session, peer *Peer) error {
-	roomId := session.State.GameRoom().Name
+	gameRoom, err := session.State.GameRoom()
+	if err != nil {
+		return nil
+	}
+
+	roomId := gameRoom.Name
 
 	if guestTCP, guestUDP, err := p.NewRedirect(peer.Mode, peer.Addr); err == nil {
 		if guestTCP != nil {

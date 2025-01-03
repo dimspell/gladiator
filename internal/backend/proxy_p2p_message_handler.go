@@ -74,7 +74,11 @@ func (h *PeerToPeerMessageHandler) Handle(ctx context.Context, payload []byte) e
 
 func (h *PeerToPeerMessageHandler) handleJoinRoom(ctx context.Context, player wire.Player) error {
 	slog.Info("Other player is joining", "playerId", player.ID())
-	h.session.State.GameRoom().SetPlayer(player)
+	gameRoom, err := h.session.State.GameRoom()
+	if err != nil {
+		return err
+	}
+	gameRoom.SetPlayer(player)
 
 	// Validate the message
 	if player.UserID == h.session.UserID {
@@ -155,7 +159,12 @@ func (h *PeerToPeerMessageHandler) handleRTCCandidate(ctx context.Context, candi
 
 func (h *PeerToPeerMessageHandler) handleLeaveRoom(ctx context.Context, player wire.Player) error {
 	slog.Info("Other player is leaving", "playerId", player.ID())
-	h.session.State.GameRoom().DeletePlayer(player)
+
+	gameRoom, err := h.session.State.GameRoom()
+	if err != nil {
+		return err
+	}
+	gameRoom.DeletePlayer(player)
 
 	slog.Debug("LEAVE_ROOM OR LEAVE_LOBBY")
 

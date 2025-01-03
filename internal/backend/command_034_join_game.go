@@ -42,7 +42,10 @@ func (b *Backend) HandleJoinGame(session *Session, req JoinGameRequest) error {
 		return err
 	}
 
-	gameRoom := session.State.GameRoom()
+	gameRoom, err := session.State.GameRoom()
+	if err != nil {
+		return err
+	}
 	gameRoom.SetPlayer(wire.Player{
 		UserID:      session.UserID,
 		Username:    session.Username,
