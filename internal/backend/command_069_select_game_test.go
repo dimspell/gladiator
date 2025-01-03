@@ -5,12 +5,13 @@ import (
 
 	"connectrpc.com/connect"
 	v1 "github.com/dimspell/gladiator/gen/multi/v1"
+	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestBackend_HandleSelectGame(t *testing.T) {
 	t.Run("Sample mocked game", func(t *testing.T) {
-		b, _ := helperNewBackend(t)
+		b, _, _ := helperNewBackend(t)
 		b.gameClient = &mockGameClient{
 			GetGameResponse: connect.NewResponse(&v1.GetGameResponse{
 				Game: &v1.Game{
@@ -38,7 +39,7 @@ func TestBackend_HandleSelectGame(t *testing.T) {
 		}
 
 		conn := &mockConn{}
-		session := &Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "mage"}
+		session := &bsession.Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "mage"}
 
 		assert.NoError(t, b.HandleSelectGame(session, SelectGameRequest{
 			'r', 'e', 't', 'r', 'e', 'a', 'a', 't', 0, // Game name
@@ -53,7 +54,7 @@ func TestBackend_HandleSelectGame(t *testing.T) {
 	})
 
 	t.Run("HostRoom only", func(t *testing.T) {
-		b, _ := helperNewBackend(t)
+		b, _, _ := helperNewBackend(t)
 		b.gameClient = &mockGameClient{
 			GetGameResponse: connect.NewResponse(&v1.GetGameResponse{
 				Game: &v1.Game{
@@ -74,7 +75,7 @@ func TestBackend_HandleSelectGame(t *testing.T) {
 			}),
 		}
 		conn := &mockConn{}
-		session := &Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
+		session := &bsession.Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
 
 		assert.NoError(t, b.HandleSelectGame(session, SelectGameRequest{
 			103, 97, 109, 101, 82, 111, 111, 109, 0, // Game name

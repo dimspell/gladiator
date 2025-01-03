@@ -5,11 +5,14 @@ import (
 
 	"connectrpc.com/connect"
 	v1 "github.com/dimspell/gladiator/gen/multi/v1"
+	"github.com/dimspell/gladiator/internal/backend/bsession"
+	"github.com/dimspell/gladiator/internal/backend/proxy"
+	"github.com/dimspell/gladiator/internal/wire"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestBackend_HandleJoinGame(t *testing.T) {
-	b, _ := helperNewBackend(t)
+	b, px, _ := helperNewBackend(t)
 	b.gameClient = &mockGameClient{
 		GetGameResponse: connect.NewResponse(&v1.GetGameResponse{
 			Game: &v1.Game{
@@ -39,12 +42,43 @@ func TestBackend_HandleJoinGame(t *testing.T) {
 	}
 
 	conn := &mockConn{}
-	session := &Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP", State: &SessionState{}}
+	session := &bsession.Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
+
+	px.BySession[session] = &proxy.GameRoom{
+		ID:   "gameId",
+		Name: "gameId",
+		Host: wire.Player{
+			UserID:      1,
+			Username:    "archer",
+			CharacterID: 1,
+			ClassType:   byte(v1.ClassType_Archer),
+			IPAddress:   "192.168.121.212",
+		},
+		Players: map[string]wire.Player{
+			"1": {
+				UserID:      1,
+				Username:    "archer",
+				CharacterID: 1,
+				ClassType:   byte(v1.ClassType_Archer),
+				IPAddress:   "192.168.121.212",
+			},
+			"2": {
+				UserID:      2,
+				Username:    "mage",
+				CharacterID: 2,
+				ClassType:   byte(v1.ClassType_Mage),
+				IPAddress:   "192.168.121.169",
+			},
+		},
+	}
 
 	assert.NoError(t, b.HandleJoinGame(session, JoinGameRequest{
 		'r', 'e', 't', 'r', 'e', 'a', 't', 0, // Game name
 		0, // Password
 	}))
+	if !assert.Len(t, conn.Written, 34) {
+		return
+	}
 
 	assert.Equal(t, []byte{255, 34, 34, 0}, conn.Written[0:4]) // Header
 	assert.Equal(t, []byte{2, 0}, conn.Written[4:6])           // Game State

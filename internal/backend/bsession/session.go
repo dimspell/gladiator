@@ -192,7 +192,7 @@ func (s *Session) SendEventTo(ctx context.Context, eventType wire.EventType, con
 }
 
 func (s *Session) JoinLobby(ctx context.Context) error {
-	ctx, cancel := context.WithTimeout(ctx, time.Second*3)
+	ctx, cancel := context.WithTimeout(ctx, time.Second*5)
 	defer cancel()
 
 	if err := s.SendEvent(ctx, wire.JoinLobby, wire.Player{

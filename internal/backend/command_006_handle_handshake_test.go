@@ -3,6 +3,7 @@ package backend
 import (
 	"testing"
 
+	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -11,7 +12,7 @@ func TestBackend_HandleAuthorizationHandshake(t *testing.T) {
 		// Arrange
 		b := &Backend{}
 		conn := &mockConn{}
-		session := &Session{Conn: conn}
+		session := &bsession.Session{Conn: conn}
 		req := AuthorizationHandshakeRequest("68XIPSID\x03\x00\x00\x00")
 
 		// Act
@@ -28,7 +29,7 @@ func TestBackend_HandleAuthorizationHandshake(t *testing.T) {
 		// Arrange
 		b := &Backend{}
 		conn := &mockConn{}
-		session := &Session{Conn: conn}
+		session := &bsession.Session{Conn: conn}
 		req := AuthorizationHandshakeRequest("WRONG")
 
 		// Act
@@ -43,7 +44,7 @@ func TestBackend_HandleAuthorizationHandshake(t *testing.T) {
 		// Arrange
 		b := &Backend{}
 		conn := &mockConn{}
-		session := &Session{Conn: conn}
+		session := &bsession.Session{Conn: conn}
 		req := AuthorizationHandshakeRequest("WRONGSID\x03\x00\x00\x00")
 
 		// Act

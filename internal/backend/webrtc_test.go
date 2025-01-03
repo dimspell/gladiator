@@ -3,7 +3,6 @@ package backend
 import (
 	"context"
 	"log/slog"
-	"net"
 	"net/http/httptest"
 	"os"
 	"testing"
@@ -12,6 +11,7 @@ import (
 	"connectrpc.com/connect"
 	v1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/internal/app/logger"
+	"github.com/dimspell/gladiator/internal/backend/proxy"
 	"github.com/dimspell/gladiator/internal/backend/redirect"
 	"github.com/dimspell/gladiator/internal/console"
 	"github.com/dimspell/gladiator/internal/console/database"
@@ -62,8 +62,8 @@ func TestWebRTC(t *testing.T) {
 	}()
 
 	// Mock the hosting user's proxy - player1
-	proxy1 := NewPeerToPeer()
-	proxy1.manager.NewRedirect = redirectFunc
+	proxy1 := proxy.NewPeerToPeer()
+	proxy1.Manager.NewRedirect = redirectFunc
 	bd1 := NewBackend("", cs.Addr, proxy1)
 	bd1.SignalServerURL = "ws://" + cs.Addr + "/lobby"
 
@@ -72,15 +72,17 @@ func TestWebRTC(t *testing.T) {
 	session1.UserID = 1
 	session1.CharacterID = 1
 	session1.ClassType = model.ClassTypeArcher
-	session1.IpRing.IsTesting = true
-	session1.IpRing.UdpPortPrefix = 1300
-	session1.IpRing.TcpPortPrefix = 1400
+
+	// FIXME: Set IPRing in test mode
+	// session1.IpRing.IsTesting = true
+	// session1.IpRing.UdpPortPrefix = 1300
+	// session1.IpRing.TcpPortPrefix = 1400
 
 	if err := bd1.ConnectToLobby(ctx, &v1.User{UserId: 1, Username: "user1"}, session1); err != nil {
 		t.Fatalf("failed to connect to lobby: %v", err)
 		return
 	}
-	if err := bd1.JoinLobby(ctx, session1); err != nil {
+	if err := session1.JoinLobby(ctx); err != nil {
 		t.Fatalf("failed to join lobby: %v", err)
 		return
 	}
@@ -91,7 +93,7 @@ func TestWebRTC(t *testing.T) {
 
 	// Create new game room by the player1
 	roomId := "room"
-	if _, err := proxy1.CreateRoom(CreateParams{GameID: roomId}, session1); err != nil {
+	if _, err := proxy1.CreateRoom(proxy.CreateParams{GameID: roomId}, session1); err != nil {
 		t.Fatalf("failed to create room: %v", err)
 		return
 	}
@@ -114,8 +116,8 @@ func TestWebRTC(t *testing.T) {
 	}
 
 	// Create a joining user, a guest - player2
-	proxy2 := NewPeerToPeer()
-	proxy2.manager.NewRedirect = redirectFunc
+	proxy2 := proxy.NewPeerToPeer()
+	proxy2.Manager.NewRedirect = redirectFunc
 	bd2 := NewBackend("", cs.Addr, proxy2)
 	bd2.SignalServerURL = "ws://" + cs.Addr + "/lobby"
 
@@ -124,15 +126,17 @@ func TestWebRTC(t *testing.T) {
 	session2.UserID = 2
 	session2.CharacterID = 2
 	session2.ClassType = model.ClassTypeMage
-	session2.IpRing.IsTesting = true
-	session2.IpRing.UdpPortPrefix = 2300
-	session2.IpRing.TcpPortPrefix = 2400
+
+	// FIXME: Set IPRing in test mode
+	// session2.IpRing.IsTesting = true
+	// session2.IpRing.UdpPortPrefix = 2300
+	// session2.IpRing.TcpPortPrefix = 2400
 
 	if err := bd2.ConnectToLobby(ctx, &v1.User{UserId: 2, Username: "user2"}, session2); err != nil {
 		t.Fatalf("failed to connect to lobby: %v", err)
 		return
 	}
-	if err := bd2.JoinLobby(ctx, session2); err != nil {
+	if err := session2.JoinLobby(ctx); err != nil {
 		t.Fatalf("failed to join lobby: %v", err)
 		return
 	}
@@ -142,21 +146,21 @@ func TestWebRTC(t *testing.T) {
 	}
 
 	// Make the packet redirect
-	ip, portTCP, portUDP := session2.IpRing.NextAddr()
-	peer := &Peer{
-		PeerUserID: session2.GetUserID(),
-		Addr:       &redirect.Addressing{IP: ip, TCPPort: portTCP, UDPPort: portUDP},
-		Mode:       redirect.OtherUserIsHost,
-	}
-
-	gameRoom := NewGameRoom(roomId, session2.ToPlayer(net.IPv4(127, 0, 0, 21)))
-	session2.State.SetGameRoom(gameRoom)
-
-	peers := map[string]*Peer{peer.PeerUserID: peer}
-	proxy2.manager.Peers[session2] = &PeersToSessionMapping{
-		Game:  gameRoom,
-		Peers: peers,
-	}
+	// ip, portTCP, portUDP := session2.IpRing.NextAddr()
+	// peer := &Peer{
+	// 	PeerUserID: session2.GetUserID(),
+	// 	Addr:       &redirect.Addressing{IP: ip, TCPPort: portTCP, UDPPort: portUDP},
+	// 	Mode:       redirect.OtherUserIsHost,
+	// }
+	//
+	// gameRoom := NewGameRoom(roomId, session2.ToPlayer(net.IPv4(127, 0, 0, 21)))
+	// session2.State.SetGameRoom(gameRoom)
+	//
+	// peers := map[string]*Peer{peer.PeerUserID: peer}
+	// proxy2.manager.Peers[session2] = &PeersToSessionMapping{
+	// 	Game:  gameRoom,
+	// 	Peers: peers,
+	// }
 }
 
 // 	player2.Peers.Range(func(_ string, peer *Peer) {

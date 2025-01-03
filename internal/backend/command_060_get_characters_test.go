@@ -5,6 +5,7 @@ import (
 
 	"connectrpc.com/connect"
 	v1 "github.com/dimspell/gladiator/gen/multi/v1"
+	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -43,7 +44,7 @@ func TestBackend_HandleGetCharacters(t *testing.T) {
 		}),
 	}}
 	conn := &mockConn{}
-	session := &Session{ID: "TEST", Conn: conn, UserID: 1, Username: "JP"}
+	session := &bsession.Session{ID: "TEST", Conn: conn, UserID: 1, Username: "JP"}
 
 	assert.NoError(t, b.HandleGetCharacters(session, GetCharactersRequest("tester\x00")))
 	assert.Equal(t, []byte{255, 60, 34, 0}, conn.Written[0:4])     // Header

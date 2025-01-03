@@ -33,7 +33,7 @@ func TestCreateGameRequest(t *testing.T) {
 }
 
 func TestBackend_HandleCreateGame(t *testing.T) {
-	b, _ := helperNewBackend(t)
+	b, _, _ := helperNewBackend(t)
 	b.gameClient = &mockGameClient{
 		CreateGameResponse: connect.NewResponse(&v1.CreateGameResponse{
 			Game: &v1.Game{

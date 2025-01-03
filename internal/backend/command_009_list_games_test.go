@@ -5,6 +5,8 @@ import (
 
 	"connectrpc.com/connect"
 	v1 "github.com/dimspell/gladiator/gen/multi/v1"
+	"github.com/dimspell/gladiator/internal/backend/bsession"
+	"github.com/dimspell/gladiator/internal/backend/proxy"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -28,7 +30,7 @@ func TestBackend_HandleListGames(t *testing.T) {
 			ListGamesResponse: connect.NewResponse(&v1.ListGamesResponse{Games: []*v1.Game{}}),
 		}}
 		conn := &mockConn{}
-		session := &Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
+		session := &bsession.Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
 
 		assert.NoError(t, b.HandleListGames(session, ListGamesRequest{}))
 		assert.Len(t, conn.Written, 8)
@@ -38,7 +40,7 @@ func TestBackend_HandleListGames(t *testing.T) {
 
 	t.Run("with one game", func(t *testing.T) {
 		b := &Backend{
-			Proxy: NewLAN("127.0.100.1"),
+			Proxy: proxy.NewLAN("127.0.100.1"),
 			gameClient: &mockGameClient{
 				ListGamesResponse: connect.NewResponse(&v1.ListGamesResponse{Games: []*v1.Game{
 					{
@@ -51,7 +53,7 @@ func TestBackend_HandleListGames(t *testing.T) {
 				}}),
 			}}
 		conn := &mockConn{}
-		session := &Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
+		session := &bsession.Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
 
 		assert.NoError(t, b.HandleListGames(session, ListGamesRequest{}))
 		assert.Len(t, conn.Written, 21)
@@ -65,7 +67,7 @@ func TestBackend_HandleListGames(t *testing.T) {
 
 	t.Run("with games", func(t *testing.T) {
 		b := &Backend{
-			Proxy: NewLAN("127.0.100.1"),
+			Proxy: proxy.NewLAN("127.0.100.1"),
 			gameClient: &mockGameClient{
 				ListGamesResponse: connect.NewResponse(&v1.ListGamesResponse{Games: []*v1.Game{
 					{
@@ -85,7 +87,7 @@ func TestBackend_HandleListGames(t *testing.T) {
 				}}),
 			}}
 		conn := &mockConn{}
-		session := &Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
+		session := &bsession.Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
 
 		assert.NoError(t, b.HandleListGames(session, ListGamesRequest{}))
 		assert.Len(t, conn.Written, 39)
