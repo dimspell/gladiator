@@ -111,10 +111,13 @@ func (p *PeerToPeer) SelectGame(params GameData, session *bsession.Session) erro
 
 	peers := map[string]*Peer{}
 	for _, player := range params.ToWirePlayers() {
-		peer := NewPeer(ipRing,
+		peer, err := NewPeer(ipRing,
 			player.ID(),
 			session.GetUserID() == player.ID(),
 			gameRoom.Host.ID() == player.ID())
+		if err != nil {
+			return err
+		}
 		peers[player.ID()] = peer
 	}
 
@@ -187,7 +190,7 @@ func (p *PeerToPeer) ExtendWire(session *bsession.Session) MessageHandler {
 
 		ctx := context.TODO()
 
-		peer := p.SessionStore.getOrCreatePeer(session, player)
+		peer, _ := p.SessionStore.getOrCreatePeer(session, player)
 		peer.Connection = peerConnection
 
 		if _, ok := p.SessionStore.GetPeer(session, player.ID()); !ok {

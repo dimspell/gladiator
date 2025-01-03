@@ -13,52 +13,55 @@ import (
 )
 
 type Peer struct {
-	UserID     string
-	Addr       *redirect.Addressing
-	Mode       redirect.Mode
+	// UserID uniquely identifies the peer
+	UserID string
+
+	// Addr contains network addressing information
+	Addr *redirect.Addressing
+
+	// Mode defines the operating mode of the peer
+	Mode redirect.Mode
+
+	// Connection holds the WebRTC peer connection
 	Connection *webrtc.PeerConnection
 
 	// mu sync.RWMutex
 }
 
-func NewPeer(r *IpRing, userId string, isCurrentUser, isHost bool) *Peer {
+func NewPeer(r *IpRing, userId string, isCurrentUser, isHost bool) (*Peer, error) {
 	switch true {
 	case isCurrentUser:
 		return &Peer{
 			UserID: userId,
 			Addr:   &redirect.Addressing{IP: net.IPv4(127, 0, 0, 1)},
 			Mode:   redirect.CurrentUserIsHost,
-		}
+		}, nil
 	case !isCurrentUser && isHost:
 		ip, portTCP, portUDP, err := r.NextAddr()
 		if err != nil {
-			slog.Error("Failed to get the next address", "error", err)
-			panic(err)
-			return nil
+			return nil, fmt.Errorf("failed to get next address: %w", err)
 		}
 		return &Peer{
 			UserID: userId,
 			Addr:   &redirect.Addressing{IP: ip, TCPPort: portTCP, UDPPort: portUDP},
 			Mode:   redirect.OtherUserIsHost,
-		}
+		}, nil
 	case !isCurrentUser && !isHost:
 		ip, _, portUDP, err := r.NextAddr()
 		if err != nil {
-			slog.Error("Failed to get the next address", "error", err)
-			panic(err)
-			return nil
+			return nil, fmt.Errorf("failed to get next address: %w", err)
 		}
 		return &Peer{
 			UserID: userId,
 			Addr:   &redirect.Addressing{IP: ip, TCPPort: "", UDPPort: portUDP},
 			Mode:   redirect.OtherUserHasJoined,
-		}
+		}, nil
 	default:
 		return &Peer{
 			UserID: userId,
 			Addr:   &redirect.Addressing{IP: net.IPv4(127, 0, 0, 1)},
 			Mode:   redirect.OtherUserIsJoining,
-		}
+		}, nil
 	}
 }
 

@@ -19,12 +19,12 @@ type SessionMapping struct {
 	Peers  map[string]*Peer
 }
 
-func (ps *SessionStore) getOrCreatePeer(session *bsession.Session, player wire.Player) *Peer {
+func (ps *SessionStore) getOrCreatePeer(session *bsession.Session, player wire.Player) (*Peer, error) {
 	mapping, ok := ps.sessions[session]
 	if ok {
 		peer, found := mapping.Peers[player.ID()]
 		if found {
-			return peer
+			return peer, nil
 		}
 	}
 
