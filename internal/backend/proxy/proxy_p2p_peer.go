@@ -30,14 +30,24 @@ func NewPeer(r *IpRing, userId string, isCurrentUser, isHost bool) *Peer {
 			Mode:   redirect.CurrentUserIsHost,
 		}
 	case !isCurrentUser && isHost:
-		ip, portTCP, portUDP := r.NextAddr()
+		ip, portTCP, portUDP, err := r.NextAddr()
+		if err != nil {
+			slog.Error("Failed to get the next address", "error", err)
+			panic(err)
+			return nil
+		}
 		return &Peer{
 			UserID: userId,
 			Addr:   &redirect.Addressing{IP: ip, TCPPort: portTCP, UDPPort: portUDP},
 			Mode:   redirect.OtherUserIsHost,
 		}
 	case !isCurrentUser && !isHost:
-		ip, _, portUDP := r.NextAddr()
+		ip, _, portUDP, err := r.NextAddr()
+		if err != nil {
+			slog.Error("Failed to get the next address", "error", err)
+			panic(err)
+			return nil
+		}
 		return &Peer{
 			UserID: userId,
 			Addr:   &redirect.Addressing{IP: ip, TCPPort: "", UDPPort: portUDP},
