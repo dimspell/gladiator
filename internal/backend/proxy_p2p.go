@@ -6,7 +6,6 @@ import (
 	"net"
 	"time"
 
-	"github.com/dimspell/gladiator/internal/proxy/p2p"
 	"github.com/dimspell/gladiator/internal/proxy/redirect"
 )
 
@@ -37,7 +36,7 @@ func (p *PeerToPeer) CreateRoom(params CreateParams, session *Session) (net.IP, 
 }
 
 func (p *PeerToPeer) HostRoom(params HostParams, session *Session) error {
-	host := &p2p.Peer{
+	host := &Peer{
 		PeerUserID: session.GetUserID(),
 		Addr:       &redirect.Addressing{IP: p.hostIPAddress},
 		Mode:       redirect.CurrentUserIsHost,
@@ -51,7 +50,7 @@ func (p *PeerToPeer) HostRoom(params HostParams, session *Session) error {
 	// FIXME: Use function instead
 	p.manager.Peers[session] = &PeersToSessionMapping{
 		Game: room,
-		Peers: map[string]*p2p.Peer{
+		Peers: map[string]*Peer{
 			host.PeerUserID: host,
 		},
 	}
@@ -96,7 +95,7 @@ func (p *PeerToPeer) GetPlayerAddr(params GetPlayerAddrParams, session *Session)
 		// FIXME: Use function instead
 		p.manager.Peers[session] = &PeersToSessionMapping{
 			Game:  session.State.GameRoom(),
-			Peers: map[string]*p2p.Peer{peer.PeerUserID: peer},
+			Peers: map[string]*Peer{peer.PeerUserID: peer},
 		}
 	}
 
@@ -104,7 +103,7 @@ func (p *PeerToPeer) GetPlayerAddr(params GetPlayerAddrParams, session *Session)
 }
 
 func (p *PeerToPeer) Join(params JoinParams, session *Session) (net.IP, error) {
-	peer := &p2p.Peer{
+	peer := &Peer{
 		PeerUserID: session.GetUserID(),
 		Addr:       &redirect.Addressing{IP: net.IPv4(127, 0, 0, 1)},
 		Mode:       redirect.None,

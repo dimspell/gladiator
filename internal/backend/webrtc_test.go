@@ -15,7 +15,6 @@ import (
 	"github.com/dimspell/gladiator/internal/console"
 	"github.com/dimspell/gladiator/internal/console/database"
 	"github.com/dimspell/gladiator/internal/model"
-	"github.com/dimspell/gladiator/internal/proxy/p2p"
 	"github.com/dimspell/gladiator/internal/proxy/redirect"
 )
 
@@ -144,7 +143,7 @@ func TestWebRTC(t *testing.T) {
 
 	// Make the packet redirect
 	ip, portTCP, portUDP := session2.IpRing.NextAddr()
-	peer := &p2p.Peer{
+	peer := &Peer{
 		PeerUserID: session2.GetUserID(),
 		Addr:       &redirect.Addressing{IP: ip, TCPPort: portTCP, UDPPort: portUDP},
 		Mode:       redirect.OtherUserIsHost,
@@ -153,14 +152,14 @@ func TestWebRTC(t *testing.T) {
 	gameRoom := NewGameRoom(roomId, session2.ToPlayer(net.IPv4(127, 0, 0, 21)))
 	session2.State.SetGameRoom(gameRoom)
 
-	peers := map[string]*p2p.Peer{peer.PeerUserID: peer}
+	peers := map[string]*Peer{peer.PeerUserID: peer}
 	proxy2.manager.Peers[session2] = &PeersToSessionMapping{
 		Game:  gameRoom,
 		Peers: peers,
 	}
 }
 
-// 	player2.Peers.Range(func(_ string, peer *p2p.Peer) {
+// 	player2.Peers.Range(func(_ string, peer *Peer) {
 // 		<-webrtc.GatheringCompletePromise(peer.Connection)
 // 	})
 

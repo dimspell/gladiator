@@ -5,16 +5,15 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/dimspell/gladiator/internal/proxy/p2p"
 	"github.com/dimspell/gladiator/internal/wire"
 	"github.com/pion/webrtc/v4"
 )
 
 type PeerToPeerInterface interface {
-	getPeer(session *Session, peerId string) (*p2p.Peer, bool)
+	getPeer(session *Session, peerId string) (*Peer, bool)
 	deletePeer(session *Session, peerId string)
 
-	setUpChannels(session *Session, peerId int64, sendRTCOffer bool, createChannels bool) (*p2p.Peer, error)
+	setUpChannels(session *Session, peerId int64, sendRTCOffer bool, createChannels bool) (*Peer, error)
 }
 
 type PeerToPeerMessageHandler struct {

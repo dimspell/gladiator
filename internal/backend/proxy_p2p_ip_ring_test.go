@@ -1,13 +1,11 @@
-package p2p_test
+package backend_test
 
 import (
 	"fmt"
-
-	"github.com/dimspell/gladiator/internal/proxy/p2p"
 )
 
 func ExampleIpRing_NextAddr() {
-	r := p2p.NewIpRing()
+	r := NewIpRing()
 	r.IsTesting = true
 	r.TcpPortPrefix = 1234
 
@@ -32,12 +30,12 @@ func ExampleIpRing_NextAddr() {
 //
 // 	helperStartGameServer(t)
 //
-// 	r1 := p2p.NewIpRing()
+// 	r1 := NewIpRing()
 // 	r1.IsTesting = true
 // 	r1.UdpPortPrefix = 1300
 // 	r1.TcpPortPrefix = 1400
 //
-// 	r2 := p2p.NewIpRing()
+// 	r2 := NewIpRing()
 // 	r2.IsTesting = true
 // 	r2.UdpPortPrefix = 2300
 // 	r2.TcpPortPrefix = 2400

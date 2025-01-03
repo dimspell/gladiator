@@ -14,7 +14,6 @@ import (
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/internal/app/logger"
 	"github.com/dimspell/gladiator/internal/model"
-	"github.com/dimspell/gladiator/internal/proxy/p2p"
 	"github.com/dimspell/gladiator/internal/wire"
 	"github.com/google/uuid"
 	"github.com/pion/webrtc/v4"
@@ -38,7 +37,7 @@ type Session struct {
 	observerDone          context.CancelFunc
 	wsConn                *websocket.Conn
 
-	IpRing *p2p.IpRing
+	IpRing *IpRing
 
 	State *SessionState
 }
@@ -73,10 +72,10 @@ func (b *Backend) AddSession(tcpConn net.Conn) *Session {
 		Conn: tcpConn,
 		ID:   id,
 
-		IpRing: p2p.NewIpRing(),
+		IpRing: NewIpRing(),
 
 		State: &SessionState{},
-		// RoomPlayers: p2p.NewPeers(),
+		// RoomPlayers: NewPeers(),
 	}
 	b.ConnectedSessions.Store(session.ID, session)
 	return session
