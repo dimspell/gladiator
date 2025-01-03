@@ -47,20 +47,14 @@ func (h *PeerToPeerMessageHandler) Handle(ctx context.Context, payload []byte) e
 	case wire.JoinRoom:
 		_, msg, err := wire.DecodeTyped[wire.Player](payload)
 		if err != nil {
-			slog.Error(errDecodingJoinRoom,
-				"error", err,
-				"payload", string(payload),
-				"sessionID", h.session.GetUserID())
+			slog.Error(errDecodingJoinRoom, "error", err, "payload", string(payload), "sessionID", h.session.GetUserID())
 			return err
 		}
 		return h.handleJoinRoom(ctx, msg.Content)
 	case wire.RTCOffer:
 		_, msg, err := wire.DecodeTyped[wire.Offer](payload)
 		if err != nil {
-			slog.Error(errDecodingRTCOffer,
-				"error", err,
-				"payload", string(payload),
-				"sessionID", h.session.GetUserID())
+			slog.Error(errDecodingRTCOffer, "error", err, "payload", string(payload), "sessionID", h.session.GetUserID())
 			return err
 		}
 		if msg.To != h.session.GetUserID() {
@@ -70,10 +64,7 @@ func (h *PeerToPeerMessageHandler) Handle(ctx context.Context, payload []byte) e
 	case wire.RTCAnswer:
 		_, msg, err := wire.DecodeTyped[wire.Offer](payload)
 		if err != nil {
-			slog.Error(errDecodingRTCAnswer,
-				"error", err,
-				"payload", string(payload),
-				"sessionID", h.session.GetUserID())
+			slog.Error(errDecodingRTCAnswer, "error", err, "payload", string(payload), "sessionID", h.session.GetUserID())
 			return err
 		}
 		if msg.To != h.session.GetUserID() {
@@ -83,9 +74,7 @@ func (h *PeerToPeerMessageHandler) Handle(ctx context.Context, payload []byte) e
 	case wire.RTCICECandidate:
 		_, msg, err := wire.DecodeTyped[webrtc.ICECandidateInit](payload)
 		if err != nil {
-			slog.Error(errDecodingRTCCandidate,
-				"error", err,
-				"payload", string(payload),
+			slog.Error(errDecodingRTCCandidate, "error", err, "payload", string(payload),
 				"sessionID", h.session.GetUserID())
 			return err
 		}
@@ -93,20 +82,14 @@ func (h *PeerToPeerMessageHandler) Handle(ctx context.Context, payload []byte) e
 	case wire.LeaveRoom, wire.LeaveLobby:
 		_, msg, err := wire.DecodeTyped[wire.Player](payload)
 		if err != nil {
-			slog.Error(errDecodingLeaveRoom,
-				"error", err,
-				"payload", string(payload),
-				"sessionID", h.session.GetUserID())
+			slog.Error(errDecodingLeaveRoom, "error", err, "payload", string(payload), "sessionID", h.session.GetUserID())
 			return err
 		}
 		return h.handleLeaveRoom(ctx, msg.Content)
 	case wire.LobbyUsers, wire.JoinLobby:
 		return nil
 	default:
-		slog.Debug("unknown wire message",
-			"type", eventType.String(),
-			"payload", string(payload),
-			"sessionID", h.session.GetUserID())
+		slog.Debug("unknown wire message", "type", eventType.String(), "payload", string(payload), "sessionID", h.session.GetUserID())
 		return nil
 	}
 }
