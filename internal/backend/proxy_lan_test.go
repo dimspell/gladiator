@@ -232,24 +232,14 @@ func TestE2E_LAN(t *testing.T) {
 	assert.Equal(t, "room", mpSession2.GameID)
 
 	// Host user has correct data
-	assert.Equal(t, int64(1), session1.UserID)
-	assert.Equal(t, "archer", session1.Username)
-	// assert.Equal(t, "archer", session1.State.gameRoom.Players["1"].Username)
-	// assert.Equal(t, byte(v1.ClassType_Archer), session1.State.gameRoom.Players["1"].ClassType)
-	// assert.Equal(t, "198.51.100.1", session1.State.gameRoom.Players["1"].IPAddress)
-	// assert.Equal(t, "mage", session1.State.gameRoom.Players["2"].Username)
-	// assert.Equal(t, byte(v1.ClassType_Mage), session1.State.gameRoom.Players["2"].ClassType)
-	// assert.Equal(t, "198.51.100.2", session1.State.gameRoom.Players["2"].IPAddress)
+	assert.Equal(t, int64(1), mpSession1.UserID)
+	assert.Equal(t, "archer", mpSession1.User.Username)
+	assert.Equal(t, "198.51.100.1", mpSession1.IPAddress)
 
 	// Joining user has also the same data
-	assert.Equal(t, int64(2), session2.UserID)
-	assert.Equal(t, "mage", session2.Username)
-	// assert.Equal(t, "archer", session2.State.gameRoom.Players["1"].Username)
-	// assert.Equal(t, byte(v1.ClassType_Archer), session2.State.gameRoom.Players["1"].ClassType)
-	// assert.Equal(t, "198.51.100.1", session2.State.gameRoom.Players["1"].IPAddress)
-	// assert.Equal(t, "mage", session2.State.gameRoom.Players["2"].Username)
-	// assert.Equal(t, byte(v1.ClassType_Mage), session2.State.gameRoom.Players["2"].ClassType)
-	// assert.Equal(t, "198.51.100.2", session2.State.gameRoom.Players["2"].IPAddress)
+	assert.Equal(t, int64(2), mpSession2.UserID)
+	assert.Equal(t, "mage", mpSession2.User.Username)
+	assert.Equal(t, "198.51.100.2", mpSession2.IPAddress)
 
 	close(cs.Multiplayer.Messages)
 	for message := range cs.Multiplayer.Messages {
