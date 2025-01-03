@@ -150,6 +150,18 @@ func (pipe *Pipe) Write(p []byte) (n int, err error) {
 
 func (pipe *Pipe) Close() error {
 	pipe.done()
+
+	// Add timeout context for cleanup
+	// ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	// defer cancel()
+	// select {
+	// case <-ctx.Done():
+	// 	return ctx.Err()
+	// default:
+	// 	close(pipe.dcData)
+	// 	pipe.dcData = nil
+	// }
+
 	close(pipe.dcData)
 	pipe.dcData = nil
 	return nil

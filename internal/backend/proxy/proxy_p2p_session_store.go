@@ -33,7 +33,8 @@ func (ps *SessionStore) getOrCreatePeer(session *bsession.Session, player wire.P
 
 	isHost := gameRoom.Host.UserID == player.UserID
 	isCurrentUser := gameRoom.Host.UserID == session.UserID
-	return mapping.IpRing.NextPeerAddress(player.ID(), isCurrentUser, isHost)
+
+	return NewPeer(mapping.IpRing, player.ID(), isCurrentUser, isHost)
 }
 
 func (ps *SessionStore) GetPeer(session *bsession.Session, userId string) (*Peer, bool) {

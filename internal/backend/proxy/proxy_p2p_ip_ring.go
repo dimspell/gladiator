@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"net"
 	"sync"
-
-	"github.com/dimspell/gladiator/internal/backend/redirect"
 )
 
 type IpRing struct {
@@ -57,35 +55,4 @@ func (r *IpRing) NextAddr() (ip net.IP, portTCP string, portUDP string) {
 	portUDP = fmt.Sprintf("%d%d", r.UdpPortPrefix, next)
 
 	return ip, portTCP, portUDP
-}
-
-func (r *IpRing) NextPeerAddress(userId string, isCurrentUser, isHost bool) *Peer {
-	switch true {
-	case isCurrentUser:
-		return &Peer{
-			UserID: userId,
-			Addr:   &redirect.Addressing{IP: net.IPv4(127, 0, 0, 1)},
-			Mode:   redirect.CurrentUserIsHost,
-		}
-	case !isCurrentUser && isHost:
-		ip, portTCP, portUDP := r.NextAddr()
-		return &Peer{
-			UserID: userId,
-			Addr:   &redirect.Addressing{IP: ip, TCPPort: portTCP, UDPPort: portUDP},
-			Mode:   redirect.OtherUserIsHost,
-		}
-	case !isCurrentUser && !isHost:
-		ip, _, portUDP := r.NextAddr()
-		return &Peer{
-			UserID: userId,
-			Addr:   &redirect.Addressing{IP: ip, TCPPort: "", UDPPort: portUDP},
-			Mode:   redirect.OtherUserHasJoined,
-		}
-	default:
-		return &Peer{
-			UserID: userId,
-			Addr:   &redirect.Addressing{IP: net.IPv4(127, 0, 0, 1)},
-			Mode:   redirect.OtherUserIsJoining,
-		}
-	}
 }
