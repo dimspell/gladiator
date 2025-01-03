@@ -156,15 +156,13 @@ func (p *PeerToPeer) Join(params JoinParams, session *bsession.Session) (net.IP,
 }
 
 func (p *PeerToPeer) Close(session *bsession.Session) {
-	// FIXME: Use function instead
 	if mapping, exists := p.SessionStore.GetSession(session); exists {
 		for _, peer := range mapping.Peers {
 			peer.Terminate()
 		}
 	}
 
-	// FIXME: Use function instead
-	delete(p.SessionStore.sessions, session)
+	p.SessionStore.DeleteSession(session)
 }
 
 func (p *PeerToPeer) ExtendWire(session *bsession.Session) MessageHandler {
