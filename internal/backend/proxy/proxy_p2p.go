@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"time"
 
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/redirect"
@@ -14,6 +13,8 @@ import (
 
 var _ Proxy = (*PeerToPeer)(nil)
 
+// PeerToPeer implements the Proxy interface for WebRTC-based peer-to-peer connections.
+// It manages game rooms, peer connections, and network addressing for multiplayer games
 type PeerToPeer struct {
 	// A custom IP address to which we will connect to.
 	hostIPAddress net.IP
@@ -45,6 +46,8 @@ func NewPeerToPeer() *PeerToPeer {
 	}
 }
 
+// CreateRoom creates a new game room and assigns the session as the host.
+// Returns the assigned IP address for the host player
 func (p *PeerToPeer) CreateRoom(params CreateParams, session *bsession.Session) (net.IP, error) {
 	p.Close(session)
 
@@ -77,18 +80,11 @@ func (p *PeerToPeer) HostRoom(params HostParams, session *bsession.Session) erro
 		return fmt.Errorf("no game room found")
 	}
 
-	if err := p.sendRoomReadyNotification(session, params.GameID); err != nil {
+	if err := session.SendSetRoomReady(context.TODO(), params.GameID); err != nil {
 		return fmt.Errorf("could not send set room ready: %w", err)
 	}
 
 	return nil
-}
-
-func (p *PeerToPeer) sendRoomReadyNotification(session *bsession.Session, gameID string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-
-	return session.SendSetRoomReady(ctx, gameID)
 }
 
 func (p *PeerToPeer) GetHostIP(hostIpAddress net.IP, session *bsession.Session) net.IP {
