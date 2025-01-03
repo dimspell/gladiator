@@ -165,6 +165,24 @@ func (p *PeerToPeer) Close(session *bsession.Session) {
 	p.SessionStore.DeleteSession(session)
 }
 
+func (ss *SessionStore) getOrCreatePeer(session *bsession.Session, player wire.Player) (*Peer, error) {
+	mapping, ok := ss.sessions[session]
+	if ok {
+		peer, found := mapping.Peers[player.ID()]
+		if found {
+			return peer, nil
+		}
+	}
+
+	gameRoom := mapping.Game
+	gameRoom.SetPlayer(player)
+
+	isHost := gameRoom.Host.UserID == player.UserID
+	isCurrentUser := gameRoom.Host.UserID == session.UserID
+
+	return NewPeer(mapping.IpRing, player.ID(), isCurrentUser, isHost)
+}
+
 func (p *PeerToPeer) ExtendWire(session *bsession.Session) MessageHandler {
 	// setUpChannels sets up the peer connection channels.
 	setUpChannels := func(session *bsession.Session, player wire.Player, sendRTCOffer bool, createChannels bool) (*Peer, error) {

@@ -4,7 +4,6 @@ import (
 	"sync"
 
 	"github.com/dimspell/gladiator/internal/backend/bsession"
-	"github.com/dimspell/gladiator/internal/wire"
 )
 
 type SessionStore struct {
@@ -36,24 +35,6 @@ type SessionMapping struct {
 	IpRing *IpRing
 	Game   *GameRoom
 	Peers  map[string]*Peer
-}
-
-func (ss *SessionStore) getOrCreatePeer(session *bsession.Session, player wire.Player) (*Peer, error) {
-	mapping, ok := ss.sessions[session]
-	if ok {
-		peer, found := mapping.Peers[player.ID()]
-		if found {
-			return peer, nil
-		}
-	}
-
-	gameRoom := mapping.Game
-	gameRoom.SetPlayer(player)
-
-	isHost := gameRoom.Host.UserID == player.UserID
-	isCurrentUser := gameRoom.Host.UserID == session.UserID
-
-	return NewPeer(mapping.IpRing, player.ID(), isCurrentUser, isHost)
 }
 
 func (ss *SessionStore) GetPeer(session *bsession.Session, userId string) (*Peer, bool) {
