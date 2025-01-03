@@ -12,6 +12,25 @@ type SessionStore struct {
 	mutex    sync.RWMutex
 }
 
+func (ss *SessionStore) GetSession(session *bsession.Session) (*SessionMapping, bool) {
+	ss.mutex.RLock()
+	defer ss.mutex.RUnlock()
+	mapping, exists := ss.sessions[session]
+	return mapping, exists
+}
+
+func (ss *SessionStore) SetSession(session *bsession.Session, mapping *SessionMapping) {
+	ss.mutex.Lock()
+	defer ss.mutex.Unlock()
+	ss.sessions[session] = mapping
+}
+
+func (ss *SessionStore) DeleteSession(session *bsession.Session) {
+	ss.mutex.Lock()
+	defer ss.mutex.Unlock()
+	delete(ss.sessions, session)
+}
+
 // SessionMapping maps sessions to their peers.
 type SessionMapping struct {
 	IpRing *IpRing
@@ -19,8 +38,8 @@ type SessionMapping struct {
 	Peers  map[string]*Peer
 }
 
-func (ps *SessionStore) getOrCreatePeer(session *bsession.Session, player wire.Player) (*Peer, error) {
-	mapping, ok := ps.sessions[session]
+func (ss *SessionStore) getOrCreatePeer(session *bsession.Session, player wire.Player) (*Peer, error) {
+	mapping, ok := ss.sessions[session]
 	if ok {
 		peer, found := mapping.Peers[player.ID()]
 		if found {
@@ -37,11 +56,11 @@ func (ps *SessionStore) getOrCreatePeer(session *bsession.Session, player wire.P
 	return NewPeer(mapping.IpRing, player.ID(), isCurrentUser, isHost)
 }
 
-func (ps *SessionStore) GetPeer(session *bsession.Session, userId string) (*Peer, bool) {
-	ps.mutex.RLock()
-	defer ps.mutex.RUnlock()
+func (ss *SessionStore) GetPeer(session *bsession.Session, userId string) (*Peer, bool) {
+	ss.mutex.RLock()
+	defer ss.mutex.RUnlock()
 
-	mapping, ok := ps.sessions[session]
+	mapping, ok := ss.sessions[session]
 	if !ok {
 		return nil, false
 	}
@@ -52,22 +71,22 @@ func (ps *SessionStore) GetPeer(session *bsession.Session, userId string) (*Peer
 	return peer, true
 }
 
-func (ps *SessionStore) AddPeer(session *bsession.Session, peer *Peer) {
-	ps.mutex.Lock()
-	defer ps.mutex.Unlock()
+func (ss *SessionStore) AddPeer(session *bsession.Session, peer *Peer) {
+	ss.mutex.Lock()
+	defer ss.mutex.Unlock()
 
-	mapping, ok := ps.sessions[session]
+	mapping, ok := ss.sessions[session]
 	if !ok {
 		return
 	}
 	mapping.Peers[peer.UserID] = peer
 }
 
-func (ps *SessionStore) RemovePeer(session *bsession.Session, userId string) {
-	ps.mutex.Lock()
-	defer ps.mutex.Unlock()
+func (ss *SessionStore) RemovePeer(session *bsession.Session, userId string) {
+	ss.mutex.Lock()
+	defer ss.mutex.Unlock()
 
-	mapping, ok := ps.sessions[session]
+	mapping, ok := ss.sessions[session]
 	if !ok {
 		return
 	}

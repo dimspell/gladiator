@@ -53,7 +53,7 @@ func (p *PeerToPeer) CreateRoom(params CreateParams, session *bsession.Session) 
 
 	gameRoom := NewGameRoom(params.GameID, hostPlayer)
 
-	p.SessionStore.sessions[session] = &SessionMapping{
+	p.SessionStore.SetSession(session, &SessionMapping{
 		Game:   gameRoom,
 		IpRing: NewIpRing(),
 		Peers: map[string]*Peer{
@@ -63,7 +63,7 @@ func (p *PeerToPeer) CreateRoom(params CreateParams, session *bsession.Session) 
 				Mode:   redirect.CurrentUserIsHost,
 			},
 		},
-	}
+	})
 
 	return ipAddr, nil
 }
@@ -121,30 +121,21 @@ func (p *PeerToPeer) SelectGame(params GameData, session *bsession.Session) erro
 		peers[player.ID()] = peer
 	}
 
-	p.SessionStore.sessions[session] = &SessionMapping{
+	p.SessionStore.SetSession(session, &SessionMapping{
 		Game:   gameRoom,
 		IpRing: ipRing,
 		Peers:  peers,
-	}
+	})
 
 	return nil
 }
 
 func (p *PeerToPeer) GetPlayerAddr(params GetPlayerAddrParams, session *bsession.Session) (net.IP, error) {
-	// Return the IP address of the player, if he is already in the list.
-	// FIXME: Use function instead
-	mapping, ok := p.SessionStore.sessions[session]
+	peer, ok := p.SessionStore.GetPeer(session, params.UserID)
 	if !ok {
-		return nil, fmt.Errorf("no game manager for session: %s", session.GetUserID())
+		return nil, fmt.Errorf("could not find peer with user ID: %s", params.UserID)
 	}
-
-	for _, peer := range mapping.Peers {
-		if peer.UserID == params.UserID {
-			return peer.Addr.IP, nil
-		}
-	}
-
-	return nil, fmt.Errorf("could not find player with user ID: %s", params.UserID)
+	return peer.Addr.IP, nil
 }
 
 func (p *PeerToPeer) Join(params JoinParams, session *bsession.Session) (net.IP, error) {
@@ -155,7 +146,7 @@ func (p *PeerToPeer) Join(params JoinParams, session *bsession.Session) (net.IP,
 	}
 
 	// FIXME: Use function instead
-	mapping, exist := p.SessionStore.sessions[session]
+	mapping, exist := p.SessionStore.GetSession(session)
 	if !exist {
 		return nil, fmt.Errorf("could not find current session among the peers for user ID: %s", session.GetUserID())
 	}
@@ -170,7 +161,7 @@ func (p *PeerToPeer) Join(params JoinParams, session *bsession.Session) (net.IP,
 
 func (p *PeerToPeer) Close(session *bsession.Session) {
 	// FIXME: Use function instead
-	if mapping, exists := p.SessionStore.sessions[session]; exists {
+	if mapping, exists := p.SessionStore.GetSession(session); exists {
 		for _, peer := range mapping.Peers {
 			peer.Terminate()
 		}
