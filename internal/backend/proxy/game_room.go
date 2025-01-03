@@ -56,7 +56,7 @@ func (g *GameRoom) DeletePlayer(playerId string) {
 	g.Unlock()
 }
 
-// func (p *Peers) Reset() {
+// func (p *SessionStore) Reset() {
 // 	p.Lock()
 // 	for id, peer := range p.peers {
 // 		peer.Close()
@@ -65,7 +65,7 @@ func (g *GameRoom) DeletePlayer(playerId string) {
 // 	p.Unlock()
 // }
 //
-// func (p *Peers) Range(f func(string, *Peer)) {
+// func (p *SessionStore) Range(f func(string, *Peer)) {
 // 	p.RLock()
 // 	defer p.RUnlock()
 // 	for id, peer := range p.peers {

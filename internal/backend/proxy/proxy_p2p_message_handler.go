@@ -10,16 +10,15 @@ import (
 	"github.com/pion/webrtc/v4"
 )
 
-type PeerToPeerInterface interface {
-	getPeer(session *bsession.Session, peerId string) (*Peer, bool)
-	deletePeer(session *bsession.Session, peerId string)
-
-	setUpChannels(session *bsession.Session, player wire.Player, sendRTCOffer bool, createChannels bool) (*Peer, error)
+type PeerManager interface {
+	GetPeer(session *bsession.Session, peerId string) (*Peer, bool)
+	RemovePeer(session *bsession.Session, peerId string)
 }
 
 type PeerToPeerMessageHandler struct {
-	session *bsession.Session
-	proxy   PeerToPeerInterface
+	session       *bsession.Session
+	peerManager   PeerManager
+	setUpChannels func(session *bsession.Session, player wire.Player, sendRTCOffer bool, createChannels bool) (*Peer, error)
 }
 
 func (h *PeerToPeerMessageHandler) Handle(ctx context.Context, payload []byte) error {
@@ -81,7 +80,7 @@ func (h *PeerToPeerMessageHandler) handleJoinRoom(ctx context.Context, player wi
 		return nil
 	}
 
-	peer, connected := h.proxy.getPeer(h.session, player.ID())
+	peer, connected := h.peerManager.GetPeer(h.session, player.ID())
 	if connected && peer.Connection != nil {
 		slog.Debug("Peer already exists, ignoring join", "userId", player.UserID)
 		return nil
@@ -90,7 +89,7 @@ func (h *PeerToPeerMessageHandler) handleJoinRoom(ctx context.Context, player wi
 	slog.Debug("JOIN", "id", player.UserID, "data", player)
 
 	// Add the peer to the list of peers, and start the WebRTC connection
-	if _, err := h.proxy.setUpChannels(h.session, player, true, true); err != nil {
+	if _, err := h.setUpChannels(h.session, player, true, true); err != nil {
 		slog.Warn("Could not add a peer", "userId", player.UserID, "error", err)
 		return err
 	}
@@ -101,7 +100,7 @@ func (h *PeerToPeerMessageHandler) handleJoinRoom(ctx context.Context, player wi
 func (h *PeerToPeerMessageHandler) handleRTCOffer(ctx context.Context, offer wire.Offer, fromUserId string) error {
 	slog.Debug("RTC_OFFER", "from", fromUserId)
 
-	peer, err := h.proxy.setUpChannels(h.session, offer.Player, false, false)
+	peer, err := h.setUpChannels(h.session, offer.Player, false, false)
 	if err != nil {
 		return err
 	}
@@ -132,7 +131,7 @@ func (h *PeerToPeerMessageHandler) handleRTCAnswer(ctx context.Context, offer wi
 		Type: webrtc.SDPTypeAnswer,
 		SDP:  offer.Offer.SDP,
 	}
-	peer, ok := h.proxy.getPeer(h.session, fromUserId)
+	peer, ok := h.peerManager.GetPeer(h.session, fromUserId)
 	if !ok {
 		return fmt.Errorf("could not find peer %q that sent the RTC answer", fromUserId)
 	}
@@ -145,7 +144,7 @@ func (h *PeerToPeerMessageHandler) handleRTCAnswer(ctx context.Context, offer wi
 func (h *PeerToPeerMessageHandler) handleRTCCandidate(ctx context.Context, candidate webrtc.ICECandidateInit, fromUserId string) error {
 	slog.Debug("RTC_ICE_CANDIDATE", "from", fromUserId)
 
-	peer, ok := h.proxy.getPeer(h.session, fromUserId)
+	peer, ok := h.peerManager.GetPeer(h.session, fromUserId)
 	if !ok {
 		return fmt.Errorf("could not find peer %q", fromUserId)
 	}
@@ -158,7 +157,7 @@ func (h *PeerToPeerMessageHandler) handleLeaveRoom(ctx context.Context, player w
 
 	slog.Debug("LEAVE_ROOM OR LEAVE_LOBBY")
 
-	peer, ok := h.proxy.getPeer(h.session, player.ID())
+	peer, ok := h.peerManager.GetPeer(h.session, player.ID())
 	if !ok {
 		// fmt.Errorf("could not find peer %q", m.From)
 		return nil
@@ -169,6 +168,6 @@ func (h *PeerToPeerMessageHandler) handleLeaveRoom(ctx context.Context, player w
 	}
 
 	slog.Info("User left", "peer", peer.UserID)
-	h.proxy.deletePeer(h.session, player.ID())
+	h.peerManager.RemovePeer(h.session, player.ID())
 	return nil
 }

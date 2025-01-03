@@ -80,7 +80,7 @@ func P2PCommand() *cli.Command {
 		// 	}
 		//
 		// 	fmt.Println("test")
-		// 	// peerToPeer.Peers.Range(func(s string, peer *p2p.Peer) {
+		// 	// peerToPeer.SessionStore.Range(func(s string, peer *p2p.Peer) {
 		// 	// 	log.Println(s, peer)
 		// 	// })
 		// 	// ch <- string(line)

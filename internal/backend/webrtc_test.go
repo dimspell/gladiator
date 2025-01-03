@@ -157,13 +157,13 @@ func TestWebRTC(t *testing.T) {
 	// session2.State.SetGameRoom(gameRoom)
 	//
 	// peers := map[string]*Peer{peer.UserID: peer}
-	// proxy2.manager.Peers[session2] = &PeersToSessionMapping{
+	// proxy2.manager.SessionStore[session2] = &SessionMapping{
 	// 	Game:  gameRoom,
-	// 	Peers: peers,
+	// 	SessionStore: peers,
 	// }
 }
 
-// 	player2.Peers.Range(func(_ string, peer *Peer) {
+// 	player2.SessionStore.Range(func(_ string, peer *Peer) {
 // 		<-webrtc.GatheringCompletePromise(peer.Connection)
 // 	})
 
