@@ -18,20 +18,9 @@ const (
 	errDecodingLeaveRoom    = "failed to decode leave-room/leave-lobby payload"
 )
 
-// PeerReader handles peer lookup operations
-type PeerReader interface {
-	GetPeer(session *bsession.Session, peerId string) (*Peer, bool)
-}
-
-// PeerWriter handles peer modification operations
-type PeerWriter interface {
-	RemovePeer(session *bsession.Session, peerId string)
-}
-
-// PeerManager combines read and write operations
 type PeerManager interface {
-	PeerReader
-	PeerWriter
+	GetPeer(session *bsession.Session, peerId string) (*Peer, bool)
+	RemovePeer(session *bsession.Session, peerId string)
 }
 
 type PeerToPeerMessageHandler struct {
