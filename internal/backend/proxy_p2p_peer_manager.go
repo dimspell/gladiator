@@ -84,8 +84,7 @@ func (p *PeerToPeerPeerManager) setUpChannels(session *Session, playerId int64, 
 		return nil, err
 	}
 
-	gameRoom := session.State.GameRoom()
-	player, found := gameRoom.GetPlayer(strconv.FormatInt(playerId, 10))
+	player, found := session.State.GameRoom().GetPlayer(strconv.FormatInt(playerId, 10))
 	if !found {
 		return nil, fmt.Errorf("could not find player in game room")
 	}
@@ -136,27 +135,29 @@ func (p *PeerToPeerPeerManager) setupPeerConnection(peerConnection *webrtc.PeerC
 	})
 
 	peerConnection.OnNegotiationNeeded(func() {
-		offer, err := peerConnection.CreateOffer(nil)
-		if err != nil {
-			slog.Error("failed to create offer", "error", err)
-			return
-		}
-
-		if err := peerConnection.SetLocalDescription(offer); err != nil {
-			slog.Error("failed to set local description", "error", err)
-			return
-		}
-
-		if !sendRTCOffer {
-			// If this is a message sent first time after joining,
-			// then we send the offer to invite yourself to join other users.
-			return
-		}
-
-		if err := session.SendRTCOffer(context.TODO(), offer, player.ID()); err != nil {
-			panic(err)
+		if err := p.handleNegotiation(peerConnection, session, player, sendRTCOffer); err != nil {
+			slog.Error("failed to handle negotiation", "error", err)
 		}
 	})
+
+	return nil
+}
+
+func (p *PeerToPeerPeerManager) handleNegotiation(peerConnection *webrtc.PeerConnection, session *Session, player *wire.Player, sendRTCOffer bool) error {
+	offer, err := peerConnection.CreateOffer(nil)
+	if err != nil {
+		return fmt.Errorf("failed to create offer: %w", err)
+	}
+
+	if err := peerConnection.SetLocalDescription(offer); err != nil {
+		return fmt.Errorf("failed to set local description: %w", err)
+	}
+
+	if sendRTCOffer {
+		if err := session.SendRTCOffer(context.TODO(), offer, player.ID()); err != nil {
+			return fmt.Errorf("failed to send RTC offer: %w", err)
+		}
+	}
 
 	return nil
 }
