@@ -18,11 +18,13 @@ type PeerToPeerPeerManager struct {
 	Peers        map[*Session]*PeersToSessionMapping
 }
 
+// PeersToSessionMapping maps sessions to their peers.
 type PeersToSessionMapping struct {
 	Game  *GameRoom
 	Peers map[string]*Peer
 }
 
+// NewPeerToPeerManager initializes a new PeerToPeerPeerManager.
 func NewPeerToPeerManager() *PeerToPeerPeerManager {
 	config := webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{
@@ -42,6 +44,38 @@ func NewPeerToPeerManager() *PeerToPeerPeerManager {
 		Peers:        make(map[*Session]*PeersToSessionMapping),
 		NewRedirect:  redirect.New,
 	}
+}
+
+// setUpChannels sets up the peer connection channels.
+func (p *PeerToPeerPeerManager) setUpChannels(session *Session, playerId int64, sendRTCOffer bool, createChannels bool) (*Peer, error) {
+	peerConnection, err := webrtc.NewPeerConnection(p.WebRTCConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	player, found := session.State.GameRoom().GetPlayer(strconv.FormatInt(playerId, 10))
+	if !found {
+		return nil, fmt.Errorf("could not find player in game room")
+	}
+
+	peer := p.getOrCreatePeer(session, &player)
+	peer.Connection = peerConnection
+
+	if !p.isPeerExisting(session, &player) {
+		p.setPeer(session, peer)
+	}
+
+	if err := p.setupPeerConnection(peerConnection, session, &player, sendRTCOffer); err != nil {
+		return nil, err
+	}
+
+	if createChannels {
+		if err := p.createDataChannels(peerConnection, session, peer); err != nil {
+			return nil, err
+		}
+	}
+
+	return peer, nil
 }
 
 func (p *PeerToPeerPeerManager) getPeer(session *Session, peerID string) (*Peer, bool) {
@@ -76,37 +110,6 @@ func (p *PeerToPeerPeerManager) deletePeer(session *Session, peerID string) {
 		return
 	}
 	delete(mapping.Peers, peerID)
-}
-
-func (p *PeerToPeerPeerManager) setUpChannels(session *Session, playerId int64, sendRTCOffer bool, createChannels bool) (*Peer, error) {
-	peerConnection, err := webrtc.NewPeerConnection(p.WebRTCConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	player, found := session.State.GameRoom().GetPlayer(strconv.FormatInt(playerId, 10))
-	if !found {
-		return nil, fmt.Errorf("could not find player in game room")
-	}
-
-	peer := p.getOrCreatePeer(session, &player)
-	peer.Connection = peerConnection
-
-	if !p.isPeerExisting(session, &player) {
-		p.setPeer(session, peer)
-	}
-
-	if err := p.setupPeerConnection(peerConnection, session, &player, sendRTCOffer); err != nil {
-		return nil, err
-	}
-
-	if createChannels {
-		if err := p.createDataChannels(peerConnection, session, peer); err != nil {
-			return nil, err
-		}
-	}
-
-	return peer, nil
 }
 
 func (p *PeerToPeerPeerManager) getOrCreatePeer(session *Session, player *wire.Player) *Peer {
