@@ -10,9 +10,28 @@ import (
 	"github.com/pion/webrtc/v4"
 )
 
-type PeerManager interface {
+const (
+	errDecodingJoinRoom     = "failed to decode join room payload"
+	errDecodingRTCOffer     = "failed to decode RTC Offer payload"
+	errDecodingRTCAnswer    = "failed to decode RTC Answer payload"
+	errDecodingRTCCandidate = "failed to decode RTC ICE Candidate payload"
+	errDecodingLeaveRoom    = "failed to decode leave-room/leave-lobby payload"
+)
+
+// PeerReader handles peer lookup operations
+type PeerReader interface {
 	GetPeer(session *bsession.Session, peerId string) (*Peer, bool)
+}
+
+// PeerWriter handles peer modification operations
+type PeerWriter interface {
 	RemovePeer(session *bsession.Session, peerId string)
+}
+
+// PeerManager combines read and write operations
+type PeerManager interface {
+	PeerReader
+	PeerWriter
 }
 
 type PeerToPeerMessageHandler struct {
@@ -28,15 +47,21 @@ func (h *PeerToPeerMessageHandler) Handle(ctx context.Context, payload []byte) e
 	case wire.JoinRoom:
 		_, msg, err := wire.DecodeTyped[wire.Player](payload)
 		if err != nil {
-			slog.Error("failed to decode join room payload", "error", err, "payload", string(payload))
-			return nil
+			slog.Error(errDecodingJoinRoom,
+				"error", err,
+				"payload", string(payload),
+				"sessionID", h.session.GetUserID())
+			return err
 		}
 		return h.handleJoinRoom(ctx, msg.Content)
 	case wire.RTCOffer:
 		_, msg, err := wire.DecodeTyped[wire.Offer](payload)
 		if err != nil {
-			slog.Error("failed to decode RTC Offer payload", "error", err, "payload", string(payload))
-			return nil
+			slog.Error(errDecodingRTCOffer,
+				"error", err,
+				"payload", string(payload),
+				"sessionID", h.session.GetUserID())
+			return err
 		}
 		if msg.To != h.session.GetUserID() {
 			return nil
@@ -45,8 +70,11 @@ func (h *PeerToPeerMessageHandler) Handle(ctx context.Context, payload []byte) e
 	case wire.RTCAnswer:
 		_, msg, err := wire.DecodeTyped[wire.Offer](payload)
 		if err != nil {
-			slog.Error("failed to decode RTC Answer payload", "error", err, "payload", string(payload))
-			return nil
+			slog.Error(errDecodingRTCAnswer,
+				"error", err,
+				"payload", string(payload),
+				"sessionID", h.session.GetUserID())
+			return err
 		}
 		if msg.To != h.session.GetUserID() {
 			return nil
@@ -55,44 +83,60 @@ func (h *PeerToPeerMessageHandler) Handle(ctx context.Context, payload []byte) e
 	case wire.RTCICECandidate:
 		_, msg, err := wire.DecodeTyped[webrtc.ICECandidateInit](payload)
 		if err != nil {
-			slog.Error("failed to decode RTC ICE Candidate payload", "error", err, "payload", string(payload))
-			return nil
+			slog.Error(errDecodingRTCCandidate,
+				"error", err,
+				"payload", string(payload),
+				"sessionID", h.session.GetUserID())
+			return err
 		}
 		return h.handleRTCCandidate(ctx, msg.Content, msg.From)
 	case wire.LeaveRoom, wire.LeaveLobby:
 		_, msg, err := wire.DecodeTyped[wire.Player](payload)
 		if err != nil {
-			slog.Error("failed to decode leave-room/leave-lobby payload", "error", err, "payload", string(payload))
-			return nil
+			slog.Error(errDecodingLeaveRoom,
+				"error", err,
+				"payload", string(payload),
+				"sessionID", h.session.GetUserID())
+			return err
 		}
 		return h.handleLeaveRoom(ctx, msg.Content)
 	case wire.LobbyUsers, wire.JoinLobby:
 		return nil
 	default:
-		slog.Debug("unknown wire message", slog.String("type", eventType.String()), slog.String("payload", string(payload)))
+		slog.Debug("unknown wire message",
+			"type", eventType.String(),
+			"payload", string(payload),
+			"sessionID", h.session.GetUserID())
 		return nil
 	}
 }
 
 func (h *PeerToPeerMessageHandler) handleJoinRoom(ctx context.Context, player wire.Player) error {
-	slog.Info("Other player is joining", "playerId", player.ID())
+	logger := slog.With(
+		"playerId", player.ID(),
+		"sessionID", h.session.GetUserID(),
+	)
+	logger.Info("Other player is joining")
 
-	// Validate the message
+	if err := ctx.Err(); err != nil {
+		return fmt.Errorf("context cancelled while handling join room: %w", err)
+	}
+
 	if player.UserID == h.session.UserID {
 		return nil
 	}
 
 	peer, connected := h.peerManager.GetPeer(h.session, player.ID())
 	if connected && peer.Connection != nil {
-		slog.Debug("Peer already exists, ignoring join", "userId", player.UserID)
+		logger.Debug("Peer already exists, ignoring join", "userId", player.UserID)
 		return nil
 	}
 
-	slog.Debug("JOIN", "id", player.UserID, "data", player)
+	logger.Debug("JOIN", "id", player.UserID, "data", player)
 
-	// Add the peer to the list of peers, and start the WebRTC connection
-	if _, err := h.setUpChannels(h.session, player, true, true); err != nil {
-		slog.Warn("Could not add a peer", "userId", player.UserID, "error", err)
+	peer, err := h.setUpChannels(h.session, player, true, true)
+	if err != nil {
+		logger.Warn("Could not add a peer", "userId", player.UserID, "error", err)
 		return err
 	}
 
@@ -100,7 +144,15 @@ func (h *PeerToPeerMessageHandler) handleJoinRoom(ctx context.Context, player wi
 }
 
 func (h *PeerToPeerMessageHandler) handleRTCOffer(ctx context.Context, offer wire.Offer, fromUserId string) error {
-	slog.Debug("RTC_OFFER", "from", fromUserId)
+	logger := slog.With(
+		"from", fromUserId,
+		"sessionID", h.session.GetUserID(),
+	)
+	logger.Debug("RTC_OFFER")
+
+	if err := ctx.Err(); err != nil {
+		return fmt.Errorf("context cancelled while handling RTC offer: %w", err)
+	}
 
 	peer, err := h.setUpChannels(h.session, offer.Player, false, false)
 	if err != nil {
@@ -108,20 +160,20 @@ func (h *PeerToPeerMessageHandler) handleRTCOffer(ctx context.Context, offer wir
 	}
 
 	if err := peer.Connection.SetRemoteDescription(offer.Offer); err != nil {
-		return fmt.Errorf("could not set remote description: %v", err)
+		return fmt.Errorf("could not set remote description: %w", err)
 	}
 
 	answer, err := peer.Connection.CreateAnswer(nil)
 	if err != nil {
-		return fmt.Errorf("could not create answer: %v", err)
+		return fmt.Errorf("could not create answer: %w", err)
 	}
 
 	if err := peer.Connection.SetLocalDescription(answer); err != nil {
-		return fmt.Errorf("could not set local description: %v", err)
+		return fmt.Errorf("could not set local description: %w", err)
 	}
 
 	if err := h.session.SendRTCAnswer(ctx, answer, fromUserId); err != nil {
-		return fmt.Errorf("could not send answer: %v", err)
+		return fmt.Errorf("could not send answer: %w", err)
 	}
 	return nil
 }
