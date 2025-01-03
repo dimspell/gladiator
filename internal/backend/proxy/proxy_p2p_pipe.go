@@ -3,13 +3,18 @@ package proxy
 import (
 	"context"
 	"io"
-	"log"
 	"log/slog"
 
 	"github.com/dimspell/gladiator/internal/backend/redirect"
 	"github.com/pion/webrtc/v4"
 	"golang.org/x/sync/errgroup"
 )
+
+// Define custom error types
+// var (
+// 	ErrReadTimeout = errors.New("read timeout")
+// 	ErrClosedPipe = errors.New("pipe closed")
+// )
 
 var _ io.ReadWriteCloser = (*Pipe)(nil)
 
@@ -39,6 +44,7 @@ func NewPipe(dc DataChannel, proxy redirect.Redirect) *Pipe {
 		dc:     dc,
 		proxy:  proxy,
 		dcData: make(chan webrtc.DataChannelMessage),
+		// dcData: make(chan webrtc.DataChannelMessage, 1),
 	}
 
 	ctx, cancel := context.WithCancel(context.TODO())
@@ -108,18 +114,33 @@ func (pipe *Pipe) Read(p []byte) (n int, err error) {
 	select {
 	case msg := <-pipe.dcData:
 		if len(msg.Data) == 0 {
-			log.Println("Pipe.Read", msg.Data, pipe.dc.Label())
+			slog.Debug("pipe read operation",
+				"bytes", len(msg.Data),
+				"channel", pipe.dc.Label(),
+				"data", msg.Data,
+			)
+
 			return 0, io.EOF
 		}
-		log.Println("Pipe.Read", msg.Data, len(msg.Data), pipe.dc.Label())
+		slog.Debug("pipe read operation",
+			"bytes", len(p),
+			"channel", pipe.dc.Label(),
+			"data", msg.Data,
+		)
 
 		copy(p, msg.Data)
 		return len(msg.Data), nil
+		// case <-time.After(readTimeout):
+		// 	return 0, ErrReadTimeout
 	}
 }
 
 func (pipe *Pipe) Write(p []byte) (n int, err error) {
-	log.Println("Pipe.Write", (p), len(p), pipe.dc.Label())
+	slog.Debug("pipe write operation",
+		"bytes", len(p),
+		"channel", pipe.dc.Label(),
+		"data", p,
+	)
 
 	if err := pipe.dc.Send(p); err != nil {
 		return 0, err
@@ -129,5 +150,7 @@ func (pipe *Pipe) Write(p []byte) (n int, err error) {
 
 func (pipe *Pipe) Close() error {
 	pipe.done()
+	close(pipe.dcData)
+	pipe.dcData = nil
 	return nil
 }
