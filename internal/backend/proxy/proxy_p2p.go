@@ -1,4 +1,4 @@
-package backend
+package proxy
 
 import (
 	"context"
@@ -6,7 +6,8 @@ import (
 	"net"
 	"time"
 
-	"github.com/dimspell/gladiator/internal/proxy/redirect"
+	"github.com/dimspell/gladiator/internal/backend/bsession"
+	"github.com/dimspell/gladiator/internal/backend/redirect"
 )
 
 var _ Proxy = (*PeerToPeer)(nil)
@@ -25,17 +26,19 @@ func NewPeerToPeer() *PeerToPeer {
 	}
 }
 
-func (p *PeerToPeer) CreateRoom(params CreateParams, session *Session) (net.IP, error) {
+func (p *PeerToPeer) CreateRoom(params CreateParams, session *bsession.Session) (net.IP, error) {
+	p.Close(session)
+
 	ipAddr := net.IPv4(127, 0, 0, 1)
 	player := session.ToPlayer(ipAddr)
 
-	gameRoom := NewGameRoom(params.GameID, player)
+	gameRoom := bsession.NewGameRoom(params.GameID, player)
 	session.State.SetGameRoom(gameRoom)
 
 	return ipAddr, nil
 }
 
-func (p *PeerToPeer) HostRoom(params HostParams, session *Session) error {
+func (p *PeerToPeer) HostRoom(params HostParams, session *bsession.Session) error {
 	host := &Peer{
 		PeerUserID: session.GetUserID(),
 		Addr:       &redirect.Addressing{IP: p.hostIPAddress},
@@ -65,18 +68,18 @@ func (p *PeerToPeer) HostRoom(params HostParams, session *Session) error {
 	return nil
 }
 
-func (p *PeerToPeer) sendRoomReadyNotification(session *Session, gameID string) error {
+func (p *PeerToPeer) sendRoomReadyNotification(session *bsession.Session, gameID string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	return session.SendSetRoomReady(ctx, gameID)
 }
 
-func (p *PeerToPeer) GetHostIP(hostIpAddress string, session *Session) net.IP {
+func (p *PeerToPeer) GetHostIP(hostIpAddress net.IP, session *bsession.Session) net.IP {
 	return p.hostIPAddress
 }
 
-func (p *PeerToPeer) GetPlayerAddr(params GetPlayerAddrParams, session *Session) (net.IP, error) {
+func (p *PeerToPeer) GetPlayerAddr(params GetPlayerAddrParams, session *bsession.Session) (net.IP, error) {
 	// Return the IP address of the player, if he is already in the list.
 	// FIXME: Use function instead
 	mapping, exist := p.manager.Peers[session]
@@ -86,31 +89,33 @@ func (p *PeerToPeer) GetPlayerAddr(params GetPlayerAddrParams, session *Session)
 		}
 	}
 
-	peer := session.IpRing.NextPeerAddress(
-		params.UserID,
-		params.UserID == session.GetUserID(),
-		params.UserID == params.HostUserID,
-	)
+	// peer := session.IpRing.NextPeerAddress(
+	// 	params.UserID,
+	// 	params.UserID == session.GetUserID(),
+	// 	params.UserID == params.HostUserID,
+	// )
 
-	if exist {
-		mapping.Peers[peer.PeerUserID] = peer
-	} else {
-		// FIXME: Use function instead
-		game, err := session.State.GameRoom()
-		if err != nil {
-			panic(err)
-		}
-
-		p.manager.Peers[session] = &PeersToSessionMapping{
-			Game:  game,
-			Peers: map[string]*Peer{peer.PeerUserID: peer},
-		}
-	}
-
-	return peer.Addr.IP, nil
+	// if exist {
+	// 	mapping.Peers[peer.PeerUserID] = peer
+	// } else {
+	// 	// FIXME: Use function instead
+	// 	game, err := session.State.GameRoom()
+	// 	if err != nil {
+	// 		panic(err)
+	// 	}
+	//
+	// 	p.manager.Peers[session] = &PeersToSessionMapping{
+	// 		Game:  game,
+	// 		Peers: map[string]*Peer{peer.PeerUserID: peer},
+	// 	}
+	// }
+	//
+	// return peer.Addr.IP, nil
+	panic("could not find peer for user")
+	return nil, nil
 }
 
-func (p *PeerToPeer) Join(params JoinParams, session *Session) (net.IP, error) {
+func (p *PeerToPeer) Join(params JoinParams, session *bsession.Session) (net.IP, error) {
 	peer := &Peer{
 		PeerUserID: session.GetUserID(),
 		Addr:       &redirect.Addressing{IP: net.IPv4(127, 0, 0, 1)},
@@ -128,7 +133,7 @@ func (p *PeerToPeer) Join(params JoinParams, session *Session) (net.IP, error) {
 	return peer.Addr.IP, nil
 }
 
-func (p *PeerToPeer) Close(session *Session) {
+func (p *PeerToPeer) Close(session *bsession.Session) {
 	// FIXME: Use function instead
 	if mapping, exists := p.manager.Peers[session]; exists {
 		for _, peer := range mapping.Peers {
@@ -137,12 +142,12 @@ func (p *PeerToPeer) Close(session *Session) {
 			}
 		}
 	}
-	session.IpRing.Reset()
+
 	// FIXME: Use function instead
 	delete(p.manager.Peers, session)
 }
 
-func (p *PeerToPeer) ExtendWire(session *Session) MessageHandler {
+func (p *PeerToPeer) ExtendWire(session *bsession.Session) MessageHandler {
 	return &PeerToPeerMessageHandler{
 		session: session,
 		proxy:   p.manager,

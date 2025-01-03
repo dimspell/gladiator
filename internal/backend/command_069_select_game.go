@@ -8,12 +8,15 @@ import (
 
 	"connectrpc.com/connect"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
+	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/packet"
+	"github.com/dimspell/gladiator/internal/backend/packet/command"
+	"github.com/dimspell/gladiator/internal/backend/proxy"
 	"github.com/dimspell/gladiator/internal/wire"
 )
 
 // HandleSelectGame handles 0x45ff (255-69) command
-func (b *Backend) HandleSelectGame(session *Session, req SelectGameRequest) error {
+func (b *Backend) HandleSelectGame(session *bsession.Session, req SelectGameRequest) error {
 	if session.UserID == 0 {
 		return fmt.Errorf("packet-69: user is not logged in")
 	}
@@ -34,7 +37,7 @@ func (b *Backend) HandleSelectGame(session *Session, req SelectGameRequest) erro
 		return nil
 	}
 
-	gameRoom := &GameRoom{
+	gameRoom := &bsession.GameRoom{
 		Players: map[string]wire.Player{},
 		ID:      respGame.Msg.GetGame().GetName(),
 		Name:    respGame.Msg.GetGame().GetName(),
@@ -67,7 +70,7 @@ func (b *Backend) HandleSelectGame(session *Session, req SelectGameRequest) erro
 			continue
 		}
 
-		ps := GetPlayerAddrParams{
+		ps := proxy.GetPlayerAddrParams{
 			GameID:     respGame.Msg.GetGame().GetName(),
 			UserID:     fmt.Sprintf("%d", player.UserId),
 			IPAddress:  player.IpAddress,
@@ -102,7 +105,7 @@ func (b *Backend) HandleSelectGame(session *Session, req SelectGameRequest) erro
 		response = append(response, byte(0))                         // Null byte
 	}
 
-	return session.Send(SelectGame, response)
+	return session.Send(command.SelectGame, response)
 }
 
 type SelectGameRequest []byte

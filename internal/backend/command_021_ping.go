@@ -4,10 +4,13 @@ import (
 	"encoding/binary"
 	"fmt"
 	"time"
+
+	"github.com/dimspell/gladiator/internal/backend/bsession"
+	"github.com/dimspell/gladiator/internal/backend/packet/command"
 )
 
-func (b *Backend) HandlePing(session *Session, req PingRequest) error {
-	return session.Send(PingClockTime, []byte{1, 0, 0, 0})
+func (b *Backend) HandlePing(session *bsession.Session, req PingRequest) error {
+	return session.Send(command.PingClockTime, []byte{1, 0, 0, 0})
 }
 
 type PingRequest []byte

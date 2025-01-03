@@ -3,12 +3,14 @@ package backend
 import (
 	"fmt"
 
+	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/packet"
+	"github.com/dimspell/gladiator/internal/backend/packet/command"
 )
 
 // HandleClientHostAndUsername handles 0x1eff (255-30) command
-func (b *Backend) HandleClientHostAndUsername(session *Session, req ClientHostAndUsernameRequest) error {
-	return session.Send(ClientHostAndUsername, []byte{1, 0, 0, 0})
+func (b *Backend) HandleClientHostAndUsername(session *bsession.Session, req ClientHostAndUsernameRequest) error {
+	return session.Send(command.ClientHostAndUsername, []byte{1, 0, 0, 0})
 }
 
 type ClientHostAndUsernameRequest []byte

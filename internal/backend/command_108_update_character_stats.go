@@ -7,7 +7,9 @@ import (
 
 	"connectrpc.com/connect"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
+	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/packet"
+	"github.com/dimspell/gladiator/internal/backend/packet/command"
 	"github.com/dimspell/gladiator/internal/model"
 )
 
@@ -15,7 +17,7 @@ import (
 //
 // It can be received by the game server in multiple scenarios:
 //   - .
-func (b *Backend) HandleUpdateCharacterStats(session *Session, req UpdateCharacterStatsRequest) error {
+func (b *Backend) HandleUpdateCharacterStats(session *bsession.Session, req UpdateCharacterStatsRequest) error {
 	if session.UserID == 0 {
 		return fmt.Errorf("packet-108: user is not logged in")
 	}
@@ -36,7 +38,7 @@ func (b *Backend) HandleUpdateCharacterStats(session *Session, req UpdateCharact
 		return err
 	}
 
-	return session.Send(UpdateCharacterStats, []byte{})
+	return session.Send(command.UpdateCharacterStats, []byte{})
 }
 
 type UpdateCharacterStatsRequest []byte

@@ -1,4 +1,4 @@
-package backend
+package proxy
 
 import (
 	"bytes"
@@ -387,3 +387,70 @@ func helperStartGameServer(t testing.TB) {
 		tcpListener.Close()
 	})
 }
+
+// func TestPeerToPeer_CreateRoom(t *testing.T) {
+// 	tests := []struct {
+// 		name       string
+// 		params     CreateParams
+// 		wantIP     net.IP
+// 		wantErr    bool
+// 		setupState func(*bsession.Session)
+// 	}{
+// 		{
+// 			name: "create room with valid params",
+// 			params: CreateParams{
+// 				GameID: "test-game",
+// 			},
+// 			wantIP:  net.IPv4(127, 0, 0, 1),
+// 			wantErr: false,
+// 		},
+// 		{
+// 			name: "create room with existing session state",
+// 			params: CreateParams{
+// 				GameID: "existing-game",
+// 			},
+// 			wantIP:  net.IPv4(127, 0, 0, 1),
+// 			wantErr: false,
+// 			setupState: func(s *bsession.Session) {
+// 				s.State.gameRoom = NewGameRoom("old-game", &Player{})
+// 			},
+// 		},
+// 		{
+// 			name: "create room with empty game ID",
+// 			params: CreateParams{
+// 				GameID: "",
+// 			},
+// 			wantIP:  net.IPv4(127, 0, 0, 1),
+// 			wantErr: false,
+// 		},
+// 	}
+//
+// 	for _, tt := range tests {
+// 		t.Run(tt.name, func(t *testing.T) {
+// 			p := NewPeerToPeer()
+// 			session := &Session{
+// 				UserID:   1,
+// 				Username: "testuser",
+// 				State:    NewState(),
+// 			}
+//
+// 			if tt.setupState != nil {
+// 				tt.setupState(session)
+// 			}
+//
+// 			gotIP, err := p.CreateRoom(tt.params, session)
+//
+// 			if tt.wantErr {
+// 				assert.Error(t, err)
+// 				return
+// 			}
+//
+// 			assert.NoError(t, err)
+// 			assert.Equal(t, tt.wantIP, gotIP)
+// 			assert.NotNil(t, session.State.gameRoom)
+// 			assert.Equal(t, tt.params.GameID, session.State.gameRoom.ID)
+// 			assert.Equal(t, session.Username, session.State.gameRoom.HostPlayer.Username)
+// 			assert.Equal(t, gotIP, session.State.gameRoom.HostPlayer.IP)
+// 		})
+// 	}
+// }

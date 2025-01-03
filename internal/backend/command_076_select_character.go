@@ -8,10 +8,12 @@ import (
 
 	"connectrpc.com/connect"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
+	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/packet"
+	"github.com/dimspell/gladiator/internal/backend/packet/command"
 )
 
-func (b *Backend) HandleSelectCharacter(session *Session, req SelectCharacterRequest) error {
+func (b *Backend) HandleSelectCharacter(session *bsession.Session, req SelectCharacterRequest) error {
 	if session.UserID == 0 {
 		return fmt.Errorf("packet-76: user is not logged in")
 	}
@@ -31,7 +33,7 @@ func (b *Backend) HandleSelectCharacter(session *Session, req SelectCharacterReq
 		var connectError *connect.Error
 		if errors.As(err, &connectError) {
 			if connectError.Code() == connect.CodeNotFound {
-				return session.Send(SelectCharacter, []byte{0, 0, 0, 0})
+				return session.Send(command.SelectCharacter, []byte{0, 0, 0, 0})
 			}
 		}
 		return fmt.Errorf("packet-76: no characters found owned by player: %s", err)
@@ -43,7 +45,7 @@ func (b *Backend) HandleSelectCharacter(session *Session, req SelectCharacterReq
 
 	session.UpdateCharacter(respChar.Msg.Character)
 
-	return session.Send(SelectCharacter, response)
+	return session.Send(command.SelectCharacter, response)
 }
 
 type SelectCharacterRequest []byte

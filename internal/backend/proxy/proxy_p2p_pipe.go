@@ -1,4 +1,4 @@
-package backend
+package proxy
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 	"log"
 	"log/slog"
 
-	"github.com/dimspell/gladiator/internal/proxy/redirect"
+	"github.com/dimspell/gladiator/internal/backend/redirect"
 	"github.com/pion/webrtc/v4"
 	"golang.org/x/sync/errgroup"
 )

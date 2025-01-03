@@ -9,13 +9,16 @@ import (
 
 	"connectrpc.com/connect"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
+	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/packet"
+	"github.com/dimspell/gladiator/internal/backend/packet/command"
+	"github.com/dimspell/gladiator/internal/backend/proxy"
 	"github.com/dimspell/gladiator/internal/model"
 	"github.com/dimspell/gladiator/internal/wire"
 )
 
 // HandleJoinGame handles 0x22ff (255-34) command
-func (b *Backend) HandleJoinGame(session *Session, req JoinGameRequest) error {
+func (b *Backend) HandleJoinGame(session *bsession.Session, req JoinGameRequest) error {
 	if session.UserID == 0 {
 		return fmt.Errorf("packet-34: user is not logged in")
 	}
@@ -33,7 +36,7 @@ func (b *Backend) HandleJoinGame(session *Session, req JoinGameRequest) error {
 		return err
 	}
 
-	myIpAddr, err := b.Proxy.Join(JoinParams{
+	myIpAddr, err := b.Proxy.Join(proxy.JoinParams{
 		HostUserID: fmt.Sprintf("%d", respGame.Msg.GetGame().HostUserId),
 		HostUserIP: respGame.Msg.GetGame().HostIpAddress,
 		GameID:     respGame.Msg.GetGame().GetName(),
@@ -71,7 +74,7 @@ func (b *Backend) HandleJoinGame(session *Session, req JoinGameRequest) error {
 			continue
 		}
 
-		ps := GetPlayerAddrParams{
+		ps := proxy.GetPlayerAddrParams{
 			GameID:     respGame.Msg.GetGame().GetName(),
 			UserID:     fmt.Sprintf("%d", player.UserId),
 			IPAddress:  player.IpAddress,
@@ -99,7 +102,7 @@ func (b *Backend) HandleJoinGame(session *Session, req JoinGameRequest) error {
 		response = append(response, byte(0))                         // Null byte
 	}
 
-	return session.Send(JoinGame, response)
+	return session.Send(command.JoinGame, response)
 }
 
 type JoinGameRequest []byte

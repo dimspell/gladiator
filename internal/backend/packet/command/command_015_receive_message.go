@@ -1,4 +1,4 @@
-package backend
+package command
 
 import (
 	"encoding/binary"

@@ -7,10 +7,12 @@ import (
 
 	"connectrpc.com/connect"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
+	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/packet"
+	"github.com/dimspell/gladiator/internal/backend/packet/command"
 )
 
-func (b *Backend) HandleDeleteCharacter(session *Session, req DeleteCharacterRequest) error {
+func (b *Backend) HandleDeleteCharacter(session *bsession.Session, req DeleteCharacterRequest) error {
 	if session.UserID == 0 {
 		return fmt.Errorf("packet-61: user is not logged in")
 	}
@@ -33,7 +35,7 @@ func (b *Backend) HandleDeleteCharacter(session *Session, req DeleteCharacterReq
 	response := make([]byte, len(data.CharacterName)+1)
 	copy(response, data.CharacterName)
 
-	return session.Send(DeleteCharacter, response)
+	return session.Send(command.DeleteCharacter, response)
 }
 
 type DeleteCharacterRequest []byte

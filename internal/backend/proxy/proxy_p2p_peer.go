@@ -1,9 +1,9 @@
-package backend
+package proxy
 
 import (
 	"log/slog"
 
-	"github.com/dimspell/gladiator/internal/proxy/redirect"
+	"github.com/dimspell/gladiator/internal/backend/redirect"
 	"github.com/pion/webrtc/v4"
 )
 

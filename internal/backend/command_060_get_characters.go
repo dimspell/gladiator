@@ -8,9 +8,11 @@ import (
 
 	"connectrpc.com/connect"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
+	"github.com/dimspell/gladiator/internal/backend/bsession"
+	"github.com/dimspell/gladiator/internal/backend/packet/command"
 )
 
-func (b *Backend) HandleGetCharacters(session *Session, req GetCharactersRequest) error {
+func (b *Backend) HandleGetCharacters(session *bsession.Session, req GetCharactersRequest) error {
 	if session.UserID == 0 {
 		return fmt.Errorf("packet-60: user is not logged in")
 	}
@@ -25,7 +27,7 @@ func (b *Backend) HandleGetCharacters(session *Session, req GetCharactersRequest
 	}
 
 	if len(resp.Msg.GetCharacters()) == 0 {
-		return session.Send(GetCharacters, []byte{0, 0, 0, 0})
+		return session.Send(command.GetCharacters, []byte{0, 0, 0, 0})
 	}
 
 	response := []byte{1, 0, 0, 0}
@@ -34,7 +36,7 @@ func (b *Backend) HandleGetCharacters(session *Session, req GetCharactersRequest
 		response = append(response, character.CharacterName...)
 		response = append(response, 0)
 	}
-	return session.Send(GetCharacters, response)
+	return session.Send(command.GetCharacters, response)
 }
 
 type GetCharactersRequest []byte

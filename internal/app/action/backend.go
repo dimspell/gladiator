@@ -2,13 +2,15 @@ package action
 
 import (
 	"context"
-	"github.com/dimspell/gladiator/internal/app/logger"
-	"github.com/dimspell/gladiator/internal/backend"
-	"github.com/lmittmann/tint"
-	"github.com/urfave/cli/v3"
 	"log/slog"
 	"os"
 	"time"
+
+	"github.com/dimspell/gladiator/internal/app/logger"
+	"github.com/dimspell/gladiator/internal/backend"
+	"github.com/dimspell/gladiator/internal/backend/proxy"
+	"github.com/lmittmann/tint"
+	"github.com/urfave/cli/v3"
 )
 
 func BackendCommand() *cli.Command {
@@ -37,11 +39,11 @@ func BackendCommand() *cli.Command {
 	cmd.Action = func(ctx context.Context, c *cli.Command) error {
 		consoleAddr := c.String("console-addr")
 		backendAddr := c.String("backend-addr")
-		//myIpAddr := c.String("my-ip-addr")
+		// myIpAddr := c.String("my-ip-addr")
 
-		//logger.PacketLogger = slog.New(packetlogger.New(os.Stderr, &packetlogger.Options{
+		// logger.PacketLogger = slog.New(packetlogger.New(os.Stderr, &packetlogger.Options{
 		//	Level: slog.LevelDebug,
-		//}))
+		// }))
 		logger.PacketLogger = slog.New(
 			tint.NewHandler(
 				os.Stderr,
@@ -53,8 +55,8 @@ func BackendCommand() *cli.Command {
 			),
 		)
 
-		//bd := backend.NewBackend(backendAddr, consoleAddr, backend.NewLAN(myIpAddr))
-		bd := backend.NewBackend(backendAddr, consoleAddr, backend.NewPeerToPeer())
+		// bd := backend.NewBackend(backendAddr, consoleAddr, backend.NewLAN(myIpAddr))
+		bd := backend.NewBackend(backendAddr, consoleAddr, proxy.NewPeerToPeer())
 
 		// TODO: Name the URL in the parameters
 		bd.SignalServerURL = defaultLobbyAddr

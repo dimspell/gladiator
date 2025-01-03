@@ -1,4 +1,4 @@
-package backend
+package proxy
 
 import (
 	"container/ring"
@@ -6,7 +6,7 @@ import (
 	"net"
 	"sync"
 
-	"github.com/dimspell/gladiator/internal/proxy/redirect"
+	"github.com/dimspell/gladiator/internal/backend/redirect"
 )
 
 type IpRing struct {

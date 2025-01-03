@@ -8,30 +8,20 @@ import (
 
 	"connectrpc.com/connect"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
+	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/packet"
+	"github.com/dimspell/gladiator/internal/backend/packet/command"
 )
 
-func (b *Backend) HandleGetCharacterInventory(session *Session, req GetCharacterInventoryRequest) error {
+func (b *Backend) HandleGetCharacterInventory(session *bsession.Session, req GetCharacterInventoryRequest) error {
 	if session.UserID == 0 {
 		return fmt.Errorf("packet-68: user is not logged in")
 	}
-	var err error
-	session.onceSelectedCharacter.Do(func() {
-		ctx := context.TODO()
 
-		// Once the character is selected (or created), the next packet will
-		// be 68 (GetCharacterInventory). This is the perfect time to tell the
-		// lobby server that someone has joined and is ready to chat & play.
-		err = b.JoinLobby(ctx, session)
-		if err != nil {
-			return
-		}
-		err = b.RegisterNewObserver(ctx, session)
-		if err != nil {
-			return
-		}
-	})
-	if err != nil {
+	// Once the character is selected (or created), the next packet will
+	// be 68 (GetCharacterInventory). This is the perfect time to tell the
+	// lobby server that someone has joined and is ready to chat & play.
+	if err := session.InitObserver(b.RegisterNewObserver); err != nil {
 		return fmt.Errorf("packet-68: could not select the character: %w", err)
 	}
 
@@ -48,7 +38,7 @@ func (b *Backend) HandleGetCharacterInventory(session *Session, req GetCharacter
 		}))
 
 	if err != nil {
-		_ = session.Send(ReceiveMessage, NewGlobalMessage("system", "Inventory fetch failed, please try sign-in again"))
+		_ = session.Send(command.ReceiveMessage, command.NewGlobalMessage("system", "Inventory fetch failed, please try sign-in again"))
 
 		var connectError *connect.Error
 		if errors.As(err, &connectError) {
@@ -65,7 +55,7 @@ func (b *Backend) HandleGetCharacterInventory(session *Session, req GetCharacter
 		return nil
 	}
 
-	return session.Send(GetCharacterInventory, inventory)
+	return session.Send(command.GetCharacterInventory, inventory)
 }
 
 type GetCharacterInventoryRequest []byte

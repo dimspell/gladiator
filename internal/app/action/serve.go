@@ -4,16 +4,18 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
+	"os"
+	"time"
+
 	"github.com/dimspell/gladiator/internal/app/logger"
 	"github.com/dimspell/gladiator/internal/backend"
+	"github.com/dimspell/gladiator/internal/backend/proxy"
 	"github.com/dimspell/gladiator/internal/console"
 	"github.com/dimspell/gladiator/internal/console/database"
 	"github.com/lmittmann/tint"
 	"github.com/urfave/cli/v3"
 	"golang.org/x/sync/errgroup"
-	"log/slog"
-	"os"
-	"time"
 )
 
 const (
@@ -89,9 +91,9 @@ func ServeCommand() *cli.Command {
 			slog.Warn("Seed queries failed", "error", err)
 		}
 
-		//logger.PacketLogger = slog.New(packetlogger.New(os.Stderr, &packetlogger.Options{
+		// logger.PacketLogger = slog.New(packetlogger.New(os.Stderr, &packetlogger.Options{
 		//	Level: slog.LevelDebug,
-		//}))
+		// }))
 		logger.PacketLogger = slog.New(
 			tint.NewHandler(
 				os.Stderr,
@@ -103,7 +105,7 @@ func ServeCommand() *cli.Command {
 			),
 		)
 
-		bd := backend.NewBackend(backendAddr, consoleAddr, backend.NewLAN(myIpAddr))
+		bd := backend.NewBackend(backendAddr, consoleAddr, proxy.NewLAN(myIpAddr))
 
 		// TODO: Name the URL in the parameters
 		bd.SignalServerURL = defaultLobbyAddr

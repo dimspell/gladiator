@@ -1,23 +1,24 @@
-package backend
+package proxy
 
 import (
 	"context"
 	"fmt"
 	"log/slog"
 
+	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/wire"
 	"github.com/pion/webrtc/v4"
 )
 
 type PeerToPeerInterface interface {
-	getPeer(session *Session, peerId string) (*Peer, bool)
-	deletePeer(session *Session, peerId string)
+	getPeer(session *bsession.Session, peerId string) (*Peer, bool)
+	deletePeer(session *bsession.Session, peerId string)
 
-	setUpChannels(session *Session, peerId int64, sendRTCOffer bool, createChannels bool) (*Peer, error)
+	setUpChannels(session *bsession.Session, peerId int64, sendRTCOffer bool, createChannels bool) (*Peer, error)
 }
 
 type PeerToPeerMessageHandler struct {
-	session *Session
+	session *bsession.Session
 	proxy   PeerToPeerInterface
 }
 

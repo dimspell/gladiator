@@ -12,10 +12,10 @@ import (
 	"connectrpc.com/connect"
 	v1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/internal/app/logger"
+	"github.com/dimspell/gladiator/internal/backend/redirect"
 	"github.com/dimspell/gladiator/internal/console"
 	"github.com/dimspell/gladiator/internal/console/database"
 	"github.com/dimspell/gladiator/internal/model"
-	"github.com/dimspell/gladiator/internal/proxy/redirect"
 )
 
 func TestWebRTC(t *testing.T) {

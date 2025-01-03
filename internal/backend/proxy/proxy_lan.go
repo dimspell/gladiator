@@ -1,4 +1,4 @@
-package backend
+package proxy
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/wire"
 )
 
@@ -24,17 +25,13 @@ func NewLAN(myIPAddress string) *LAN {
 	return &LAN{MyIPAddress: myIPAddress}
 }
 
-// TODO: This function should actually load the map and save it to the struct
-
-func (p *LAN) GetHostIP(hostIpAddress string, _ *Session) net.IP {
-	ip := net.ParseIP(hostIpAddress)
-	if ip == nil {
-		return net.IP{}
-	}
-	return ip
+func (p *LAN) GetHostIP(hostIpAddress net.IP, _ *bsession.Session) net.IP {
+	return hostIpAddress
 }
 
-func (p *LAN) CreateRoom(params CreateParams, session *Session) (net.IP, error) {
+func (p *LAN) CreateRoom(params CreateParams, session *bsession.Session) (net.IP, error) {
+	p.Close(session)
+
 	ip := net.ParseIP(p.MyIPAddress)
 	if ip == nil {
 		return net.IP{}, fmt.Errorf("incorrect host IP address: %s", p.MyIPAddress)
@@ -42,13 +39,13 @@ func (p *LAN) CreateRoom(params CreateParams, session *Session) (net.IP, error) 
 
 	player := session.ToPlayer(ip)
 
-	gameRoom := NewGameRoom(params.GameID, player)
+	gameRoom := bsession.NewGameRoom(params.GameID, player)
 	session.State.SetGameRoom(gameRoom)
 
 	return ip, nil
 }
 
-func (p *LAN) HostRoom(params HostParams, session *Session) error {
+func (p *LAN) HostRoom(params HostParams, session *bsession.Session) error {
 	ctx, cancel := context.WithTimeout(context.TODO(), 3*time.Second)
 	defer cancel()
 
@@ -59,7 +56,7 @@ func (p *LAN) HostRoom(params HostParams, session *Session) error {
 	return nil
 }
 
-func (p *LAN) Join(params JoinParams, session *Session) (net.IP, error) {
+func (p *LAN) Join(params JoinParams, session *bsession.Session) (net.IP, error) {
 	ip := net.ParseIP(p.MyIPAddress)
 	if ip == nil {
 		return nil, fmt.Errorf("incorrect IP address: %s", p.MyIPAddress)
@@ -68,7 +65,7 @@ func (p *LAN) Join(params JoinParams, session *Session) (net.IP, error) {
 	return ip, nil
 }
 
-func (p *LAN) GetPlayerAddr(params GetPlayerAddrParams, session *Session) (net.IP, error) {
+func (p *LAN) GetPlayerAddr(params GetPlayerAddrParams, session *bsession.Session) (net.IP, error) {
 	ip := net.ParseIP(params.IPAddress)
 	if ip == nil {
 		return net.IP{}, fmt.Errorf("incorrect exchange IP address: %s", params.IPAddress)
@@ -76,7 +73,7 @@ func (p *LAN) GetPlayerAddr(params GetPlayerAddrParams, session *Session) (net.I
 	return ip, nil
 }
 
-func (p *LAN) Close(session *Session) {
+func (p *LAN) Close(session *bsession.Session) {
 	if gameRoom, err := session.State.GameRoom(); err != nil {
 		session.SendLeaveRoom(context.TODO(), gameRoom)
 		session.State.SetGameRoom(nil)
@@ -85,12 +82,12 @@ func (p *LAN) Close(session *Session) {
 	// p.RoomPlayers.Clear()
 }
 
-func (p *LAN) ExtendWire(session *Session) MessageHandler {
+func (p *LAN) ExtendWire(session *bsession.Session) MessageHandler {
 	return &LanMessageHandler{session: session}
 }
 
 type LanMessageHandler struct {
-	session *Session
+	session *bsession.Session
 }
 
 func (l *LanMessageHandler) Handle(ctx context.Context, payload []byte) error {

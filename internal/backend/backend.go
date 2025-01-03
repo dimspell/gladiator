@@ -12,6 +12,9 @@ import (
 	"time"
 
 	"github.com/dimspell/gladiator/gen/multi/v1/multiv1connect"
+	"github.com/dimspell/gladiator/internal/backend/bsession"
+	"github.com/dimspell/gladiator/internal/backend/packet/command"
+	"github.com/dimspell/gladiator/internal/backend/proxy"
 )
 
 type Backend struct {
@@ -21,9 +24,8 @@ type Backend struct {
 	listener net.Listener
 
 	ConnectedSessions sync.Map
-	SessionCounter    uint64
 
-	Proxy Proxy
+	Proxy proxy.Proxy
 
 	characterClient multiv1connect.CharacterServiceClient
 	gameClient      multiv1connect.GameServiceClient
@@ -31,7 +33,7 @@ type Backend struct {
 	rankingClient   multiv1connect.RankingServiceClient
 }
 
-func NewBackend(backendAddr, consoleAddr string, gameProxy Proxy) *Backend {
+func NewBackend(backendAddr, consoleAddr string, gameProxy proxy.Proxy) *Backend {
 	characterClient, gameClient, userClient, rankingClient := createServiceClients(consoleAddr)
 
 	return &Backend{
@@ -96,12 +98,12 @@ func (b *Backend) Shutdown() {
 
 	// Close all open connections
 	b.ConnectedSessions.Range(func(k, v any) bool {
-		session := v.(*Session)
+		session := v.(*bsession.Session)
 
 		// TODO: Send a system message "(system) The server is going to close in less than 30 seconds"
 		_ = session.Send(
-			ReceiveMessage,
-			NewGlobalMessage("system-info", "The server is going to shut down..."))
+			command.ReceiveMessage,
+			command.NewGlobalMessage("system-info", "The server is going to shut down..."))
 
 		// TODO: Send a packet to trigger stats saving
 		// TODO: Send a system message "(system): Your stats were saving, your game client might close in the next 10 seconds"

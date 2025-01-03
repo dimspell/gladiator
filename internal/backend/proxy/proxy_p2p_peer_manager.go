@@ -1,4 +1,4 @@
-package backend
+package proxy
 
 import (
 	"context"
@@ -6,7 +6,8 @@ import (
 	"log/slog"
 	"strconv"
 
-	"github.com/dimspell/gladiator/internal/proxy/redirect"
+	"github.com/dimspell/gladiator/internal/backend/bsession"
+	"github.com/dimspell/gladiator/internal/backend/redirect"
 	"github.com/dimspell/gladiator/internal/wire"
 	"github.com/pion/webrtc/v4"
 )
@@ -15,13 +16,14 @@ import (
 type PeerToPeerPeerManager struct {
 	WebRTCConfig webrtc.Configuration
 	NewRedirect  redirect.NewRedirect
-	Peers        map[*Session]*PeersToSessionMapping
+	Peers        map[*bsession.Session]*PeersToSessionMapping
 }
 
 // PeersToSessionMapping maps sessions to their peers.
 type PeersToSessionMapping struct {
-	Game  *GameRoom
-	Peers map[string]*Peer
+	IpRing *IpRing
+	Game   *bsession.GameRoom
+	Peers  map[string]*Peer
 }
 
 // NewPeerToPeerManager initializes a new PeerToPeerPeerManager.
@@ -41,13 +43,13 @@ func NewPeerToPeerManager() *PeerToPeerPeerManager {
 
 	return &PeerToPeerPeerManager{
 		WebRTCConfig: config,
-		Peers:        make(map[*Session]*PeersToSessionMapping),
+		Peers:        make(map[*bsession.Session]*PeersToSessionMapping),
 		NewRedirect:  redirect.New,
 	}
 }
 
 // setUpChannels sets up the peer connection channels.
-func (p *PeerToPeerPeerManager) setUpChannels(session *Session, playerId int64, sendRTCOffer bool, createChannels bool) (*Peer, error) {
+func (p *PeerToPeerPeerManager) setUpChannels(session *bsession.Session, playerId int64, sendRTCOffer bool, createChannels bool) (*Peer, error) {
 	peerConnection, err := webrtc.NewPeerConnection(p.WebRTCConfig)
 	if err != nil {
 		return nil, err
@@ -82,7 +84,7 @@ func (p *PeerToPeerPeerManager) setUpChannels(session *Session, playerId int64, 
 	return peer, nil
 }
 
-func (p *PeerToPeerPeerManager) getPeer(session *Session, peerID string) (*Peer, bool) {
+func (p *PeerToPeerPeerManager) getPeer(session *bsession.Session, peerID string) (*Peer, bool) {
 	mapping, ok := p.Peers[session]
 	if !ok {
 		return nil, false
@@ -95,12 +97,12 @@ func (p *PeerToPeerPeerManager) getPeer(session *Session, peerID string) (*Peer,
 	return peer, true
 }
 
-func (p *PeerToPeerPeerManager) isPeerExisting(session *Session, player *wire.Player) bool {
+func (p *PeerToPeerPeerManager) isPeerExisting(session *bsession.Session, player *wire.Player) bool {
 	_, ok := p.getPeer(session, player.ID())
 	return ok
 }
 
-func (p *PeerToPeerPeerManager) setPeer(session *Session, peer *Peer) {
+func (p *PeerToPeerPeerManager) setPeer(session *bsession.Session, peer *Peer) {
 	mapping, ok := p.Peers[session]
 	if !ok {
 		return
@@ -108,7 +110,7 @@ func (p *PeerToPeerPeerManager) setPeer(session *Session, peer *Peer) {
 	mapping.Peers[peer.PeerUserID] = peer
 }
 
-func (p *PeerToPeerPeerManager) deletePeer(session *Session, peerID string) {
+func (p *PeerToPeerPeerManager) deletePeer(session *bsession.Session, peerID string) {
 	mapping, ok := p.Peers[session]
 	if !ok {
 		return
@@ -116,21 +118,29 @@ func (p *PeerToPeerPeerManager) deletePeer(session *Session, peerID string) {
 	delete(mapping.Peers, peerID)
 }
 
-func (p *PeerToPeerPeerManager) getOrCreatePeer(session *Session, player *wire.Player) *Peer {
-	peer, ok := p.getPeer(session, player.ID())
-	if !ok {
-		gameRoom, err := session.State.GameRoom()
-		if err != nil {
-			panic(err)
+func (p *PeerToPeerPeerManager) getOrCreatePeer(session *bsession.Session, player *wire.Player) *Peer {
+	mapping, ok := p.Peers[session]
+	if ok {
+		peer, found := mapping.Peers[player.ID()]
+		if found {
+			return peer
 		}
-		isHost := gameRoom.Host.UserID == player.UserID
-		isCurrentUser := gameRoom.Host.UserID == session.UserID
-		return session.IpRing.NextPeerAddress(player.ID(), isCurrentUser, isHost)
 	}
-	return peer
+
+	// FIXME: Why duplicated?
+	// mapping.Game
+
+	gameRoom, err := session.State.GameRoom()
+	if err != nil {
+		panic(err)
+	}
+
+	isHost := gameRoom.Host.UserID == player.UserID
+	isCurrentUser := gameRoom.Host.UserID == session.UserID
+	return mapping.IpRing.NextPeerAddress(player.ID(), isCurrentUser, isHost)
 }
 
-func (p *PeerToPeerPeerManager) setupPeerConnection(peerConnection *webrtc.PeerConnection, session *Session, player *wire.Player, sendRTCOffer bool) error {
+func (p *PeerToPeerPeerManager) setupPeerConnection(peerConnection *webrtc.PeerConnection, session *bsession.Session, player *wire.Player, sendRTCOffer bool) error {
 	peerConnection.OnICEConnectionStateChange(func(connectionState webrtc.ICEConnectionState) {
 		slog.Debug("ICE Connection State has changed", "peer", player.UserID, "state", connectionState.String())
 	})
@@ -154,7 +164,7 @@ func (p *PeerToPeerPeerManager) setupPeerConnection(peerConnection *webrtc.PeerC
 	return nil
 }
 
-func (p *PeerToPeerPeerManager) handleNegotiation(peerConnection *webrtc.PeerConnection, session *Session, player *wire.Player, sendRTCOffer bool) error {
+func (p *PeerToPeerPeerManager) handleNegotiation(peerConnection *webrtc.PeerConnection, session *bsession.Session, player *wire.Player, sendRTCOffer bool) error {
 	offer, err := peerConnection.CreateOffer(nil)
 	if err != nil {
 		return fmt.Errorf("failed to create offer: %w", err)
@@ -173,7 +183,7 @@ func (p *PeerToPeerPeerManager) handleNegotiation(peerConnection *webrtc.PeerCon
 	return nil
 }
 
-func (p *PeerToPeerPeerManager) createDataChannels(peerConnection *webrtc.PeerConnection, session *Session, peer *Peer) error {
+func (p *PeerToPeerPeerManager) createDataChannels(peerConnection *webrtc.PeerConnection, session *bsession.Session, peer *Peer) error {
 	gameRoom, err := session.State.GameRoom()
 	if err != nil {
 		return nil

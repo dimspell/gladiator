@@ -1,11 +1,8 @@
-package backend
+package bsession
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"log/slog"
-	"math"
 	"net"
 	"sync"
 	"time"
@@ -13,6 +10,8 @@ import (
 	"github.com/coder/websocket"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/internal/app/logger"
+	"github.com/dimspell/gladiator/internal/backend/packet"
+	"github.com/dimspell/gladiator/internal/backend/packet/command"
 	"github.com/dimspell/gladiator/internal/model"
 	"github.com/dimspell/gladiator/internal/wire"
 	"github.com/google/uuid"
@@ -33,13 +32,19 @@ type Session struct {
 	// Conn stores the TCP connection between the backend and the game client.
 	Conn net.Conn
 
-	onceSelectedCharacter sync.Once
+	OnceSelectedCharacter sync.Once
 	observerDone          context.CancelFunc
 	wsConn                *websocket.Conn
 
-	IpRing *IpRing
-
 	State *SessionState
+}
+
+func NewSession(tcpConn net.Conn) *Session {
+	return &Session{
+		Conn:  tcpConn,
+		ID:    uuid.New().String(),
+		State: &SessionState{},
+	}
 }
 
 func (s *Session) SetLogonData(user *multiv1.User) {
@@ -60,56 +65,16 @@ func (s *Session) UpdateCharacter(character *multiv1.Character) {
 
 func (s *Session) GetUserID() string { return fmt.Sprintf("%d", s.UserID) }
 
-func (b *Backend) AddSession(tcpConn net.Conn) *Session {
-	if b.SessionCounter == math.MaxUint64 {
-		b.SessionCounter = 0
-	}
-	b.SessionCounter++
-	id := fmt.Sprintf("%s-%d", uuid.New().String(), b.SessionCounter)
-	slog.Debug("New session", "session", id, "backend", fmt.Sprintf("%p", b.Proxy))
-
-	session := &Session{
-		Conn: tcpConn,
-		ID:   id,
-
-		IpRing: NewIpRing(),
-
-		State: &SessionState{},
-		// RoomPlayers: NewPeers(),
-	}
-	b.ConnectedSessions.Store(session.ID, session)
-	return session
-}
-
-func (b *Backend) CloseSession(session *Session) error {
-	slog.Info("Session closed", "session", session.ID)
-
-	b.Proxy.Close(session)
-
-	if session.observerDone != nil {
-		session.observerDone()
-	}
-
-	b.ConnectedSessions.Delete(session.ID)
-
-	if session.Conn != nil {
-		_ = session.Conn.Close()
-	}
-
-	session = nil
-	return nil
-}
-
-func (s *Session) Send(packetType PacketType, payload []byte) error {
+func (s *Session) Send(packetType command.PacketType, payload []byte) error {
 	return sendPacket(s.Conn, packetType, payload)
 }
 
-func sendPacket(conn net.Conn, packetType PacketType, payload []byte) error {
+func sendPacket(conn net.Conn, packetType command.PacketType, payload []byte) error {
 	if conn == nil {
 		return fmt.Errorf("backend: invalid client connection")
 	}
 
-	data := encodePacket(packetType, payload)
+	data := packet.EncodePacket(packetType, payload)
 
 	if logger.PacketLogger != nil {
 		logger.PacketLogger.Debug("Sent",
@@ -134,11 +99,50 @@ func (s *Session) ToPlayer(ipAddr net.IP) wire.Player {
 	}
 }
 
-func (b *Backend) ConnectToLobby(ctx context.Context, user *multiv1.User, session *Session) error {
-	session.Lock()
-	defer session.Unlock()
+func (s *Session) ExtendWire() *SessionMessageHandler {
+	return &SessionMessageHandler{Session: s}
+}
 
-	ws, err := wire.Connect(ctx, b.SignalServerURL, wire.User{
+func (s *Session) InitObserver(registerNewObserver func(context.Context, *Session) error) error {
+	var err error
+	s.OnceSelectedCharacter.Do(func() {
+		ctx := context.TODO()
+
+		err = s.JoinLobby(ctx)
+		if err != nil {
+			return
+		}
+		err = registerNewObserver(ctx, s)
+		if err != nil {
+			return
+		}
+	})
+	return err
+}
+
+func (s *Session) StartObserver(ctx context.Context, observe func(ctx context.Context, wsConn *websocket.Conn)) error {
+	if s.wsConn == nil {
+		return fmt.Errorf("missing websocket connection")
+	}
+
+	go observe(ctx, s.wsConn)
+	return nil
+}
+
+func (s *Session) StopObserver() {
+	if s.observerDone != nil {
+		s.observerDone()
+	}
+	if s.Conn != nil {
+		_ = s.Conn.Close()
+	}
+}
+
+func (s *Session) ConnectOverWebsocket(ctx context.Context, user *multiv1.User, wsURL string) error {
+	s.Lock()
+	defer s.Unlock()
+
+	ws, err := wire.Connect(ctx, wsURL, wire.User{
 		UserID:   user.UserId,
 		Username: user.Username,
 		Version:  wire.ProtoVersion,
@@ -147,82 +151,14 @@ func (b *Backend) ConnectToLobby(ctx context.Context, user *multiv1.User, sessio
 		return err
 	}
 
-	ctx, session.observerDone = context.WithCancel(ctx)
-	session.wsConn = ws
+	ctx, s.observerDone = context.WithCancel(ctx)
+	s.wsConn = ws
 
 	go func(ctx context.Context, ws *websocket.Conn) {
 		<-ctx.Done()
 		ws.CloseNow()
 		return
 	}(ctx, ws)
-	return nil
-}
-
-func (b *Backend) JoinLobby(ctx context.Context, session *Session) error {
-	ctx, cancel := context.WithTimeout(ctx, time.Second*3)
-	defer cancel()
-
-	if err := session.SendEvent(ctx, wire.JoinLobby, wire.Player{
-		UserID:      session.UserID,
-		Username:    session.Username,
-		CharacterID: session.CharacterID,
-		ClassType:   byte(session.ClassType),
-	}); err != nil {
-		return fmt.Errorf("backend: failed send a join lobby message: %w for %d", err, session.UserID)
-	}
-
-	// Expect to receive the joined message.
-	_, response, err := session.wsConn.Read(ctx)
-	if err != nil {
-		return fmt.Errorf("backend: failed receive a join lobby message: %w", err)
-	}
-	if len(response) != 1 || wire.EventType(response[0]) != wire.JoinedLobby {
-		return fmt.Errorf("expected joined message, got: %s (len=%d)", string(response), len(response))
-	}
-	return nil
-}
-
-type MessageHandler interface {
-	Handle(ctx context.Context, payload []byte) error
-}
-
-func (b *Backend) RegisterNewObserver(ctx context.Context, session *Session) error {
-	if session.wsConn == nil {
-		return fmt.Errorf("backend: invalid websocket client connection")
-	}
-
-	handlers := []MessageHandler{
-		&SessionMessageHandler{session: session},
-		b.Proxy.ExtendWire(session),
-	}
-	observe := func(ctx context.Context, wsConn *websocket.Conn) {
-		for {
-			if ctx.Err() != nil {
-				return
-			}
-
-			// Read the broadcast & handle them as commands.
-			_, p, err := wsConn.Read(ctx)
-			if err != nil {
-				if errors.Is(err, context.Canceled) {
-					return
-				}
-				slog.Error("Error reading from WebSocket", "session", session.ID, "error", err)
-				return
-			}
-
-			// slog.Debug("Signal from lobby", "type", et.String(), "session", session.ID, "payload", string(p[1:]))
-
-			// TODO: Register handlers and handle them here.
-			for _, handler := range handlers {
-				if err := handler.Handle(ctx, p); err != nil {
-					slog.Error("Error handling message", "session", session.ID, "error", err)
-					return
-				}
-			}
-		}
-	}
-	go observe(ctx, session.wsConn)
 	return nil
 }
 
@@ -253,6 +189,30 @@ func (s *Session) SendEventTo(ctx context.Context, eventType wire.EventType, con
 			Content: content,
 		}),
 	)
+}
+
+func (s *Session) JoinLobby(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, time.Second*3)
+	defer cancel()
+
+	if err := s.SendEvent(ctx, wire.JoinLobby, wire.Player{
+		UserID:      s.UserID,
+		Username:    s.Username,
+		CharacterID: s.CharacterID,
+		ClassType:   byte(s.ClassType),
+	}); err != nil {
+		return fmt.Errorf("failed send a join lobby message: %w for %d", err, s.UserID)
+	}
+
+	// Expect to receive the joined message.
+	_, response, err := s.wsConn.Read(ctx)
+	if err != nil {
+		return fmt.Errorf("failed receive a join lobby message: %w", err)
+	}
+	if len(response) != 1 || wire.EventType(response[0]) != wire.JoinedLobby {
+		return fmt.Errorf("expected joined message, got: %s (len=%d)", string(response), len(response))
+	}
+	return nil
 }
 
 func (s *Session) SendChatMessage(ctx context.Context, text string) error {

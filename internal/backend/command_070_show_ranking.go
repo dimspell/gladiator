@@ -8,12 +8,14 @@ import (
 
 	"connectrpc.com/connect"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
+	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/packet"
+	"github.com/dimspell/gladiator/internal/backend/packet/command"
 	"github.com/dimspell/gladiator/internal/model"
 )
 
 // HandleShowRanking handles 0x46ff (255-70) command
-func (b *Backend) HandleShowRanking(session *Session, req RankingRequest) error {
+func (b *Backend) HandleShowRanking(session *bsession.Session, req RankingRequest) error {
 	if session.UserID == 0 {
 		return fmt.Errorf("packet-70: user is not logged in")
 	}
@@ -37,7 +39,7 @@ func (b *Backend) HandleShowRanking(session *Session, req RankingRequest) error 
 
 	ranking := model.RankingToBytes(respRanking.Msg)
 
-	return session.Send(ShowRanking, ranking)
+	return session.Send(command.ShowRanking, ranking)
 }
 
 type RankingRequest []byte

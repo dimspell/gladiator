@@ -1,6 +1,11 @@
 package backend
 
-func (b *Backend) SendHostMigration(session *Session, isHost bool, newHostIP [4]byte) error {
+import (
+	"github.com/dimspell/gladiator/internal/backend/bsession"
+	"github.com/dimspell/gladiator/internal/backend/packet/command"
+)
+
+func (b *Backend) SendHostMigration(session *bsession.Session, isHost bool, newHostIP [4]byte) error {
 	payload := []byte{}
 
 	// Yes(int32 1)/No(int32 0)
@@ -13,5 +18,5 @@ func (b *Backend) SendHostMigration(session *Session, isHost bool, newHostIP [4]
 	// IP address in 4 bytes
 	payload = append(payload, newHostIP[:]...)
 
-	return session.Send(ChangeHost, payload)
+	return session.Send(command.ChangeHost, payload)
 }

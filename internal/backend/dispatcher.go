@@ -7,38 +7,11 @@ import (
 	"net"
 
 	"github.com/dimspell/gladiator/internal/app/logger"
+	"github.com/dimspell/gladiator/internal/backend/bsession"
+	"github.com/dimspell/gladiator/internal/backend/packet/command"
 )
 
-type PacketType byte
-
-const (
-	AuthorizationHandshake   PacketType = 6   // 0x6ff
-	ListGames                PacketType = 9   // 0x9ff
-	ListChannels             PacketType = 11  // 0xbff
-	SelectedChannel          PacketType = 12  // 0xcff
-	SendLobbyMessage         PacketType = 14  // 0xeff
-	ReceiveMessage           PacketType = 15  // 0xfff
-	PingClockTime            PacketType = 21  // 0x15ff
-	CreateGame               PacketType = 28  // 0x1cff
-	ClientHostAndUsername    PacketType = 30  // 0x1eff
-	JoinGame                 PacketType = 34  // 0x22ff
-	ClientAuthentication     PacketType = 41  // 0x29ff
-	CreateNewAccount         PacketType = 42  // 0x2aff
-	UpdateCharacterInventory PacketType = 44  // 0x2cff
-	GetCharacters            PacketType = 60  // 0x3cff
-	DeleteCharacter          PacketType = 61  // 0x3dff
-	GetCharacterInventory    PacketType = 68  // 0x44ff
-	SelectGame               PacketType = 69  // 0x45ff
-	ShowRanking              PacketType = 70  // 0x46ff
-	ChangeHost               PacketType = 71  // 0x47ff
-	GetCharacterSpells       PacketType = 72  // 0x48ff
-	UpdateCharacterSpells    PacketType = 73  // 0x49ff
-	SelectCharacter          PacketType = 76  // 0x4cff
-	CreateCharacter          PacketType = 92  // 0x5cff
-	UpdateCharacterStats     PacketType = 108 // 0x6cff
-)
-
-func (b *Backend) handshake(conn net.Conn) (*Session, error) {
+func (b *Backend) handshake(conn net.Conn) (*bsession.Session, error) {
 	// Ping (single byte - [0x01])
 	{
 		buf := make([]byte, 1)
@@ -83,7 +56,7 @@ func (b *Backend) handshake(conn net.Conn) (*Session, error) {
 	return session, nil
 }
 
-func (b *Backend) handleCommands(ctx context.Context, session *Session) error {
+func (b *Backend) handleCommands(ctx context.Context, session *bsession.Session) error {
 	buf := make([]byte, 1024)
 	n, err := session.Conn.Read(buf)
 	if err != nil {
@@ -99,7 +72,7 @@ func (b *Backend) handleCommands(ctx context.Context, session *Session) error {
 			continue
 		}
 
-		pt := PacketType(packet[1])
+		pt := command.PacketType(packet[1])
 		if logger.PacketLogger != nil {
 			logger.PacketLogger.Debug("Recv",
 				"packetType", pt,
@@ -111,79 +84,79 @@ func (b *Backend) handleCommands(ctx context.Context, session *Session) error {
 
 		// TODO: Pass context further
 		switch pt {
-		case CreateNewAccount:
+		case command.CreateNewAccount:
 			if err := b.HandleCreateNewAccount(session, packet[4:]); err != nil {
 				return err
 			}
-		case ClientAuthentication:
+		case command.ClientAuthentication:
 			if err := b.HandleClientAuthentication(session, packet[4:]); err != nil {
 				return err
 			}
-		case ListChannels:
+		case command.ListChannels:
 			if err := b.HandleListChannels(session, packet[4:]); err != nil {
 				return err
 			}
-		case SelectedChannel:
+		case command.SelectedChannel:
 			if err := b.HandleSelectChannel(session, packet[4:]); err != nil {
 				return err
 			}
-		case SendLobbyMessage:
+		case command.SendLobbyMessage:
 			if err := b.HandleSendLobbyMessage(session, packet[4:]); err != nil {
 				return err
 			}
-		case CreateGame:
+		case command.CreateGame:
 			if err := b.HandleCreateGame(session, packet[4:]); err != nil {
 				return err
 			}
-		case ListGames:
+		case command.ListGames:
 			if err := b.HandleListGames(session, packet[4:]); err != nil {
 				return err
 			}
-		case SelectGame:
+		case command.SelectGame:
 			if err := b.HandleSelectGame(session, packet[4:]); err != nil {
 				return err
 			}
-		case JoinGame:
+		case command.JoinGame:
 			if err := b.HandleJoinGame(session, packet[4:]); err != nil {
 				return err
 			}
-		case ShowRanking:
+		case command.ShowRanking:
 			if err := b.HandleShowRanking(session, packet[4:]); err != nil {
 				return err
 			}
-		case UpdateCharacterInventory:
+		case command.UpdateCharacterInventory:
 			if err := b.HandleUpdateCharacterInventory(session, packet[4:]); err != nil {
 				return err
 			}
-		case GetCharacters:
+		case command.GetCharacters:
 			if err := b.HandleGetCharacters(session, packet[4:]); err != nil {
 				return err
 			}
-		case DeleteCharacter:
+		case command.DeleteCharacter:
 			if err := b.HandleDeleteCharacter(session, packet[4:]); err != nil {
 				return err
 			}
-		case GetCharacterInventory:
+		case command.GetCharacterInventory:
 			if err := b.HandleGetCharacterInventory(session, packet[4:]); err != nil {
 				return err
 			}
-		case GetCharacterSpells:
+		case command.GetCharacterSpells:
 			if err := b.HandleGetCharacterSpells(session, packet[4:]); err != nil {
 				return err
 			}
-		case UpdateCharacterSpells:
+		case command.UpdateCharacterSpells:
 			if err := b.HandleUpdateCharacterSpells(session, packet[4:]); err != nil {
 				return err
 			}
-		case SelectCharacter:
+		case command.SelectCharacter:
 			if err := b.HandleSelectCharacter(session, packet[4:]); err != nil {
 				return err
 			}
-		case CreateCharacter:
+		case command.CreateCharacter:
 			if err := b.HandleCreateCharacter(session, packet[4:]); err != nil {
 				return err
 			}
-		case UpdateCharacterStats:
+		case command.UpdateCharacterStats:
 			if err := b.HandleUpdateCharacterStats(session, packet[4:]); err != nil {
 				return err
 			}
@@ -210,19 +183,4 @@ func splitMultiPacket(buf []byte) [][]byte {
 		offset += length
 	}
 	return packets
-}
-
-func encodePacket(packetType PacketType, payload []byte) []byte {
-	length := len(payload) + 4
-	packet := make([]byte, length)
-
-	// Header
-	packet[0] = 255
-	packet[1] = byte(packetType)
-	binary.LittleEndian.PutUint16(packet[2:4], uint16(length))
-
-	// Data
-	copy(packet[4:], payload)
-
-	return packet
 }

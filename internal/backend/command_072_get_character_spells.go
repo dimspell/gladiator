@@ -7,10 +7,12 @@ import (
 
 	"connectrpc.com/connect"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
+	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/packet"
+	"github.com/dimspell/gladiator/internal/backend/packet/command"
 )
 
-func (b *Backend) HandleGetCharacterSpells(session *Session, req GetCharacterSpellsRequest) error {
+func (b *Backend) HandleGetCharacterSpells(session *bsession.Session, req GetCharacterSpellsRequest) error {
 	if session.UserID == 0 {
 		return fmt.Errorf("packet-72: user is not logged in")
 	}
@@ -41,7 +43,7 @@ func (b *Backend) HandleGetCharacterSpells(session *Session, req GetCharacterSpe
 		}
 	}
 
-	return session.Send(GetCharacterSpells, character.Spells)
+	return session.Send(command.GetCharacterSpells, character.Spells)
 }
 
 type GetCharacterSpellsRequest []byte
