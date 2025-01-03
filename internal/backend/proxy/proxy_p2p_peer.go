@@ -8,7 +8,7 @@ import (
 )
 
 type Peer struct {
-	PeerUserID string
+	UserID string
 
 	Addr *redirect.Addressing
 	Mode redirect.Mode
@@ -16,13 +16,13 @@ type Peer struct {
 	Connection *webrtc.PeerConnection
 }
 
-// Close is used to terminate the WebRTC connection.
-func (p *Peer) Close() {
+// Terminate is used to terminate the WebRTC connection.
+func (p *Peer) Terminate() {
 	if p.Connection != nil {
-		slog.Debug("Closing of the WebRTC connection", "peerId", p.PeerUserID)
+		slog.Debug("Closing of the WebRTC connection", "peerId", p.UserID)
 
 		if err := p.Connection.Close(); err != nil {
-			slog.Error("Failed to close the WebRTC connection", "peerId", p.PeerUserID, "error", err)
+			slog.Error("Failed to close the WebRTC connection", "peerId", p.UserID, "error", err)
 			return
 		}
 	}

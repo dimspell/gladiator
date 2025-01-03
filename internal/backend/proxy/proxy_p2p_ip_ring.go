@@ -63,29 +63,29 @@ func (r *IpRing) NextPeerAddress(userId string, isCurrentUser, isHost bool) *Pee
 	switch true {
 	case isCurrentUser:
 		return &Peer{
-			PeerUserID: userId,
-			Addr:       &redirect.Addressing{IP: net.IPv4(127, 0, 0, 1)},
-			Mode:       redirect.CurrentUserIsHost,
+			UserID: userId,
+			Addr:   &redirect.Addressing{IP: net.IPv4(127, 0, 0, 1)},
+			Mode:   redirect.CurrentUserIsHost,
 		}
 	case !isCurrentUser && isHost:
 		ip, portTCP, portUDP := r.NextAddr()
 		return &Peer{
-			PeerUserID: userId,
-			Addr:       &redirect.Addressing{IP: ip, TCPPort: portTCP, UDPPort: portUDP},
-			Mode:       redirect.OtherUserIsHost,
+			UserID: userId,
+			Addr:   &redirect.Addressing{IP: ip, TCPPort: portTCP, UDPPort: portUDP},
+			Mode:   redirect.OtherUserIsHost,
 		}
 	case !isCurrentUser && !isHost:
 		ip, _, portUDP := r.NextAddr()
 		return &Peer{
-			PeerUserID: userId,
-			Addr:       &redirect.Addressing{IP: ip, TCPPort: "", UDPPort: portUDP},
-			Mode:       redirect.OtherUserHasJoined,
+			UserID: userId,
+			Addr:   &redirect.Addressing{IP: ip, TCPPort: "", UDPPort: portUDP},
+			Mode:   redirect.OtherUserHasJoined,
 		}
 	default:
 		return &Peer{
-			PeerUserID: userId,
-			Addr:       &redirect.Addressing{IP: net.IPv4(127, 0, 0, 1)},
-			Mode:       redirect.OtherUserIsJoining,
+			UserID: userId,
+			Addr:   &redirect.Addressing{IP: net.IPv4(127, 0, 0, 1)},
+			Mode:   redirect.OtherUserIsJoining,
 		}
 	}
 }

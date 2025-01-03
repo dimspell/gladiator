@@ -148,7 +148,7 @@ func TestWebRTC(t *testing.T) {
 	// Make the packet redirect
 	// ip, portTCP, portUDP := session2.IpRing.NextAddr()
 	// peer := &Peer{
-	// 	PeerUserID: session2.GetUserID(),
+	// 	UserID: session2.GetUserID(),
 	// 	Addr:       &redirect.Addressing{IP: ip, TCPPort: portTCP, UDPPort: portUDP},
 	// 	Mode:       redirect.OtherUserIsHost,
 	// }
@@ -156,7 +156,7 @@ func TestWebRTC(t *testing.T) {
 	// gameRoom := NewGameRoom(roomId, session2.ToPlayer(net.IPv4(127, 0, 0, 21)))
 	// session2.State.SetGameRoom(gameRoom)
 	//
-	// peers := map[string]*Peer{peer.PeerUserID: peer}
+	// peers := map[string]*Peer{peer.UserID: peer}
 	// proxy2.manager.Peers[session2] = &PeersToSessionMapping{
 	// 	Game:  gameRoom,
 	// 	Peers: peers,

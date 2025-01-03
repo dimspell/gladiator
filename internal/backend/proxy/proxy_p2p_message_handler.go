@@ -163,12 +163,12 @@ func (h *PeerToPeerMessageHandler) handleLeaveRoom(ctx context.Context, player w
 		// fmt.Errorf("could not find peer %q", m.From)
 		return nil
 	}
-	if peer.PeerUserID == h.session.GetUserID() {
+	if peer.UserID == h.session.GetUserID() {
 		// return fmt.Errorf("peer %q is the same as the host, ignoring leave", m.From)
 		return nil
 	}
 
-	slog.Info("User left", "peer", peer.PeerUserID)
+	slog.Info("User left", "peer", peer.UserID)
 	h.proxy.deletePeer(h.session, player.ID())
 	return nil
 }

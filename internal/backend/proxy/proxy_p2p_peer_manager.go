@@ -97,7 +97,7 @@ func (p *PeerToPeerPeerManager) setPeer(session *bsession.Session, peer *Peer) {
 	if !ok {
 		return
 	}
-	mapping.Peers[peer.PeerUserID] = peer
+	mapping.Peers[peer.UserID] = peer
 }
 
 func (p *PeerToPeerPeerManager) deletePeer(session *bsession.Session, peerID string) {
