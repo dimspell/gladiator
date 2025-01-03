@@ -12,7 +12,6 @@ import (
 	"github.com/dimspell/gladiator/internal/backend/packet"
 	"github.com/dimspell/gladiator/internal/backend/packet/command"
 	"github.com/dimspell/gladiator/internal/backend/proxy"
-	"github.com/dimspell/gladiator/internal/wire"
 )
 
 // HandleSelectGame handles 0x45ff (255-69) command
@@ -27,8 +26,6 @@ func (b *Backend) HandleSelectGame(session *bsession.Session, req SelectGameRequ
 		return nil
 	}
 
-	b.Proxy.Close(session)
-
 	respGame, err := b.gameClient.GetGame(context.TODO(), connect.NewRequest(&multiv1.GetGameRequest{
 		GameRoomId: data.RoomName,
 	}))
@@ -37,30 +34,12 @@ func (b *Backend) HandleSelectGame(session *bsession.Session, req SelectGameRequ
 		return nil
 	}
 
-	gameRoom := &bsession.GameRoom{
-		Players: map[string]wire.Player{},
-		ID:      respGame.Msg.GetGame().GetName(),
-		Name:    respGame.Msg.GetGame().GetName(),
+	if err := b.Proxy.SelectGame(proxy.GameData{
+		Game:    respGame.Msg.GetGame(),
+		Players: respGame.Msg.GetPlayers(),
+	}, session); err != nil {
+		return err
 	}
-	for _, player := range respGame.Msg.Players {
-		gameRoom.SetPlayer(wire.Player{
-			UserID:      player.UserId,
-			Username:    player.Username,
-			CharacterID: player.CharacterId,
-			ClassType:   byte(player.ClassType),
-			IPAddress:   player.IpAddress,
-		})
-		if respGame.Msg.Game.HostUserId == player.UserId {
-			gameRoom.SetHost(wire.Player{
-				UserID:      player.UserId,
-				Username:    player.Username,
-				CharacterID: player.CharacterId,
-				ClassType:   byte(player.ClassType),
-				IPAddress:   player.IpAddress,
-			})
-		}
-	}
-	session.State.SetGameRoom(gameRoom)
 
 	response := []byte{}
 	response = binary.LittleEndian.AppendUint32(response, uint32(respGame.Msg.Game.GetMapId()))

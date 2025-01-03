@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"strconv"
 
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/redirect"
@@ -22,7 +21,7 @@ type PeerToPeerPeerManager struct {
 // PeersToSessionMapping maps sessions to their peers.
 type PeersToSessionMapping struct {
 	IpRing *IpRing
-	Game   *bsession.GameRoom
+	Game   *GameRoom
 	Peers  map[string]*Peer
 }
 
@@ -49,22 +48,13 @@ func NewPeerToPeerManager() *PeerToPeerPeerManager {
 }
 
 // setUpChannels sets up the peer connection channels.
-func (p *PeerToPeerPeerManager) setUpChannels(session *bsession.Session, playerId int64, sendRTCOffer bool, createChannels bool) (*Peer, error) {
+func (p *PeerToPeerPeerManager) setUpChannels(session *bsession.Session, player wire.Player, sendRTCOffer bool, createChannels bool) (*Peer, error) {
 	peerConnection, err := webrtc.NewPeerConnection(p.WebRTCConfig)
 	if err != nil {
 		return nil, err
 	}
 
-	gameRoom, err := session.State.GameRoom()
-	if err != nil {
-		return nil, err
-	}
-	player, found := gameRoom.GetPlayer(strconv.FormatInt(playerId, 10))
-	if !found {
-		return nil, fmt.Errorf("could not find player in game room")
-	}
-
-	peer := p.getOrCreatePeer(session, &player)
+	peer := p.getOrCreatePeer(session, player)
 	peer.Connection = peerConnection
 
 	if !p.isPeerExisting(session, &player) {
@@ -116,9 +106,10 @@ func (p *PeerToPeerPeerManager) deletePeer(session *bsession.Session, peerID str
 		return
 	}
 	delete(mapping.Peers, peerID)
+	mapping.Game.DeletePlayer(peerID)
 }
 
-func (p *PeerToPeerPeerManager) getOrCreatePeer(session *bsession.Session, player *wire.Player) *Peer {
+func (p *PeerToPeerPeerManager) getOrCreatePeer(session *bsession.Session, player wire.Player) *Peer {
 	mapping, ok := p.Peers[session]
 	if ok {
 		peer, found := mapping.Peers[player.ID()]
@@ -127,13 +118,8 @@ func (p *PeerToPeerPeerManager) getOrCreatePeer(session *bsession.Session, playe
 		}
 	}
 
-	// FIXME: Why duplicated?
-	// mapping.Game
-
-	gameRoom, err := session.State.GameRoom()
-	if err != nil {
-		panic(err)
-	}
+	gameRoom := mapping.Game
+	gameRoom.SetPlayer(player)
 
 	isHost := gameRoom.Host.UserID == player.UserID
 	isCurrentUser := gameRoom.Host.UserID == session.UserID
@@ -184,11 +170,12 @@ func (p *PeerToPeerPeerManager) handleNegotiation(peerConnection *webrtc.PeerCon
 }
 
 func (p *PeerToPeerPeerManager) createDataChannels(peerConnection *webrtc.PeerConnection, session *bsession.Session, peer *Peer) error {
-	gameRoom, err := session.State.GameRoom()
-	if err != nil {
-		return nil
+	mapping, found := p.Peers[session]
+	if !found {
+		return fmt.Errorf("could not find session in peer manager")
 	}
 
+	gameRoom := mapping.Game
 	roomId := gameRoom.Name
 
 	if guestTCP, guestUDP, err := p.NewRedirect(peer.Mode, peer.Addr); err == nil {

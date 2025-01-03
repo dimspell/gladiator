@@ -2,15 +2,27 @@ package proxy
 
 import (
 	"context"
+	"fmt"
 	"net"
 
+	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/internal/backend/bsession"
+	"github.com/dimspell/gladiator/internal/wire"
 )
 
 // Proxy is an interface that defines methods for managing game rooms and player
 // connections. It provides functionality for creating and hosting game rooms,
 // joining game sessions, and retrieving player IP addresses.
 type Proxy interface {
+	HostProxy
+	JoinProxy
+
+	Close(session *bsession.Session)
+
+	ExtendWire(session *bsession.Session) MessageHandler
+}
+
+type HostProxy interface {
 	// GetHostIP is used when game attempts to list the IP address of the game
 	// room. This function can be used to override the IP address.
 	GetHostIP(net.IP, *bsession.Session) net.IP
@@ -22,15 +34,6 @@ type Proxy interface {
 	// HostRoom creates a new game room with the provided parameters and returns
 	// an error if the operation fails.
 	HostRoom(HostParams, *bsession.Session) error
-
-	GetPlayerAddr(GetPlayerAddrParams, *bsession.Session) (net.IP, error)
-
-	// Join is used to connect to TCP game host
-	Join(JoinParams, *bsession.Session) (net.IP, error)
-
-	Close(session *bsession.Session)
-
-	ExtendWire(session *bsession.Session) MessageHandler
 }
 
 type CreateParams struct {
@@ -39,6 +42,51 @@ type CreateParams struct {
 
 type HostParams struct {
 	GameID string
+}
+
+type JoinProxy interface {
+	SelectGame(GameData, *bsession.Session) error
+
+	// Join is used to connect to TCP game host
+	Join(JoinParams, *bsession.Session) (net.IP, error)
+
+	GetPlayerAddr(GetPlayerAddrParams, *bsession.Session) (net.IP, error)
+}
+
+type GameData struct {
+	Game    *multiv1.Game
+	Players []*multiv1.Player
+}
+
+func (d *GameData) ToWirePlayers() []wire.Player {
+	players := make([]wire.Player, len(d.Players))
+
+	for i, player := range d.Players {
+		players[i] = wire.Player{
+			UserID:      player.UserId,
+			Username:    player.Username,
+			CharacterID: player.CharacterId,
+			ClassType:   byte(player.ClassType),
+			IPAddress:   player.IpAddress,
+		}
+	}
+
+	return players
+}
+
+func (d *GameData) FindHostUser() (wire.Player, error) {
+	for _, player := range d.Players {
+		if d.Game.HostUserId == player.UserId {
+			return wire.Player{
+				UserID:      player.UserId,
+				Username:    player.Username,
+				CharacterID: player.CharacterId,
+				ClassType:   byte(player.ClassType),
+				IPAddress:   player.IpAddress,
+			}, nil
+		}
+	}
+	return wire.Player{}, fmt.Errorf("host user not found")
 }
 
 type JoinParams struct {

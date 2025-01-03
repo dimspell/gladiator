@@ -1,7 +1,6 @@
 package bsession
 
 import (
-	"fmt"
 	"slices"
 	"sync"
 
@@ -11,25 +10,8 @@ import (
 type SessionState struct {
 	sync.RWMutex
 
-	gameRoom *GameRoom
-
 	// lobbyUsers contains list of players who are connected to lobby server.
 	lobbyUsers []wire.Player
-}
-
-func (s *SessionState) GameRoom() (*GameRoom, error) {
-	s.RLock()
-	defer s.RUnlock()
-	if s.gameRoom == nil {
-		return nil, fmt.Errorf("game room not set in session state")
-	}
-	return s.gameRoom, nil
-}
-
-func (s *SessionState) SetGameRoom(gameRoom *GameRoom) {
-	s.Lock()
-	s.gameRoom = gameRoom
-	s.Unlock()
 }
 
 func (s *SessionState) UpdateLobbyUsers(users []wire.Player) {

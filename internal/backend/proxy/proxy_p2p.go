@@ -30,35 +30,32 @@ func (p *PeerToPeer) CreateRoom(params CreateParams, session *bsession.Session) 
 	p.Close(session)
 
 	ipAddr := net.IPv4(127, 0, 0, 1)
-	player := session.ToPlayer(ipAddr)
+	hostPlayer := session.ToPlayer(ipAddr)
 
-	gameRoom := bsession.NewGameRoom(params.GameID, player)
-	session.State.SetGameRoom(gameRoom)
+	gameRoom := NewGameRoom(params.GameID, hostPlayer)
+
+	p.manager.Peers[session] = &PeersToSessionMapping{
+		Game:   gameRoom,
+		IpRing: NewIpRing(),
+		Peers: map[string]*Peer{
+			hostPlayer.ID(): {
+				PeerUserID: session.GetUserID(),
+				Addr:       &redirect.Addressing{IP: p.hostIPAddress},
+				Mode:       redirect.CurrentUserIsHost,
+			},
+		},
+	}
 
 	return ipAddr, nil
 }
 
 func (p *PeerToPeer) HostRoom(params HostParams, session *bsession.Session) error {
-	host := &Peer{
-		PeerUserID: session.GetUserID(),
-		Addr:       &redirect.Addressing{IP: p.hostIPAddress},
-		Mode:       redirect.CurrentUserIsHost,
+	peers, ok := p.manager.Peers[session]
+	if !ok {
+		return fmt.Errorf("no game mananged for session: %s", session.GetUserID())
 	}
-
-	room, err := session.State.GameRoom()
-	if err != nil {
-		return fmt.Errorf("could not get game room: %w", err)
-	}
-	if room.ID != params.GameID {
+	if peers.Game == nil || peers.Game.ID != params.GameID {
 		return fmt.Errorf("no game room found")
-	}
-
-	// FIXME: Use function instead
-	p.manager.Peers[session] = &PeersToSessionMapping{
-		Game: room,
-		Peers: map[string]*Peer{
-			host.PeerUserID: host,
-		},
 	}
 
 	if err := p.sendRoomReadyNotification(session, params.GameID); err != nil {
@@ -79,40 +76,53 @@ func (p *PeerToPeer) GetHostIP(hostIpAddress net.IP, session *bsession.Session) 
 	return p.hostIPAddress
 }
 
+func (p *PeerToPeer) SelectGame(params GameData, session *bsession.Session) error {
+	p.Close(session)
+
+	hostPlayer, err := params.FindHostUser()
+	if err != nil {
+		return err
+	}
+	gameRoom := NewGameRoom(params.Game.GameId, hostPlayer)
+	for _, player := range params.ToWirePlayers() {
+		gameRoom.SetPlayer(player)
+	}
+
+	ipRing := NewIpRing()
+
+	peers := map[string]*Peer{}
+	for _, player := range params.ToWirePlayers() {
+		peer := ipRing.NextPeerAddress(
+			player.ID(),
+			session.GetUserID() == player.ID(),
+			gameRoom.Host.ID() == player.ID())
+		peers[player.ID()] = peer
+	}
+
+	p.manager.Peers[session] = &PeersToSessionMapping{
+		Game:   gameRoom,
+		IpRing: ipRing,
+		Peers:  peers,
+	}
+
+	return nil
+}
+
 func (p *PeerToPeer) GetPlayerAddr(params GetPlayerAddrParams, session *bsession.Session) (net.IP, error) {
 	// Return the IP address of the player, if he is already in the list.
 	// FIXME: Use function instead
-	mapping, exist := p.manager.Peers[session]
-	if exist {
-		if peer, ok := mapping.Peers[params.UserID]; ok {
+	mapping, ok := p.manager.Peers[session]
+	if !ok {
+		return nil, fmt.Errorf("no game manager for session: %s", session.GetUserID())
+	}
+
+	for _, peer := range mapping.Peers {
+		if peer.PeerUserID == params.UserID {
 			return peer.Addr.IP, nil
 		}
 	}
 
-	// peer := session.IpRing.NextPeerAddress(
-	// 	params.UserID,
-	// 	params.UserID == session.GetUserID(),
-	// 	params.UserID == params.HostUserID,
-	// )
-
-	// if exist {
-	// 	mapping.Peers[peer.PeerUserID] = peer
-	// } else {
-	// 	// FIXME: Use function instead
-	// 	game, err := session.State.GameRoom()
-	// 	if err != nil {
-	// 		panic(err)
-	// 	}
-	//
-	// 	p.manager.Peers[session] = &PeersToSessionMapping{
-	// 		Game:  game,
-	// 		Peers: map[string]*Peer{peer.PeerUserID: peer},
-	// 	}
-	// }
-	//
-	// return peer.Addr.IP, nil
-	panic("could not find peer for user")
-	return nil, nil
+	return nil, fmt.Errorf("could not find player with user ID: %s", params.UserID)
 }
 
 func (p *PeerToPeer) Join(params JoinParams, session *bsession.Session) (net.IP, error) {
@@ -129,6 +139,9 @@ func (p *PeerToPeer) Join(params JoinParams, session *bsession.Session) (net.IP,
 	}
 
 	mapping.Peers[peer.PeerUserID] = peer
+
+	gameRoom := mapping.Game
+	gameRoom.SetPlayer(session.ToPlayer(peer.Addr.IP.To4()))
 
 	return peer.Addr.IP, nil
 }

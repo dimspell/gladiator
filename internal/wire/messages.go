@@ -30,7 +30,7 @@ func (m Message) Encode() []byte {
 }
 
 type Offer struct {
-	UserID int64                     `json:"userID"`
+	Player Player                    `json:"player"`
 	Offer  webrtc.SessionDescription `json:"offer"`
 }
 
@@ -55,7 +55,7 @@ type Player struct {
 	CharacterID int64  `json:"characterID"`
 	ClassType   byte   `json:"classType"`
 
-	IPAddress string `json:"ipAddress"`
+	IPAddress string `json:"ipAddress,omitempty"`
 }
 
 func (p *Player) ID() string {

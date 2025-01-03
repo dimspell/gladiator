@@ -14,15 +14,13 @@ type SessionMessageHandler struct {
 }
 
 func (h *SessionMessageHandler) Handle(ctx context.Context, payload []byte) error {
-	et := wire.ParseEventType(payload)
-	// msg := wire.ParseTyped[wire.ChatMessage](payload)
+	eventType := wire.ParseEventType(payload)
 
-	// handleWireEvent := func(et wire.EventType, p []byte) {
-	switch et {
+	switch eventType {
 	case wire.Chat:
 		_, msg, err := wire.DecodeTyped[wire.ChatMessage](payload)
 		if err != nil {
-			slog.Warn("Could not decode the message", "session", h.Session.ID, "error", err, "event", et.String(), "payload", payload)
+			slog.Warn("Could not decode the message", "session", h.Session.ID, "error", err, "event", eventType.String(), "payload", payload)
 			return nil
 		}
 		// if err := session.Send(ReceiveMessage, NewGlobalMessage(msg.Content.User, msg.Content.Text)); err != nil {
@@ -34,7 +32,7 @@ func (h *SessionMessageHandler) Handle(ctx context.Context, payload []byte) erro
 		// TODO: Handle it. Note: It should be sent only once.
 		_, msg, err := wire.DecodeTyped[[]wire.Player](payload)
 		if err != nil {
-			slog.Warn("Could not decode the message", "session", h.Session.ID, "error", err, "event", et.String(), "payload", payload)
+			slog.Warn("Could not decode the message", "session", h.Session.ID, "error", err, "event", eventType.String(), "payload", payload)
 			return nil
 		}
 
@@ -42,7 +40,7 @@ func (h *SessionMessageHandler) Handle(ctx context.Context, payload []byte) erro
 	case wire.JoinLobby:
 		_, msg, err := wire.DecodeTyped[wire.Player](payload)
 		if err != nil {
-			slog.Warn("Could not decode the message", "session", h.Session.ID, "error", err, "event", et.String(), "payload", payload)
+			slog.Warn("Could not decode the message", "session", h.Session.ID, "error", err, "event", eventType.String(), "payload", payload)
 			return nil
 		}
 		if msg.Content.UserID == h.Session.UserID {
@@ -61,7 +59,7 @@ func (h *SessionMessageHandler) Handle(ctx context.Context, payload []byte) erro
 	case wire.LeaveLobby:
 		_, msg, err := wire.DecodeTyped[wire.Player](payload)
 		if err != nil {
-			slog.Warn("Could not decode the message", "session", h.Session.ID, "error", err, "event", et.String(), "payload", payload)
+			slog.Warn("Could not decode the message", "session", h.Session.ID, "error", err, "event", eventType.String(), "payload", payload)
 			return nil
 		}
 

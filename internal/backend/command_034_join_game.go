@@ -14,7 +14,6 @@ import (
 	"github.com/dimspell/gladiator/internal/backend/packet/command"
 	"github.com/dimspell/gladiator/internal/backend/proxy"
 	"github.com/dimspell/gladiator/internal/model"
-	"github.com/dimspell/gladiator/internal/wire"
 )
 
 // HandleJoinGame handles 0x22ff (255-34) command
@@ -44,19 +43,6 @@ func (b *Backend) HandleJoinGame(session *bsession.Session, req JoinGameRequest)
 	if err != nil {
 		return err
 	}
-
-	gameRoom, err := session.State.GameRoom()
-	if err != nil {
-		return err
-	}
-	gameRoom.SetPlayer(wire.Player{
-		UserID:      session.UserID,
-		Username:    session.Username,
-		CharacterID: session.CharacterID,
-		ClassType:   byte(session.ClassType),
-		IPAddress:   myIpAddr.To4().String(),
-	})
-	session.State.SetGameRoom(gameRoom)
 
 	respJoin, err := b.gameClient.JoinGame(context.TODO(), connect.NewRequest(&multiv1.JoinGameRequest{
 		UserId:     session.UserID,

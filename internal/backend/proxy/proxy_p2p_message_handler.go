@@ -14,7 +14,7 @@ type PeerToPeerInterface interface {
 	getPeer(session *bsession.Session, peerId string) (*Peer, bool)
 	deletePeer(session *bsession.Session, peerId string)
 
-	setUpChannels(session *bsession.Session, peerId int64, sendRTCOffer bool, createChannels bool) (*Peer, error)
+	setUpChannels(session *bsession.Session, player wire.Player, sendRTCOffer bool, createChannels bool) (*Peer, error)
 }
 
 type PeerToPeerMessageHandler struct {
@@ -75,11 +75,6 @@ func (h *PeerToPeerMessageHandler) Handle(ctx context.Context, payload []byte) e
 
 func (h *PeerToPeerMessageHandler) handleJoinRoom(ctx context.Context, player wire.Player) error {
 	slog.Info("Other player is joining", "playerId", player.ID())
-	gameRoom, err := h.session.State.GameRoom()
-	if err != nil {
-		return err
-	}
-	gameRoom.SetPlayer(player)
 
 	// Validate the message
 	if player.UserID == h.session.UserID {
@@ -95,7 +90,7 @@ func (h *PeerToPeerMessageHandler) handleJoinRoom(ctx context.Context, player wi
 	slog.Debug("JOIN", "id", player.UserID, "data", player)
 
 	// Add the peer to the list of peers, and start the WebRTC connection
-	if _, err := h.proxy.setUpChannels(h.session, player.UserID, true, true); err != nil {
+	if _, err := h.proxy.setUpChannels(h.session, player, true, true); err != nil {
 		slog.Warn("Could not add a peer", "userId", player.UserID, "error", err)
 		return err
 	}
@@ -106,7 +101,7 @@ func (h *PeerToPeerMessageHandler) handleJoinRoom(ctx context.Context, player wi
 func (h *PeerToPeerMessageHandler) handleRTCOffer(ctx context.Context, offer wire.Offer, fromUserId string) error {
 	slog.Debug("RTC_OFFER", "from", fromUserId)
 
-	peer, err := h.proxy.setUpChannels(h.session, offer.UserID, false, false)
+	peer, err := h.proxy.setUpChannels(h.session, offer.Player, false, false)
 	if err != nil {
 		return err
 	}
@@ -160,12 +155,6 @@ func (h *PeerToPeerMessageHandler) handleRTCCandidate(ctx context.Context, candi
 
 func (h *PeerToPeerMessageHandler) handleLeaveRoom(ctx context.Context, player wire.Player) error {
 	slog.Info("Other player is leaving", "playerId", player.ID())
-
-	gameRoom, err := h.session.State.GameRoom()
-	if err != nil {
-		return err
-	}
-	gameRoom.DeletePlayer(player)
 
 	slog.Debug("LEAVE_ROOM OR LEAVE_LOBBY")
 

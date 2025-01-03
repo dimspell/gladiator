@@ -1,4 +1,4 @@
-package bsession
+package proxy
 
 import (
 	"sync"
@@ -50,9 +50,9 @@ func (g *GameRoom) SetPlayer(player wire.Player) {
 	g.Unlock()
 }
 
-func (g *GameRoom) DeletePlayer(player wire.Player) {
+func (g *GameRoom) DeletePlayer(playerId string) {
 	g.Lock()
-	delete(g.Players, player.ID())
+	delete(g.Players, playerId)
 	g.Unlock()
 }
 

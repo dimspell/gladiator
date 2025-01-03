@@ -226,8 +226,8 @@ func (s *Session) SendSetRoomReady(ctx context.Context, gameRoomId string) error
 	return s.SendEvent(ctx, wire.SetRoomReady, gameRoomId)
 }
 
-func (s *Session) SendLeaveRoom(ctx context.Context, gameRoom *GameRoom) error {
-	return s.SendEvent(ctx, wire.LeaveRoom, gameRoom.ID)
+func (s *Session) SendLeaveRoom(ctx context.Context, gameRoomId string) error {
+	return s.SendEvent(ctx, wire.LeaveRoom, gameRoomId)
 }
 
 func (s *Session) SendRTCICECandidate(ctx context.Context, candidate webrtc.ICECandidateInit, recipientId string) error {
@@ -236,14 +236,14 @@ func (s *Session) SendRTCICECandidate(ctx context.Context, candidate webrtc.ICEC
 
 func (s *Session) SendRTCOffer(ctx context.Context, offer webrtc.SessionDescription, recipientId string) error {
 	return s.SendEventTo(ctx, wire.RTCOffer, wire.Offer{
-		UserID: s.UserID,
+		Player: s.ToPlayer(nil),
 		Offer:  offer,
 	}, recipientId)
 }
 
 func (s *Session) SendRTCAnswer(ctx context.Context, answer webrtc.SessionDescription, recipientId string) error {
 	return s.SendEventTo(ctx, wire.RTCAnswer, wire.Offer{
-		UserID: s.UserID,
+		Player: s.ToPlayer(nil),
 		Offer:  answer,
 	}, recipientId)
 }
