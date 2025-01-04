@@ -3,6 +3,7 @@ package proxy
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net"
 
 	"github.com/dimspell/gladiator/internal/backend/bsession"
@@ -56,15 +57,16 @@ func (p *PeerToPeer) CreateRoom(params CreateParams, session *bsession.Session) 
 
 	gameRoom := NewGameRoom(params.GameID, hostPlayer)
 
+	// peer, err := p.CreatePeer(session, hostPlayer)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("failed to create peer: %w", err)
+	// }
+
 	p.SessionStore.SetSession(session, &SessionMapping{
 		Game:   gameRoom,
 		IpRing: NewIpRing(),
 		Peers: map[string]*Peer{
-			hostPlayer.ID(): {
-				UserID: session.GetUserID(),
-				Addr:   &redirect.Addressing{IP: p.hostIPAddress},
-				Mode:   redirect.CurrentUserIsHost,
-			},
+			// hostPlayer.ID(): peer,
 		},
 	})
 
@@ -99,22 +101,36 @@ func (p *PeerToPeer) SelectGame(params GameData, session *bsession.Session) erro
 		return err
 	}
 	gameRoom := NewGameRoom(params.Game.GameId, hostPlayer)
-	for _, player := range params.ToWirePlayers() {
-		gameRoom.SetPlayer(player)
-	}
 
 	ipRing := NewIpRing()
 
 	peers := map[string]*Peer{}
 	for _, player := range params.ToWirePlayers() {
-		peer, err := NewPeer(ipRing,
+		peerConnection, err := webrtc.NewPeerConnection(p.WebRTCConfig)
+		if err != nil {
+			return err
+		}
+
+		isCurrentUser := session.GetUserID() == player.ID()
+		isHostUser := gameRoom.Host.ID() == player.ID()
+
+		peer, err := NewPeer(peerConnection,
+			ipRing,
 			player.ID(),
-			session.GetUserID() == player.ID(),
-			gameRoom.Host.ID() == player.ID())
+			isCurrentUser,
+			isHostUser)
 		if err != nil {
 			return err
 		}
 		peers[player.ID()] = peer
+
+		if !isCurrentUser {
+			// if err := peer.setupPeerConnection(context.TODO(), session, player, false); err != nil {
+			// 	return err
+			// }
+		}
+
+		gameRoom.SetPlayer(player)
 	}
 
 	p.SessionStore.SetSession(session, &SessionMapping{
@@ -156,22 +172,38 @@ func (p *PeerToPeer) Join(params JoinParams, session *bsession.Session) (net.IP,
 }
 
 func (p *PeerToPeer) Close(session *bsession.Session) {
-	if mapping, exists := p.SessionStore.GetSession(session); exists {
-		for _, peer := range mapping.Peers {
-			peer.Terminate()
-		}
-	}
-
-	p.SessionStore.DeleteSession(session)
+	// if mapping, exists := p.SessionStore.GetSession(session); exists {
+	// 	for _, peer := range mapping.Peers {
+	// 		peer.Terminate()
+	// 	}
+	// }
+	//
+	// p.SessionStore.DeleteSession(session)
 }
 
-func (ss *SessionStore) getOrCreatePeer(session *bsession.Session, player wire.Player) (*Peer, error) {
-	mapping, ok := ss.sessions[session]
-	if ok {
-		peer, found := mapping.Peers[player.ID()]
-		if found {
-			return peer, nil
-		}
+func (p *PeerToPeer) ExtendWire(session *bsession.Session) MessageHandler {
+	return &PeerToPeerMessageHandler{
+		session,
+		p.SessionStore,
+		p.CreatePeer,
+		p.NewRedirect,
+	}
+}
+
+func (p *PeerToPeer) CreatePeer(session *bsession.Session, player wire.Player) (*Peer, error) {
+	// createPeer sets up the peer connection channels.
+	mapping, ok := p.SessionStore.GetSession(session)
+	if !ok {
+		return nil, fmt.Errorf("could not find mapping for user ID: %s", session.GetUserID())
+	}
+	if peer, found := mapping.Peers[player.ID()]; found {
+		slog.Debug("Reusing peer", "userId", player.ID())
+		return peer, nil
+	}
+
+	peerConnection, err := webrtc.NewPeerConnection(p.WebRTCConfig)
+	if err != nil {
+		return nil, err
 	}
 
 	gameRoom := mapping.Game
@@ -180,42 +212,5 @@ func (ss *SessionStore) getOrCreatePeer(session *bsession.Session, player wire.P
 	isHost := gameRoom.Host.UserID == player.UserID
 	isCurrentUser := gameRoom.Host.UserID == session.UserID
 
-	return NewPeer(mapping.IpRing, player.ID(), isCurrentUser, isHost)
-}
-
-func (p *PeerToPeer) ExtendWire(session *bsession.Session) MessageHandler {
-	// setUpChannels sets up the peer connection channels.
-	setUpChannels := func(session *bsession.Session, player wire.Player, sendRTCOffer bool, createChannels bool) (*Peer, error) {
-		peerConnection, err := webrtc.NewPeerConnection(p.WebRTCConfig)
-		if err != nil {
-			return nil, err
-		}
-
-		ctx := context.TODO()
-
-		peer, _ := p.SessionStore.getOrCreatePeer(session, player)
-		peer.Connection = peerConnection
-
-		if _, ok := p.SessionStore.GetPeer(session, player.ID()); !ok {
-			p.SessionStore.AddPeer(session, peer)
-		}
-
-		if err := peer.setupPeerConnection(ctx, session, &player, sendRTCOffer); err != nil {
-			return nil, err
-		}
-
-		if createChannels {
-			if err := peer.createDataChannels(p.NewRedirect); err != nil {
-				return nil, err
-			}
-		}
-
-		return peer, nil
-	}
-
-	return &PeerToPeerMessageHandler{
-		session:       session,
-		setUpChannels: setUpChannels,
-		peerManager:   p.SessionStore,
-	}
+	return NewPeer(peerConnection, mapping.IpRing, player.ID(), isCurrentUser, isHost)
 }

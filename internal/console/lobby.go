@@ -11,7 +11,7 @@ import (
 
 func (c *Console) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	params := r.URL.Query()
-	roomName := params.Get("roomName")
+	channelName := params.Get("channelName")
 	userID, err := strconv.ParseInt(params.Get("userID"), 10, 64)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
@@ -21,7 +21,7 @@ func (c *Console) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 	// FIXME: Improve validation.
 	// For now only the DISPEL channel is available to use.
-	if roomName != "DISPEL" || userID == 0 {
+	if channelName != "DISPEL" || userID == 0 {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -40,7 +40,7 @@ func (c *Console) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			"error", err,
 			"origin", r.Header.Get("Origin"),
 			"userId", userID,
-			"roomName", roomName)
+			"channelName", channelName)
 		return
 	}
 	defer conn.CloseNow()

@@ -40,7 +40,7 @@ func (b *Backend) ConnectToLobby(ctx context.Context, user *multiv1.User, sessio
 
 func (b *Backend) RegisterNewObserver(ctx context.Context, session *bsession.Session) error {
 	handlers := []proxy.MessageHandler{
-		session.ExtendWire(),
+		bsession.NewLobbyEventHandler(session),
 		b.Proxy.ExtendWire(session),
 	}
 	observe := func(ctx context.Context, wsConn *websocket.Conn) {
@@ -50,7 +50,7 @@ func (b *Backend) RegisterNewObserver(ctx context.Context, session *bsession.Ses
 			}
 
 			// Read the broadcast & handle them as commands.
-			_, p, err := wsConn.Read(ctx)
+			p, err := session.ConsumeWebSocket(ctx)
 			if err != nil {
 				if errors.Is(err, context.Canceled) {
 					return

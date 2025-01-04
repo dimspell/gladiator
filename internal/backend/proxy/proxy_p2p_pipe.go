@@ -36,6 +36,8 @@ type DataChannel interface {
 }
 
 func NewPipe(dc DataChannel, proxy redirect.Redirect) *Pipe {
+	slog.Info("Creating pipe", "label", dc.Label())
+
 	if proxy == nil {
 		panic("proxy is nil")
 	}

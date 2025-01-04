@@ -24,17 +24,16 @@ type Peer struct {
 
 	// Connection holds the WebRTC peer connection
 	Connection *webrtc.PeerConnection
-
-	// mu sync.RWMutex
 }
 
-func NewPeer(r *IpRing, userId string, isCurrentUser, isHost bool) (*Peer, error) {
+func NewPeer(connection *webrtc.PeerConnection, r *IpRing, userId string, isCurrentUser, isHost bool) (*Peer, error) {
 	switch true {
 	case isCurrentUser:
 		return &Peer{
-			UserID: userId,
-			Addr:   &redirect.Addressing{IP: net.IPv4(127, 0, 0, 1)},
-			Mode:   redirect.CurrentUserIsHost,
+			UserID:     userId,
+			Addr:       &redirect.Addressing{IP: net.IPv4(127, 0, 0, 1)},
+			Mode:       redirect.CurrentUserIsHost,
+			Connection: connection,
 		}, nil
 	case !isCurrentUser && isHost:
 		ip, portTCP, portUDP, err := r.NextAddr()
@@ -42,9 +41,10 @@ func NewPeer(r *IpRing, userId string, isCurrentUser, isHost bool) (*Peer, error
 			return nil, fmt.Errorf("failed to get next address: %w", err)
 		}
 		return &Peer{
-			UserID: userId,
-			Addr:   &redirect.Addressing{IP: ip, TCPPort: portTCP, UDPPort: portUDP},
-			Mode:   redirect.OtherUserIsHost,
+			UserID:     userId,
+			Addr:       &redirect.Addressing{IP: ip, TCPPort: portTCP, UDPPort: portUDP},
+			Mode:       redirect.OtherUserIsHost,
+			Connection: connection,
 		}, nil
 	case !isCurrentUser && !isHost:
 		ip, _, portUDP, err := r.NextAddr()
@@ -52,20 +52,22 @@ func NewPeer(r *IpRing, userId string, isCurrentUser, isHost bool) (*Peer, error
 			return nil, fmt.Errorf("failed to get next address: %w", err)
 		}
 		return &Peer{
-			UserID: userId,
-			Addr:   &redirect.Addressing{IP: ip, TCPPort: "", UDPPort: portUDP},
-			Mode:   redirect.OtherUserHasJoined,
+			UserID:     userId,
+			Addr:       &redirect.Addressing{IP: ip, TCPPort: "", UDPPort: portUDP},
+			Mode:       redirect.OtherUserHasJoined,
+			Connection: connection,
 		}, nil
 	default:
 		return &Peer{
-			UserID: userId,
-			Addr:   &redirect.Addressing{IP: net.IPv4(127, 0, 0, 1)},
-			Mode:   redirect.OtherUserIsJoining,
+			UserID:     userId,
+			Addr:       &redirect.Addressing{IP: net.IPv4(127, 0, 0, 1)},
+			Mode:       redirect.OtherUserIsJoining,
+			Connection: connection,
 		}, nil
 	}
 }
 
-func (p *Peer) setupPeerConnection(ctx context.Context, session *bsession.Session, player *wire.Player, sendRTCOffer bool) error {
+func (p *Peer) setupPeerConnection(ctx context.Context, session *bsession.Session, player wire.Player, sendRTCOffer bool) error {
 	p.Connection.OnICEConnectionStateChange(func(connectionState webrtc.ICEConnectionState) {
 		slog.Debug("ICE Connection State has changed",
 			"userId", player.UserID,
@@ -96,7 +98,7 @@ func (p *Peer) setupPeerConnection(ctx context.Context, session *bsession.Sessio
 	return nil
 }
 
-func (p *Peer) handleNegotiation(ctx context.Context, session *bsession.Session, player *wire.Player, sendRTCOffer bool) error {
+func (p *Peer) handleNegotiation(ctx context.Context, session *bsession.Session, player wire.Player, sendRTCOffer bool) error {
 	offer, err := p.Connection.CreateOffer(nil)
 	if err != nil {
 		return fmt.Errorf("failed to create offer for peer %s: %w", player.UserID, err)

@@ -182,13 +182,18 @@ func (mp *Multiplayer) HandleSession(ctx context.Context, session *UserSession) 
 			if errors.Is(err, context.Canceled) {
 				return err
 			}
-			if websocket.CloseStatus(err) == websocket.StatusNormalClosure {
+
+			switch state := websocket.CloseStatus(err); state {
+			case -1:
+				// connection reset by peer
+				return nil
+			case websocket.StatusNormalClosure:
 				slog.Debug("Closing because of", "error", err)
 				return err
+			default:
+				slog.Error("Could not handle the message", "error", err)
+				return err
 			}
-
-			slog.Error("Could not handle the message", "error", err)
-			return err
 		}
 
 		// Enqueue message

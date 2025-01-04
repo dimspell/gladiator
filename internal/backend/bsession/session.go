@@ -99,8 +99,8 @@ func (s *Session) ToPlayer(ipAddr net.IP) wire.Player {
 	}
 }
 
-func (s *Session) ExtendWire() *SessionMessageHandler {
-	return &SessionMessageHandler{Session: s}
+func (s *Session) ExtendWire() *LobbyEventHandler {
+	return &LobbyEventHandler{Session: s}
 }
 
 func (s *Session) InitObserver(registerNewObserver func(context.Context, *Session) error) error {
@@ -160,6 +160,11 @@ func (s *Session) ConnectOverWebsocket(ctx context.Context, user *multiv1.User, 
 		return
 	}(ctx, ws)
 	return nil
+}
+
+func (s *Session) ConsumeWebSocket(ctx context.Context) ([]byte, error) {
+	_, p, err := s.wsConn.Read(ctx)
+	return p, err
 }
 
 func (s *Session) SendEvent(ctx context.Context, eventType wire.EventType, content any) error {

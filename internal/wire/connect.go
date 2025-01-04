@@ -26,7 +26,7 @@ func Connect(ctx context.Context, wsURL string, user User) (*websocket.Conn, err
 	// Set query parameters.
 	v := u.Query()
 	v.Set("userID", user.ID())
-	v.Set("roomName", "DISPEL")
+	v.Set("channelName", "DISPEL")
 	u.RawQuery = v.Encode()
 
 	// Encode the URL to the WebSocket with the query parameters.

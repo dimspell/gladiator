@@ -9,11 +9,16 @@ import (
 	"github.com/dimspell/gladiator/internal/wire"
 )
 
-type SessionMessageHandler struct {
+type LobbyEventHandler struct {
 	Session *Session
 }
 
-func (h *SessionMessageHandler) Handle(ctx context.Context, payload []byte) error {
+// NewLobbyEventHandler creates a new LobbyEventHandler for the given Session.
+func NewLobbyEventHandler(session *Session) *LobbyEventHandler {
+	return &LobbyEventHandler{session}
+}
+
+func (h *LobbyEventHandler) Handle(ctx context.Context, payload []byte) error {
 	eventType := wire.ParseEventType(payload)
 
 	switch eventType {

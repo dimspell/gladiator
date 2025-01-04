@@ -6,6 +6,7 @@ import (
 	"log/slog"
 
 	"github.com/dimspell/gladiator/internal/backend/bsession"
+	"github.com/dimspell/gladiator/internal/backend/redirect"
 	"github.com/dimspell/gladiator/internal/wire"
 	"github.com/pion/webrtc/v4"
 )
@@ -19,14 +20,17 @@ const (
 )
 
 type PeerManager interface {
+	AddPeer(session *bsession.Session, peer *Peer)
 	GetPeer(session *bsession.Session, peerId string) (*Peer, bool)
 	RemovePeer(session *bsession.Session, peerId string)
 }
 
 type PeerToPeerMessageHandler struct {
-	session       *bsession.Session
-	peerManager   PeerManager
-	setUpChannels func(session *bsession.Session, player wire.Player, sendRTCOffer bool, createChannels bool) (*Peer, error)
+	session     *bsession.Session
+	peerManager PeerManager
+
+	createPeer  func(session *bsession.Session, player wire.Player) (*Peer, error)
+	newRedirect redirect.NewRedirect
 }
 
 func (h *PeerToPeerMessageHandler) Handle(ctx context.Context, payload []byte) error {
@@ -75,7 +79,7 @@ func (h *PeerToPeerMessageHandler) Handle(ctx context.Context, payload []byte) e
 			return err
 		}
 		return h.handleLeaveRoom(ctx, msg.Content)
-	case wire.LobbyUsers, wire.JoinLobby:
+	case wire.LobbyUsers, wire.JoinLobby, wire.CreateRoom:
 		return nil
 	default:
 		slog.Debug("unknown wire message", "type", eventType.String(), "payload", string(payload), "sessionID", h.session.GetUserID())
@@ -95,6 +99,7 @@ func (h *PeerToPeerMessageHandler) handleJoinRoom(ctx context.Context, player wi
 	}
 
 	if player.UserID == h.session.UserID {
+		slog.Debug("Player is already joined", "userId", player.UserID, "sessionID", h.session.GetUserID())
 		return nil
 	}
 
@@ -106,15 +111,30 @@ func (h *PeerToPeerMessageHandler) handleJoinRoom(ctx context.Context, player wi
 
 	logger.Debug("JOIN", "id", player.UserID, "data", player)
 
-	peer, err := h.setUpChannels(h.session, player, true, true)
+	peer, err := h.createPeer(h.session, player)
 	if err != nil {
 		logger.Warn("Could not add a peer", "userId", player.UserID, "error", err)
+		return err
+	}
+
+	h.peerManager.AddPeer(h.session, peer)
+
+	if err := peer.setupPeerConnection(ctx, h.session, player, true); err != nil {
+		return err
+	}
+	if err := peer.createDataChannels(h.newRedirect); err != nil {
 		return err
 	}
 
 	return nil
 }
 
+// handleRTCOffer handles the incoming RTCOffer from another peer.
+//
+// It sets up the peer connection, creates data channels, and sends the RTCOffer
+// to the other peer.
+//
+// The RTC offer is usually handled by the guest player, who responds to a host.
 func (h *PeerToPeerMessageHandler) handleRTCOffer(ctx context.Context, offer wire.Offer, fromUserId string) error {
 	logger := slog.With(
 		"from", fromUserId,
@@ -126,10 +146,42 @@ func (h *PeerToPeerMessageHandler) handleRTCOffer(ctx context.Context, offer wir
 		return fmt.Errorf("context cancelled while handling RTC offer: %w", err)
 	}
 
-	peer, err := h.setUpChannels(h.session, offer.Player, false, false)
-	if err != nil {
+	peer, found := h.peerManager.GetPeer(h.session, offer.Player.ID())
+	if !found {
+		// logger.Warn("Could not add a peer", "userId", offer.Player.UserID, "error", err)
+		return fmt.Errorf("could not add peer: %s", offer.Player.ID())
+	}
+	// peer, err := h.createPeer(h.session, offer.Player)
+	// if err != nil {
+	// 	return err
+	// }
+
+	if err := peer.setupPeerConnection(ctx, h.session, offer.Player, false); err != nil {
 		return err
 	}
+
+	peer.Connection.OnDataChannel(func(dc *webrtc.DataChannel) {
+		guestTCP, guestUDP, err := redirect.New(peer.Mode, peer.Addr)
+		if err != nil {
+			logger.Error("Could not create redirect", "error", err)
+			return
+		}
+
+		var redir redirect.Redirect
+		switch dc.Label() {
+		case "tcp":
+			redir = guestTCP
+		case "udp":
+			redir = guestUDP
+		}
+
+		NewPipe(dc, redir)
+
+		// dc.OnOpen(func() {
+		// 	logger.Debug("Data channel opened", "label", dc.Label())
+		// 	// dc.SendText("Hello from the server")
+		// })
+	})
 
 	if err := peer.Connection.SetRemoteDescription(offer.Offer); err != nil {
 		return fmt.Errorf("could not set remote description: %w", err)
@@ -150,6 +202,7 @@ func (h *PeerToPeerMessageHandler) handleRTCOffer(ctx context.Context, offer wir
 	return nil
 }
 
+// handleRTCAnswer handles the incoming RTCAnswer from another peer.
 func (h *PeerToPeerMessageHandler) handleRTCAnswer(ctx context.Context, offer wire.Offer, fromUserId string) error {
 	slog.Debug("RTC_ANSWER", "from", fromUserId)
 
