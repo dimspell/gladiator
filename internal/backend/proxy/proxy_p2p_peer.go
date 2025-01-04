@@ -24,9 +24,12 @@ type Peer struct {
 
 	// Connection holds the WebRTC peer connection
 	Connection *webrtc.PeerConnection
+
+	Connected chan struct{}
 }
 
 func NewPeer(connection *webrtc.PeerConnection, r *IpRing, userId string, isCurrentUser, isHost bool) (*Peer, error) {
+
 	switch true {
 	case isCurrentUser:
 		return &Peer{
@@ -72,6 +75,11 @@ func (p *Peer) setupPeerConnection(ctx context.Context, session *bsession.Sessio
 		slog.Debug("ICE Connection State has changed",
 			"userId", player.UserID,
 			"state", connectionState.String())
+	})
+	p.Connection.OnConnectionStateChange(func(state webrtc.PeerConnectionState) {
+		if state == webrtc.PeerConnectionStateConnected {
+			p.Connected <- struct{}{}
+		}
 	})
 
 	p.Connection.OnICECandidate(func(candidate *webrtc.ICECandidate) {

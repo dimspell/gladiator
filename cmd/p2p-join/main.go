@@ -89,6 +89,18 @@ func main() {
 		return
 	}
 
+	addr, err := px.GetPlayerAddr(proxy.GetPlayerAddrParams{
+		GameID:     "testing",
+		UserID:     "1",
+		IPAddress:  "127.0.1.2",
+		HostUserID: "1",
+	}, session)
+	if err != nil {
+		slog.Error("failed to get player address", "error", err)
+		return
+	}
+	slog.Info("got player address", "address", addr)
+
 	// px.GetPlayerAddr(proxy.GetPlayerAddrParams{}, session)
 	// px.ExtendWire(session)
 
@@ -102,6 +114,27 @@ func main() {
 		return
 	}
 	slog.Info("joined game", "game", join.Msg)
+
+	if _, err := px.Join(proxy.JoinParams{
+		HostUserID: "1",
+		GameID:     "testing",
+		HostUserIP: "127.0.1.2",
+	}, session); err != nil {
+		slog.Error("failed to join game", "error", err)
+		return
+	}
+
+	addr2, err := px.GetPlayerAddr(proxy.GetPlayerAddrParams{
+		GameID:     "testing",
+		UserID:     "1",
+		IPAddress:  "127.0.1.2",
+		HostUserID: "1",
+	}, session)
+	if err != nil {
+		slog.Error("failed to get player address", "error", err)
+		return
+	}
+	slog.Info("got player address", "address", addr2)
 
 	select {}
 }

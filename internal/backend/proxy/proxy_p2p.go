@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"time"
 
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/redirect"
@@ -67,7 +68,7 @@ func (p *PeerToPeer) CreateRoom(params CreateParams, session *bsession.Session) 
 	p.SessionStore.SetSession(session, &SessionMapping{
 		Game:   gameRoom,
 		IpRing: NewIpRing(),
-		Peers:  map[string]*Peer{
+		Peers: map[string]*Peer{
 			// hostPlayer.ID(): peer,
 		},
 	})
@@ -126,11 +127,10 @@ func (p *PeerToPeer) SelectGame(params GameData, session *bsession.Session) erro
 		}
 		peers[player.ID()] = peer
 
-		if !isCurrentUser {
-			// if err := peer.setupPeerConnection(context.TODO(), session, player, false); err != nil {
-			// 	return err
-			// }
-		}
+		// if !isCurrentUser {
+		// if err := peer.setupPeerConnection(context.TODO(), session, player, false); err != nil {
+		// 	return err
+		// }
 
 		gameRoom.SetPlayer(player)
 	}
@@ -149,6 +149,22 @@ func (p *PeerToPeer) GetPlayerAddr(params GetPlayerAddrParams, session *bsession
 	if !ok {
 		return nil, fmt.Errorf("could not find peer with user ID: %s", params.UserID)
 	}
+
+	if peer.Connected != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+
+		select {
+		case <-ctx.Done():
+			slog.Error("timeout waiting for peer to connect", "userID", params.UserID)
+			// return nil, fmt.Errorf("could not get peer addr: %w for user ID: %s", ctx.Err(), params.UserID)
+		// case <-webrtc.GatheringCompletePromise(peer.Connection):
+		// 	slog.Debug("gathering complete")
+		case <-peer.Connected:
+			slog.Debug("peer connected, user ID", "userID", params.UserID)
+		}
+	}
+
 	return peer.Addr.IP, nil
 }
 
@@ -166,6 +182,11 @@ func (p *PeerToPeer) Join(params JoinParams, session *bsession.Session) (net.IP,
 	}
 
 	mapping.Peers[peer.UserID] = peer
+
+	for _, pr := range mapping.Peers {
+		ch := make(chan struct{}, 1)
+		pr.Connected = ch
+	}
 
 	gameRoom := mapping.Game
 	gameRoom.SetPlayer(session.ToPlayer(peer.Addr.IP.To4()))
@@ -215,5 +236,13 @@ func (p *PeerToPeer) CreatePeer(session *bsession.Session, player wire.Player) (
 	isHost := gameRoom.Host.UserID == player.UserID
 	isCurrentUser := gameRoom.Host.UserID == session.UserID
 
-	return NewPeer(peerConnection, mapping.IpRing, player.ID(), isCurrentUser, isHost)
+	peer, err := NewPeer(peerConnection, mapping.IpRing, player.ID(), isCurrentUser, isHost)
+	if err != nil {
+		return nil, err
+	}
+
+	ch := make(chan struct{}, 1)
+	peer.Connected = ch
+
+	return peer, nil
 }
