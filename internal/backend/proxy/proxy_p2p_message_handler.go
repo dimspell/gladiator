@@ -29,8 +29,9 @@ type PeerToPeerMessageHandler struct {
 	session     *bsession.Session
 	peerManager PeerManager
 
-	createPeer  func(session *bsession.Session, player wire.Player) (*Peer, error)
-	newRedirect redirect.NewRedirect
+	createPeer     func(session *bsession.Session, player wire.Player) (*Peer, error)
+	newTCPRedirect redirect.NewRedirect
+	newUDPRedirect redirect.NewRedirect
 }
 
 func (h *PeerToPeerMessageHandler) Handle(ctx context.Context, payload []byte) error {
@@ -122,7 +123,7 @@ func (h *PeerToPeerMessageHandler) handleJoinRoom(ctx context.Context, player wi
 	if err := peer.setupPeerConnection(ctx, h.session, player, true); err != nil {
 		return err
 	}
-	if err := peer.createDataChannels(h.newRedirect); err != nil {
+	if err := peer.createDataChannels(h.newTCPRedirect, h.newUDPRedirect); err != nil {
 		return err
 	}
 
@@ -161,18 +162,24 @@ func (h *PeerToPeerMessageHandler) handleRTCOffer(ctx context.Context, offer wir
 	}
 
 	peer.Connection.OnDataChannel(func(dc *webrtc.DataChannel) {
-		guestTCP, guestUDP, err := redirect.New(peer.Mode, peer.Addr)
-		if err != nil {
-			logger.Error("Could not create redirect", "error", err)
-			return
-		}
+		logger.Debug("Data channel opened", "label", dc.Label())
 
 		var redir redirect.Redirect
+		var err error
 		switch dc.Label() {
 		case "tcp":
-			redir = guestTCP
+			// FIXME: Allow to mock redirect from test
+			redir, err = redirect.NewTCPRedirect(peer.Mode, peer.Addr)
+			if err != nil {
+				logger.Error("Could not create TCP redirect", "error", err)
+				return
+			}
 		case "udp":
-			redir = guestUDP
+			redir, err = redirect.NewUDPRedirect(peer.Mode, peer.Addr)
+			if err != nil {
+				logger.Error("Could not create UDP redirect", "error", err)
+				return
+			}
 		}
 
 		NewPipe(dc, redir)

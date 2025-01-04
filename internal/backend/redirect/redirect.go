@@ -12,9 +12,25 @@ type Mode int
 
 const (
 	None Mode = iota
+
+	// All players, who connect to the server are guests (joiners).
+	// We are connecting (dialing) to ourselves on the loopback interface,
+	// to the local instance served by the DispelMulti.exe.
 	CurrentUserIsHost
+
+	// The person who is connecting is a host (game creator).
+	// We are exposing a packet redirect on the local IP address,
+	// to which the game is going to connect (dial).
 	OtherUserIsHost
+
+	// The person who is connecting is a guest, who has already joined.
+	// We are connecting (dialing) to the host (game creator) on the loopback interface,
+	// to the local instance served by the DispelMulti.exe.
 	OtherUserHasJoined
+
+	// The person who is connecting is a guest, who has not joined yet.
+	// We have registered the join during the game phase.
+	// We are dialing to ourselves on the loopback interface,
 	OtherUserIsJoining
 )
 
@@ -48,70 +64,49 @@ type Addressing struct {
 	UDPPort string
 }
 
-type NewRedirect func(joinType Mode, addr *Addressing) (tcpProxy Redirect, udpProxy Redirect, err error)
+type NewRedirect func(joinType Mode, addr *Addressing) (Redirect, error)
 
-func New(joinType Mode, addr *Addressing) (tcpProxy Redirect, udpProxy Redirect, err error) {
-	slog.Info("Creating redirect", "joinType", joinType.String(), "ip", addr.IP)
+func NewUDPRedirect(joinType Mode, addr *Addressing) (Redirect, error) {
+	logger := slog.With("redirect", "NewUDPRedirect", "joinType", joinType.String(), "ip", addr.IP, "udpPort", addr.UDPPort)
+	logger.Debug("Creating new UDP redirect")
 
 	switch joinType {
 	case CurrentUserIsHost:
-		// All players, who connect to the server are guests (joiners).
-		// We are connecting (dialing) to ourselves on the loopback interface,
-		// to the local instance served by the DispelMulti.exe.
+		logger.Info("Creating client to dial TCP and UDP on default ports")
 
-		slog.Info("Creating client to dial TCP and UDP on default ports", "ip", addr.IP)
-
-		tcpProxy, err = DialTCP(addr.IP.To4().String(), "")
-		if err != nil {
-			return nil, nil, err
-		}
-		udpProxy, err = DialUDP(addr.IP.To4().String(), "")
-		if err != nil {
-			return nil, nil, err
-		}
-		return tcpProxy, udpProxy, nil
+		return DialUDP(addr.IP.To4().String(), "")
 	case OtherUserIsHost:
-		// The person who is connecting is a host (game creator).
-		// We are exposing a packet redirect on the local IP address,
-		// to which the game is going to connect (dial).
+		logger.Info("Creating TCP and UDP listeners on custom ports")
 
-		slog.Info("Creating TCP and UDP listeners on custom ports", "ip", addr.IP, "tcpPort", addr.TCPPort, "udpPort", addr.UDPPort)
-		tcpProxy, err = ListenTCP(addr.IP.To4().String(), addr.TCPPort)
-		if err != nil {
-			return nil, nil, err
-		}
-		udpProxy, err = ListenUDP(addr.IP.To4().String(), addr.UDPPort)
-		if err != nil {
-			return nil, nil, err
-		}
-		return tcpProxy, udpProxy, nil
+		return ListenUDP(addr.IP.To4().String(), addr.UDPPort)
 	case OtherUserHasJoined:
-		// The person who is connecting is a guest, who has already joined.
-		// We are connecting (dialing) to the host (game creator) on the loopback interface,
-		// to the local instance served by the DispelMulti.exe.
+		logger.Info("Creating UDP listener only on a custom port")
 
-		slog.Info("Creating UDP listener only on a custom port", "ip", addr.IP, "udpPort", addr.UDPPort)
-		udpProxy, err = ListenUDP(addr.IP.To4().String(), addr.UDPPort)
-		if err != nil {
-			return nil, nil, err
-		}
-		return nil, udpProxy, nil
+		return ListenUDP(addr.IP.To4().String(), addr.UDPPort)
 	case OtherUserIsJoining:
-		// The person who is connecting is a guest, who has not joined yet.
-		// We have registered the join during the game phase.
-		// We are dialing to ourselves on the loopback interface,
+		logger.Info("Creating UDP dialler on the default port")
 
-		slog.Info("Creating UDP dialler on the default port", "ip", addr.IP)
-		udpProxy, err = DialUDP(addr.IP.To4().String(), "")
-		if err != nil {
-			return nil, nil, err
-		}
-		return nil, udpProxy, nil
+		return DialUDP(addr.IP.To4().String(), "")
 	default:
-		return nil, nil, fmt.Errorf("unknown joining type: %s", joinType)
+		return nil, fmt.Errorf("unknown joining type: %s", joinType)
 	}
 }
 
-func NewNoop(_ Mode, _ *Addressing) (Redirect, Redirect, error) {
-	return &Noop{}, &Noop{}, nil
+func NewTCPRedirect(joinType Mode, addr *Addressing) (Redirect, error) {
+	logger := slog.With("redirect", "NewTCPRedirect", "joinType", joinType.String(), "ip", addr.IP, "tcpPort", addr.TCPPort)
+	logger.Debug("Creating new UDP redirect")
+
+	switch joinType {
+	case CurrentUserIsHost:
+		slog.Info("Creating client to dial TCP and UDP on default ports")
+		return DialTCP(addr.IP.To4().String(), "")
+	case OtherUserIsHost:
+		slog.Info("Creating TCP and UDP listeners on custom ports")
+		return ListenTCP(addr.IP.To4().String(), addr.TCPPort)
+	case OtherUserHasJoined:
+		slog.Info("Creating UDP listener only on a custom port")
+		return ListenUDP(addr.IP.To4().String(), addr.UDPPort)
+	default:
+		return &Noop{}, nil
+	}
 }

@@ -117,10 +117,14 @@ func (p *Peer) handleNegotiation(ctx context.Context, session *bsession.Session,
 	return nil
 }
 
-func (p *Peer) createDataChannels(newRedirect redirect.NewRedirect) error {
-	guestTCP, guestUDP, err := newRedirect(p.Mode, p.Addr)
+func (p *Peer) createDataChannels(newTCPRedirect, newUDPRedirect redirect.NewRedirect) error {
+	guestTCP, err := newTCPRedirect(p.Mode, p.Addr)
 	if err != nil {
-		return fmt.Errorf("failed to create redirects: %w", err)
+		return fmt.Errorf("failed to create TCP redirect: %w", err)
+	}
+	guestUDP, err := newUDPRedirect(p.Mode, p.Addr)
+	if err != nil {
+		return fmt.Errorf("failed to create UDP redirect: %w", err)
 	}
 
 	if guestTCP != nil {

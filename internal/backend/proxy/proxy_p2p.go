@@ -20,9 +20,10 @@ type PeerToPeer struct {
 	// A custom IP address to which we will connect to.
 	hostIPAddress net.IP
 
-	WebRTCConfig webrtc.Configuration
-	NewRedirect  redirect.NewRedirect
-	SessionStore *SessionStore
+	WebRTCConfig   webrtc.Configuration
+	NewTCPRedirect redirect.NewRedirect
+	NewUDPRedirect redirect.NewRedirect
+	SessionStore   *SessionStore
 }
 
 func NewPeerToPeer() *PeerToPeer {
@@ -40,10 +41,11 @@ func NewPeerToPeer() *PeerToPeer {
 	}
 
 	return &PeerToPeer{
-		hostIPAddress: net.IPv4(127, 0, 1, 2),
-		WebRTCConfig:  config,
-		NewRedirect:   redirect.New,
-		SessionStore:  &SessionStore{sessions: make(map[*bsession.Session]*SessionMapping)},
+		hostIPAddress:  net.IPv4(127, 0, 1, 2),
+		WebRTCConfig:   config,
+		NewTCPRedirect: redirect.NewTCPRedirect,
+		NewUDPRedirect: redirect.NewUDPRedirect,
+		SessionStore:   &SessionStore{sessions: make(map[*bsession.Session]*SessionMapping)},
 	}
 }
 
@@ -65,7 +67,7 @@ func (p *PeerToPeer) CreateRoom(params CreateParams, session *bsession.Session) 
 	p.SessionStore.SetSession(session, &SessionMapping{
 		Game:   gameRoom,
 		IpRing: NewIpRing(),
-		Peers: map[string]*Peer{
+		Peers:  map[string]*Peer{
 			// hostPlayer.ID(): peer,
 		},
 	})
@@ -186,7 +188,8 @@ func (p *PeerToPeer) ExtendWire(session *bsession.Session) MessageHandler {
 		session,
 		p.SessionStore,
 		p.CreatePeer,
-		p.NewRedirect,
+		p.NewTCPRedirect,
+		p.NewUDPRedirect,
 	}
 }
 
