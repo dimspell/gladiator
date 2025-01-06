@@ -182,7 +182,7 @@ func (h *PeerToPeerMessageHandler) handleRTCOffer(ctx context.Context, offer wir
 			}
 		}
 
-		NewPipe(dc, redir)
+		NewPipe(ctx, dc, redir)
 
 		// dc.OnOpen(func() {
 		// 	logger.Debug("Data channel opened", "label", dc.Label())

@@ -32,15 +32,15 @@ func DialTCP(ipv4 string, portNumber string) (*DialerTCP, error) {
 	}, nil
 }
 
-func (p *DialerTCP) Run(ctx context.Context, rw io.ReadWriteCloser) error {
+func (p *DialerTCP) Run(ctx context.Context, dc io.Writer) error {
 	g, ctx := errgroup.WithContext(ctx)
-	g.Go(func() error {
-		if _, err := io.Copy(rw, p.tcpConn); err != nil {
-			slog.Error("Could not copy the payload", "error", err)
-			return err
-		}
-		return nil
-	})
+	// g.Go(func() error {
+	// 	if _, err := io.Copy(dc, p.tcpConn); err != nil {
+	// 		slog.Error("Could not copy the payload", "error", err)
+	// 		return err
+	// 	}
+	// 	return nil
+	// })
 	g.Go(func() error {
 		for {
 			if err := ctx.Err(); err != nil {
@@ -62,7 +62,7 @@ func (p *DialerTCP) Run(ctx context.Context, rw io.ReadWriteCloser) error {
 			}
 
 			slog.Debug("Received TCP message", "message", buf[0:n], "length", n, "proto", "tcp")
-			if _, err := rw.Write(buf[0:n]); err != nil {
+			if _, err := dc.Write(buf[0:n]); err != nil {
 				return err
 			}
 		}

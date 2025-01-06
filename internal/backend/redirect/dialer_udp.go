@@ -38,23 +38,23 @@ func DialUDP(ipv4 string, portNumber string) (*DialerUDP, error) {
 	}, nil
 }
 
-func (p *DialerUDP) Run(ctx context.Context, rw io.ReadWriteCloser) error {
+func (p *DialerUDP) Run(ctx context.Context, rw io.Writer) error {
 	g, ctx := errgroup.WithContext(ctx)
 
-	g.Go(func() error {
-		for {
-			buf := make([]byte, 1024)
-			n, err := rw.Read(buf)
-			if err != nil {
-				slog.Error("Failed to read", "error", err)
-				return err
-			}
-			if _, err := p.udpConn.WriteToUDP(buf[:n], p.udpAddr); err != nil {
-				slog.Warn("Error writing to UDP", "error", err, "protocol", "udp")
-				return err
-			}
-		}
-	})
+	// g.Go(func() error {
+	// 	for {
+	// 		buf := make([]byte, 1024)
+	// 		n, err := rw.Read(buf)
+	// 		if err != nil {
+	// 			slog.Error("Failed to read", "error", err)
+	// 			return err
+	// 		}
+	// 		if _, err := p.udpConn.WriteToUDP(buf[:n], p.udpAddr); err != nil {
+	// 			slog.Warn("Error writing to UDP", "error", err, "protocol", "udp")
+	// 			return err
+	// 		}
+	// 	}
+	// })
 	g.Go(func() error {
 		for {
 			if err := ctx.Err(); err != nil {

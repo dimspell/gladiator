@@ -52,7 +52,7 @@ func (s Mode) String() string {
 }
 
 type Redirect interface {
-	Run(ctx context.Context, rw io.ReadWriteCloser) error
+	Run(ctx context.Context, rw io.Writer) error
 
 	io.Writer
 	io.Closer

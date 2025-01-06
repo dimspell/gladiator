@@ -68,7 +68,7 @@ func (p *PeerToPeer) CreateRoom(params CreateParams, session *bsession.Session) 
 	p.SessionStore.SetSession(session, &SessionMapping{
 		Game:   gameRoom,
 		IpRing: NewIpRing(),
-		Peers: map[string]*Peer{
+		Peers:  map[string]*Peer{
 			// hostPlayer.ID(): peer,
 		},
 	})

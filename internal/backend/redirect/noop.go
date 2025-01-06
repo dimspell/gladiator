@@ -21,6 +21,6 @@ func (r *Noop) Close() error {
 	return nil
 }
 
-func (r *Noop) Run(_ context.Context, _ io.ReadWriteCloser) error {
+func (r *Noop) Run(_ context.Context, _ io.Writer) error {
 	return nil
 }

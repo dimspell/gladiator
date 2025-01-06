@@ -2,7 +2,6 @@ package redirect
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"log/slog"
 	"net"
@@ -14,8 +13,11 @@ import (
 var _ Redirect = (*ListenerUDP)(nil)
 
 type ListenerUDP struct {
-	connUDP  *net.UDPConn
-	writeUDP chan []byte
+	connUDP *net.UDPConn
+
+	onceSetAddr sync.Once
+	udpAddr     *net.UDPAddr
+	// writeUDP chan []byte
 }
 
 func ListenUDP(ipv4 string, portNumber string) (*ListenerUDP, error) {
@@ -33,68 +35,62 @@ func ListenUDP(ipv4 string, portNumber string) (*ListenerUDP, error) {
 	slog.Info("Guest: Listening UDP", "addr", srcAddr.String())
 
 	p := ListenerUDP{
-		writeUDP: make(chan []byte),
-		connUDP:  srcConn,
+		// writeUDP: make(chan []byte),
+		connUDP: srcConn,
 	}
 	return &p, nil
 }
 
-func (p *ListenerUDP) Run(ctx context.Context, rw io.ReadWriteCloser) error {
+func (p *ListenerUDP) Run(ctx context.Context, rw io.Writer) error {
 	defer func() {
 		slog.Warn("Closing udp connnection", "error", p.connUDP.Close())
-		close(p.writeUDP)
+		// close(p.writeUDP)
 	}()
-
-	var (
-		clientDestAddr *net.UDPAddr
-		clientDestOnce sync.Once
-		setClientAddr  = func(addr *net.UDPAddr) func() { return func() { clientDestAddr = addr } }
-	)
 
 	g, ctx := errgroup.WithContext(ctx)
 
-	g.Go(func() error {
-		for {
-			if ctx.Err() != nil {
-				return ctx.Err()
-			}
-
-			buf := make([]byte, 1024)
-			n, err := rw.Read(buf)
-			if err != nil {
-				slog.Warn("Error reading from UDP", "error", err, "protocol", "udp")
-				return err
-			}
-
-			slog.Debug("Received from RW", "payload", buf[0:n], "protocol", "udp")
-			if clientDestAddr != nil {
-				continue
-			}
-			if _, err := p.connUDP.WriteToUDP(buf[:n], clientDestAddr); err != nil {
-				slog.Warn("Error writing to UDP", "error", err, "protocol", "udp")
-				return err
-			}
-		}
-	})
-	g.Go(func() error {
-		for {
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case msg, ok := <-p.writeUDP:
-				if !ok {
-					return fmt.Errorf("closed channel")
-				}
-				if clientDestAddr != nil {
-					continue
-				}
-				if _, err := p.connUDP.WriteToUDP(msg, clientDestAddr); err != nil {
-					slog.Warn("Error writing to UDP", "error", err, "protocol", "udp")
-					return err
-				}
-			}
-		}
-	})
+	// g.Go(func() error {
+	// 	for {
+	// 		if ctx.Err() != nil {
+	// 			return ctx.Err()
+	// 		}
+	//
+	// 		buf := make([]byte, 1024)
+	// 		n, err := rw.Read(buf)
+	// 		if err != nil {
+	// 			slog.Warn("Error reading from UDP", "error", err, "protocol", "udp")
+	// 			return err
+	// 		}
+	//
+	// 		slog.Debug("Received from RW", "payload", buf[0:n], "protocol", "udp")
+	// 		if clientDestAddr != nil {
+	// 			continue
+	// 		}
+	// 		if _, err := p.connUDP.WriteToUDP(buf[:n], clientDestAddr); err != nil {
+	// 			slog.Warn("Error writing to UDP", "error", err, "protocol", "udp")
+	// 			return err
+	// 		}
+	// 	}
+	// })
+	// g.Go(func() error {
+	// 	for {
+	// 		select {
+	// 		case <-ctx.Done():
+	// 			return ctx.Err()
+	// 		case msg, ok := <-p.writeUDP:
+	// 			if !ok {
+	// 				return fmt.Errorf("closed channel")
+	// 			}
+	// 			if clientDestAddr != nil {
+	// 				continue
+	// 			}
+	// 			if _, err := p.connUDP.WriteToUDP(msg, clientDestAddr); err != nil {
+	// 				slog.Warn("Error writing to UDP", "error", err, "protocol", "udp")
+	// 				return err
+	// 			}
+	// 		}
+	// 	}
+	// })
 	g.Go(func() error {
 		for {
 			if ctx.Err() != nil {
@@ -107,7 +103,7 @@ func (p *ListenerUDP) Run(ctx context.Context, rw io.ReadWriteCloser) error {
 				slog.Warn("Error reading from UDP ", "error", err, "protocol", "udp")
 				return err
 			}
-			clientDestOnce.Do(setClientAddr(addr))
+			p.setAddr(addr)
 
 			if _, err := rw.Write(buf[:n]); err != nil {
 				slog.Warn("Error writing to RW", "error", err, "protocol", "udp", "from", addr, "payload", buf[0:n])
@@ -121,11 +117,14 @@ func (p *ListenerUDP) Run(ctx context.Context, rw io.ReadWriteCloser) error {
 }
 
 func (p *ListenerUDP) Write(msg []byte) (int, error) {
-	if p.connUDP == nil {
+	if p.udpAddr == nil || p.connUDP == nil {
 		return 0, io.EOF
 	}
-	p.writeUDP <- msg
-	return len(msg), nil
+	return p.connUDP.WriteToUDP(msg, p.udpAddr)
+}
+
+func (p *ListenerUDP) setAddr(addr *net.UDPAddr) {
+	p.udpAddr = addr
 }
 
 func (p *ListenerUDP) Close() error {

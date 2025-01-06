@@ -109,16 +109,16 @@ func (p *Peer) setupPeerConnection(ctx context.Context, session *bsession.Sessio
 func (p *Peer) handleNegotiation(ctx context.Context, session *bsession.Session, player wire.Player, sendRTCOffer bool) error {
 	offer, err := p.Connection.CreateOffer(nil)
 	if err != nil {
-		return fmt.Errorf("failed to create offer for peer %s: %w", player.UserID, err)
+		return fmt.Errorf("failed to create offer for peer %d: %w", player.UserID, err)
 	}
 
 	if err := p.Connection.SetLocalDescription(offer); err != nil {
-		return fmt.Errorf("failed to set local description for peer %s: %w", player.UserID, err)
+		return fmt.Errorf("failed to set local description for peer %d: %w", player.UserID, err)
 	}
 
 	if sendRTCOffer {
 		if err := session.SendRTCOffer(ctx, offer, player.ID()); err != nil {
-			return fmt.Errorf("failed to send RTC offer to peer %s: %w", player.UserID, err)
+			return fmt.Errorf("failed to send RTC offer to peer %d: %w", player.UserID, err)
 		}
 	}
 
@@ -160,7 +160,7 @@ func (p *Peer) createDataChannel(label string, redir redirect.Redirect) error {
 	// p.dataChannels[label] = dc
 	// p.mu.Unlock()
 
-	pipe := NewPipe(dc, redir)
+	pipe := NewPipe(context.TODO(), dc, redir)
 
 	dc.OnOpen(func() {
 		slog.Debug("Opened WebRTC channel",
