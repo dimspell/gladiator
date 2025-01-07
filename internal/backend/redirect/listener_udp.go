@@ -65,7 +65,9 @@ func (p *ListenerUDP) Run(ctx context.Context, rw io.Writer) error {
 				p.logger.Warn("Failed to read", "error", err)
 				return err
 			}
-			p.setAddr(remoteAddr)
+			p.onceSetAddr.Do(func() {
+				p.setAddr(remoteAddr)
+			})
 
 			if _, err := rw.Write(buf[:n]); err != nil {
 				p.logger.Warn("Failed to write", "error", err, "payload", buf[0:n])
