@@ -25,7 +25,6 @@ func DialUDP(ipv4 string, portNumber string) (*DialerUDP, error) {
 
 	if portNumber == "" {
 		portNumber = defaultUdpPort
-
 	}
 
 	udpAddr, err := net.ResolveUDPAddr("udp", net.JoinHostPort(ipv4, portNumber))
