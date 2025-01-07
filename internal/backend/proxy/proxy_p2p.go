@@ -33,11 +33,11 @@ func NewPeerToPeer() *PeerToPeer {
 			// {
 			// 	URLs: []string{"stun:stun.l.google.com:19302"},
 			// },
-			// {
-			// 	URLs:       []string{"turn:127.0.0.1:3478"},
-			// 	Username:   "username1",
-			// 	Credential: "password1",
-			// },
+			{
+				URLs:       []string{"turn:192.168.121.212:3478"},
+				Username:   "username1",
+				Credential: "password1",
+			},
 		},
 	}
 
