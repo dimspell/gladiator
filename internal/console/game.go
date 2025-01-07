@@ -140,6 +140,7 @@ func (s *gameServiceServer) JoinGame(_ context.Context, req *connect.Request[mul
 		})
 	}
 
+	// FIXME: Likely empty response
 	resp := connect.NewResponse(&multiv1.JoinGameResponse{Players: players})
 	return resp, nil
 }
