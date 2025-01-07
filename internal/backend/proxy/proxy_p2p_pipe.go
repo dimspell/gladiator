@@ -80,7 +80,10 @@ func NewPipe(ctx context.Context, dc DataChannel, proxy redirect.Redirect) *Pipe
 	})
 
 	dc.OnMessage(func(msg webrtc.DataChannelMessage) {
-		proxy.Write(msg.Data)
+		if _, err := proxy.Write(msg.Data); err != nil {
+			pipe.logger.Warn("could not write to the proxy", "error", err, "data", msg.Data)
+			return
+		}
 	})
 
 	return pipe

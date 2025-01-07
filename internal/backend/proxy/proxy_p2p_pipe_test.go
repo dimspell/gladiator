@@ -10,6 +10,7 @@ import (
 
 	"github.com/dimspell/gladiator/internal/app/logger"
 	"github.com/pion/webrtc/v4"
+	"github.com/stretchr/testify/assert"
 	"go.uber.org/goleak"
 	"golang.org/x/sync/errgroup"
 )
@@ -20,7 +21,8 @@ type mockDataChannel struct {
 	onClose   func()
 	onError   func(err error)
 	closed    bool
-	received  chan []byte
+
+	received chan []byte
 }
 
 func (m *mockDataChannel) Label() string                                   { return m.label }
@@ -39,40 +41,23 @@ func (m *mockDataChannel) Close() error {
 	}
 	return nil
 }
-func (m *mockDataChannel) receive(t *testing.T, data []byte) {
-	t.Logf("Writing data to data channel (data=%q)", string(data))
-	m.onMessage(webrtc.DataChannelMessage{Data: data})
-}
 
 type mockRedirect struct {
-	fromDataChannel chan []byte
-	fromProxy       chan []byte
-	t               *testing.T
+	toProxy       chan []byte
+	toDataChannel chan []byte
+	t             *testing.T
 }
 
 func (m *mockRedirect) Run(ctx context.Context, dc io.Writer) error {
 	g, ctx := errgroup.WithContext(ctx)
 
-	// Writer
-	// g.Go(func() error {
-	// 	for {
-	// 		data := make([]byte, 1024)
-	// 		n, err := dc.Read(data)
-	// 		if err != nil {
-	// 			return err
-	// 		}
-	// 		m.t.Logf("reading data from redirect (data=%q)", string(data[:n]))
-	// 		m.fromProxy <- data[:n]
-	// 	}
-	// })
-	// Reader
+	// Proxy -> DataChannel
 	g.Go(func() error {
-		// Proxy -> DataChannel
 		for {
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
-			case data := <-m.fromProxy:
+			case data := <-m.toDataChannel:
 				m.t.Logf("sending data to redirect (data=%q)", string(data))
 				_, err := dc.Write(data)
 				if err != nil {
@@ -86,14 +71,14 @@ func (m *mockRedirect) Run(ctx context.Context, dc io.Writer) error {
 }
 
 func (m *mockRedirect) Close() error {
-	close(m.fromProxy)
-	close(m.fromDataChannel)
+	close(m.toDataChannel)
+	close(m.toProxy)
 	return nil
 }
 
 func (m *mockRedirect) Write(p []byte) (n int, err error) {
 	// DataChannel -> Proxy
-	m.fromDataChannel <- p
+	m.toProxy <- p
 	return n, nil
 }
 
@@ -107,14 +92,14 @@ func TestPipeMessageHandling(t *testing.T) {
 			label:    "test",
 			received: make(chan []byte, 1),
 		}
-		// defer dc.Close()
+		defer dc.Close()
 
 		proxy := &mockRedirect{
-			t:               t,
-			fromDataChannel: make(chan []byte, 1),
-			fromProxy:       make(chan []byte, 1),
+			t:             t,
+			toProxy:       make(chan []byte, 1),
+			toDataChannel: make(chan []byte, 1),
 		}
-		// defer proxy.Close()
+		defer proxy.Close()
 
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
@@ -122,17 +107,14 @@ func TestPipeMessageHandling(t *testing.T) {
 		pipe := NewPipe(ctx, dc, proxy)
 		defer pipe.Close()
 
-		testData := []byte("test message")
+		// Test that the DataChannel receives messages from the proxy
+		msgFromProxy := "Message from the Proxy"
+		proxy.toDataChannel <- []byte(msgFromProxy)
+		assert.Equal(t, msgFromProxy, string(<-dc.received))
 
-		dc.receive(t, testData)
-
-		testMsg := "message from the proxy"
-		proxy.fromProxy <- []byte(testMsg)
-
-		msg := string(<-dc.received)
-		t.Logf("DataChannel received message from the redirect (data=%q)", msg)
-		if msg != testMsg {
-			t.Errorf("Unexpected message received from the redirect (data=%q)", msg)
-		}
+		// Test that the DataChannel sends messages to the proxy
+		msgFromDataChannel := "Message from the DataChannel"
+		dc.onMessage(webrtc.DataChannelMessage{Data: []byte(msgFromDataChannel)})
+		assert.Equal(t, msgFromDataChannel, string(<-proxy.toProxy))
 	})
 }
