@@ -36,6 +36,8 @@ func TurnCommand() *cli.Command {
 			Realm:        c.String("turn-realm"),
 			Users:        `username1=password1,username2=password2`,
 		})
+
+		select {}
 		return nil
 	}
 
