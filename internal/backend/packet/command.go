@@ -1,3 +1,3 @@
-package command
+package packet
 
 type PacketType byte

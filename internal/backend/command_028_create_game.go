@@ -10,7 +10,6 @@ import (
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/packet"
-	"github.com/dimspell/gladiator/internal/backend/packet/command"
 	"github.com/dimspell/gladiator/internal/backend/proxy"
 	"github.com/dimspell/gladiator/internal/model"
 )
@@ -64,7 +63,7 @@ func (b *Backend) HandleCreateGame(session *bsession.Session, req CreateGameRequ
 		break
 	}
 
-	return session.Send(command.CreateGame, response)
+	return session.Send(packet.CreateGame, response)
 }
 
 type CreateGameRequest []byte

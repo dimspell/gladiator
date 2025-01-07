@@ -10,7 +10,6 @@ import (
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/packet"
-	"github.com/dimspell/gladiator/internal/backend/packet/command"
 )
 
 func (b *Backend) HandleSelectCharacter(session *bsession.Session, req SelectCharacterRequest) error {
@@ -33,7 +32,7 @@ func (b *Backend) HandleSelectCharacter(session *bsession.Session, req SelectCha
 		var connectError *connect.Error
 		if errors.As(err, &connectError) {
 			if connectError.Code() == connect.CodeNotFound {
-				return session.Send(command.SelectCharacter, []byte{0, 0, 0, 0})
+				return session.Send(packet.SelectCharacter, []byte{0, 0, 0, 0})
 			}
 		}
 		return fmt.Errorf("packet-76: no characters found owned by player: %s", err)
@@ -45,7 +44,7 @@ func (b *Backend) HandleSelectCharacter(session *bsession.Session, req SelectCha
 
 	session.UpdateCharacter(respChar.Msg.Character)
 
-	return session.Send(command.SelectCharacter, response)
+	return session.Send(packet.SelectCharacter, response)
 }
 
 type SelectCharacterRequest []byte

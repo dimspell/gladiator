@@ -6,7 +6,6 @@ import (
 
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/packet"
-	"github.com/dimspell/gladiator/internal/backend/packet/command"
 )
 
 // HandleAuthorizationHandshake handles 0x6ff (255-6) command.
@@ -29,7 +28,7 @@ func (b *Backend) HandleAuthorizationHandshake(session *bsession.Session, req Au
 		return nil
 	}
 	if string(data.AuthKey) != "68XIPSID" {
-		if err := session.Send(command.AuthorizationHandshake, []byte{0, 0, 0, 0}); err != nil {
+		if err := session.Send(packet.AuthorizationHandshake, []byte{0, 0, 0, 0}); err != nil {
 			return err
 		}
 
@@ -37,7 +36,7 @@ func (b *Backend) HandleAuthorizationHandshake(session *bsession.Session, req Au
 		return fmt.Errorf("packet-6: wrong auth key: %q", data.AuthKey)
 	}
 
-	return session.Send(command.AuthorizationHandshake, []byte("ENET\x00"))
+	return session.Send(packet.AuthorizationHandshake, []byte("ENET\x00"))
 }
 
 type AuthorizationHandshakeRequest []byte

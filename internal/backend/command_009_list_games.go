@@ -10,7 +10,7 @@ import (
 	"connectrpc.com/connect"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/internal/backend/bsession"
-	"github.com/dimspell/gladiator/internal/backend/packet/command"
+	"github.com/dimspell/gladiator/internal/backend/packet"
 	"github.com/dimspell/gladiator/internal/model"
 )
 
@@ -50,7 +50,7 @@ func (b *Backend) HandleListGames(session *bsession.Session, req ListGamesReques
 		response = append(response, byte(0))                   // Null byte
 	}
 
-	return session.Send(command.ListGames, response)
+	return session.Send(packet.ListGames, response)
 }
 
 type ListGamesRequest []byte

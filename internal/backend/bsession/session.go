@@ -11,7 +11,6 @@ import (
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/internal/app/logger"
 	"github.com/dimspell/gladiator/internal/backend/packet"
-	"github.com/dimspell/gladiator/internal/backend/packet/command"
 	"github.com/dimspell/gladiator/internal/model"
 	"github.com/dimspell/gladiator/internal/wire"
 	"github.com/google/uuid"
@@ -65,11 +64,11 @@ func (s *Session) UpdateCharacter(character *multiv1.Character) {
 
 func (s *Session) GetUserID() string { return fmt.Sprintf("%d", s.UserID) }
 
-func (s *Session) Send(packetType command.PacketType, payload []byte) error {
+func (s *Session) Send(packetType packet.PacketType, payload []byte) error {
 	return sendPacket(s.Conn, packetType, payload)
 }
 
-func sendPacket(conn net.Conn, packetType command.PacketType, payload []byte) error {
+func sendPacket(conn net.Conn, packetType packet.PacketType, payload []byte) error {
 	if conn == nil {
 		return fmt.Errorf("backend: invalid client connection")
 	}

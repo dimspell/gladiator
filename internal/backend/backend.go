@@ -13,7 +13,7 @@ import (
 
 	"github.com/dimspell/gladiator/gen/multi/v1/multiv1connect"
 	"github.com/dimspell/gladiator/internal/backend/bsession"
-	"github.com/dimspell/gladiator/internal/backend/packet/command"
+	"github.com/dimspell/gladiator/internal/backend/packet"
 	"github.com/dimspell/gladiator/internal/backend/proxy"
 )
 
@@ -102,8 +102,8 @@ func (b *Backend) Shutdown() {
 
 		// TODO: Send a system message "(system) The server is going to close in less than 30 seconds"
 		_ = session.Send(
-			command.ReceiveMessage,
-			command.NewGlobalMessage("system-info", "The server is going to shut down..."))
+			packet.ReceiveMessage,
+			packet.NewGlobalMessage("system-info", "The server is going to shut down..."))
 
 		// TODO: Send a packet to trigger stats saving
 		// TODO: Send a system message "(system): Your stats were saving, your game client might close in the next 10 seconds"

@@ -1,4 +1,4 @@
-package command
+package packet
 
 import (
 	"encoding/binary"

@@ -1,4 +1,4 @@
-package command
+package packet
 
 const (
 	AuthorizationHandshake   PacketType = 6   // 0x6ff

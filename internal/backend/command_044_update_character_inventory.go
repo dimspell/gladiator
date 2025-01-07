@@ -9,7 +9,6 @@ import (
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/packet"
-	"github.com/dimspell/gladiator/internal/backend/packet/command"
 )
 
 func (b *Backend) HandleUpdateCharacterInventory(session *bsession.Session, req UpdateCharacterInventoryRequest) error {
@@ -32,7 +31,7 @@ func (b *Backend) HandleUpdateCharacterInventory(session *bsession.Session, req 
 		return err
 	}
 
-	return session.Send(command.UpdateCharacterInventory, []byte{1, 0, 0, 0})
+	return session.Send(packet.UpdateCharacterInventory, []byte{1, 0, 0, 0})
 }
 
 type UpdateCharacterInventoryRequest []byte

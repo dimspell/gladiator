@@ -10,7 +10,6 @@ import (
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/packet"
-	"github.com/dimspell/gladiator/internal/backend/packet/command"
 )
 
 func (b *Backend) HandleGetCharacterInventory(session *bsession.Session, req GetCharacterInventoryRequest) error {
@@ -38,7 +37,7 @@ func (b *Backend) HandleGetCharacterInventory(session *bsession.Session, req Get
 		}))
 
 	if err != nil {
-		_ = session.Send(command.ReceiveMessage, command.NewGlobalMessage("system", "Inventory fetch failed, please try sign-in again"))
+		_ = session.Send(packet.ReceiveMessage, packet.NewGlobalMessage("system", "Inventory fetch failed, please try sign-in again"))
 
 		var connectError *connect.Error
 		if errors.As(err, &connectError) {
@@ -55,7 +54,7 @@ func (b *Backend) HandleGetCharacterInventory(session *bsession.Session, req Get
 		return nil
 	}
 
-	return session.Send(command.GetCharacterInventory, inventory)
+	return session.Send(packet.GetCharacterInventory, inventory)
 }
 
 type GetCharacterInventoryRequest []byte

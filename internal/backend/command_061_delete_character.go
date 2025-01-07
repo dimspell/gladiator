@@ -9,7 +9,6 @@ import (
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/packet"
-	"github.com/dimspell/gladiator/internal/backend/packet/command"
 )
 
 func (b *Backend) HandleDeleteCharacter(session *bsession.Session, req DeleteCharacterRequest) error {
@@ -35,7 +34,7 @@ func (b *Backend) HandleDeleteCharacter(session *bsession.Session, req DeleteCha
 	response := make([]byte, len(data.CharacterName)+1)
 	copy(response, data.CharacterName)
 
-	return session.Send(command.DeleteCharacter, response)
+	return session.Send(packet.DeleteCharacter, response)
 }
 
 type DeleteCharacterRequest []byte

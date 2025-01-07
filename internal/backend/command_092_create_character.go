@@ -9,7 +9,6 @@ import (
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/packet"
-	"github.com/dimspell/gladiator/internal/backend/packet/command"
 	"github.com/dimspell/gladiator/internal/model"
 )
 
@@ -32,14 +31,14 @@ func (b *Backend) HandleCreateCharacter(session *bsession.Session, req CreateCha
 		}))
 	if err != nil {
 		slog.Error("Could not create a character", "err", err)
-		return session.Send(command.CreateCharacter, []byte{0, 0, 0, 0})
+		return session.Send(packet.CreateCharacter, []byte{0, 0, 0, 0})
 	}
 
 	slog.Info("packet-92: new character created",
 		"character", respChar.Msg.Character.CharacterName,
 		"username", data.Username)
 
-	return session.Send(command.CreateCharacter, []byte{1, 0, 0, 0})
+	return session.Send(packet.CreateCharacter, []byte{1, 0, 0, 0})
 }
 
 // TODO: check if there is any additional not recognised byte at the end like slot number

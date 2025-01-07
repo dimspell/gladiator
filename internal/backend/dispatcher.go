@@ -8,7 +8,7 @@ import (
 
 	"github.com/dimspell/gladiator/internal/app/logger"
 	"github.com/dimspell/gladiator/internal/backend/bsession"
-	"github.com/dimspell/gladiator/internal/backend/packet/command"
+	"github.com/dimspell/gladiator/internal/backend/packet"
 )
 
 func (b *Backend) handshake(conn net.Conn) (*bsession.Session, error) {
@@ -64,100 +64,100 @@ func (b *Backend) handleCommands(ctx context.Context, session *bsession.Session)
 	}
 	packets := splitMultiPacket(buf[:n])
 
-	for _, packet := range packets {
-		if len(packet) < 4 {
+	for _, data := range packets {
+		if len(data) < 4 {
 			continue
 		}
-		if packet[0] != 255 {
+		if data[0] != 255 {
 			continue
 		}
 
-		pt := command.PacketType(packet[1])
+		pt := packet.PacketType(data[1])
 		if logger.PacketLogger != nil {
 			logger.PacketLogger.Debug("Recv",
 				"packetType", pt,
-				"bytes", packet,
+				"bytes", data,
 				"sessionId", session.ID,
-				"length", len(packet),
+				"length", len(data),
 			)
 		}
 
 		// TODO: Pass context further
 		switch pt {
-		case command.CreateNewAccount:
-			if err := b.HandleCreateNewAccount(session, packet[4:]); err != nil {
+		case packet.CreateNewAccount:
+			if err := b.HandleCreateNewAccount(session, data[4:]); err != nil {
 				return err
 			}
-		case command.ClientAuthentication:
-			if err := b.HandleClientAuthentication(session, packet[4:]); err != nil {
+		case packet.ClientAuthentication:
+			if err := b.HandleClientAuthentication(session, data[4:]); err != nil {
 				return err
 			}
-		case command.ListChannels:
-			if err := b.HandleListChannels(session, packet[4:]); err != nil {
+		case packet.ListChannels:
+			if err := b.HandleListChannels(session, data[4:]); err != nil {
 				return err
 			}
-		case command.SelectedChannel:
-			if err := b.HandleSelectChannel(session, packet[4:]); err != nil {
+		case packet.SelectedChannel:
+			if err := b.HandleSelectChannel(session, data[4:]); err != nil {
 				return err
 			}
-		case command.SendLobbyMessage:
-			if err := b.HandleSendLobbyMessage(session, packet[4:]); err != nil {
+		case packet.SendLobbyMessage:
+			if err := b.HandleSendLobbyMessage(session, data[4:]); err != nil {
 				return err
 			}
-		case command.CreateGame:
-			if err := b.HandleCreateGame(session, packet[4:]); err != nil {
+		case packet.CreateGame:
+			if err := b.HandleCreateGame(session, data[4:]); err != nil {
 				return err
 			}
-		case command.ListGames:
-			if err := b.HandleListGames(session, packet[4:]); err != nil {
+		case packet.ListGames:
+			if err := b.HandleListGames(session, data[4:]); err != nil {
 				return err
 			}
-		case command.SelectGame:
-			if err := b.HandleSelectGame(session, packet[4:]); err != nil {
+		case packet.SelectGame:
+			if err := b.HandleSelectGame(session, data[4:]); err != nil {
 				return err
 			}
-		case command.JoinGame:
-			if err := b.HandleJoinGame(session, packet[4:]); err != nil {
+		case packet.JoinGame:
+			if err := b.HandleJoinGame(session, data[4:]); err != nil {
 				return err
 			}
-		case command.ShowRanking:
-			if err := b.HandleShowRanking(session, packet[4:]); err != nil {
+		case packet.ShowRanking:
+			if err := b.HandleShowRanking(session, data[4:]); err != nil {
 				return err
 			}
-		case command.UpdateCharacterInventory:
-			if err := b.HandleUpdateCharacterInventory(session, packet[4:]); err != nil {
+		case packet.UpdateCharacterInventory:
+			if err := b.HandleUpdateCharacterInventory(session, data[4:]); err != nil {
 				return err
 			}
-		case command.GetCharacters:
-			if err := b.HandleGetCharacters(session, packet[4:]); err != nil {
+		case packet.GetCharacters:
+			if err := b.HandleGetCharacters(session, data[4:]); err != nil {
 				return err
 			}
-		case command.DeleteCharacter:
-			if err := b.HandleDeleteCharacter(session, packet[4:]); err != nil {
+		case packet.DeleteCharacter:
+			if err := b.HandleDeleteCharacter(session, data[4:]); err != nil {
 				return err
 			}
-		case command.GetCharacterInventory:
-			if err := b.HandleGetCharacterInventory(session, packet[4:]); err != nil {
+		case packet.GetCharacterInventory:
+			if err := b.HandleGetCharacterInventory(session, data[4:]); err != nil {
 				return err
 			}
-		case command.GetCharacterSpells:
-			if err := b.HandleGetCharacterSpells(session, packet[4:]); err != nil {
+		case packet.GetCharacterSpells:
+			if err := b.HandleGetCharacterSpells(session, data[4:]); err != nil {
 				return err
 			}
-		case command.UpdateCharacterSpells:
-			if err := b.HandleUpdateCharacterSpells(session, packet[4:]); err != nil {
+		case packet.UpdateCharacterSpells:
+			if err := b.HandleUpdateCharacterSpells(session, data[4:]); err != nil {
 				return err
 			}
-		case command.SelectCharacter:
-			if err := b.HandleSelectCharacter(session, packet[4:]); err != nil {
+		case packet.SelectCharacter:
+			if err := b.HandleSelectCharacter(session, data[4:]); err != nil {
 				return err
 			}
-		case command.CreateCharacter:
-			if err := b.HandleCreateCharacter(session, packet[4:]); err != nil {
+		case packet.CreateCharacter:
+			if err := b.HandleCreateCharacter(session, data[4:]); err != nil {
 				return err
 			}
-		case command.UpdateCharacterStats:
-			if err := b.HandleUpdateCharacterStats(session, packet[4:]); err != nil {
+		case packet.UpdateCharacterStats:
+			if err := b.HandleUpdateCharacterStats(session, data[4:]); err != nil {
 				return err
 			}
 		}

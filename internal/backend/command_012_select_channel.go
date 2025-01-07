@@ -6,7 +6,6 @@ import (
 
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/packet"
-	"github.com/dimspell/gladiator/internal/backend/packet/command"
 	"github.com/dimspell/gladiator/internal/model"
 )
 
@@ -15,7 +14,7 @@ func (b *Backend) HandleSelectChannel(session *bsession.Session, req SelectChann
 	slog.Info("Selected channel", "serverName", serverName, "channelName", channelName, "error", err)
 	if serverName == "DISPEL" && channelName == "DISPEL" {
 		for idx, user := range session.State.GetLobbyUsers() {
-			session.Send(command.ReceiveMessage, command.AppendCharacterToLobby(user.Username, model.ClassType(user.ClassType), uint32(idx)))
+			session.Send(packet.ReceiveMessage, packet.AppendCharacterToLobby(user.Username, model.ClassType(user.ClassType), uint32(idx)))
 		}
 		// session.Send(ReceiveMessage, NewGlobalMessage("admin", "hello"))
 	}

@@ -9,7 +9,7 @@ import (
 	"connectrpc.com/connect"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/internal/backend/bsession"
-	"github.com/dimspell/gladiator/internal/backend/packet/command"
+	"github.com/dimspell/gladiator/internal/backend/packet"
 )
 
 func (b *Backend) HandleGetCharacters(session *bsession.Session, req GetCharactersRequest) error {
@@ -27,7 +27,7 @@ func (b *Backend) HandleGetCharacters(session *bsession.Session, req GetCharacte
 	}
 
 	if len(resp.Msg.GetCharacters()) == 0 {
-		return session.Send(command.GetCharacters, []byte{0, 0, 0, 0})
+		return session.Send(packet.GetCharacters, []byte{0, 0, 0, 0})
 	}
 
 	response := []byte{1, 0, 0, 0}
@@ -36,7 +36,7 @@ func (b *Backend) HandleGetCharacters(session *bsession.Session, req GetCharacte
 		response = append(response, character.CharacterName...)
 		response = append(response, 0)
 	}
-	return session.Send(command.GetCharacters, response)
+	return session.Send(packet.GetCharacters, response)
 }
 
 type GetCharactersRequest []byte

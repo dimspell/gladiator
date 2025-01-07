@@ -2,11 +2,9 @@ package packet
 
 import (
 	"encoding/binary"
-
-	"github.com/dimspell/gladiator/internal/backend/packet/command"
 )
 
-func EncodePacket(packetType command.PacketType, data []byte) []byte {
+func EncodePacket(packetType PacketType, data []byte) []byte {
 	length := len(data) + 4
 	payload := make([]byte, length)
 

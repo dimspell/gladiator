@@ -9,7 +9,6 @@ import (
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/packet"
-	"github.com/dimspell/gladiator/internal/backend/packet/command"
 )
 
 func (b *Backend) HandleUpdateCharacterSpells(session *bsession.Session, req UpdateCharacterSpellsRequest) error {
@@ -33,7 +32,7 @@ func (b *Backend) HandleUpdateCharacterSpells(session *bsession.Session, req Upd
 		return fmt.Errorf("packet-73: could not update character spells: %s", err)
 	}
 
-	return session.Send(command.UpdateCharacterSpells, []byte{1, 0, 0, 0})
+	return session.Send(packet.UpdateCharacterSpells, []byte{1, 0, 0, 0})
 }
 
 type UpdateCharacterSpellsRequest []byte

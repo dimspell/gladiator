@@ -9,7 +9,6 @@ import (
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/packet"
-	"github.com/dimspell/gladiator/internal/backend/packet/command"
 	"github.com/dimspell/gladiator/internal/model"
 )
 
@@ -38,7 +37,7 @@ func (b *Backend) HandleUpdateCharacterStats(session *bsession.Session, req Upda
 		return err
 	}
 
-	return session.Send(command.UpdateCharacterStats, []byte{})
+	return session.Send(packet.UpdateCharacterStats, []byte{})
 }
 
 type UpdateCharacterStatsRequest []byte

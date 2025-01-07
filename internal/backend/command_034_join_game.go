@@ -11,7 +11,6 @@ import (
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/packet"
-	"github.com/dimspell/gladiator/internal/backend/packet/command"
 	"github.com/dimspell/gladiator/internal/backend/proxy"
 	"github.com/dimspell/gladiator/internal/model"
 )
@@ -88,7 +87,7 @@ func (b *Backend) HandleJoinGame(session *bsession.Session, req JoinGameRequest)
 		response = append(response, byte(0))                         // Null byte
 	}
 
-	return session.Send(command.JoinGame, response)
+	return session.Send(packet.JoinGame, response)
 }
 
 type JoinGameRequest []byte

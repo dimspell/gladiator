@@ -9,7 +9,6 @@ import (
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/packet"
-	"github.com/dimspell/gladiator/internal/backend/packet/command"
 )
 
 // 008-JP1-20001
@@ -26,12 +25,12 @@ func (b *Backend) HandleCreateNewAccount(session *bsession.Session, req CreateNe
 	}))
 	if err != nil {
 		slog.Warn("packet-42: could not save new user into database", "err", err)
-		return session.Send(command.CreateNewAccount, []byte{0, 0, 0, 0})
+		return session.Send(packet.CreateNewAccount, []byte{0, 0, 0, 0})
 	}
 
 	slog.Info("packet-42: new user created", "user", respUser.Msg.User.Username)
 
-	return session.Send(command.CreateNewAccount, []byte{1, 0, 0, 0})
+	return session.Send(packet.CreateNewAccount, []byte{1, 0, 0, 0})
 }
 
 type CreateNewAccountRequest []byte

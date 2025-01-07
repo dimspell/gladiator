@@ -13,7 +13,7 @@ import (
 
 	v1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/internal/app/logger"
-	"github.com/dimspell/gladiator/internal/backend/packet/command"
+	"github.com/dimspell/gladiator/internal/backend/packet"
 	"github.com/dimspell/gladiator/internal/backend/proxy"
 	"github.com/dimspell/gladiator/internal/backend/redirect"
 	"github.com/dimspell/gladiator/internal/console"
@@ -183,7 +183,7 @@ func TestE2E_P2P(t *testing.T) {
 		127, 0, 1, 2, // IP address of host
 		'r', 'o', 'o', 'm', 0, // Room name
 		0, // Password
-	}, findPacket(conn2.Written, command.ListGames))
+	}, findPacket(conn2.Written, packet.ListGames))
 
 	// Truncate
 	conn2.Written = nil
@@ -201,7 +201,7 @@ func TestE2E_P2P(t *testing.T) {
 		// 127, 0, 1, 2, // IP address of host
 		127, 0, 1, 2, // IP address of host
 		'a', 'r', 'c', 'h', 'e', 'r', 0, // Player name
-	}, findPacket(conn2.Written, command.SelectGame))
+	}, findPacket(conn2.Written, packet.SelectGame))
 
 	// Truncate
 	conn2.Written = nil
@@ -219,7 +219,7 @@ func TestE2E_P2P(t *testing.T) {
 		// 127, 0, 1, 2, // IP address of host
 		127, 0, 1, 2, // IP address of host
 		'a', 'r', 'c', 'h', 'e', 'r', 0, // Player name
-	}, findPacket(conn2.Written, command.JoinGame))
+	}, findPacket(conn2.Written, packet.JoinGame))
 
 	// Room contains all data
 	room, ok = cs.Multiplayer.Rooms["room"]

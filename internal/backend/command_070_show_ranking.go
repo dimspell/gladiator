@@ -10,7 +10,6 @@ import (
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/packet"
-	"github.com/dimspell/gladiator/internal/backend/packet/command"
 	"github.com/dimspell/gladiator/internal/model"
 )
 
@@ -39,7 +38,7 @@ func (b *Backend) HandleShowRanking(session *bsession.Session, req RankingReques
 
 	ranking := model.RankingToBytes(respRanking.Msg)
 
-	return session.Send(command.ShowRanking, ranking)
+	return session.Send(packet.ShowRanking, ranking)
 }
 
 type RankingRequest []byte

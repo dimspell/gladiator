@@ -6,11 +6,11 @@ import (
 	"time"
 
 	"github.com/dimspell/gladiator/internal/backend/bsession"
-	"github.com/dimspell/gladiator/internal/backend/packet/command"
+	"github.com/dimspell/gladiator/internal/backend/packet"
 )
 
 func (b *Backend) HandlePing(session *bsession.Session, req PingRequest) error {
-	return session.Send(command.PingClockTime, []byte{1, 0, 0, 0})
+	return session.Send(packet.PingClockTime, []byte{1, 0, 0, 0})
 }
 
 type PingRequest []byte

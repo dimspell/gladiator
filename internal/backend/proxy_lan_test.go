@@ -10,7 +10,7 @@ import (
 
 	v1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/internal/app/logger"
-	"github.com/dimspell/gladiator/internal/backend/packet/command"
+	"github.com/dimspell/gladiator/internal/backend/packet"
 	"github.com/dimspell/gladiator/internal/backend/proxy"
 	"github.com/dimspell/gladiator/internal/console"
 	"github.com/dimspell/gladiator/internal/console/database"
@@ -164,7 +164,7 @@ func TestE2E_LAN(t *testing.T) {
 		198, 51, 100, 1, // IP address of host
 		'r', 'o', 'o', 'm', 0, // Room name
 		0, // Password
-	}, findPacket(conn2.Written, command.ListGames))
+	}, findPacket(conn2.Written, packet.ListGames))
 
 	// Truncate
 	conn2.Written = nil
@@ -181,7 +181,7 @@ func TestE2E_LAN(t *testing.T) {
 		byte(v1.ClassType_Archer), 0, 0, 0, // Host's character class type
 		198, 51, 100, 1, // IP address of host
 		'a', 'r', 'c', 'h', 'e', 'r', 0, // Player name
-	}, findPacket(conn2.Written, command.SelectGame))
+	}, findPacket(conn2.Written, packet.SelectGame))
 
 	// Truncate
 	conn2.Written = nil
@@ -198,7 +198,7 @@ func TestE2E_LAN(t *testing.T) {
 		byte(v1.ClassType_Archer), 0, 0, 0, // Host's character class type
 		198, 51, 100, 1, // IP address of host
 		'a', 'r', 'c', 'h', 'e', 'r', 0, // Player name
-	}, findPacket(conn2.Written, command.JoinGame))
+	}, findPacket(conn2.Written, packet.JoinGame))
 
 	// Room contains all data
 	room, ok = cs.Multiplayer.Rooms["room"]
@@ -247,14 +247,14 @@ func TestE2E_LAN(t *testing.T) {
 	}
 }
 
-func findPacket(buf []byte, packetType command.PacketType) []byte {
+func findPacket(buf []byte, packetType packet.PacketType) []byte {
 	for _, payload := range splitMultiPacket(buf) {
 		if len(payload) == 0 {
 			// TODO: Why it happens?
 			slog.Error("failed to split packet", "buffer", buf)
 			return nil
 		}
-		pt := command.PacketType(payload[1])
+		pt := packet.PacketType(payload[1])
 		if pt == packetType {
 			return payload[4:]
 		}

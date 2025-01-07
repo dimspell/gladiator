@@ -2,7 +2,7 @@ package backend
 
 import (
 	"github.com/dimspell/gladiator/internal/backend/bsession"
-	"github.com/dimspell/gladiator/internal/backend/packet/command"
+	"github.com/dimspell/gladiator/internal/backend/packet"
 	"github.com/dimspell/gladiator/internal/console/database"
 )
 
@@ -13,7 +13,7 @@ func (b *Backend) HandleListChannels(session *bsession.Session, req ListChannels
 		response = append(response, channel...)
 		response = append(response, 0)
 	}
-	return session.Send(command.ListChannels, response)
+	return session.Send(packet.ListChannels, response)
 }
 
 type ListChannelsRequest []byte

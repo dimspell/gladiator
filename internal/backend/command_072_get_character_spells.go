@@ -9,7 +9,6 @@ import (
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/packet"
-	"github.com/dimspell/gladiator/internal/backend/packet/command"
 )
 
 func (b *Backend) HandleGetCharacterSpells(session *bsession.Session, req GetCharacterSpellsRequest) error {
@@ -43,7 +42,7 @@ func (b *Backend) HandleGetCharacterSpells(session *bsession.Session, req GetCha
 		}
 	}
 
-	return session.Send(command.GetCharacterSpells, character.Spells)
+	return session.Send(packet.GetCharacterSpells, character.Spells)
 }
 
 type GetCharacterSpellsRequest []byte
