@@ -83,7 +83,8 @@ func (p *ListenerUDP) Write(msg []byte) (int, error) {
 	if p.udpAddr == nil || p.connUDP == nil {
 		return 0, io.EOF
 	}
-	return p.connUDP.WriteToUDP(msg, p.udpAddr)
+	// return p.connUDP.WriteToUDP(msg, p.udpAddr)
+	return p.connUDP.WriteTo(msg, p.udpAddr)
 }
 
 func (p *ListenerUDP) setAddr(addr *net.UDPAddr) {
