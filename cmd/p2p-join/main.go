@@ -19,6 +19,12 @@ import (
 
 const (
 	consoleUri = "127.0.0.1:2137"
+	roomId     = "room"
+
+	meUserId = 3
+	meName   = "meuser"
+
+	otherUserId = 2
 )
 
 var httpClient = &http.Client{Timeout: 10 * time.Second}
@@ -32,16 +38,16 @@ func main() {
 	px := proxy.NewPeerToPeer()
 
 	session := &bsession.Session{
-		ID:          "2",
-		UserID:      2,
-		Username:    "joiner",
-		CharacterID: 2,
-		ClassType:   model.ClassTypeMage,
+		ID:          fmt.Sprintf("%d", meUserId),
+		UserID:      meUserId,
+		Username:    meName,
+		CharacterID: meUserId,
+		ClassType:   model.ClassTypeArcher,
 		State:       &bsession.SessionState{},
 	}
 	user2 := &multiv1.User{
-		UserId:   2,
-		Username: "joiner",
+		UserId:   meUserId,
+		Username: meName,
 	}
 
 	if err := session.ConnectOverWebsocket(ctx, user2, fmt.Sprintf("ws://%s/lobby", consoleUri)); err != nil {
@@ -73,13 +79,13 @@ func main() {
 	}()
 
 	game, err := gm.GetGame(ctx, connect.NewRequest(&multiv1.GetGameRequest{
-		GameRoomId: "testing",
+		GameRoomId: roomId,
 	}))
 	if err != nil {
 		slog.Error("failed to get game", "error", err)
 		return
 	}
-	slog.Info("got game", "game", game.Msg)
+	slog.Info("got game", "game", game.Msg.Game, "players", game.Msg.Players)
 
 	if err := px.SelectGame(proxy.GameData{
 		Game:    game.Msg.Game,
@@ -90,10 +96,10 @@ func main() {
 	}
 
 	addr, err := px.GetPlayerAddr(proxy.GetPlayerAddrParams{
-		GameID:     "testing",
-		UserID:     "1",
+		GameID:     roomId,
+		UserID:     fmt.Sprintf("%d", otherUserId),
 		IPAddress:  "127.0.1.2",
-		HostUserID: "1",
+		HostUserID: fmt.Sprintf("%d", otherUserId),
 	}, session)
 	if err != nil {
 		slog.Error("failed to get player address", "error", err)
@@ -105,19 +111,19 @@ func main() {
 	// px.ExtendWire(session)
 
 	join, err := gm.JoinGame(ctx, connect.NewRequest(&multiv1.JoinGameRequest{
-		UserId:     2,
-		GameRoomId: "testing",
+		UserId:     meUserId,
+		GameRoomId: roomId,
 		IpAddress:  "127.0.0.1",
 	}))
 	if err != nil {
 		slog.Error("failed to join game", "error", err)
 		return
 	}
-	slog.Info("joined game", "game", join.Msg)
+	slog.Info("joined game", "players", join.Msg.Players)
 
 	if _, err := px.Join(proxy.JoinParams{
-		HostUserID: "1",
-		GameID:     "testing",
+		HostUserID: fmt.Sprintf("%d", otherUserId),
+		GameID:     roomId,
 		HostUserIP: "127.0.1.2",
 	}, session); err != nil {
 		slog.Error("failed to join game", "error", err)
@@ -125,10 +131,10 @@ func main() {
 	}
 
 	addr2, err := px.GetPlayerAddr(proxy.GetPlayerAddrParams{
-		GameID:     "testing",
-		UserID:     "1",
+		GameID:     roomId,
+		UserID:     fmt.Sprintf("%d", otherUserId),
 		IPAddress:  "127.0.1.2",
-		HostUserID: "1",
+		HostUserID: fmt.Sprintf("%d", otherUserId),
 	}, session)
 	if err != nil {
 		slog.Error("failed to get player address", "error", err)
