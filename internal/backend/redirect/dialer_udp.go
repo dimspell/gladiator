@@ -19,13 +19,20 @@ type DialerUDP struct {
 }
 
 func DialUDP(ipv4 string, portNumber string) (*DialerUDP, error) {
-	if portNumber == "" {
-		portNumber = "6113"
+	if net.ParseIP(ipv4) == nil {
+		return nil, fmt.Errorf("dial-udp: invalid IPv4 address format")
 	}
+
+	if portNumber == "" {
+		portNumber = defaultUdpPort
+
+	}
+
 	udpAddr, err := net.ResolveUDPAddr("udp", net.JoinHostPort(ipv4, portNumber))
 	if err != nil {
 		return nil, fmt.Errorf("dial-udp: could not resolve UDP address: %w", err)
 	}
+
 	udpConn, err := net.DialUDP("udp", nil, udpAddr)
 	if err != nil {
 		return nil, fmt.Errorf("dial-udp: could not dial over udp: %w", err)
@@ -64,13 +71,13 @@ func (p *DialerUDP) Run(ctx context.Context, dc io.Writer) error {
 			buf := make([]byte, 1024)
 			n, addr, err := p.udpConn.ReadFromUDP(buf)
 			if err != nil {
-				return fmt.Errorf("could not read UDP message: %s", err.Error())
+				return fmt.Errorf("dial-udp: could not read UDP message: %w", err)
 			}
 
 			p.logger.Debug("Received UDP message", "message", buf[0:n], "length", n, "fromAddr", addr.String())
 
 			if _, err := dc.Write(buf[0:n]); err != nil {
-				return err
+				return fmt.Errorf("dial-udp: writing to data channel failed: %w", err)
 			}
 		}
 	})

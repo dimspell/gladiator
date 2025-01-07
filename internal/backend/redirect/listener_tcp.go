@@ -8,8 +8,6 @@ import (
 	"log/slog"
 	"net"
 	"sync"
-
-	"golang.org/x/sync/errgroup"
 )
 
 var _ Redirect = (*ListenerTCP)(nil)
@@ -23,9 +21,14 @@ type ListenerTCP struct {
 }
 
 func ListenTCP(ipv4 string, portNumber string) (*ListenerTCP, error) {
-	if portNumber == "" {
-		portNumber = "6114"
+	if net.ParseIP(ipv4) == nil {
+		return nil, fmt.Errorf("listen-tcp: invalid IPv4 address format")
 	}
+
+	if portNumber == "" {
+		portNumber = defaultTcpPort
+	}
+
 	tcpListener, err := net.Listen("tcp", net.JoinHostPort(ipv4, portNumber))
 	if err != nil {
 		return nil, err
@@ -54,57 +57,67 @@ func (p *ListenerTCP) Run(ctx context.Context, rw io.Writer) error {
 	}()
 
 	for {
-		if ctx.Err() != nil {
+		select {
+		case <-ctx.Done():
 			return ctx.Err()
-		}
+		default:
+			conn, err := p.listenerTCP.Accept()
+			if err != nil {
+				p.logger.Error("Failed to accept TCP connection", "error", err)
+				continue
+			}
+			p.logger.Debug("Accepted connection", "remote-addr", conn.RemoteAddr())
 
-		conn, err := p.listenerTCP.Accept()
-		if err != nil {
-			p.logger.Error("failed to accept the TCP connection", "error", err)
-			continue
-		}
-		p.logger.Debug("Accepted connection", "remote-addr", conn.RemoteAddr())
+			p.mu.Lock()
+			p.connTCP = conn
+			p.mu.Unlock()
 
-		go p.readerTCP(ctx, conn, rw)
+			go func() {
+				if err := p.handleConnection(ctx, conn, rw); err != nil {
+					p.logger.Error("Error handling connection", "error", err)
+				}
+			}()
+		}
 	}
 }
 
-func (p *ListenerTCP) readerTCP(ctx context.Context, conn net.Conn, dc io.Writer) {
-	p.mu.Lock()
+func (p *ListenerTCP) handleConnection(ctx context.Context, conn net.Conn, dc io.Writer) error {
 	defer func() {
-		p.logger.Warn("Closing TCP connection from listener", "try-error", conn.Close())
+		p.mu.Lock()
+		p.connTCP = nil
 		p.mu.Unlock()
+
+		p.logger.Debug("Closing TCP connection", "remote-addr", conn.RemoteAddr())
+		if err := conn.Close(); err != nil {
+			p.logger.Warn("Error closing TCP connection", "error", err)
+		}
 	}()
 
-	g, gCtx := errgroup.WithContext(ctx)
-	g.Go(func() error {
-		for {
-			if gCtx.Err() != nil {
-				return gCtx.Err()
-			}
-			buf := make([]byte, 1024)
-			n, err := conn.Read(buf)
+	// Handle incoming data
+	buffer := make([]byte, 1024)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+			clear(buffer)
+
+			n, err := conn.Read(buffer)
 			if err != nil {
-				p.logger.Warn("Error reading from TCP", "error", err)
+				if !errors.Is(err, io.EOF) {
+					p.logger.Warn("Error reading from TCP", "error", err)
+				}
 				return err
 			}
-			if _, err := dc.Write(buf[:n]); err != nil {
+
+			if _, err := dc.Write(buffer[:n]); err != nil {
 				p.logger.Warn("Error writing to TCP", "error", err)
 				return err
 			}
 
-			p.logger.Debug("Received from client", "payload", buf[0:n])
+			p.logger.Debug("Received from client", "payload", buffer[0:n])
 		}
-
-	})
-	g.Go(func() error {
-		<-ctx.Done()
-		conn.Close()
-		return ctx.Err()
-	})
-
-	if err := g.Wait(); err != nil {
-		p.logger.Error("Failed proxying TCP", "error", err)
 	}
 }
 
@@ -113,7 +126,7 @@ func (p *ListenerTCP) Write(msg []byte) (int, error) {
 	defer p.mu.RUnlock()
 
 	if p.connTCP == nil {
-		return 0, fmt.Errorf("listener-tcp: no connection available")
+		return 0, fmt.Errorf("listener-tcp: no active TCP connection")
 	}
 	return p.connTCP.Write(msg)
 }
