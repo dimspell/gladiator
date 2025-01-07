@@ -15,6 +15,7 @@ var _ Redirect = (*DialerTCP)(nil)
 
 type DialerTCP struct {
 	tcpConn net.Conn
+	logger  *slog.Logger
 }
 
 func DialTCP(ipv4 string, portNumber string) (*DialerTCP, error) {
@@ -25,59 +26,69 @@ func DialTCP(ipv4 string, portNumber string) (*DialerTCP, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not connect to game server on 6114: %s", err.Error())
 	}
-	slog.Info("Host: Connected TCP", "local", tcpConn.LocalAddr().String(), "remote", tcpConn.RemoteAddr().String())
+
+	logger := slog.With(
+		slog.String("redirect", "dial-tcp"),
+		slog.String("local", tcpConn.LocalAddr().String()),
+		slog.String("remote", tcpConn.RemoteAddr().String()),
+	)
+	logger.Info("Dialed via TCP")
 
 	return &DialerTCP{
 		tcpConn: tcpConn,
+		logger:  logger,
 	}, nil
 }
 
 func (p *DialerTCP) Run(ctx context.Context, dc io.Writer) error {
+	if p.tcpConn == nil {
+		return fmt.Errorf("tcp-dial: tcp connection is nil")
+	}
+
+	defer func() {
+		p.logger.Info("Closing the TCP dialer")
+	}()
+
 	g, ctx := errgroup.WithContext(ctx)
-	// g.Go(func() error {
-	// 	if _, err := io.Copy(dc, p.tcpConn); err != nil {
-	// 		slog.Error("Could not copy the payload", "error", err)
-	// 		return err
-	// 	}
-	// 	return nil
-	// })
 	g.Go(func() error {
 		for {
 			if err := ctx.Err(); err != nil {
-				return err
-			}
-			if p.tcpConn == nil {
-				return io.EOF
+				return fmt.Errorf("tcp-dial: context canceled: %w", err)
 			}
 
 			buf := make([]byte, 1024)
 			n, err := p.tcpConn.Read(buf)
 			if err != nil {
 				if err == io.EOF {
-					slog.Debug("Connection closed to the game client", "proto", "tcp", "addr", p.tcpConn.LocalAddr())
+					p.logger.Debug("Connection closed to the game client")
 					return err
 				}
-				slog.Debug("Error reading from server", "error", err, "proto", "tcp")
+				p.logger.Debug("Error reading from server", "error", err)
 				return err
 			}
 
-			slog.Debug("Received TCP message", "message", buf[0:n], "length", n, "proto", "tcp")
+			p.logger.Debug("Received TCP message", "message", buf[0:n])
+
 			if _, err := dc.Write(buf[0:n]); err != nil {
-				return err
+				return fmt.Errorf("tcp-dial: could not write to the datachannel: %w", err)
 			}
 		}
 	})
 
-	return g.Wait()
+	if err := g.Wait(); err != nil {
+		p.logger.Debug("Error during game server", "error", err)
+		return err
+	}
+	return nil
 }
 
 func (p *DialerTCP) Write(msg []byte) (n int, err error) {
 	n, err = p.tcpConn.Write(msg)
 	if err != nil {
-		slog.Error("(tcp): Error writing to server", "error", err)
+		p.logger.Error("Could not send a message", "error", err)
 		return n, err
 	}
-	slog.Debug("(tcp): wrote to server", "msg", msg)
+	p.logger.Debug("Wrote to proxy", "msg", msg)
 	return n, err
 }
 

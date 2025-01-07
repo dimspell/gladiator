@@ -67,25 +67,25 @@ type Addressing struct {
 type NewRedirect func(joinType Mode, addr *Addressing) (Redirect, error)
 
 func NewUDPRedirect(joinType Mode, addr *Addressing) (Redirect, error) {
-	logger := slog.With("redirect", "NewUDPRedirect", "joinType", joinType.String(), "ip", addr.IP, "udpPort", addr.UDPPort)
+	logger := slog.With(
+		slog.String("redirect", "NewUDPRedirect"),
+		slog.String("joinType", joinType.String()),
+		slog.String("ip", addr.IP.String()),
+		slog.String("udpPort", addr.UDPPort))
 	logger.Debug("Creating new UDP redirect")
 
 	switch joinType {
 	case CurrentUserIsHost:
 		logger.Info("Creating client to dial TCP and UDP on default ports")
-
 		return DialUDP(addr.IP.To4().String(), "")
 	case OtherUserIsHost:
 		logger.Info("Creating TCP and UDP listeners on custom ports")
-
 		return ListenUDP(addr.IP.To4().String(), addr.UDPPort)
 	case OtherUserHasJoined:
 		logger.Info("Creating UDP listener only on a custom port")
-
 		return ListenUDP(addr.IP.To4().String(), addr.UDPPort)
 	case OtherUserIsJoining:
 		logger.Info("Creating UDP dialler on the default port")
-
 		return DialUDP(addr.IP.To4().String(), "")
 	default:
 		return nil, fmt.Errorf("unknown joining type: %s", joinType)
@@ -93,18 +93,22 @@ func NewUDPRedirect(joinType Mode, addr *Addressing) (Redirect, error) {
 }
 
 func NewTCPRedirect(joinType Mode, addr *Addressing) (Redirect, error) {
-	logger := slog.With("redirect", "NewTCPRedirect", "joinType", joinType.String(), "ip", addr.IP, "tcpPort", addr.TCPPort)
+	logger := slog.With(
+		slog.String("redirect", "NewTCPRedirect"),
+		slog.String("joinType", joinType.String()),
+		slog.String("ip", addr.IP.String()),
+		slog.String("tcpPort", addr.TCPPort))
 	logger.Debug("Creating new UDP redirect")
 
 	switch joinType {
 	case CurrentUserIsHost:
-		slog.Info("Creating client to dial TCP and UDP on default ports")
+		logger.Info("Creating client to dial TCP and UDP on default ports")
 		return DialTCP(addr.IP.To4().String(), "")
 	case OtherUserIsHost:
-		slog.Info("Creating TCP and UDP listeners on custom ports")
+		logger.Info("Creating TCP and UDP listeners on custom ports")
 		return ListenTCP(addr.IP.To4().String(), addr.TCPPort)
 	case OtherUserHasJoined:
-		slog.Info("Creating UDP listener only on a custom port")
+		logger.Info("Creating UDP listener only on a custom port")
 		return ListenUDP(addr.IP.To4().String(), addr.UDPPort)
 	default:
 		return &Noop{}, nil

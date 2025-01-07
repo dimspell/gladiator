@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"log/slog"
 	"net"
 
@@ -16,6 +15,7 @@ var _ Redirect = (*DialerUDP)(nil)
 type DialerUDP struct {
 	udpAddr *net.UDPAddr
 	udpConn *net.UDPConn
+	logger  *slog.Logger
 }
 
 func DialUDP(ipv4 string, portNumber string) (*DialerUDP, error) {
@@ -24,44 +24,41 @@ func DialUDP(ipv4 string, portNumber string) (*DialerUDP, error) {
 	}
 	udpAddr, err := net.ResolveUDPAddr("udp", net.JoinHostPort(ipv4, portNumber))
 	if err != nil {
-		return nil, fmt.Errorf("could not resolve UDP address on 6113 as a host: %s", err.Error())
+		return nil, fmt.Errorf("dial-udp: could not resolve UDP address: %w", err)
 	}
 	udpConn, err := net.DialUDP("udp", nil, udpAddr)
 	if err != nil {
-		log.Fatal(err)
+		return nil, fmt.Errorf("dial-udp: could not dial over udp: %w", err)
 	}
-	slog.Info("Host: Connected UDP", "local", udpConn.LocalAddr().String(), "remote", udpConn.RemoteAddr().String())
+
+	logger := slog.With(
+		slog.String("redirect", "dial-udp"),
+		slog.String("local", udpConn.LocalAddr().String()),
+		slog.String("remote", udpConn.RemoteAddr().String()),
+	)
+	logger.Info("Dialed via UDP")
 
 	return &DialerUDP{
 		udpAddr: udpAddr,
 		udpConn: udpConn,
+		logger:  logger,
 	}, nil
 }
 
-func (p *DialerUDP) Run(ctx context.Context, rw io.Writer) error {
-	g, ctx := errgroup.WithContext(ctx)
+func (p *DialerUDP) Run(ctx context.Context, dc io.Writer) error {
+	if p.udpConn == nil {
+		return fmt.Errorf("dial-udp: udp connection is nil")
+	}
 
-	// g.Go(func() error {
-	// 	for {
-	// 		buf := make([]byte, 1024)
-	// 		n, err := rw.Read(buf)
-	// 		if err != nil {
-	// 			slog.Error("Failed to read", "error", err)
-	// 			return err
-	// 		}
-	// 		if _, err := p.udpConn.WriteToUDP(buf[:n], p.udpAddr); err != nil {
-	// 			slog.Warn("Error writing to UDP", "error", err, "protocol", "udp")
-	// 			return err
-	// 		}
-	// 	}
-	// })
+	defer func() {
+		p.logger.Info("Closing the UDP dialer")
+	}()
+
+	g, _ := errgroup.WithContext(ctx)
 	g.Go(func() error {
 		for {
 			if err := ctx.Err(); err != nil {
 				return err
-			}
-			if p.udpConn == nil {
-				return io.EOF
 			}
 
 			buf := make([]byte, 1024)
@@ -70,12 +67,17 @@ func (p *DialerUDP) Run(ctx context.Context, rw io.Writer) error {
 				return fmt.Errorf("could not read UDP message: %s", err.Error())
 			}
 
-			slog.Debug("Received UDP message", "message", buf[0:n], "length", n, "fromAddr", addr.String())
+			p.logger.Debug("Received UDP message", "message", buf[0:n], "length", n, "fromAddr", addr.String())
 
-			if _, err := rw.Write(buf[0:n]); err != nil {
+			if _, err := dc.Write(buf[0:n]); err != nil {
 				return err
 			}
 		}
+	})
+	g.Go(func() error {
+		<-ctx.Done()
+		p.udpConn.Close()
+		return ctx.Err()
 	})
 
 	return g.Wait()
@@ -84,9 +86,9 @@ func (p *DialerUDP) Run(ctx context.Context, rw io.Writer) error {
 func (p *DialerUDP) Write(msg []byte) (n int, err error) {
 	n, err = p.udpConn.Write(msg)
 	if err != nil {
-		return n, fmt.Errorf("could not write UDP message: %s", err.Error())
+		return n, fmt.Errorf("dial-udp: could not write UDP message: %w", err)
 	}
-	slog.Debug("(udp): wrote to server", "msg", msg)
+	p.logger.Debug("Wrote to proxy", "msg", msg)
 	return n, err
 }
 
