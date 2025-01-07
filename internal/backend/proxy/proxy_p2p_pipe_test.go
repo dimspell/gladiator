@@ -110,11 +110,21 @@ func TestPipeMessageHandling(t *testing.T) {
 		// Test that the DataChannel receives messages from the proxy
 		msgFromProxy := "Message from the Proxy"
 		proxy.toDataChannel <- []byte(msgFromProxy)
-		assert.Equal(t, msgFromProxy, string(<-dc.received))
+		select {
+		case msg := <-dc.received:
+			assert.Equal(t, msgFromProxy, string(msg))
+		case <-ctx.Done():
+			t.Fatal("timeout")
+		}
 
 		// Test that the DataChannel sends messages to the proxy
 		msgFromDataChannel := "Message from the DataChannel"
 		dc.onMessage(webrtc.DataChannelMessage{Data: []byte(msgFromDataChannel)})
-		assert.Equal(t, msgFromDataChannel, string(<-proxy.toProxy))
+		select {
+		case msg := <-proxy.toProxy:
+			assert.Equal(t, msgFromDataChannel, string(msg))
+		case <-ctx.Done():
+			t.Fatal("timeout")
+		}
 	})
 }
