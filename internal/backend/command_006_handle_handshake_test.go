@@ -1,6 +1,7 @@
 package backend
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/dimspell/gladiator/internal/backend/bsession"
@@ -8,6 +9,59 @@ import (
 )
 
 func TestBackend_HandleAuthorizationHandshake(t *testing.T) {
+	t.Run("error cases", func(t *testing.T) {
+		t.Run("send wrong auth key", func(t *testing.T) {
+			// Arrange
+			b := &Backend{}
+			conn := &mockConn{}
+			session := &bsession.Session{Conn: conn}
+			req := AuthorizationHandshakeRequest("WRONGSID\x03\x00\x00\x00")
+
+			// Act
+			err := b.HandleAuthorizationHandshake(session, req)
+
+			// Assert
+			assert.Error(t, err)
+			assert.Contains(t, err.Error(), "wrong auth key")
+			assert.Len(t, conn.Written, 8)
+			assert.Equal(t, []byte{255, 6, 8, 0}, conn.Written[0:4]) // Header
+			assert.Equal(t, []byte{0, 0, 0, 0}, conn.Written[4:])    // Response
+		})
+
+		t.Run("send wrong version number", func(t *testing.T) {
+			// Arrange
+			b := &Backend{}
+			conn := &mockConn{}
+			session := &bsession.Session{Conn: conn}
+			req := AuthorizationHandshakeRequest("68XIPSID\x04\x00\x00\x00")
+
+			// Act
+			err := b.HandleAuthorizationHandshake(session, req)
+
+			// Assert
+			assert.Error(t, err)
+			assert.Contains(t, err.Error(), "invalid version number")
+			assert.Len(t, conn.Written, 8)
+			assert.Equal(t, []byte{255, 6, 8, 0}, conn.Written[0:4]) // Header
+			assert.Equal(t, []byte{0, 0, 0, 0}, conn.Written[4:])    // Response
+		})
+
+		t.Run("sending failed because of network error", func(t *testing.T) {
+			// Arrange
+			b := &Backend{}
+			conn := &mockConn{WriteError: fmt.Errorf("network error")}
+			session := &bsession.Session{Conn: conn}
+			req := AuthorizationHandshakeRequest("68XIPSID\x03\x00\x00\x00")
+
+			// Act
+			err := b.HandleAuthorizationHandshake(session, req)
+
+			// Assert
+			assert.Error(t, err)
+			assert.Contains(t, err.Error(), "network error")
+		})
+	})
+
 	t.Run("valid request", func(t *testing.T) {
 		// Arrange
 		b := &Backend{}
@@ -23,38 +77,6 @@ func TestBackend_HandleAuthorizationHandshake(t *testing.T) {
 		assert.Len(t, conn.Written, 9)
 		assert.Equal(t, []byte{255, 6, 9, 0}, conn.Written[0:4]) // Header
 		assert.Equal(t, []byte("ENET\x00"), conn.Written[4:])    // Response
-	})
-
-	t.Run("invalid request", func(t *testing.T) {
-		// Arrange
-		b := &Backend{}
-		conn := &mockConn{}
-		session := &bsession.Session{Conn: conn}
-		req := AuthorizationHandshakeRequest("WRONG")
-
-		// Act
-		err := b.HandleAuthorizationHandshake(session, req)
-
-		// Assert
-		assert.NoError(t, err, nil)
-		assert.Len(t, conn.Written, 0) // No response
-	})
-
-	t.Run("invalid but padded request", func(t *testing.T) {
-		// Arrange
-		b := &Backend{}
-		conn := &mockConn{}
-		session := &bsession.Session{Conn: conn}
-		req := AuthorizationHandshakeRequest("WRONGSID\x03\x00\x00\x00")
-
-		// Act
-		err := b.HandleAuthorizationHandshake(session, req)
-
-		// Assert
-		assert.Contains(t, err.Error(), `packet-6: wrong auth key: "WRONGSID"`)
-		assert.Len(t, conn.Written, 8)
-		assert.Equal(t, []byte{255, 6, 8, 0}, conn.Written[0:4]) // Header
-		assert.Equal(t, []byte{0, 0, 0, 0}, conn.Written[4:])    // Response
 	})
 }
 

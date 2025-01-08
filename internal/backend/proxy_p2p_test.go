@@ -15,7 +15,6 @@ import (
 	"github.com/dimspell/gladiator/internal/app/logger"
 	"github.com/dimspell/gladiator/internal/backend/packet"
 	"github.com/dimspell/gladiator/internal/backend/proxy"
-	"github.com/dimspell/gladiator/internal/backend/redirect"
 	"github.com/dimspell/gladiator/internal/console"
 	"github.com/dimspell/gladiator/internal/console/database"
 	"github.com/dimspell/gladiator/internal/model"
@@ -27,7 +26,7 @@ func TestE2E_P2P(t *testing.T) {
 
 	helperStartGameServer(t)
 
-	redirectFunc := redirect.New
+	// redirectFunc := redirect.New
 
 	db, err := database.NewMemory()
 	if err != nil {
@@ -58,7 +57,7 @@ func TestE2E_P2P(t *testing.T) {
 	cs.Addr = ts.URL[len("http://"):]
 
 	proxy1 := proxy.NewPeerToPeer()
-	proxy1.NewRedirect = redirectFunc
+	// proxy1.NewRedirect = redirectFunc
 	bd1 := NewBackend("", cs.Addr, proxy1)
 	bd1.SignalServerURL = "ws://" + cs.Addr + "/lobby"
 
@@ -132,7 +131,7 @@ func TestE2E_P2P(t *testing.T) {
 
 	// Other user
 	proxy2 := proxy.NewPeerToPeer()
-	proxy2.NewRedirect = redirectFunc
+	// proxy2.NewRedirect = redirectFunc
 	bd2 := NewBackend("", cs.Addr, proxy2)
 	bd2.SignalServerURL = "ws://" + cs.Addr + "/lobby"
 

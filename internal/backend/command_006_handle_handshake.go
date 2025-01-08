@@ -27,6 +27,7 @@ func (b *Backend) HandleAuthorizationHandshake(session *bsession.Session, req Au
 		slog.Warn("Invalid packet", "error", err)
 		return nil
 	}
+
 	if string(data.AuthKey) != "68XIPSID" {
 		if err := session.Send(packet.AuthorizationHandshake, []byte{0, 0, 0, 0}); err != nil {
 			return err
@@ -34,6 +35,14 @@ func (b *Backend) HandleAuthorizationHandshake(session *bsession.Session, req Au
 
 		// Returned only for any fake clients
 		return fmt.Errorf("packet-6: wrong auth key: %q", data.AuthKey)
+	}
+
+	if data.VersionNumber != 3 {
+		if err := session.Send(packet.AuthorizationHandshake, []byte{0, 0, 0, 0}); err != nil {
+			return err
+		}
+
+		return fmt.Errorf("packet-6: invalid version number: %d", data.VersionNumber)
 	}
 
 	return session.Send(packet.AuthorizationHandshake, []byte("ENET\x00"))
