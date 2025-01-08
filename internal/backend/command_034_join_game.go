@@ -16,7 +16,7 @@ import (
 )
 
 // HandleJoinGame handles 0x22ff (255-34) command
-func (b *Backend) HandleJoinGame(session *bsession.Session, req JoinGameRequest) error {
+func (b *Backend) HandleJoinGame(ctx context.Context, session *bsession.Session, req JoinGameRequest) error {
 	if session.UserID == 0 {
 		return fmt.Errorf("packet-34: user is not logged in")
 	}
@@ -27,7 +27,7 @@ func (b *Backend) HandleJoinGame(session *bsession.Session, req JoinGameRequest)
 		return nil
 	}
 
-	respGame, err := b.gameClient.GetGame(context.TODO(), connect.NewRequest(&multiv1.GetGameRequest{
+	respGame, err := b.gameClient.GetGame(ctx, connect.NewRequest(&multiv1.GetGameRequest{
 		GameRoomId: data.RoomName,
 	}))
 	if err != nil {
@@ -43,7 +43,7 @@ func (b *Backend) HandleJoinGame(session *bsession.Session, req JoinGameRequest)
 		return err
 	}
 
-	respJoin, err := b.gameClient.JoinGame(context.TODO(), connect.NewRequest(&multiv1.JoinGameRequest{
+	respJoin, err := b.gameClient.JoinGame(ctx, connect.NewRequest(&multiv1.JoinGameRequest{
 		UserId:     session.UserID,
 		GameRoomId: respGame.Msg.Game.GetGameId(),
 		IpAddress:  myIpAddr.To4().String(),

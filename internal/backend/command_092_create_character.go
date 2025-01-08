@@ -12,7 +12,7 @@ import (
 	"github.com/dimspell/gladiator/internal/model"
 )
 
-func (b *Backend) HandleCreateCharacter(session *bsession.Session, req CreateCharacterRequest) error {
+func (b *Backend) HandleCreateCharacter(ctx context.Context, session *bsession.Session, req CreateCharacterRequest) error {
 	if session.UserID == 0 {
 		return fmt.Errorf("packet-92: user is not logged in")
 	}
@@ -23,7 +23,7 @@ func (b *Backend) HandleCreateCharacter(session *bsession.Session, req CreateCha
 		return nil
 	}
 
-	respChar, err := b.characterClient.CreateCharacter(context.TODO(),
+	respChar, err := b.characterClient.CreateCharacter(ctx,
 		connect.NewRequest(&multiv1.CreateCharacterRequest{
 			UserId:        session.UserID,
 			CharacterName: data.CharacterName,

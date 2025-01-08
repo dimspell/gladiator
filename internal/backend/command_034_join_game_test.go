@@ -1,6 +1,7 @@
 package backend
 
 import (
+	"context"
 	"testing"
 
 	"connectrpc.com/connect"
@@ -72,7 +73,7 @@ func TestBackend_HandleJoinGame(t *testing.T) {
 		},
 	}
 
-	assert.NoError(t, b.HandleJoinGame(session, JoinGameRequest{
+	assert.NoError(t, b.HandleJoinGame(context.Background(), session, JoinGameRequest{
 		'r', 'e', 't', 'r', 'e', 'a', 't', 0, // Game name
 		0, // Password
 	}))

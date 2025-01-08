@@ -16,7 +16,7 @@ import (
 //
 // It can be received by the game server in multiple scenarios:
 //   - .
-func (b *Backend) HandleUpdateCharacterStats(session *bsession.Session, req UpdateCharacterStatsRequest) error {
+func (b *Backend) HandleUpdateCharacterStats(ctx context.Context, session *bsession.Session, req UpdateCharacterStatsRequest) error {
 	if session.UserID == 0 {
 		return fmt.Errorf("packet-108: user is not logged in")
 	}

@@ -15,7 +15,7 @@ import (
 )
 
 // HandleCreateGame handles 0x1cff (255-28) command
-func (b *Backend) HandleCreateGame(session *bsession.Session, req CreateGameRequest) error {
+func (b *Backend) HandleCreateGame(ctx context.Context, session *bsession.Session, req CreateGameRequest) error {
 	if session.UserID == 0 {
 		return fmt.Errorf("packet-28: user is not logged in")
 	}
@@ -34,7 +34,7 @@ func (b *Backend) HandleCreateGame(session *bsession.Session, req CreateGameRequ
 			return fmt.Errorf("packet-28: incorrect host address %w", err)
 		}
 
-		respGame, err := b.gameClient.CreateGame(context.TODO(), connect.NewRequest(&multiv1.CreateGameRequest{
+		respGame, err := b.gameClient.CreateGame(ctx, connect.NewRequest(&multiv1.CreateGameRequest{
 			GameName:      data.RoomName,
 			Password:      data.Password,
 			MapId:         multiv1.GameMap(data.MapID),
@@ -49,7 +49,7 @@ func (b *Backend) HandleCreateGame(session *bsession.Session, req CreateGameRequ
 		binary.LittleEndian.PutUint32(response[0:4], uint32(model.GameStateCreating))
 		break
 	case uint32(model.GameStateCreating):
-		respGame, err := b.gameClient.GetGame(context.TODO(), connect.NewRequest(&multiv1.GetGameRequest{
+		respGame, err := b.gameClient.GetGame(ctx, connect.NewRequest(&multiv1.GetGameRequest{
 			GameRoomId: data.RoomName,
 		}))
 		if err != nil {

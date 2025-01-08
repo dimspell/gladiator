@@ -82,7 +82,7 @@ func TestBackend_HandleCreateGame(t *testing.T) {
 	}
 
 	// State = 0
-	assert.NoError(t, b.HandleCreateGame(session, CreateGameRequest{
+	assert.NoError(t, b.HandleCreateGame(context.Background(), session, CreateGameRequest{
 		0, 0, 0, 0, // State
 		3, 0, 0, 0, // Map ID
 		'r', 'o', 'o', 'm', 0, // Game room name
@@ -95,7 +95,7 @@ func TestBackend_HandleCreateGame(t *testing.T) {
 	conn.Written = nil
 
 	// State = 1
-	assert.NoError(t, b.HandleCreateGame(session, CreateGameRequest{
+	assert.NoError(t, b.HandleCreateGame(context.Background(), session, CreateGameRequest{
 		1, 0, 0, 0, // State
 		3, 0, 0, 0, // Map ID
 		'r', 'o', 'o', 'm', 0, // Game room name

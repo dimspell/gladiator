@@ -11,7 +11,7 @@ import (
 	"github.com/dimspell/gladiator/internal/backend/packet"
 )
 
-func (b *Backend) HandleUpdateCharacterSpells(session *bsession.Session, req UpdateCharacterSpellsRequest) error {
+func (b *Backend) HandleUpdateCharacterSpells(ctx context.Context, session *bsession.Session, req UpdateCharacterSpellsRequest) error {
 	if session.UserID == 0 {
 		return fmt.Errorf("packet-73: user has been already logged in")
 	}
@@ -22,7 +22,7 @@ func (b *Backend) HandleUpdateCharacterSpells(session *bsession.Session, req Upd
 		return nil
 	}
 
-	_, err = b.characterClient.PutSpells(context.TODO(),
+	_, err = b.characterClient.PutSpells(ctx,
 		connect.NewRequest(&multiv1.PutSpellsRequest{
 			UserId:        session.UserID,
 			CharacterName: data.CharacterName,

@@ -1,6 +1,7 @@
 package backend
 
 import (
+	"context"
 	"testing"
 
 	"connectrpc.com/connect"
@@ -51,7 +52,7 @@ func TestBackend_HandleGetCharacterSpells(t *testing.T) {
 	conn := &mockConn{}
 	session := &bsession.Session{ID: "TEST", Conn: conn, UserID: 1, Username: "JP"}
 
-	assert.NoError(t, b.HandleGetCharacterSpells(session, GetCharacterSpellsRequest("tester\x00characterName\x00")))
+	assert.NoError(t, b.HandleGetCharacterSpells(context.Background(), session, GetCharacterSpellsRequest("tester\x00characterName\x00")))
 	assert.Equal(t, []byte{255, 72, 47, 0}, conn.Written[0:4]) // Header
 	assert.Equal(t, spells, conn.Written[4:47])                // Spells
 	assert.Len(t, conn.Written, 47)

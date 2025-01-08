@@ -1,6 +1,7 @@
 package backend
 
 import (
+	"context"
 	"testing"
 
 	"connectrpc.com/connect"
@@ -41,7 +42,7 @@ func TestBackend_HandleSelectGame(t *testing.T) {
 		conn := &mockConn{}
 		session := &bsession.Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "mage"}
 
-		assert.NoError(t, b.HandleSelectGame(session, SelectGameRequest{
+		assert.NoError(t, b.HandleSelectGame(context.Background(), session, SelectGameRequest{
 			'r', 'e', 't', 'r', 'e', 'a', 'a', 't', 0, // Game name
 			0, // Password
 		}))
@@ -77,7 +78,7 @@ func TestBackend_HandleSelectGame(t *testing.T) {
 		conn := &mockConn{}
 		session := &bsession.Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
 
-		assert.NoError(t, b.HandleSelectGame(session, SelectGameRequest{
+		assert.NoError(t, b.HandleSelectGame(context.Background(), session, SelectGameRequest{
 			103, 97, 109, 101, 82, 111, 111, 109, 0, // Game name
 			0, // Password
 		}))

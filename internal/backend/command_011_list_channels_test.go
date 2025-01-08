@@ -1,6 +1,7 @@
 package backend
 
 import (
+	"context"
 	"testing"
 
 	"github.com/dimspell/gladiator/internal/backend/bsession"
@@ -26,7 +27,7 @@ func TestBackend_HandleListChannels(t *testing.T) {
 	conn := &mockConn{}
 	session := &bsession.Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
 
-	assert.NoError(t, b.HandleListChannels(session, ListChannelsRequest{}))
+	assert.NoError(t, b.HandleListChannels(context.Background(), session, ListChannelsRequest{}))
 	assert.Equal(t, []byte{255, 11, 11, 0}, conn.Written[0:4]) // Header
 	assert.Equal(t, []byte("DISPEL\x00"), conn.Written[4:11])  // Channel name
 	assert.Len(t, conn.Written, 11)

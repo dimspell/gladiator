@@ -12,7 +12,7 @@ import (
 	"github.com/dimspell/gladiator/internal/backend/packet"
 )
 
-func (b *Backend) HandleGetCharacterInventory(session *bsession.Session, req GetCharacterInventoryRequest) error {
+func (b *Backend) HandleGetCharacterInventory(ctx context.Context, session *bsession.Session, req GetCharacterInventoryRequest) error {
 	if session.UserID == 0 {
 		return fmt.Errorf("packet-68: user is not logged in")
 	}
@@ -30,7 +30,7 @@ func (b *Backend) HandleGetCharacterInventory(session *bsession.Session, req Get
 		return nil
 	}
 
-	resp, err := b.characterClient.GetCharacter(context.TODO(),
+	resp, err := b.characterClient.GetCharacter(ctx,
 		connect.NewRequest(&multiv1.GetCharacterRequest{
 			UserId:        session.UserID,
 			CharacterName: data.CharacterName,

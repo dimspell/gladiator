@@ -14,7 +14,7 @@ import (
 )
 
 // HandleShowRanking handles 0x46ff (255-70) command
-func (b *Backend) HandleShowRanking(session *bsession.Session, req RankingRequest) error {
+func (b *Backend) HandleShowRanking(ctx context.Context, session *bsession.Session, req RankingRequest) error {
 	if session.UserID == 0 {
 		return fmt.Errorf("packet-70: user is not logged in")
 	}
@@ -25,7 +25,7 @@ func (b *Backend) HandleShowRanking(session *bsession.Session, req RankingReques
 		return nil
 	}
 
-	respRanking, err := b.rankingClient.GetRanking(context.TODO(),
+	respRanking, err := b.rankingClient.GetRanking(ctx,
 		connect.NewRequest(&multiv1.GetRankingRequest{
 			UserId:        session.UserID,
 			CharacterName: data.CharacterName,

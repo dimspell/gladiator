@@ -14,7 +14,7 @@ import (
 )
 
 // HandleSelectGame handles 0x45ff (255-69) command
-func (b *Backend) HandleSelectGame(session *bsession.Session, req SelectGameRequest) error {
+func (b *Backend) HandleSelectGame(ctx context.Context, session *bsession.Session, req SelectGameRequest) error {
 	if session.UserID == 0 {
 		return fmt.Errorf("packet-69: user is not logged in")
 	}
@@ -25,7 +25,7 @@ func (b *Backend) HandleSelectGame(session *bsession.Session, req SelectGameRequ
 		return nil
 	}
 
-	respGame, err := b.gameClient.GetGame(context.TODO(), connect.NewRequest(&multiv1.GetGameRequest{
+	respGame, err := b.gameClient.GetGame(ctx, connect.NewRequest(&multiv1.GetGameRequest{
 		GameRoomId: data.RoomName,
 	}))
 	if err != nil {

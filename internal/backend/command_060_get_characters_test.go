@@ -1,6 +1,7 @@
 package backend
 
 import (
+	"context"
 	"testing"
 
 	"connectrpc.com/connect"
@@ -46,7 +47,7 @@ func TestBackend_HandleGetCharacters(t *testing.T) {
 	conn := &mockConn{}
 	session := &bsession.Session{ID: "TEST", Conn: conn, UserID: 1, Username: "JP"}
 
-	assert.NoError(t, b.HandleGetCharacters(session, GetCharactersRequest("tester\x00")))
+	assert.NoError(t, b.HandleGetCharacters(context.Background(), session, GetCharactersRequest("tester\x00")))
 	assert.Equal(t, []byte{255, 60, 34, 0}, conn.Written[0:4])     // Header
 	assert.Equal(t, []byte{1, 0, 0, 0}, conn.Written[4:8])         //
 	assert.Equal(t, []byte{2, 0, 0, 0}, conn.Written[8:12])        // Number of characters

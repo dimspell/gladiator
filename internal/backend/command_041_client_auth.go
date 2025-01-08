@@ -11,7 +11,7 @@ import (
 	"github.com/dimspell/gladiator/internal/backend/packet"
 )
 
-func (b *Backend) HandleClientAuthentication(session *bsession.Session, req ClientAuthenticationRequest) error {
+func (b *Backend) HandleClientAuthentication(ctx context.Context, session *bsession.Session, req ClientAuthenticationRequest) error {
 	if session.UserID != 0 {
 		return fmt.Errorf("packet-41: user has been already logged in")
 	}
@@ -23,7 +23,7 @@ func (b *Backend) HandleClientAuthentication(session *bsession.Session, req Clie
 	}
 
 	// Authenticate with the password.
-	user, err := b.userClient.AuthenticateUser(context.TODO(), connect.NewRequest(&multiv1.AuthenticateUserRequest{
+	user, err := b.userClient.AuthenticateUser(ctx, connect.NewRequest(&multiv1.AuthenticateUserRequest{
 		Username: data.Username,
 		Password: data.Password,
 	}))
@@ -33,7 +33,7 @@ func (b *Backend) HandleClientAuthentication(session *bsession.Session, req Clie
 	}
 
 	// Connect to the lobby server.
-	if err = b.ConnectToLobby(context.TODO(), user.Msg.User, session); err != nil {
+	if err = b.ConnectToLobby(ctx, user.Msg.User, session); err != nil {
 		slog.Debug("packet-41: could not connect to lobby", "err", err)
 		return session.Send(packet.ClientAuthentication, []byte{0, 0, 0, 0})
 	}

@@ -103,7 +103,7 @@ func (b *Backend) Shutdown() {
 		// TODO: Send a system message "(system) The server is going to close in less than 30 seconds"
 		_ = session.Send(
 			packet.ReceiveMessage,
-			packet.NewGlobalMessage("system-info", "The server is going to shut down..."))
+			NewGlobalMessage("system-info", "The server is going to shut down..."))
 
 		// TODO: Send a packet to trigger stats saving
 		// TODO: Send a system message "(system): Your stats were saving, your game client might close in the next 10 seconds"
@@ -158,24 +158,23 @@ func (b *Backend) Listen() {
 }
 
 func (b *Backend) handleClient(conn net.Conn) error {
-	// TODO: Use cancellation token
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	session, err := b.handshake(conn)
 	if err != nil {
-		if err := conn.Close(); err != nil {
+		if err2 := conn.Close(); err2 != nil {
 			slog.Error("Could not close connection in handshake", "err", err)
-			return err
+			return errors.Join(err, err2)
 		}
 		if err == io.EOF {
 			return nil
 		}
-		slog.Warn("Handshake failed", "err", err)
+		slog.Warn("Handshake failed", "error", err)
 		return err
 	}
 	defer func() {
-		err := b.CloseSession(session)
-		if err != nil {
+		if err := b.CloseSession(session); err != nil {
 			slog.Warn("Close session failed", "err", err)
 		}
 	}()

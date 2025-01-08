@@ -11,7 +11,7 @@ import (
 	"github.com/dimspell/gladiator/internal/backend/packet"
 )
 
-func (b *Backend) HandleUpdateCharacterInventory(session *bsession.Session, req UpdateCharacterInventoryRequest) error {
+func (b *Backend) HandleUpdateCharacterInventory(ctx context.Context, session *bsession.Session, req UpdateCharacterInventoryRequest) error {
 	if session.UserID == 0 {
 		return fmt.Errorf("packet-44: user is not logged in")
 	}
@@ -21,7 +21,7 @@ func (b *Backend) HandleUpdateCharacterInventory(session *bsession.Session, req 
 		return nil
 	}
 
-	_, err = b.characterClient.PutInventoryCharacter(context.TODO(),
+	_, err = b.characterClient.PutInventoryCharacter(ctx,
 		connect.NewRequest(&multiv1.PutInventoryRequest{
 			UserId:        session.UserID,
 			CharacterName: data.CharacterName,

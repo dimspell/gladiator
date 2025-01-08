@@ -5,12 +5,11 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"time"
 
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 )
 
-func (b *Backend) HandleSendLobbyMessage(session *bsession.Session, req SendLobbyMessageRequest) error {
+func (b *Backend) HandleSendLobbyMessage(ctx context.Context, session *bsession.Session, req SendLobbyMessageRequest) error {
 	message, err := req.Parse()
 	if err != nil {
 		return fmt.Errorf("packet-14: could not parse request: %w", err)
@@ -18,9 +17,6 @@ func (b *Backend) HandleSendLobbyMessage(session *bsession.Session, req SendLobb
 	if len(message) == 0 || len(message) > 87 {
 		return nil
 	}
-
-	ctx, cancel := context.WithTimeout(context.TODO(), 2*time.Second)
-	defer cancel()
 
 	if err := session.SendChatMessage(ctx, message); err != nil {
 		slog.Warn("Could not send WS message", "error", fmt.Errorf("packet-14: could not send chat message: %w", err))

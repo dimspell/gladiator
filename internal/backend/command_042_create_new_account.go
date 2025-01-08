@@ -12,14 +12,14 @@ import (
 )
 
 // 008-JP1-20001
-func (b *Backend) HandleCreateNewAccount(session *bsession.Session, req CreateNewAccountRequest) error {
+func (b *Backend) HandleCreateNewAccount(ctx context.Context, session *bsession.Session, req CreateNewAccountRequest) error {
 	data, err := req.Parse()
 	if err != nil {
 		slog.Warn("Invalid packet", "error", err)
 		return nil
 	}
 
-	respUser, err := b.userClient.CreateUser(context.TODO(), connect.NewRequest(&multiv1.CreateUserRequest{
+	respUser, err := b.userClient.CreateUser(ctx, connect.NewRequest(&multiv1.CreateUserRequest{
 		Username: data.Username,
 		Password: data.Password,
 	}))

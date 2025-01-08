@@ -1,6 +1,7 @@
 package backend
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 
@@ -9,7 +10,7 @@ import (
 	"github.com/dimspell/gladiator/internal/model"
 )
 
-func (b *Backend) HandleSelectChannel(session *bsession.Session, req SelectChannelRequest) error {
+func (b *Backend) HandleSelectChannel(ctx context.Context, session *bsession.Session, req SelectChannelRequest) error {
 	serverName, channelName, err := req.Parse()
 	slog.Info("Selected channel", "serverName", serverName, "channelName", channelName, "error", err)
 	if serverName == "DISPEL" && channelName == "DISPEL" {

@@ -1,6 +1,7 @@
 package backend
 
 import (
+	"context"
 	"testing"
 
 	"connectrpc.com/connect"
@@ -32,7 +33,7 @@ func TestBackend_HandleListGames(t *testing.T) {
 		conn := &mockConn{}
 		session := &bsession.Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
 
-		assert.NoError(t, b.HandleListGames(session, ListGamesRequest{}))
+		assert.NoError(t, b.HandleListGames(context.Background(), session, ListGamesRequest{}))
 		assert.Len(t, conn.Written, 8)
 		assert.Equal(t, []byte{255, 9, 8, 0}, conn.Written[0:4]) // Header
 		assert.Equal(t, []byte{0, 0, 0, 0}, conn.Written[4:8])   // Number of games
@@ -55,7 +56,7 @@ func TestBackend_HandleListGames(t *testing.T) {
 		conn := &mockConn{}
 		session := &bsession.Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
 
-		assert.NoError(t, b.HandleListGames(session, ListGamesRequest{}))
+		assert.NoError(t, b.HandleListGames(context.Background(), session, ListGamesRequest{}))
 		assert.Len(t, conn.Written, 21)
 
 		assert.Equal(t, []byte{255, 9, 21, 0}, conn.Written[0:4])                           // Header
@@ -89,7 +90,7 @@ func TestBackend_HandleListGames(t *testing.T) {
 		conn := &mockConn{}
 		session := &bsession.Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
 
-		assert.NoError(t, b.HandleListGames(session, ListGamesRequest{}))
+		assert.NoError(t, b.HandleListGames(context.Background(), session, ListGamesRequest{}))
 		assert.Len(t, conn.Written, 39)
 		assert.Equal(t, []byte{255, 9, 39, 0}, conn.Written[0:4])    // Header
 		assert.Equal(t, []byte{2, 0, 0, 0}, conn.Written[4:8])       // Number of games

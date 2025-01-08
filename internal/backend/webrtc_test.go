@@ -93,7 +93,7 @@ func TestWebRTC(t *testing.T) {
 		t.Fatalf("failed to create room: %v", err)
 		return
 	}
-	if _, err := bd1.gameClient.CreateGame(context.TODO(), connect.NewRequest(&v1.CreateGameRequest{
+	if _, err := bd1.gameClient.CreateGame(ctx, connect.NewRequest(&v1.CreateGameRequest{
 		GameName:      roomId,
 		MapId:         v1.GameMap_AbandonedRealm,
 		HostUserId:    1,
@@ -156,25 +156,6 @@ func TestWebRTC(t *testing.T) {
 	// 	Game:  gameRoom,
 	// 	SessionStore: peers,
 	// }
+
+	// <-webrtc.GatheringCompletePromise(peer.Connection)
 }
-
-// 	player2.SessionStore.Range(func(_ string, peer *Peer) {
-// 		<-webrtc.GatheringCompletePromise(peer.Connection)
-// 	})
-
-// params := GetPlayerAddrParams{
-//	GameID:     roomId,
-//	UserID:     "2",
-//	IPAddress:  "",
-//	HostUserID: "1",
-// }
-// peer := session2.IpRing.NextPeerAddress(
-//	params.UserID,
-//	params.UserID == session2.GetUserID(),
-//	params.UserID == params.HostUserID,
-// )
-// ip, err := proxy2.Join(JoinParams{
-//	HostUserID: "1",
-//	GameID:     roomId,
-//	HostUserIP: "127.0.0.1",
-// }, session2)

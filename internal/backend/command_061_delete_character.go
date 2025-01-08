@@ -11,7 +11,7 @@ import (
 	"github.com/dimspell/gladiator/internal/backend/packet"
 )
 
-func (b *Backend) HandleDeleteCharacter(session *bsession.Session, req DeleteCharacterRequest) error {
+func (b *Backend) HandleDeleteCharacter(ctx context.Context, session *bsession.Session, req DeleteCharacterRequest) error {
 	if session.UserID == 0 {
 		return fmt.Errorf("packet-61: user is not logged in")
 	}
@@ -22,7 +22,7 @@ func (b *Backend) HandleDeleteCharacter(session *bsession.Session, req DeleteCha
 		return nil
 	}
 
-	if _, err := b.characterClient.DeleteCharacter(context.TODO(),
+	if _, err := b.characterClient.DeleteCharacter(ctx,
 		connect.NewRequest(&multiv1.DeleteCharacterRequest{
 			UserId:        session.UserID,
 			CharacterName: data.CharacterName,

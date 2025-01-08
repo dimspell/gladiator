@@ -57,7 +57,7 @@ func TestE2E_LAN(t *testing.T) {
 	session1 := bd1.AddSession(conn1)
 
 	// Sign-in
-	assert.NoError(t, bd1.HandleClientAuthentication(session1, ClientAuthenticationRequest{
+	assert.NoError(t, bd1.HandleClientAuthentication(ctx, session1, ClientAuthenticationRequest{
 		2, 0, 0, 0, // Unknown
 		't', 'e', 's', 't', 0, // Password
 		'a', 'r', 'c', 'h', 'e', 'r', 0, // Username
@@ -68,7 +68,7 @@ func TestE2E_LAN(t *testing.T) {
 	}
 
 	// Select character
-	assert.NoError(t, bd1.HandleSelectCharacter(session1, SelectCharacterRequest{
+	assert.NoError(t, bd1.HandleSelectCharacter(ctx, session1, SelectCharacterRequest{
 		'a', 'r', 'c', 'h', 'e', 'r', 0, // User name
 		'a', 'r', 'c', 'h', 'e', 'r', 0, // Character name
 	}))
@@ -84,13 +84,13 @@ func TestE2E_LAN(t *testing.T) {
 	}
 
 	// Create new game room
-	assert.NoError(t, bd1.HandleCreateGame(session1, CreateGameRequest{
+	assert.NoError(t, bd1.HandleCreateGame(ctx, session1, CreateGameRequest{
 		0, 0, 0, 0, // State
 		byte(v1.GameMap_FrozenLabyrinth), 0, 0, 0, // Map ID
 		'r', 'o', 'o', 'm', 0, // Game room name
 		0, // Password
 	}))
-	assert.NoError(t, bd1.HandleCreateGame(session1, CreateGameRequest{
+	assert.NoError(t, bd1.HandleCreateGame(ctx, session1, CreateGameRequest{
 		1, 0, 0, 0, // State
 		byte(v1.GameMap_FrozenLabyrinth), 0, 0, 0, // Map ID
 		'r', 'o', 'o', 'm', 0, // Game room name
@@ -126,7 +126,7 @@ func TestE2E_LAN(t *testing.T) {
 	session2 := bd2.AddSession(conn2)
 
 	// Sign-in by player2
-	assert.NoError(t, bd2.HandleClientAuthentication(session2, ClientAuthenticationRequest{
+	assert.NoError(t, bd2.HandleClientAuthentication(ctx, session2, ClientAuthenticationRequest{
 		2, 0, 0, 0, // Unknown
 		't', 'e', 's', 't', 0, // Password
 		'm', 'a', 'g', 'e', 0, // Username
@@ -137,7 +137,7 @@ func TestE2E_LAN(t *testing.T) {
 	}
 
 	// Select character by player2
-	assert.NoError(t, bd2.HandleSelectCharacter(session2, SelectCharacterRequest{
+	assert.NoError(t, bd2.HandleSelectCharacter(ctx, session2, SelectCharacterRequest{
 		'm', 'a', 'g', 'e', 0, // User name
 		'm', 'a', 'g', 'e', 0, // Character name
 	}))
@@ -156,7 +156,7 @@ func TestE2E_LAN(t *testing.T) {
 	conn2.Written = nil
 
 	// List games
-	assert.NoError(t, bd2.HandleListGames(session2, ListGamesRequest{}))
+	assert.NoError(t, bd2.HandleListGames(ctx, session2, ListGamesRequest{}))
 
 	// Check if user has received the game list with corresponding payload
 	assert.Equal(t, []byte{
@@ -170,7 +170,7 @@ func TestE2E_LAN(t *testing.T) {
 	conn2.Written = nil
 
 	// Select game
-	assert.NoError(t, bd2.HandleSelectGame(session2, SelectGameRequest{
+	assert.NoError(t, bd2.HandleSelectGame(ctx, session2, SelectGameRequest{
 		'r', 'o', 'o', 'm', 0, // Game name
 		0, // Password
 	}))
@@ -187,7 +187,7 @@ func TestE2E_LAN(t *testing.T) {
 	conn2.Written = nil
 
 	// Join to host
-	assert.NoError(t, bd2.HandleJoinGame(session2, JoinGameRequest{
+	assert.NoError(t, bd2.HandleJoinGame(ctx, session2, JoinGameRequest{
 		'r', 'o', 'o', 'm', 0, // Game name
 		0, // Password
 	}))

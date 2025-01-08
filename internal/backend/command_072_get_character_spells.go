@@ -11,7 +11,7 @@ import (
 	"github.com/dimspell/gladiator/internal/backend/packet"
 )
 
-func (b *Backend) HandleGetCharacterSpells(session *bsession.Session, req GetCharacterSpellsRequest) error {
+func (b *Backend) HandleGetCharacterSpells(ctx context.Context, session *bsession.Session, req GetCharacterSpellsRequest) error {
 	if session.UserID == 0 {
 		return fmt.Errorf("packet-72: user is not logged in")
 	}
@@ -22,7 +22,7 @@ func (b *Backend) HandleGetCharacterSpells(session *bsession.Session, req GetCha
 		return nil
 	}
 
-	respChar, err := b.characterClient.GetCharacter(context.TODO(), connect.NewRequest(&multiv1.GetCharacterRequest{
+	respChar, err := b.characterClient.GetCharacter(ctx, connect.NewRequest(&multiv1.GetCharacterRequest{
 		UserId:        session.UserID,
 		CharacterName: data.CharacterName,
 	}))

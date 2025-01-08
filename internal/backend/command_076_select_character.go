@@ -12,7 +12,7 @@ import (
 	"github.com/dimspell/gladiator/internal/backend/packet"
 )
 
-func (b *Backend) HandleSelectCharacter(session *bsession.Session, req SelectCharacterRequest) error {
+func (b *Backend) HandleSelectCharacter(ctx context.Context, session *bsession.Session, req SelectCharacterRequest) error {
 	if session.UserID == 0 {
 		return fmt.Errorf("packet-76: user is not logged in")
 	}
@@ -23,7 +23,7 @@ func (b *Backend) HandleSelectCharacter(session *bsession.Session, req SelectCha
 		return nil
 	}
 
-	respChar, err := b.characterClient.GetCharacter(context.TODO(),
+	respChar, err := b.characterClient.GetCharacter(ctx,
 		connect.NewRequest(&multiv1.GetCharacterRequest{
 			UserId:        session.UserID,
 			CharacterName: data.CharacterName,
