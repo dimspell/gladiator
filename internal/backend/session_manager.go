@@ -40,7 +40,7 @@ func (b *Backend) ConnectToLobby(ctx context.Context, user *multiv1.User, sessio
 
 func (b *Backend) RegisterNewObserver(ctx context.Context, session *bsession.Session) error {
 	handlers := []proxy.MessageHandler{
-		bsession.NewLobbyEventHandler(session),
+		NewLobbyEventHandler(session),
 		b.Proxy.ExtendWire(session),
 	}
 	observe := func(ctx context.Context, wsConn *websocket.Conn) {

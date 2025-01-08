@@ -37,7 +37,7 @@ func (b *Backend) HandleGetCharacterInventory(session *bsession.Session, req Get
 		}))
 
 	if err != nil {
-		_ = session.Send(packet.ReceiveMessage, packet.NewGlobalMessage("system", "Inventory fetch failed, please try sign-in again"))
+		_ = session.Send(packet.ReceiveMessage, NewGlobalMessage("system", "Inventory fetch failed, please try sign-in again"))
 
 		var connectError *connect.Error
 		if errors.As(err, &connectError) {

@@ -98,10 +98,6 @@ func (s *Session) ToPlayer(ipAddr net.IP) wire.Player {
 	}
 }
 
-func (s *Session) ExtendWire() *LobbyEventHandler {
-	return &LobbyEventHandler{Session: s}
-}
-
 func (s *Session) InitObserver(registerNewObserver func(context.Context, *Session) error) error {
 	var err error
 	s.OnceSelectedCharacter.Do(func() {
