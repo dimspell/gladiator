@@ -91,7 +91,7 @@ func main() {
 	}
 	slog.Info("created room over proxy")
 
-	if err := px.HostRoom(proxy.HostParams{GameID: game.Msg.Game.GameId}, session); err != nil {
+	if err := px.HostRoom(ctx, proxy.HostParams{GameID: game.Msg.Game.GameId}, session); err != nil {
 		slog.Error("failed to host room over proxy", "error", err)
 		return
 	}
