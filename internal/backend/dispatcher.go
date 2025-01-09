@@ -71,18 +71,16 @@ func (b *Backend) handleCommands(ctx context.Context, session *bsession.Session)
 			continue
 		}
 
-		pt := packet.Code(data[1])
+		code := packet.Code(data[1])
 		if logger.PacketLogger != nil {
 			logger.PacketLogger.Debug("Recv",
-				"packetType", pt,
+				"code", code,
 				"bytes", data,
-				"sessionId", session.ID,
-				"length", len(data),
+				"session_id", session.ID,
 			)
 		}
 
-		// TODO: Pass context further
-		switch pt {
+		switch code {
 		case packet.CreateNewAccount:
 			if err := b.HandleCreateNewAccount(ctx, session, data[4:]); err != nil {
 				return err
