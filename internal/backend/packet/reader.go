@@ -14,6 +14,9 @@ type Reader struct {
 }
 
 func NewReader(data []byte) *Reader {
+	if data == nil {
+		data = []byte{}
+	}
 	return &Reader{data: data}
 }
 
