@@ -56,7 +56,7 @@ func (b *Backend) HandleCreateGame(ctx context.Context, session *bsession.Sessio
 			return err
 		}
 
-		if err := b.Proxy.HostRoom(proxy.HostParams{GameID: respGame.Msg.GetGame().Name}, session); err != nil {
+		if err := b.Proxy.HostRoom(ctx, proxy.HostParams{GameID: respGame.Msg.GetGame().Name}, session); err != nil {
 			return err
 		}
 		binary.LittleEndian.PutUint32(response[0:4], uint32(model.GameStateStarted))

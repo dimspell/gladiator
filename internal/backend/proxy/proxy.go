@@ -33,7 +33,7 @@ type HostProxy interface {
 
 	// HostRoom creates a new game room with the provided parameters and returns
 	// an error if the operation fails.
-	HostRoom(HostParams, *bsession.Session) error
+	HostRoom(context.Context, HostParams, *bsession.Session) error
 }
 
 type CreateParams struct {

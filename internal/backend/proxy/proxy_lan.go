@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
-	"time"
 
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/wire"
@@ -48,10 +47,7 @@ func (p *LAN) CreateRoom(params CreateParams, session *bsession.Session) (net.IP
 	return ip, nil
 }
 
-func (p *LAN) HostRoom(params HostParams, session *bsession.Session) error {
-	ctx, cancel := context.WithTimeout(context.TODO(), 3*time.Second)
-	defer cancel()
-
+func (p *LAN) HostRoom(ctx context.Context, params HostParams, session *bsession.Session) error {
 	if err := session.SendSetRoomReady(ctx, params.GameID); err != nil {
 		return err
 	}

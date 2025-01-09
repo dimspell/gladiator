@@ -163,7 +163,7 @@ func (s *Session) ConsumeWebSocket(ctx context.Context) ([]byte, error) {
 }
 
 func (s *Session) SendEvent(ctx context.Context, eventType wire.EventType, content any) error {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+	ctx, cancel := context.WithTimeout(ctx, time.Second*3)
 	defer cancel()
 
 	return wire.Write(ctx, s.wsConn, wire.Compose(
@@ -177,7 +177,7 @@ func (s *Session) SendEvent(ctx context.Context, eventType wire.EventType, conte
 }
 
 func (s *Session) SendEventTo(ctx context.Context, eventType wire.EventType, content any, recipientId string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+	ctx, cancel := context.WithTimeout(ctx, time.Second*3)
 	defer cancel()
 
 	return wire.Write(ctx, s.wsConn, wire.Compose(

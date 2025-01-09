@@ -76,7 +76,7 @@ func (p *PeerToPeer) CreateRoom(params CreateParams, session *bsession.Session) 
 	return ipAddr, nil
 }
 
-func (p *PeerToPeer) HostRoom(params HostParams, session *bsession.Session) error {
+func (p *PeerToPeer) HostRoom(ctx context.Context, params HostParams, session *bsession.Session) error {
 	peers, ok := p.SessionStore.sessions[session]
 	if !ok {
 		return fmt.Errorf("no game mananged for session: %s", session.GetUserID())
@@ -85,7 +85,7 @@ func (p *PeerToPeer) HostRoom(params HostParams, session *bsession.Session) erro
 		return fmt.Errorf("no game room found")
 	}
 
-	if err := session.SendSetRoomReady(context.TODO(), params.GameID); err != nil {
+	if err := session.SendSetRoomReady(ctx, params.GameID); err != nil {
 		return fmt.Errorf("could not send set room ready: %w", err)
 	}
 
