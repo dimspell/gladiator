@@ -64,11 +64,11 @@ func (s *Session) UpdateCharacter(character *multiv1.Character) {
 
 func (s *Session) GetUserID() string { return fmt.Sprintf("%d", s.UserID) }
 
-func (s *Session) Send(packetType packet.PacketType, payload []byte) error {
+func (s *Session) Send(packetType packet.Code, payload []byte) error {
 	return sendPacket(s.Conn, packetType, payload)
 }
 
-func sendPacket(conn net.Conn, packetType packet.PacketType, payload []byte) error {
+func sendPacket(conn net.Conn, packetType packet.Code, payload []byte) error {
 	if conn == nil {
 		return fmt.Errorf("backend: invalid client connection")
 	}
@@ -218,7 +218,7 @@ func (s *Session) JoinLobby(ctx context.Context) error {
 func (s *Session) SendChatMessage(ctx context.Context, text string) error {
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
-	
+
 	return s.SendEvent(ctx, wire.Chat, wire.ChatMessage{
 		User: s.Username,
 		Text: text,

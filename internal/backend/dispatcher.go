@@ -2,7 +2,6 @@ package backend
 
 import (
 	"context"
-	"encoding/binary"
 	"fmt"
 	"net"
 
@@ -62,7 +61,7 @@ func (b *Backend) handleCommands(ctx context.Context, session *bsession.Session)
 	if err != nil {
 		return err
 	}
-	packets := splitMultiPacket(buf[:n])
+	packets := packet.Split(buf[:n])
 
 	for _, data := range packets {
 		if len(data) < 4 {
@@ -72,7 +71,7 @@ func (b *Backend) handleCommands(ctx context.Context, session *bsession.Session)
 			continue
 		}
 
-		pt := packet.PacketType(data[1])
+		pt := packet.Code(data[1])
 		if logger.PacketLogger != nil {
 			logger.PacketLogger.Debug("Recv",
 				"packetType", pt,
@@ -164,23 +163,4 @@ func (b *Backend) handleCommands(ctx context.Context, session *bsession.Session)
 	}
 
 	return nil
-}
-
-func splitMultiPacket(buf []byte) [][]byte {
-	if len(buf) < 4 {
-		return [][]byte{buf}
-	}
-
-	var packets [][]byte
-	var offset int
-	for i := 0; i < 10; i++ {
-		if (offset + 4) > len(buf) {
-			break
-		}
-
-		length := int(binary.LittleEndian.Uint16(buf[offset+2 : offset+4]))
-		packets = append(packets, buf[offset:offset+length])
-		offset += length
-	}
-	return packets
 }

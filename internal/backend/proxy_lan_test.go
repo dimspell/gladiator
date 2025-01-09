@@ -247,14 +247,14 @@ func TestE2E_LAN(t *testing.T) {
 	}
 }
 
-func findPacket(buf []byte, packetType packet.PacketType) []byte {
-	for _, payload := range splitMultiPacket(buf) {
+func findPacket(buf []byte, packetType packet.Code) []byte {
+	for _, payload := range packet.Split(buf) {
 		if len(payload) == 0 {
 			// TODO: Why it happens?
 			slog.Error("failed to split packet", "buffer", buf)
 			return nil
 		}
-		pt := packet.PacketType(payload[1])
+		pt := packet.Code(payload[1])
 		if pt == packetType {
 			return payload[4:]
 		}

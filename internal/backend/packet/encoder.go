@@ -4,7 +4,7 @@ import (
 	"encoding/binary"
 )
 
-func EncodePacket(packetType PacketType, data []byte) []byte {
+func EncodePacket(packetType Code, data []byte) []byte {
 	length := len(data) + 4
 	payload := make([]byte, length)
 
