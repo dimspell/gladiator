@@ -72,7 +72,7 @@ func (p *LAN) SelectGame(params GameData, session *bsession.Session) error {
 	return nil
 }
 
-func (p *LAN) Join(params JoinParams, session *bsession.Session) (net.IP, error) {
+func (p *LAN) Join(ctx context.Context, params JoinParams, session *bsession.Session) (net.IP, error) {
 	ip := net.ParseIP(p.MyIPAddress)
 	if ip == nil {
 		return nil, fmt.Errorf("incorrect IP address: %s", p.MyIPAddress)
@@ -99,7 +99,7 @@ func (p *LAN) Close(session *bsession.Session) {
 	delete(p.BySession, session)
 }
 
-func (p *LAN) ExtendWire(session *bsession.Session) MessageHandler {
+func (p *LAN) NewWebSocketHandler(session *bsession.Session) MessageHandler {
 	return &LanMessageHandler{session: session, BySession: p.BySession}
 }
 

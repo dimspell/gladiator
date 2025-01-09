@@ -19,7 +19,7 @@ type Proxy interface {
 
 	Close(session *bsession.Session)
 
-	ExtendWire(session *bsession.Session) MessageHandler
+	NewWebSocketHandler(session *bsession.Session) MessageHandler
 }
 
 type HostProxy interface {
@@ -48,7 +48,7 @@ type JoinProxy interface {
 	SelectGame(GameData, *bsession.Session) error
 
 	// Join is used to connect to TCP game host
-	Join(JoinParams, *bsession.Session) (net.IP, error)
+	Join(context.Context, JoinParams, *bsession.Session) (net.IP, error)
 
 	GetPlayerAddr(GetPlayerAddrParams, *bsession.Session) (net.IP, error)
 }

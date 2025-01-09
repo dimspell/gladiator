@@ -57,7 +57,7 @@ func main() {
 	slog.Info("joined lobby over websocket")
 
 	go func() {
-		handler := px.ExtendWire(session)
+		handler := px.NewWebSocketHandler(session)
 
 		for {
 			payload, err := session.ConsumeWebSocket(ctx)

@@ -68,7 +68,7 @@ func (p *PeerToPeer) CreateRoom(params CreateParams, session *bsession.Session) 
 	p.SessionStore.SetSession(session, &SessionMapping{
 		Game:   gameRoom,
 		IpRing: NewIpRing(),
-		Peers:  map[string]*Peer{
+		Peers: map[string]*Peer{
 			// hostPlayer.ID(): peer,
 		},
 	})
@@ -168,7 +168,7 @@ func (p *PeerToPeer) GetPlayerAddr(params GetPlayerAddrParams, session *bsession
 	return peer.Addr.IP, nil
 }
 
-func (p *PeerToPeer) Join(params JoinParams, session *bsession.Session) (net.IP, error) {
+func (p *PeerToPeer) Join(ctx context.Context, params JoinParams, session *bsession.Session) (net.IP, error) {
 	peer := &Peer{
 		UserID: session.GetUserID(),
 		Addr:   &redirect.Addressing{IP: net.IPv4(127, 0, 0, 1)},
@@ -204,7 +204,7 @@ func (p *PeerToPeer) Close(session *bsession.Session) {
 	// p.SessionStore.DeleteSession(session)
 }
 
-func (p *PeerToPeer) ExtendWire(session *bsession.Session) MessageHandler {
+func (p *PeerToPeer) NewWebSocketHandler(session *bsession.Session) MessageHandler {
 	return &PeerToPeerMessageHandler{
 		session,
 		p.SessionStore,

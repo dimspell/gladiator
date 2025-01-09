@@ -63,7 +63,7 @@ func main() {
 	slog.Info("joined lobby over websocket")
 
 	go func() {
-		handler := px.ExtendWire(session)
+		handler := px.NewWebSocketHandler(session)
 
 		for {
 			payload, err := session.ConsumeWebSocket(ctx)
@@ -108,7 +108,7 @@ func main() {
 	slog.Info("got player address", "address", addr)
 
 	// px.GetPlayerAddr(proxy.GetPlayerAddrParams{}, session)
-	// px.ExtendWire(session)
+	// px.NewWebSocketHandler(session)
 
 	join, err := gm.JoinGame(ctx, connect.NewRequest(&multiv1.JoinGameRequest{
 		UserId:     meUserId,
@@ -121,7 +121,7 @@ func main() {
 	}
 	slog.Info("joined game", "players", join.Msg.Players)
 
-	if _, err := px.Join(proxy.JoinParams{
+	if _, err := px.Join(ctx, proxy.JoinParams{
 		HostUserID: fmt.Sprintf("%d", otherUserId),
 		GameID:     roomId,
 		HostUserIP: "127.0.1.2",
