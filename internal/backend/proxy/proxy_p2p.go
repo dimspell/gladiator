@@ -27,7 +27,7 @@ type PeerToPeer struct {
 	SessionStore   *SessionStore
 }
 
-func NewPeerToPeer() *PeerToPeer {
+func NewPeerToPeer(iceServers ...webrtc.ICEServer) *PeerToPeer {
 	config := webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{
 			// {
@@ -39,6 +39,9 @@ func NewPeerToPeer() *PeerToPeer {
 				Credential: "password1",
 			},
 		},
+	}
+	for _, server := range iceServers {
+		config.ICEServers = append(config.ICEServers, server)
 	}
 
 	return &PeerToPeer{
@@ -68,9 +71,7 @@ func (p *PeerToPeer) CreateRoom(params CreateParams, session *bsession.Session) 
 	p.SessionStore.SetSession(session, &SessionMapping{
 		Game:   gameRoom,
 		IpRing: NewIpRing(),
-		Peers: map[string]*Peer{
-			// hostPlayer.ID(): peer,
-		},
+		Peers:  make(map[string]*Peer), // FIXME: Add size limit
 	})
 
 	return ipAddr, nil

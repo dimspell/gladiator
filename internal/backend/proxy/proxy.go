@@ -60,33 +60,18 @@ type GameData struct {
 
 func (d *GameData) ToWirePlayers() []wire.Player {
 	players := make([]wire.Player, len(d.Players))
-
 	for i, player := range d.Players {
-		players[i] = wire.Player{
-			UserID:      player.UserId,
-			Username:    player.Username,
-			CharacterID: player.CharacterId,
-			ClassType:   byte(player.ClassType),
-			IPAddress:   player.IpAddress,
-		}
+		players[i] = toWirePlayer(player)
 	}
-
 	return players
 }
 
 func (d *GameData) FindHostUser() (wire.Player, error) {
-	for _, player := range d.Players {
-		if d.Game.HostUserId == player.UserId {
-			return wire.Player{
-				UserID:      player.UserId,
-				Username:    player.Username,
-				CharacterID: player.CharacterId,
-				ClassType:   byte(player.ClassType),
-				IPAddress:   player.IpAddress,
-			}, nil
-		}
+	player, err := findPlayer(d.Players, d.Game.HostUserId)
+	if err != nil {
+		return player, fmt.Errorf("host user not found")
 	}
-	return wire.Player{}, fmt.Errorf("host user not found")
+	return player, nil
 }
 
 type JoinParams struct {
@@ -104,4 +89,23 @@ type GetPlayerAddrParams struct {
 
 type MessageHandler interface {
 	Handle(ctx context.Context, payload []byte) error
+}
+
+func toWirePlayer(player *multiv1.Player) wire.Player {
+	return wire.Player{
+		UserID:      player.UserId,
+		Username:    player.Username,
+		CharacterID: player.CharacterId,
+		ClassType:   byte(player.ClassType),
+		IPAddress:   player.IpAddress,
+	}
+}
+
+func findPlayer(players []*multiv1.Player, needleUserId int64) (wire.Player, error) {
+	for _, player := range players {
+		if needleUserId == player.UserId {
+			return toWirePlayer(player), nil
+		}
+	}
+	return wire.Player{}, fmt.Errorf("user not found")
 }

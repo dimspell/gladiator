@@ -216,9 +216,6 @@ func (s *Session) JoinLobby(ctx context.Context) error {
 }
 
 func (s *Session) SendChatMessage(ctx context.Context, text string) error {
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
-	defer cancel()
-
 	return s.SendEvent(ctx, wire.Chat, wire.ChatMessage{
 		User: s.Username,
 		Text: text,
