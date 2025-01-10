@@ -95,6 +95,10 @@ func (p *LAN) GetPlayerAddr(params GetPlayerAddrParams, session *bsession.Sessio
 	return ip, nil
 }
 
+func (p *LAN) ConnectToPlayer(ctx context.Context, params GetPlayerAddrParams, session *bsession.Session) (net.IP, error) {
+	return p.GetPlayerAddr(params, session)
+}
+
 func (p *LAN) Close(session *bsession.Session) {
 	delete(p.BySession, session)
 }

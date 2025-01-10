@@ -65,7 +65,7 @@ func (b *Backend) HandleJoinGame(ctx context.Context, session *bsession.Session,
 			IPAddress:  player.IpAddress,
 			HostUserID: fmt.Sprintf("%d", respGame.Msg.GetGame().HostUserId),
 		}
-		proxyIP, err := b.Proxy.GetPlayerAddr(ps, session)
+		proxyIP, err := b.Proxy.ConnectToPlayer(ctx, ps, session)
 		if err != nil {
 			return err
 		}

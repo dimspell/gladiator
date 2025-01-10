@@ -14,11 +14,16 @@ import (
 	"github.com/dimspell/gladiator/internal/app/logger"
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/proxy"
+	"github.com/dimspell/gladiator/internal/backend/redirect"
 	"github.com/dimspell/gladiator/internal/model"
 )
 
 const (
 	consoleUri = "127.0.0.1:2137"
+	roomId     = "room"
+
+	meUserId = 1
+	meName   = "host"
 )
 
 var httpClient = &http.Client{Timeout: 10 * time.Second}
@@ -30,18 +35,20 @@ func main() {
 
 	gm := multiv1connect.NewGameServiceClient(httpClient, fmt.Sprintf("http://%s/grpc", consoleUri))
 	px := proxy.NewPeerToPeer()
+	px.NewUDPRedirect = redirect.NewNoop
+	px.NewTCPRedirect = redirect.NewLineReader
 
 	session := &bsession.Session{
-		ID:          "1",
-		UserID:      1,
-		Username:    "host",
-		CharacterID: 1,
+		ID:          "session-host",
+		UserID:      meUserId,
+		Username:    meName,
+		CharacterID: meUserId,
 		ClassType:   model.ClassTypeArcher,
 		State:       &bsession.SessionState{},
 	}
 	user1 := &multiv1.User{
 		UserId:   1,
-		Username: "host",
+		Username: meName,
 	}
 
 	if err := session.ConnectOverWebsocket(ctx, user1, fmt.Sprintf("ws://%s/lobby", consoleUri)); err != nil {
@@ -73,10 +80,10 @@ func main() {
 	}()
 
 	game, err := gm.CreateGame(ctx, connect.NewRequest(&multiv1.CreateGameRequest{
-		GameName:      "testing",
+		GameName:      roomId,
 		Password:      "",
-		MapId:         0,
-		HostUserId:    1,
+		MapId:         multiv1.GameMap_AbandonedRealm,
+		HostUserId:    meUserId,
 		HostIpAddress: "127.0.1.2", // Not used for P2P traffic
 	}))
 	if err != nil {

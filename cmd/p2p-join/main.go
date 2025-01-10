@@ -14,6 +14,7 @@ import (
 	"github.com/dimspell/gladiator/internal/app/logger"
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/proxy"
+	"github.com/dimspell/gladiator/internal/backend/redirect"
 	"github.com/dimspell/gladiator/internal/model"
 )
 
@@ -21,10 +22,10 @@ const (
 	consoleUri = "127.0.0.1:2137"
 	roomId     = "room"
 
-	meUserId = 3
+	meUserId = 2
 	meName   = "meuser"
 
-	otherUserId = 2
+	otherUserId = 1
 )
 
 var httpClient = &http.Client{Timeout: 10 * time.Second}
@@ -36,6 +37,8 @@ func main() {
 
 	gm := multiv1connect.NewGameServiceClient(httpClient, fmt.Sprintf("http://%s/grpc", consoleUri))
 	px := proxy.NewPeerToPeer()
+	px.NewUDPRedirect = redirect.NewNoop
+	px.NewTCPRedirect = redirect.NewLineReader
 
 	session := &bsession.Session{
 		ID:          fmt.Sprintf("%d", meUserId),
@@ -107,9 +110,6 @@ func main() {
 	}
 	slog.Info("got player address", "address", addr)
 
-	// px.GetPlayerAddr(proxy.GetPlayerAddrParams{}, session)
-	// px.NewWebSocketHandler(session)
-
 	join, err := gm.JoinGame(ctx, connect.NewRequest(&multiv1.JoinGameRequest{
 		UserId:     meUserId,
 		GameRoomId: roomId,
@@ -130,7 +130,7 @@ func main() {
 		return
 	}
 
-	addr2, err := px.GetPlayerAddr(proxy.GetPlayerAddrParams{
+	addr2, err := px.ConnectToPlayer(ctx, proxy.GetPlayerAddrParams{
 		GameID:     roomId,
 		UserID:     fmt.Sprintf("%d", otherUserId),
 		IPAddress:  "127.0.1.2",
@@ -140,7 +140,7 @@ func main() {
 		slog.Error("failed to get player address", "error", err)
 		return
 	}
-	slog.Info("got player address", "address", addr2)
+	slog.Info("connected to player", "address", addr2)
 
 	select {}
 }

@@ -33,11 +33,11 @@ func NewPeerToPeer(iceServers ...webrtc.ICEServer) *PeerToPeer {
 			// {
 			// 	URLs: []string{"stun:stun.l.google.com:19302"},
 			// },
-			{
-				URLs:       []string{"turn:192.168.121.212:3478"},
-				Username:   "username1",
-				Credential: "password1",
-			},
+			// {
+			// 	URLs:       []string{"turn:192.168.121.212:3478"},
+			// 	Username:   "username1",
+			// 	Credential: "password1",
+			// },
 		},
 	}
 	for _, server := range iceServers {
@@ -151,21 +151,6 @@ func (p *PeerToPeer) GetPlayerAddr(params GetPlayerAddrParams, session *bsession
 		return nil, fmt.Errorf("could not find peer with user ID: %s", params.UserID)
 	}
 
-	if peer.Connected != nil {
-		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-		defer cancel()
-
-		select {
-		case <-ctx.Done():
-			slog.Error("timeout waiting for peer to connect", "userID", params.UserID)
-			// return nil, fmt.Errorf("could not get peer addr: %w for user ID: %s", ctx.Err(), params.UserID)
-		// case <-webrtc.GatheringCompletePromise(peer.Connection):
-		// 	slog.Debug("gathering complete")
-		case <-peer.Connected:
-			slog.Debug("peer connected, user ID", "userID", params.UserID)
-		}
-	}
-
 	return peer.Addr.IP, nil
 }
 
@@ -182,7 +167,7 @@ func (p *PeerToPeer) Join(ctx context.Context, params JoinParams, session *bsess
 		return nil, fmt.Errorf("could not find current session among the peers for user ID: %s", session.GetUserID())
 	}
 
-	mapping.Peers[peer.UserID] = peer
+	mapping.Peers[session.GetUserID()] = peer
 
 	for _, pr := range mapping.Peers {
 		ch := make(chan struct{}, 1)
@@ -191,6 +176,32 @@ func (p *PeerToPeer) Join(ctx context.Context, params JoinParams, session *bsess
 
 	gameRoom := mapping.Game
 	gameRoom.SetPlayer(session.ToPlayer(peer.Addr.IP.To4()))
+
+	return peer.Addr.IP, nil
+}
+
+func (p *PeerToPeer) ConnectToPlayer(ctx context.Context, params GetPlayerAddrParams, session *bsession.Session) (net.IP, error) {
+	peer, ok := p.SessionStore.GetPeer(session, params.UserID)
+	if !ok {
+		return nil, fmt.Errorf("could not find peer with user ID: %s", params.UserID)
+	}
+
+	if peer.Connected == nil {
+		return nil, fmt.Errorf("peer does not have a connection channel")
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+
+	select {
+	case <-ctx.Done():
+		slog.Error("timeout waiting for peer to connect", "userID", params.UserID)
+		// return nil, fmt.Errorf("could not get peer addr: %w for user ID: %s", ctx.Err(), params.UserID)
+	// case <-webrtc.GatheringCompletePromise(peer.Connection):
+	// 	slog.Debug("gathering complete")
+	case <-peer.Connected:
+		slog.Debug("peer connected, user ID", "userID", params.UserID)
+	}
 
 	return peer.Addr.IP, nil
 }

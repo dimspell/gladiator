@@ -168,14 +168,13 @@ func (h *PeerToPeerMessageHandler) handleRTCOffer(ctx context.Context, offer wir
 		var err error
 		switch dc.Label() {
 		case "tcp":
-			// FIXME: Allow to mock redirect from test
-			redir, err = redirect.NewTCPRedirect(peer.Mode, peer.Addr)
+			redir, err = h.newTCPRedirect(peer.Mode, peer.Addr)
 			if err != nil {
 				logger.Error("Could not create TCP redirect", "error", err)
 				return
 			}
 		case "udp":
-			redir, err = redirect.NewUDPRedirect(peer.Mode, peer.Addr)
+			redir, err = h.newUDPRedirect(peer.Mode, peer.Addr)
 			if err != nil {
 				logger.Error("Could not create UDP redirect", "error", err)
 				return

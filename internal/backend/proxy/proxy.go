@@ -15,6 +15,7 @@ import (
 // joining game sessions, and retrieving player IP addresses.
 type Proxy interface {
 	HostProxy
+	SelectProxy
 	JoinProxy
 
 	Close(session *bsession.Session)
@@ -44,13 +45,14 @@ type HostParams struct {
 	GameID string
 }
 
-type JoinProxy interface {
+type SelectProxy interface {
 	SelectGame(GameData, *bsession.Session) error
-
-	// Join is used to connect to TCP game host
-	Join(context.Context, JoinParams, *bsession.Session) (net.IP, error)
-
 	GetPlayerAddr(GetPlayerAddrParams, *bsession.Session) (net.IP, error)
+}
+
+type JoinProxy interface {
+	Join(context.Context, JoinParams, *bsession.Session) (net.IP, error)
+	ConnectToPlayer(context.Context, GetPlayerAddrParams, *bsession.Session) (net.IP, error)
 }
 
 type GameData struct {
