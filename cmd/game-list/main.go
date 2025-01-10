@@ -33,10 +33,22 @@ func main() {
 		panic(err)
 	}
 
-	b, err := json.MarshalIndent(list.Msg.GetGames(), "", "  ")
-	if err != nil {
-		panic(err)
-	}
+	fmt.Printf("Game list (%d)\n", len(list.Msg.Games))
+	fmt.Println("--------------------------------")
 
-	fmt.Println(string(b))
+	for _, g := range list.Msg.Games {
+		game, err := gm.GetGame(ctx, connect.NewRequest(&multiv1.GetGameRequest{
+			GameRoomId: g.GetGameId(),
+		}))
+		if err != nil {
+			continue
+		}
+
+		fmt.Println("Game")
+		b, err := json.MarshalIndent(game, "", "  ")
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println(string(b))
+	}
 }
