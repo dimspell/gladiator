@@ -226,10 +226,6 @@ func (s *Session) SendSetRoomReady(ctx context.Context, gameRoomId string) error
 	return s.SendEvent(ctx, wire.SetRoomReady, gameRoomId)
 }
 
-func (s *Session) SendLeaveRoom(ctx context.Context, gameRoomId string) error {
-	return s.SendEvent(ctx, wire.LeaveRoom, gameRoomId)
-}
-
 func (s *Session) SendRTCICECandidate(ctx context.Context, candidate webrtc.ICECandidateInit, recipientId string) error {
 	return s.SendEventTo(ctx, wire.RTCICECandidate, candidate, recipientId)
 }

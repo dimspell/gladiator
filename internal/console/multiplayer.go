@@ -147,8 +147,6 @@ func (mp *Multiplayer) HandleIncomingMessage(ctx context.Context, msg wire.Messa
 		mp.ForwardRTCMessage(ctx, msg)
 	case wire.SetRoomReady:
 		mp.SetRoomReady(ctx, msg)
-	case wire.LeaveRoom:
-		mp.HandleLeaveRoom(ctx, msg)
 	default:
 		// Do nothing but log the event type
 		slog.Error("Unhandled event type", "type", msg.Type.String())
@@ -311,41 +309,28 @@ func (mp *Multiplayer) JoinRoom(roomId string, userId int64, ipAddr string) (Gam
 	return *room, nil
 }
 
-func (mp *Multiplayer) HandleLeaveRoom(ctx context.Context, msg wire.Message) {
-	player, ok := msg.Content.(wire.Player)
+func (mp *Multiplayer) LeaveRoom(ctx context.Context, session *UserSession) {
+	mp.roomsMutex.Lock()
+	defer mp.roomsMutex.Unlock()
+
+	room, ok := mp.Rooms[session.GameID]
 	if !ok {
 		return
 	}
 
-	mp.roomsMutex.Lock()
-	defer mp.roomsMutex.Unlock()
+	delete(room.Players, session.UserID)
 
-	mp.sessionMutex.Lock()
-	defer mp.sessionMutex.Unlock()
-
-	joinedPlayer, found := mp.sessions[player.UserID]
-	if !found {
-		return
-	}
-
-	room, ok := mp.Rooms[joinedPlayer.GameID]
-	if ok {
-		return
-	}
-
-	delete(room.Players, joinedPlayer.UserID)
-
-	for id, session := range room.Players {
-		session.Send(ctx, wire.Compose(wire.LeaveRoom, wire.Message{
+	for id, player := range room.Players {
+		player.Send(ctx, wire.Compose(wire.LeaveRoom, wire.Message{
 			To:   strconv.Itoa(int(id)),
-			From: strconv.Itoa(int(joinedPlayer.UserID)),
+			From: strconv.Itoa(int(session.UserID)),
 			Type: wire.LeaveRoom,
 			Content: wire.Player{
-				UserID:      joinedPlayer.UserID,
-				Username:    joinedPlayer.User.Username,
-				CharacterID: joinedPlayer.Character.CharacterID,
-				ClassType:   joinedPlayer.Character.ClassType,
-				IPAddress:   joinedPlayer.IPAddress,
+				UserID:      session.UserID,
+				Username:    session.User.Username,
+				CharacterID: session.Character.CharacterID,
+				ClassType:   session.Character.ClassType,
+				IPAddress:   session.IPAddress,
 			},
 		}))
 	}
@@ -487,11 +472,19 @@ func (mp *Multiplayer) SetPlayerConnected(session *UserSession) {
 func (mp *Multiplayer) SetPlayerDisconnected(session *UserSession) {
 	slog.Info("Closing player connection", "user", session.UserID)
 
+	// Close the websocket connection
 	if err := session.wsConn.CloseNow(); err != nil {
 		slog.Debug("Could not close the connection", "user", session.UserID, "error", err)
 	}
+
+	// Kick the user from the game room (if any)
+	mp.LeaveRoom(context.Background(), session)
+
+	// Delete the session from the map
 	mp.DeleteUserSession(session.UserID)
-	mp.BroadcastMessage(context.TODO(), wire.Compose(wire.LeaveLobby, wire.Message{
+
+	// Notify all the users
+	mp.BroadcastMessage(context.Background(), wire.Compose(wire.LeaveLobby, wire.Message{
 		Type:    wire.LeaveLobby,
 		From:    strconv.Itoa(int(session.UserID)),
 		Content: session.ToPlayer(),
