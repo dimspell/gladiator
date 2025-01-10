@@ -160,7 +160,7 @@ func (mp *Multiplayer) HandleSession(ctx context.Context, session *UserSession) 
 	}
 
 	// Expect the character info, then join and synchronise the state.
-	if err := mp.HandleJoin(ctx, session); err != nil {
+	if err := mp.HandleJoinLobby(ctx, session); err != nil {
 		return err
 	}
 
@@ -173,7 +173,7 @@ func (mp *Multiplayer) HandleSession(ctx context.Context, session *UserSession) 
 	// Handle all the incoming messages.
 	for {
 		// Register that the user is still being active.
-		session.LastSeen = time.Now().In(time.UTC)
+		session.ConnectedAt = time.Now().In(time.UTC)
 
 		payload, err := session.ReadNext(ctx)
 		if err != nil {
@@ -302,6 +302,7 @@ func (mp *Multiplayer) JoinRoom(roomId string, userId int64, ipAddr string) (Gam
 	// Override the IP address
 	joiningPlayer.IPAddress = ipAddr
 	joiningPlayer.GameID = room.ID
+	joiningPlayer.JoinedAt = time.Now().In(time.UTC)
 
 	// Update the game room
 	room.Players[userId] = joiningPlayer
@@ -309,6 +310,7 @@ func (mp *Multiplayer) JoinRoom(roomId string, userId int64, ipAddr string) (Gam
 	return *room, nil
 }
 
+// LeaveRoom removes a player from a game room.
 func (mp *Multiplayer) LeaveRoom(ctx context.Context, session *UserSession) {
 	mp.roomsMutex.Lock()
 	defer mp.roomsMutex.Unlock()
@@ -318,7 +320,21 @@ func (mp *Multiplayer) LeaveRoom(ctx context.Context, session *UserSession) {
 		return
 	}
 
+	// Was the player the game host?
+	playerWasHost := room.HostPlayer.UserID == session.UserID
+
 	delete(room.Players, session.UserID)
+
+	if len(room.Players) == 0 {
+		// There is nobody in the room, so we can destroy it
+		mp.DestroyRoom(room.ID)
+		return
+	}
+
+	if playerWasHost {
+		// Find the user who will become the new host
+		room.HostPlayer = mp.GetNextHost(room)
+	}
 
 	for id, player := range room.Players {
 		player.Send(ctx, wire.Compose(wire.LeaveRoom, wire.Message{
@@ -333,11 +349,36 @@ func (mp *Multiplayer) LeaveRoom(ctx context.Context, session *UserSession) {
 				IPAddress:   session.IPAddress,
 			},
 		}))
+
+		if playerWasHost {
+			player.Send(ctx, wire.Compose(wire.HostMigration, wire.Message{
+				To:   strconv.Itoa(int(id)),
+				From: strconv.Itoa(int(room.HostPlayer.UserID)),
+				Type: wire.HostMigration,
+				Content: wire.Player{
+					UserID:      room.HostPlayer.UserID,
+					Username:    room.HostPlayer.User.Username,
+					CharacterID: room.HostPlayer.Character.CharacterID,
+					ClassType:   room.HostPlayer.Character.ClassType,
+					IPAddress:   room.HostPlayer.IPAddress,
+				},
+			}))
+		}
+	}
+}
+
+// GetNextHost returns the next host of the game room.
+func (mp *Multiplayer) GetNextHost(room *GameRoom) *UserSession {
+	var earliest *UserSession
+
+	// Find the player who joined the room earliest
+	for _, player := range room.Players {
+		if earliest == nil || player.JoinedAt.Before(earliest.JoinedAt) {
+			earliest = player
+		}
 	}
 
-	if len(room.Players) == 0 {
-		mp.DestroyRoom(room.ID)
-	}
+	return earliest
 }
 
 func (mp *Multiplayer) AnnounceJoin(room GameRoom, userId int64) {
@@ -423,7 +464,7 @@ func (mp *Multiplayer) HandleHello(ctx context.Context, session *UserSession) er
 	return nil
 }
 
-func (mp *Multiplayer) HandleJoin(ctx context.Context, session *UserSession) error {
+func (mp *Multiplayer) HandleJoinLobby(ctx context.Context, session *UserSession) error {
 	payload, err := session.ReadNext(ctx)
 	if err != nil {
 		return err

@@ -11,10 +11,12 @@ import (
 )
 
 type UserSession struct {
-	UserID    int64     `json:"userID,omitempty"`
-	GameID    string    `json:"gameID,omitempty"`
-	Connected bool      `json:"connected,omitempty"`
-	LastSeen  time.Time `json:"lastSeen"`
+	UserID    int64  `json:"userID,omitempty"`
+	GameID    string `json:"gameID,omitempty"`
+	Connected bool   `json:"connected,omitempty"`
+
+	ConnectedAt time.Time `json:"connectedAt,omitempty"`
+	JoinedAt    time.Time `json:"joinedAt,omitempty"`
 
 	// TODO: It is never provided
 	IPAddress string `json:"ip"`
@@ -27,10 +29,10 @@ type UserSession struct {
 
 func NewUserSession(id int64, conn ConnReadWriter) *UserSession {
 	return &UserSession{
-		UserID:    id,
-		Connected: true,
-		LastSeen:  time.Now().In(time.UTC),
-		wsConn:    conn,
+		UserID:      id,
+		Connected:   true,
+		ConnectedAt: time.Now().In(time.UTC),
+		wsConn:      conn,
 	}
 }
 

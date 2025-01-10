@@ -21,7 +21,7 @@ const (
 	GetCharacterInventory    Code = 68  // 0x44ff
 	SelectGame               Code = 69  // 0x45ff
 	ShowRanking              Code = 70  // 0x46ff
-	ChangeHost               Code = 71  // 0x47ff
+	HostMigration            Code = 71  // 0x47ff
 	GetCharacterSpells       Code = 72  // 0x48ff
 	UpdateCharacterSpells    Code = 73  // 0x49ff
 	SelectCharacter          Code = 76  // 0x4cff

@@ -15,6 +15,7 @@ const (
 	SetRoomReady
 	JoinRoom
 	LeaveRoom
+	HostMigration
 	RTCOffer
 	RTCAnswer
 	RTCICECandidate
@@ -42,6 +43,8 @@ func (e EventType) String() string {
 		return "SetRoomReady"
 	case JoinRoom:
 		return "JoinRoom"
+	case HostMigration:
+		return "HostMigration"
 	case LeaveRoom:
 		return "LeaveRoom"
 	case RTCOffer:

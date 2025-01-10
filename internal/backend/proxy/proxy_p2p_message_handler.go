@@ -82,6 +82,13 @@ func (h *PeerToPeerMessageHandler) Handle(ctx context.Context, payload []byte) e
 		return h.handleLeaveRoom(ctx, msg.Content)
 	case wire.LobbyUsers, wire.JoinLobby, wire.CreateRoom:
 		return nil
+	case wire.HostMigration:
+		_, msg, err := wire.DecodeTyped[wire.Player](payload)
+		if err != nil {
+			slog.Error(errDecodingJoinRoom, "error", err, "payload", string(payload), "sessionID", h.session.GetUserID())
+			return err
+		}
+		return h.handleHostMigration(ctx, msg.Content)
 	default:
 		slog.Debug("unknown wire message", "type", eventType.String(), "payload", string(payload), "sessionID", h.session.GetUserID())
 		return nil
@@ -254,5 +261,13 @@ func (h *PeerToPeerMessageHandler) handleLeaveRoom(ctx context.Context, player w
 
 	slog.Info("User left", "peer", peer.UserID)
 	h.peerManager.RemovePeer(h.session, player.ID())
+	return nil
+}
+
+func (h *PeerToPeerMessageHandler) handleHostMigration(ctx context.Context, content wire.Player) error {
+	// response := make([]byte, 8)
+	// copy(response[0:4], []byte{1, 0, 0, 0})
+	// copy(response[4:], ip.To4())
+
 	return nil
 }
