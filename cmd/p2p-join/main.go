@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -19,18 +20,23 @@ import (
 )
 
 const (
-	consoleUri = "127.0.0.1:2137"
-	roomId     = "room"
-
-	meUserId = 2
-	meName   = "meuser"
-
+	consoleUri  = "127.0.0.1:2137"
+	roomId      = "room"
 	otherUserId = 1
+)
+
+var (
+	meUserId int64 = 2
+	meName         = "meuser"
 )
 
 var httpClient = &http.Client{Timeout: 10 * time.Second}
 
 func main() {
+	flag.StringVar(&meName, "name", meName, "name")
+	flag.Int64Var(&meUserId, "id", meUserId, "id")
+	flag.Parse()
+
 	logger.SetColoredLogger(os.Stderr, slog.LevelDebug, false)
 
 	ctx := context.Background()
