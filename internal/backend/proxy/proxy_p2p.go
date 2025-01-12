@@ -155,11 +155,7 @@ func (p *PeerToPeer) GetPlayerAddr(params GetPlayerAddrParams, session *bsession
 }
 
 func (p *PeerToPeer) Join(ctx context.Context, params JoinParams, session *bsession.Session) (net.IP, error) {
-	peer := &Peer{
-		UserID: session.GetUserID(),
-		Addr:   &redirect.Addressing{IP: net.IPv4(127, 0, 0, 1)},
-		Mode:   redirect.None,
-	}
+	ip := net.IPv4(127, 0, 0, 1)
 
 	// FIXME: Use function instead
 	mapping, exist := p.SessionStore.GetSession(session)
@@ -167,6 +163,11 @@ func (p *PeerToPeer) Join(ctx context.Context, params JoinParams, session *bsess
 		return nil, fmt.Errorf("could not find current session among the peers for user ID: %s", session.GetUserID())
 	}
 
+	peer := &Peer{
+		UserID: session.GetUserID(),
+		Addr:   &redirect.Addressing{IP: ip},
+		Mode:   redirect.None,
+	}
 	mapping.Peers[session.GetUserID()] = peer
 
 	for _, pr := range mapping.Peers {
@@ -175,9 +176,9 @@ func (p *PeerToPeer) Join(ctx context.Context, params JoinParams, session *bsess
 	}
 
 	gameRoom := mapping.Game
-	gameRoom.SetPlayer(session.ToPlayer(peer.Addr.IP.To4()))
+	gameRoom.SetPlayer(session.ToPlayer(ip))
 
-	return peer.Addr.IP, nil
+	return ip, nil
 }
 
 func (p *PeerToPeer) ConnectToPlayer(ctx context.Context, params GetPlayerAddrParams, session *bsession.Session) (net.IP, error) {

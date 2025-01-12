@@ -136,13 +136,13 @@ func (p *Peer) createDataChannels(newTCPRedirect, newUDPRedirect redirect.NewRed
 	}
 
 	if guestTCP != nil {
-		if err := p.createDataChannel("tcp", guestTCP); err != nil {
+		if err := p.createDataChannel(ctx, p.channelName("tcp", myUserId, p.UserID), guestTCP); err != nil {
 			return fmt.Errorf("failed to create TCP channel: %w", err)
 		}
 	}
 
 	if guestUDP != nil {
-		if err := p.createDataChannel("udp", guestUDP); err != nil {
+		if err := p.createDataChannel(ctx, p.channelName("udp", myUserId, p.UserID), guestUDP); err != nil {
 			return fmt.Errorf("failed to create UDP channel: %w", err)
 		}
 	}
@@ -150,7 +150,11 @@ func (p *Peer) createDataChannels(newTCPRedirect, newUDPRedirect redirect.NewRed
 	return nil
 }
 
-func (p *Peer) createDataChannel(label string, redir redirect.Redirect) error {
+func (p *Peer) channelName(proto string, from, to string) string {
+	return fmt.Sprintf("/redirect/proto/%s/user/%s/to/%s", proto, from, to)
+}
+
+func (p *Peer) createDataChannel(ctx context.Context, label string, redir redirect.Redirect) error {
 	dc, err := p.Connection.CreateDataChannel(label, nil)
 	if err != nil {
 		return fmt.Errorf("could not create data channel %q: %w", label, err)
@@ -161,6 +165,7 @@ func (p *Peer) createDataChannel(label string, redir redirect.Redirect) error {
 	// p.mu.Unlock()
 
 	pipe := NewPipe(context.TODO(), dc, redir)
+	pipe := NewPipe(ctx, dc, redir)
 
 	dc.OnOpen(func() {
 		slog.Debug("Opened WebRTC channel",

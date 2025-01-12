@@ -17,9 +17,8 @@ import (
 // )
 
 type Pipe struct {
-	dc   DataChannel
-	done func()
-	// dcData chan webrtc.DataChannelMessage
+	dc     DataChannel
+	done   func()
 	proxy  redirect.Redirect
 	logger *slog.Logger
 }
@@ -41,9 +40,8 @@ func NewPipe(ctx context.Context, dc DataChannel, proxy redirect.Redirect) *Pipe
 	}
 
 	pipe := &Pipe{
-		dc:    dc,
-		proxy: proxy,
-		// dcData: make(chan webrtc.DataChannelMessage),
+		dc:     dc,
+		proxy:  proxy,
 		logger: slog.With("label", dc.Label()),
 	}
 

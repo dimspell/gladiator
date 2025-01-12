@@ -130,7 +130,7 @@ func (h *PeerToPeerMessageHandler) handleJoinRoom(ctx context.Context, player wi
 	if err := peer.setupPeerConnection(ctx, h.session, player, true); err != nil {
 		return err
 	}
-	if err := peer.createDataChannels(h.newTCPRedirect, h.newUDPRedirect); err != nil {
+	if err := peer.createDataChannels(ctx, h.newTCPRedirect, h.newUDPRedirect, h.session.GetUserID()); err != nil {
 		return err
 	}
 
@@ -174,18 +174,21 @@ func (h *PeerToPeerMessageHandler) handleRTCOffer(ctx context.Context, offer wir
 		var redir redirect.Redirect
 		var err error
 		switch dc.Label() {
-		case "tcp":
+		case peer.channelName("tcp", fromUserId, h.session.GetUserID()):
 			redir, err = h.newTCPRedirect(peer.Mode, peer.Addr)
 			if err != nil {
 				logger.Error("Could not create TCP redirect", "error", err)
 				return
 			}
-		case "udp":
+		case peer.channelName("udp", fromUserId, h.session.GetUserID()):
 			redir, err = h.newUDPRedirect(peer.Mode, peer.Addr)
 			if err != nil {
 				logger.Error("Could not create UDP redirect", "error", err)
 				return
 			}
+		default:
+			logger.Error("Unknown channel", "label", dc.Label())
+			return
 		}
 
 		NewPipe(ctx, dc, redir)
