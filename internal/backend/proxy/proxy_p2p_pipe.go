@@ -71,6 +71,8 @@ func NewPipe(ctx context.Context, dc DataChannel, proxy redirect.Redirect) *Pipe
 		pipe.logger.Warn("datachannel reports an error", "error", err)
 	})
 	dc.OnClose(func() {
+		pipe.logger.Debug("Close called on the datachannel")
+
 		if err := pipe.Close(); err != nil {
 			pipe.logger.Error("could not close the pipe after the datachannel has closed", "error", err)
 		}
@@ -98,6 +100,10 @@ func (pipe *Pipe) Write(p []byte) (n int, err error) {
 }
 
 func (pipe *Pipe) Close() error {
+	pipe.logger.Debug("closing pipe")
+	if pipe == nil {
+		return nil
+	}
 	pipe.done()
 	return nil
 }

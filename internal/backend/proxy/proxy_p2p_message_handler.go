@@ -180,18 +180,18 @@ func (h *PeerToPeerMessageHandler) handleRTCOffer(ctx context.Context, offer wir
 				logger.Error("Could not create TCP redirect", "error", err)
 				return
 			}
+			peer.PipeTCP = NewPipe(ctx, dc, redir)
 		case peer.channelName("udp", fromUserId, h.session.GetUserID()):
 			redir, err = h.newUDPRedirect(peer.Mode, peer.Addr)
 			if err != nil {
 				logger.Error("Could not create UDP redirect", "error", err)
 				return
 			}
+			peer.PipeUDP = NewPipe(ctx, dc, redir)
 		default:
 			logger.Error("Unknown channel", "label", dc.Label())
 			return
 		}
-
-		NewPipe(ctx, dc, redir)
 
 		// dc.OnOpen(func() {
 		// 	logger.Debug("Data channel opened", "label", dc.Label())
@@ -267,7 +267,40 @@ func (h *PeerToPeerMessageHandler) handleLeaveRoom(ctx context.Context, player w
 	return nil
 }
 
-func (h *PeerToPeerMessageHandler) handleHostMigration(ctx context.Context, content wire.Player) error {
+func (h *PeerToPeerMessageHandler) handleHostMigration(ctx context.Context, newHost wire.Player) error {
+	{
+		var hostId string
+		if hostId == "" {
+			panic("not implemented yet")
+		}
+
+		if hostId == h.session.GetUserID() {
+			panic("host is me, so not sure what to do")
+		}
+
+		if oldHost, ok := h.peerManager.GetPeer(h.session, hostId); ok {
+			// Disconnect from the host
+			oldHost.Terminate()
+		}
+
+		newHostPeer, ok := h.peerManager.GetPeer(h.session, newHost.ID())
+		if ok {
+			panic("new host could not be found")
+		}
+
+		fmt.Println(newHostPeer.Addr)
+	}
+
+	// fmt.Println("Host migration", newHost)
+	//
+	// mapping, _ := h.debug1.SessionStore.GetSession(h.session)
+	//
+	// // Set the new host
+	// mapping.Game.Host = newHost
+	//
+	// hostPeer, _ := mapping.Peers[newHost.ID()]
+	// fmt.Println("Host peer", hostPeer)
+
 	// response := make([]byte, 8)
 	// copy(response[0:4], []byte{1, 0, 0, 0})
 	// copy(response[4:], ip.To4())

@@ -3,6 +3,7 @@ package proxy
 import (
 	"context"
 	"fmt"
+	"log"
 	"log/slog"
 	"net"
 
@@ -26,6 +27,9 @@ type Peer struct {
 	Connection *webrtc.PeerConnection
 
 	Connected chan struct{}
+
+	PipeTCP *Pipe
+	PipeUDP *Pipe
 }
 
 func NewPeer(connection *webrtc.PeerConnection, r *IpRing, userId string, isCurrentUser, isHost bool) (*Peer, error) {
@@ -71,14 +75,20 @@ func NewPeer(connection *webrtc.PeerConnection, r *IpRing, userId string, isCurr
 }
 
 func (p *Peer) setupPeerConnection(ctx context.Context, session *bsession.Session, player wire.Player, sendRTCOffer bool) error {
+	slog.Debug("setting up peer connection", "userId", player.UserID)
+
 	p.Connection.OnICEConnectionStateChange(func(connectionState webrtc.ICEConnectionState) {
 		slog.Debug("ICE Connection State has changed",
 			"userId", player.UserID,
 			"state", connectionState.String())
 	})
 	p.Connection.OnConnectionStateChange(func(state webrtc.PeerConnectionState) {
-		if state == webrtc.PeerConnectionStateConnected {
+		switch state {
+		case webrtc.PeerConnectionStateConnected:
 			p.Connected <- struct{}{}
+		case webrtc.PeerConnectionStateDisconnected:
+			slog.Error("Peer connection disconnected", "userId", player.UserID)
+			p.Terminate()
 		}
 	})
 
@@ -125,7 +135,7 @@ func (p *Peer) handleNegotiation(ctx context.Context, session *bsession.Session,
 	return nil
 }
 
-func (p *Peer) createDataChannels(newTCPRedirect, newUDPRedirect redirect.NewRedirect) error {
+func (p *Peer) createDataChannels(ctx context.Context, newTCPRedirect, newUDPRedirect redirect.NewRedirect, myUserId string) error {
 	guestTCP, err := newTCPRedirect(p.Mode, p.Addr)
 	if err != nil {
 		return fmt.Errorf("failed to create TCP redirect: %w", err)
@@ -136,15 +146,19 @@ func (p *Peer) createDataChannels(newTCPRedirect, newUDPRedirect redirect.NewRed
 	}
 
 	if guestTCP != nil {
-		if err := p.createDataChannel(ctx, p.channelName("tcp", myUserId, p.UserID), guestTCP); err != nil {
+		pipe, err := p.createDataChannel(ctx, p.channelName("tcp", myUserId, p.UserID), guestTCP)
+		if err != nil {
 			return fmt.Errorf("failed to create TCP channel: %w", err)
 		}
+		p.PipeTCP = pipe
 	}
 
 	if guestUDP != nil {
-		if err := p.createDataChannel(ctx, p.channelName("udp", myUserId, p.UserID), guestUDP); err != nil {
+		pipe, err := p.createDataChannel(ctx, p.channelName("udp", myUserId, p.UserID), guestUDP)
+		if err != nil {
 			return fmt.Errorf("failed to create UDP channel: %w", err)
 		}
+		p.PipeUDP = pipe
 	}
 
 	return nil
@@ -154,17 +168,17 @@ func (p *Peer) channelName(proto string, from, to string) string {
 	return fmt.Sprintf("/redirect/proto/%s/user/%s/to/%s", proto, from, to)
 }
 
-func (p *Peer) createDataChannel(ctx context.Context, label string, redir redirect.Redirect) error {
+func (p *Peer) createDataChannel(ctx context.Context, label string, redir redirect.Redirect) (*Pipe, error) {
 	dc, err := p.Connection.CreateDataChannel(label, nil)
 	if err != nil {
-		return fmt.Errorf("could not create data channel %q: %w", label, err)
+		return nil, fmt.Errorf("could not create data channel %q: %w", label, err)
 	}
 
 	// p.mu.Lock()
 	// p.dataChannels[label] = dc
 	// p.mu.Unlock()
 
-	pipe := NewPipe(context.TODO(), dc, redir)
+	log.Println("Created data channel", "userId", p.UserID, "channel", label)
 	pipe := NewPipe(ctx, dc, redir)
 
 	dc.OnOpen(func() {
@@ -185,10 +199,12 @@ func (p *Peer) createDataChannel(ctx context.Context, label string, redir redire
 		pipe.Close()
 	})
 
-	return nil
+	return pipe, nil
 }
 
 func (p *Peer) Terminate() {
+	slog.Debug("Terminating peer connection", "userId", p.UserID)
+
 	if p.Connection != nil {
 		slog.Debug("Closing WebRTC connection", "userId", p.UserID)
 

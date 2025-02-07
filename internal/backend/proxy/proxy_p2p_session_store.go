@@ -71,6 +71,9 @@ func (ss *SessionStore) RemovePeer(session *bsession.Session, userId string) {
 	if !ok {
 		return
 	}
+
+	// peer, found := mapping.Peers[userId]
+
 	delete(mapping.Peers, userId)
 	mapping.Game.DeletePlayer(userId)
 }
