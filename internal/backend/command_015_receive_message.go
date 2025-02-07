@@ -6,10 +6,21 @@ import (
 	"github.com/dimspell/gladiator/internal/model"
 )
 
+const (
+	opLobbyAppendUser byte = 2
+	opLobbyRemoveUser byte = 3
+	opChatGlobal      byte = 4
+	opChatLobby       byte = 5
+	opSetChannelName  byte = 7 // 6?
+
+	opUnknown1  byte = 1
+	opUnknown17 byte = 18 // 0x11? 0x12?
+)
+
 func AppendCharacterToLobby(userName string, classType model.ClassType, idx uint32) []byte {
 	buf := make([]byte, 4+4+4+len(userName)+1)
 
-	buf[0] = 2                                    // Message type
+	buf[0] = opLobbyAppendUser                    // Message type
 	buf[4] = byte(classType)                      // Class of character
 	binary.LittleEndian.PutUint32(buf[8:12], idx) // Index?
 	copy(buf[12:], userName)                      // Character name
@@ -20,8 +31,8 @@ func AppendCharacterToLobby(userName string, classType model.ClassType, idx uint
 func RemoveCharacterFromLobby(userName string) []byte {
 	buf := make([]byte, 4+4+4+len(userName)+1)
 
-	buf[0] = 3               // Message type
-	copy(buf[12:], userName) // Character name
+	buf[0] = opLobbyRemoveUser // Message type
+	copy(buf[12:], userName)   // Character name
 
 	return buf
 }
@@ -30,7 +41,7 @@ func RemoveCharacterFromLobby(userName string) []byte {
 func NewGlobalMessage(user, text string) []byte {
 	buf := make([]byte, 4+4+4+len(user)+1+len(text)+1)
 
-	buf[0] = 4                       // Message type
+	buf[0] = opChatGlobal            // Message type
 	copy(buf[12:], user)             // User name
 	copy(buf[12+len(user)+1:], text) // Text of message
 
@@ -40,7 +51,7 @@ func NewGlobalMessage(user, text string) []byte {
 func NewSystemMessage(user, text, unknown string) []byte {
 	buf := make([]byte, 4+4+4+len(user)+1+len(text)+1+len(unknown)+1)
 
-	buf[0] = 5 // Message type
+	buf[0] = opChatLobby // Message type
 	copy(buf[12:], user)
 	copy(buf[12+len(user)+1:], text)
 	copy(buf[12+len(user)+1+len(text)+1:], unknown)
@@ -51,7 +62,7 @@ func NewSystemMessage(user, text, unknown string) []byte {
 func SetChannelName(channelName string) []byte {
 	buf := make([]byte, 4+4+4+1+len(channelName)+1)
 
-	buf[0] = 3                  // Message type
+	buf[0] = opSetChannelName   // Message type
 	copy(buf[13:], channelName) // Character name
 	return buf
 }
