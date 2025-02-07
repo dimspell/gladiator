@@ -33,7 +33,6 @@ type Peer struct {
 }
 
 func NewPeer(connection *webrtc.PeerConnection, r *IpRing, userId string, isCurrentUser, isHost bool) (*Peer, error) {
-
 	switch true {
 	case isCurrentUser:
 		return &Peer{

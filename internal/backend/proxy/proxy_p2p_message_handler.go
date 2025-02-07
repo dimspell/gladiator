@@ -20,16 +20,17 @@ const (
 )
 
 type PeerManager interface {
-	AddPeer(session *bsession.Session, peer *Peer)
-	GetPeer(session *bsession.Session, peerId string) (*Peer, bool)
-	RemovePeer(session *bsession.Session, peerId string)
+	AddPeer(peer *Peer)
+	GetPeer(peerId string) (*Peer, bool)
+	RemovePeer(peerId string)
+	CreatePeer(player wire.Player) (*Peer, error)
+	Host() (*Peer, bool)
 }
 
 type PeerToPeerMessageHandler struct {
 	session     *bsession.Session
 	peerManager PeerManager
 
-	createPeer     func(session *bsession.Session, player wire.Player) (*Peer, error)
 	newTCPRedirect redirect.NewRedirect
 	newUDPRedirect redirect.NewRedirect
 }
@@ -111,7 +112,7 @@ func (h *PeerToPeerMessageHandler) handleJoinRoom(ctx context.Context, player wi
 		return nil
 	}
 
-	peer, connected := h.peerManager.GetPeer(h.session, player.ID())
+	peer, connected := h.peerManager.GetPeer(player.ID())
 	if connected && peer.Connection != nil {
 		logger.Debug("Peer already exists, ignoring join", "userId", player.UserID)
 		return nil
@@ -119,13 +120,13 @@ func (h *PeerToPeerMessageHandler) handleJoinRoom(ctx context.Context, player wi
 
 	logger.Debug("JOIN", "id", player.UserID, "data", player)
 
-	peer, err := h.createPeer(h.session, player)
+	peer, err := h.peerManager.CreatePeer(player)
 	if err != nil {
 		logger.Warn("Could not add a peer", "userId", player.UserID, "error", err)
 		return err
 	}
 
-	h.peerManager.AddPeer(h.session, peer)
+	h.peerManager.AddPeer(peer)
 
 	if err := peer.setupPeerConnection(ctx, h.session, player, true); err != nil {
 		return err
@@ -154,7 +155,7 @@ func (h *PeerToPeerMessageHandler) handleRTCOffer(ctx context.Context, offer wir
 		return fmt.Errorf("context cancelled while handling RTC offer: %w", err)
 	}
 
-	peer, found := h.peerManager.GetPeer(h.session, offer.Player.ID())
+	peer, found := h.peerManager.GetPeer(offer.Player.ID())
 	if !found {
 		// logger.Warn("Could not add a peer", "userId", offer.Player.UserID, "error", err)
 		return fmt.Errorf("could not add peer: %s", offer.Player.ID())
@@ -226,7 +227,7 @@ func (h *PeerToPeerMessageHandler) handleRTCAnswer(ctx context.Context, offer wi
 		Type: webrtc.SDPTypeAnswer,
 		SDP:  offer.Offer.SDP,
 	}
-	peer, ok := h.peerManager.GetPeer(h.session, fromUserId)
+	peer, ok := h.peerManager.GetPeer(fromUserId)
 	if !ok {
 		return fmt.Errorf("could not find peer %q that sent the RTC answer", fromUserId)
 	}
@@ -239,7 +240,7 @@ func (h *PeerToPeerMessageHandler) handleRTCAnswer(ctx context.Context, offer wi
 func (h *PeerToPeerMessageHandler) handleRTCCandidate(ctx context.Context, candidate webrtc.ICECandidateInit, fromUserId string) error {
 	slog.Debug("RTC_ICE_CANDIDATE", "from", fromUserId)
 
-	peer, ok := h.peerManager.GetPeer(h.session, fromUserId)
+	peer, ok := h.peerManager.GetPeer(fromUserId)
 	if !ok {
 		return fmt.Errorf("could not find peer %q", fromUserId)
 	}
@@ -252,7 +253,7 @@ func (h *PeerToPeerMessageHandler) handleLeaveRoom(ctx context.Context, player w
 
 	slog.Debug("LEAVE_ROOM OR LEAVE_LOBBY")
 
-	peer, ok := h.peerManager.GetPeer(h.session, player.ID())
+	peer, ok := h.peerManager.GetPeer(player.ID())
 	if !ok {
 		// fmt.Errorf("could not find peer %q", m.From)
 		return nil
@@ -263,43 +264,31 @@ func (h *PeerToPeerMessageHandler) handleLeaveRoom(ctx context.Context, player w
 	}
 
 	slog.Info("User left", "peer", peer.UserID)
-	h.peerManager.RemovePeer(h.session, player.ID())
+	h.peerManager.RemovePeer(player.ID())
 	return nil
 }
 
 func (h *PeerToPeerMessageHandler) handleHostMigration(ctx context.Context, newHost wire.Player) error {
-	{
-		var hostId string
-		if hostId == "" {
-			panic("not implemented yet")
-		}
-
-		if hostId == h.session.GetUserID() {
-			panic("host is me, so not sure what to do")
-		}
-
-		if oldHost, ok := h.peerManager.GetPeer(h.session, hostId); ok {
-			// Disconnect from the host
-			oldHost.Terminate()
-		}
-
-		newHostPeer, ok := h.peerManager.GetPeer(h.session, newHost.ID())
-		if ok {
-			panic("new host could not be found")
-		}
-
-		fmt.Println(newHostPeer.Addr)
+	oldPeer, ok := h.peerManager.Host()
+	if !ok {
+		// There is no host, go along.
 	}
 
-	// fmt.Println("Host migration", newHost)
-	//
-	// mapping, _ := h.debug1.SessionStore.GetSession(h.session)
-	//
-	// // Set the new host
-	// mapping.Game.Host = newHost
-	//
-	// hostPeer, _ := mapping.Peers[newHost.ID()]
-	// fmt.Println("Host peer", hostPeer)
+	if oldPeer.UserID == h.session.GetUserID() {
+		// I am the host, not sure what to do
+		panic("not implemented")
+	}
+
+	// Close connection to the old host
+	oldPeer.Terminate()
+
+	newHostPeer, ok := h.peerManager.GetPeer(newHost.ID())
+	if !ok {
+		panic("could not find peer of new host")
+	}
+
+	// todo: write tests
+	fmt.Println(newHostPeer.Addr)
 
 	// response := make([]byte, 8)
 	// copy(response[0:4], []byte{1, 0, 0, 0})

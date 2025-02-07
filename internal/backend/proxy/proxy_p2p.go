@@ -218,27 +218,59 @@ func (p *PeerToPeer) Close(session *bsession.Session) {
 }
 
 func (p *PeerToPeer) NewWebSocketHandler(session *bsession.Session) MessageHandler {
+	impl := &PeerManagerImpl{
+		p.WebRTCConfig,
+		session,
+		p.SessionStore}
+
 	return &PeerToPeerMessageHandler{
 		session,
-		p.SessionStore,
-		p.CreatePeer,
+		impl,
 		p.NewTCPRedirect,
 		p.NewUDPRedirect,
 	}
 }
 
-func (p *PeerToPeer) CreatePeer(session *bsession.Session, player wire.Player) (*Peer, error) {
-	// createPeer sets up the peer connection channels.
-	mapping, ok := p.SessionStore.GetSession(session)
+type PeerManagerImpl struct {
+	config  webrtc.Configuration
+	session *bsession.Session
+	store   *SessionStore
+}
+
+func (p *PeerManagerImpl) AddPeer(peer *Peer) {
+	p.store.AddPeer(p.session, peer)
+}
+
+func (p *PeerManagerImpl) GetPeer(peerId string) (*Peer, bool) {
+	return p.store.GetPeer(p.session, peerId)
+}
+
+func (p *PeerManagerImpl) RemovePeer(peerId string) {
+	p.store.RemovePeer(p.session, peerId)
+}
+
+func (p *PeerManagerImpl) Host() (*Peer, bool) {
+	mapping, ok := p.store.GetSession(p.session)
 	if !ok {
-		return nil, fmt.Errorf("could not find mapping for user ID: %s", session.GetUserID())
+		return nil, false
+	}
+	userId := mapping.Game.Host.ID()
+	host, ok := mapping.Peers[userId]
+	return host, ok
+}
+
+func (p *PeerManagerImpl) CreatePeer(player wire.Player) (*Peer, error) {
+	// createPeer sets up the peer connection channels.
+	mapping, ok := p.store.GetSession(p.session)
+	if !ok {
+		return nil, fmt.Errorf("could not find mapping for user ID: %s", p.session.GetUserID())
 	}
 	if peer, found := mapping.Peers[player.ID()]; found {
 		slog.Debug("Reusing peer", "userId", player.ID())
 		return peer, nil
 	}
 
-	peerConnection, err := webrtc.NewPeerConnection(p.WebRTCConfig)
+	peerConnection, err := webrtc.NewPeerConnection(p.config)
 	if err != nil {
 		return nil, err
 	}
@@ -247,7 +279,7 @@ func (p *PeerToPeer) CreatePeer(session *bsession.Session, player wire.Player) (
 	gameRoom.SetPlayer(player)
 
 	isHost := gameRoom.Host.UserID == player.UserID
-	isCurrentUser := gameRoom.Host.UserID == session.UserID
+	isCurrentUser := gameRoom.Host.UserID == p.session.UserID
 
 	peer, err := NewPeer(peerConnection, mapping.IpRing, player.ID(), isCurrentUser, isHost)
 	if err != nil {
