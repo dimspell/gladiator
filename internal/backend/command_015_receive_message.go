@@ -2,16 +2,17 @@ package backend
 
 import (
 	"encoding/binary"
-
 	"github.com/dimspell/gladiator/internal/model"
 )
 
 const (
 	opLobbyAppendUser byte = 2
 	opLobbyRemoveUser byte = 3
-	opChatGlobal      byte = 4
-	opChatLobby       byte = 5
-	opSetChannelName  byte = 7 // 6?
+
+	opChatGlobal byte = 4
+	opChatLobby  byte = 5
+
+	opSetChannelName byte = 7
 
 	opUnknown1  byte = 1
 	opUnknown17 byte = 18 // 0x11? 0x12?
@@ -63,7 +64,7 @@ func SetChannelName(channelName string) []byte {
 	buf := make([]byte, 4+4+4+1+len(channelName)+1)
 
 	buf[0] = opSetChannelName   // Message type
-	copy(buf[13:], channelName) // Character name
+	copy(buf[13:], channelName) // Channel name
 	return buf
 }
 

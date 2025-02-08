@@ -3,27 +3,26 @@ package backend
 import (
 	"context"
 	"fmt"
-	"log/slog"
-
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/packet"
 	"github.com/dimspell/gladiator/internal/model"
+	"log/slog"
 )
 
 func (b *Backend) HandleSelectChannel(ctx context.Context, session *bsession.Session, req SelectChannelRequest) error {
 	serverName, channelName, err := req.Parse()
 	slog.Info("Selected channel", "serverName", serverName, "channelName", channelName, "error", err)
+
+	if err := session.Send(packet.ReceiveMessage, SetChannelName(channelName)); err != nil {
+		return err
+	}
+
 	if serverName == "DISPEL" && channelName == "DISPEL" {
 		for idx, user := range session.State.GetLobbyUsers() {
 			session.Send(packet.ReceiveMessage, AppendCharacterToLobby(user.Username, model.ClassType(user.ClassType), uint32(idx)))
 		}
 		// session.Send(ReceiveMessage, NewGlobalMessage("admin", "hello"))
 	}
-
-	// session.Send(SelectedChannel, SetChannelName("DISPEL"))
-
-	// session.Send(ReceiveMessage, AppendCharacterToLobby(session.Username, model.ClassTypeKnight, 1))
-	// session.Send(ReceiveMessage, SetChannelName("channel"))
 
 	// b.Proxy.Close()
 
