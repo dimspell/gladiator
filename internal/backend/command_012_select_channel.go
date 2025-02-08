@@ -39,7 +39,7 @@ func (r SelectChannelRequest) Parse() (serverName string, channelName string, er
 	}
 	channelName, err = rd.ReadString()
 	if err != nil {
-		return "", "", fmt.Errorf("error parsing server name: %w", err)
+		return "", "", fmt.Errorf("error parsing channel name: %w", err)
 	}
 	return serverName, channelName, err
 }
