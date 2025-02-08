@@ -30,7 +30,7 @@ func (h *LobbyEventHandler) Handle(ctx context.Context, payload []byte) error {
 			return nil
 		}
 		// if err := session.Send(ReceiveMessage, NewGlobalMessage(msg.Content.User, msg.Content.Text)); err != nil {
-		if err := h.Session.Send(packet.ReceiveMessage, NewSystemMessage(msg.Content.User, msg.Content.Text, "???")); err != nil {
+		if err := h.Session.Send(packet.ReceiveMessage, NewLobbyMessage(msg.Content.User, msg.Content.Text)); err != nil {
 			slog.Error("Error writing chat message over the backend wire", "session", h.Session.ID, "error", err)
 			return nil
 		}

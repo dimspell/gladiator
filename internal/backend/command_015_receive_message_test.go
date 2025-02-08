@@ -58,16 +58,16 @@ func TestNewSystemMessage(t *testing.T) {
 	conn := &mockConn{}
 	session := &bsession.Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
 
-	assert.NoError(t, session.Send(packet.ReceiveMessage, NewSystemMessage("user", "lobby message", "unknown")))
+	assert.NoError(t, session.Send(packet.ReceiveMessage, NewLobbyMessage("user", "lobby message")))
 	assert.Equal(t, []byte{
 		255, 15, // packet code
-		43, 0, // packet length
+		35, 0, // packet length
 		5, 0, 0, 0, // op code
 		0, 0, 0, 0, // unused
 		0, 0, 0, 0, // unused
 		'u', 's', 'e', 'r', 0, // user name
 		'l', 'o', 'b', 'b', 'y', ' ', 'm', 'e', 's', 's', 'a', 'g', 'e', 0,
-		'u', 'n', 'k', 'n', 'o', 'w', 'n', 0,
+		//'u', 'n', 'k', 'n', 'o', 'w', 'n', 0,
 	}, conn.Written)
 }
 

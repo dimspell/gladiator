@@ -49,13 +49,18 @@ func NewGlobalMessage(user, text string) []byte {
 	return buf
 }
 
-func NewSystemMessage(user, text, unknown string) []byte {
-	buf := make([]byte, 4+4+4+len(user)+1+len(text)+1+len(unknown)+1)
+// Note: These are very similar - prints a message using a red text, ignoring the username
+// session.Send(packet.ReceiveMessage, NewLobbyMessage("admin", "admin lobby test", "")) - this will be displayed in lobby only
+// session.Send(packet.ReceiveMessage, NewGlobalMessage("admin", "admin global test")) - this will be displayed in-game also
+
+func NewLobbyMessage(user, text string) []byte {
+	//buf := make([]byte, 4+4+4+len(user)+1+len(text)+1+len(unknown)+1)
+	buf := make([]byte, 4+4+4+len(user)+1+len(text)+1)
 
 	buf[0] = opChatLobby // Message type
 	copy(buf[12:], user)
 	copy(buf[12+len(user)+1:], text)
-	copy(buf[12+len(user)+1+len(text)+1:], unknown)
+	//copy(buf[12+len(user)+1+len(text)+1:], unknown)
 
 	return buf
 }
