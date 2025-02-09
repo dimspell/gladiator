@@ -259,6 +259,14 @@ func (p *PeerManagerImpl) Host() (*Peer, bool) {
 	return host, ok
 }
 
+func (p *PeerManagerImpl) SetHost(peer *Peer, newHost wire.Player) {
+	mapping, ok := p.store.GetSession(p.session)
+	if !ok {
+		return
+	}
+	mapping.Game.Host = newHost
+}
+
 func (p *PeerManagerImpl) CreatePeer(player wire.Player) (*Peer, error) {
 	// createPeer sets up the peer connection channels.
 	mapping, ok := p.store.GetSession(p.session)

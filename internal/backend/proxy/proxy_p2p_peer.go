@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"net"
 
-	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/redirect"
 	"github.com/dimspell/gladiator/internal/wire"
 	"github.com/pion/webrtc/v4"
@@ -73,7 +72,7 @@ func NewPeer(connection *webrtc.PeerConnection, r *IpRing, userId string, isCurr
 	}
 }
 
-func (p *Peer) setupPeerConnection(ctx context.Context, session *bsession.Session, player wire.Player, sendRTCOffer bool) error {
+func (p *Peer) setupPeerConnection(ctx context.Context, session PeerInterface, player wire.Player, sendRTCOffer bool) error {
 	slog.Debug("setting up peer connection", "userId", player.UserID)
 
 	p.Connection.OnICEConnectionStateChange(func(connectionState webrtc.ICEConnectionState) {
@@ -115,7 +114,7 @@ func (p *Peer) setupPeerConnection(ctx context.Context, session *bsession.Sessio
 	return nil
 }
 
-func (p *Peer) handleNegotiation(ctx context.Context, session *bsession.Session, player wire.Player, sendRTCOffer bool) error {
+func (p *Peer) handleNegotiation(ctx context.Context, session PeerInterface, player wire.Player, sendRTCOffer bool) error {
 	offer, err := p.Connection.CreateOffer(nil)
 	if err != nil {
 		return fmt.Errorf("failed to create offer for peer %d: %w", player.UserID, err)

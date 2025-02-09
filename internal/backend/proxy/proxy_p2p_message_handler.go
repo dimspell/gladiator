@@ -2,10 +2,10 @@ package proxy
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 
-	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/redirect"
 	"github.com/dimspell/gladiator/internal/wire"
 	"github.com/pion/webrtc/v4"
@@ -24,11 +24,21 @@ type PeerManager interface {
 	GetPeer(peerId string) (*Peer, bool)
 	RemovePeer(peerId string)
 	CreatePeer(player wire.Player) (*Peer, error)
+
 	Host() (*Peer, bool)
+	SetHost(newHostPeer *Peer, newHost wire.Player)
+}
+
+type PeerInterface interface {
+	GetUserID() string
+
+	SendRTCICECandidate(context.Context, webrtc.ICECandidateInit, string) error
+	SendRTCOffer(context.Context, webrtc.SessionDescription, string) error
+	SendRTCAnswer(context.Context, webrtc.SessionDescription, string) error
 }
 
 type PeerToPeerMessageHandler struct {
-	session     *bsession.Session
+	session     PeerInterface
 	peerManager PeerManager
 
 	newTCPRedirect redirect.NewRedirect
@@ -38,18 +48,20 @@ type PeerToPeerMessageHandler struct {
 func (h *PeerToPeerMessageHandler) Handle(ctx context.Context, payload []byte) error {
 	eventType := wire.ParseEventType(payload)
 
+	lgr := slog.With("payload", string(payload), "sessionID", h.session.GetUserID())
+
 	switch eventType {
 	case wire.JoinRoom:
 		_, msg, err := wire.DecodeTyped[wire.Player](payload)
 		if err != nil {
-			slog.Error(errDecodingJoinRoom, "error", err, "payload", string(payload), "sessionID", h.session.GetUserID())
+			lgr.Error(errDecodingJoinRoom, "error", err)
 			return err
 		}
 		return h.handleJoinRoom(ctx, msg.Content)
 	case wire.RTCOffer:
 		_, msg, err := wire.DecodeTyped[wire.Offer](payload)
 		if err != nil {
-			slog.Error(errDecodingRTCOffer, "error", err, "payload", string(payload), "sessionID", h.session.GetUserID())
+			lgr.Error(errDecodingRTCOffer, "error", err)
 			return err
 		}
 		if msg.To != h.session.GetUserID() {
@@ -59,7 +71,7 @@ func (h *PeerToPeerMessageHandler) Handle(ctx context.Context, payload []byte) e
 	case wire.RTCAnswer:
 		_, msg, err := wire.DecodeTyped[wire.Offer](payload)
 		if err != nil {
-			slog.Error(errDecodingRTCAnswer, "error", err, "payload", string(payload), "sessionID", h.session.GetUserID())
+			lgr.Error(errDecodingRTCAnswer, "error", err)
 			return err
 		}
 		if msg.To != h.session.GetUserID() {
@@ -69,15 +81,14 @@ func (h *PeerToPeerMessageHandler) Handle(ctx context.Context, payload []byte) e
 	case wire.RTCICECandidate:
 		_, msg, err := wire.DecodeTyped[webrtc.ICECandidateInit](payload)
 		if err != nil {
-			slog.Error(errDecodingRTCCandidate, "error", err, "payload", string(payload),
-				"sessionID", h.session.GetUserID())
+			lgr.Error(errDecodingRTCCandidate, "error", err)
 			return err
 		}
 		return h.handleRTCCandidate(ctx, msg.Content, msg.From)
 	case wire.LeaveRoom, wire.LeaveLobby:
 		_, msg, err := wire.DecodeTyped[wire.Player](payload)
 		if err != nil {
-			slog.Error(errDecodingLeaveRoom, "error", err, "payload", string(payload), "sessionID", h.session.GetUserID())
+			lgr.Error(errDecodingLeaveRoom, "error", err)
 			return err
 		}
 		return h.handleLeaveRoom(ctx, msg.Content)
@@ -86,12 +97,12 @@ func (h *PeerToPeerMessageHandler) Handle(ctx context.Context, payload []byte) e
 	case wire.HostMigration:
 		_, msg, err := wire.DecodeTyped[wire.Player](payload)
 		if err != nil {
-			slog.Error(errDecodingJoinRoom, "error", err, "payload", string(payload), "sessionID", h.session.GetUserID())
+			lgr.Error(errDecodingJoinRoom, "error", err)
 			return err
 		}
 		return h.handleHostMigration(ctx, msg.Content)
 	default:
-		slog.Debug("unknown wire message", "type", eventType.String(), "payload", string(payload), "sessionID", h.session.GetUserID())
+		lgr.Debug("unknown wire message", "type", eventType.String())
 		return nil
 	}
 }
@@ -107,7 +118,7 @@ func (h *PeerToPeerMessageHandler) handleJoinRoom(ctx context.Context, player wi
 		return fmt.Errorf("context cancelled while handling join room: %w", err)
 	}
 
-	if player.UserID == h.session.UserID {
+	if player.ID() == h.session.GetUserID() {
 		slog.Debug("Player is already joined", "userId", player.UserID, "sessionID", h.session.GetUserID())
 		return nil
 	}
@@ -269,18 +280,23 @@ func (h *PeerToPeerMessageHandler) handleLeaveRoom(ctx context.Context, player w
 }
 
 func (h *PeerToPeerMessageHandler) handleHostMigration(ctx context.Context, newHost wire.Player) error {
+	b, _ := json.Marshal(h)
+	fmt.Println(string(b))
+
 	oldPeer, ok := h.peerManager.Host()
 	if !ok {
 		// There is no host, go along.
+	} else {
+		fmt.Println(oldPeer.Addr)
+
+		// Close connection to the old host
+		oldPeer.Terminate()
 	}
 
-	if oldPeer.UserID == h.session.GetUserID() {
-		// I am the host, not sure what to do
-		panic("not implemented")
-	}
-
-	// Close connection to the old host
-	oldPeer.Terminate()
+	//if oldPeer.UserID == h.session.GetUserID() {
+	//	// I am the host, not sure what to do
+	//	panic("not implemented")
+	//}
 
 	newHostPeer, ok := h.peerManager.GetPeer(newHost.ID())
 	if !ok {
@@ -289,6 +305,8 @@ func (h *PeerToPeerMessageHandler) handleHostMigration(ctx context.Context, newH
 
 	// todo: write tests
 	fmt.Println(newHostPeer.Addr)
+
+	h.peerManager.SetHost(newHostPeer, newHost)
 
 	// response := make([]byte, 8)
 	// copy(response[0:4], []byte{1, 0, 0, 0})
