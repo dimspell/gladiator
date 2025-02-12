@@ -1,4 +1,4 @@
-package proxy
+package p2p
 
 import (
 	"context"
@@ -8,12 +8,13 @@ import (
 	"time"
 
 	"github.com/dimspell/gladiator/internal/backend/bsession"
+	"github.com/dimspell/gladiator/internal/backend/proxy"
 	"github.com/dimspell/gladiator/internal/backend/redirect"
 	"github.com/dimspell/gladiator/internal/wire"
 	"github.com/pion/webrtc/v4"
 )
 
-var _ Proxy = (*PeerToPeer)(nil)
+var _ proxy.Proxy = (*PeerToPeer)(nil)
 
 // PeerToPeer implements the Proxy interface for WebRTC-based peer-to-peer connections.
 // It manages game rooms, peer connections, and network addressing for multiplayer games
@@ -55,13 +56,13 @@ func NewPeerToPeer(iceServers ...webrtc.ICEServer) *PeerToPeer {
 
 // CreateRoom creates a new game room and assigns the session as the host.
 // Returns the assigned IP address for the host player
-func (p *PeerToPeer) CreateRoom(params CreateParams, session *bsession.Session) (net.IP, error) {
+func (p *PeerToPeer) CreateRoom(params proxy.CreateParams, session *bsession.Session) (net.IP, error) {
 	p.Close(session)
 
 	ipAddr := net.IPv4(127, 0, 0, 1)
 	hostPlayer := session.ToPlayer(ipAddr)
 
-	gameRoom := NewGameRoom(params.GameID, hostPlayer)
+	gameRoom := proxy.NewGameRoom(params.GameID, hostPlayer)
 
 	// peer, err := p.CreatePeer(session, hostPlayer)
 	// if err != nil {
@@ -77,7 +78,7 @@ func (p *PeerToPeer) CreateRoom(params CreateParams, session *bsession.Session) 
 	return ipAddr, nil
 }
 
-func (p *PeerToPeer) HostRoom(ctx context.Context, params HostParams, session *bsession.Session) error {
+func (p *PeerToPeer) HostRoom(ctx context.Context, params proxy.HostParams, session *bsession.Session) error {
 	peers, ok := p.SessionStore.sessions[session]
 	if !ok {
 		return fmt.Errorf("no game mananged for session: %s", session.GetUserID())
@@ -97,14 +98,14 @@ func (p *PeerToPeer) GetHostIP(hostIpAddress net.IP, session *bsession.Session) 
 	return p.hostIPAddress
 }
 
-func (p *PeerToPeer) SelectGame(params GameData, session *bsession.Session) error {
+func (p *PeerToPeer) SelectGame(params proxy.GameData, session *bsession.Session) error {
 	p.Close(session)
 
 	hostPlayer, err := params.FindHostUser()
 	if err != nil {
 		return err
 	}
-	gameRoom := NewGameRoom(params.Game.GameId, hostPlayer)
+	gameRoom := proxy.NewGameRoom(params.Game.GameId, hostPlayer)
 
 	ipRing := NewIpRing()
 
@@ -145,7 +146,7 @@ func (p *PeerToPeer) SelectGame(params GameData, session *bsession.Session) erro
 	return nil
 }
 
-func (p *PeerToPeer) GetPlayerAddr(params GetPlayerAddrParams, session *bsession.Session) (net.IP, error) {
+func (p *PeerToPeer) GetPlayerAddr(params proxy.GetPlayerAddrParams, session *bsession.Session) (net.IP, error) {
 	peer, ok := p.SessionStore.GetPeer(session, params.UserID)
 	if !ok {
 		return nil, fmt.Errorf("could not find peer with user ID: %s", params.UserID)
@@ -154,7 +155,7 @@ func (p *PeerToPeer) GetPlayerAddr(params GetPlayerAddrParams, session *bsession
 	return peer.Addr.IP, nil
 }
 
-func (p *PeerToPeer) Join(ctx context.Context, params JoinParams, session *bsession.Session) (net.IP, error) {
+func (p *PeerToPeer) Join(ctx context.Context, params proxy.JoinParams, session *bsession.Session) (net.IP, error) {
 	ip := net.IPv4(127, 0, 0, 1)
 
 	// FIXME: Use function instead
@@ -181,7 +182,7 @@ func (p *PeerToPeer) Join(ctx context.Context, params JoinParams, session *bsess
 	return ip, nil
 }
 
-func (p *PeerToPeer) ConnectToPlayer(ctx context.Context, params GetPlayerAddrParams, session *bsession.Session) (net.IP, error) {
+func (p *PeerToPeer) ConnectToPlayer(ctx context.Context, params proxy.GetPlayerAddrParams, session *bsession.Session) (net.IP, error) {
 	peer, ok := p.SessionStore.GetPeer(session, params.UserID)
 	if !ok {
 		return nil, fmt.Errorf("could not find peer with user ID: %s", params.UserID)
@@ -217,7 +218,7 @@ func (p *PeerToPeer) Close(session *bsession.Session) {
 	// p.SessionStore.DeleteSession(session)
 }
 
-func (p *PeerToPeer) NewWebSocketHandler(session *bsession.Session) MessageHandler {
+func (p *PeerToPeer) NewWebSocketHandler(session *bsession.Session) proxy.MessageHandler {
 	impl := &PeerManagerImpl{
 		p.WebRTCConfig,
 		session,

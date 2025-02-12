@@ -12,6 +12,7 @@ import (
 	v1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/internal/app/logger"
 	"github.com/dimspell/gladiator/internal/backend/proxy"
+	"github.com/dimspell/gladiator/internal/backend/proxy/p2p"
 	"github.com/dimspell/gladiator/internal/console"
 	"github.com/dimspell/gladiator/internal/console/database"
 	"github.com/dimspell/gladiator/internal/model"
@@ -59,7 +60,7 @@ func TestWebRTC(t *testing.T) {
 	}()
 
 	// Mock the hosting user's proxy - player1
-	proxy1 := proxy.NewPeerToPeer()
+	proxy1 := p2p.NewPeerToPeer()
 	bd1 := NewBackend("", cs.Addr, proxy1)
 	bd1.SignalServerURL = "ws://" + cs.Addr + "/lobby"
 
@@ -112,7 +113,7 @@ func TestWebRTC(t *testing.T) {
 	}
 
 	// Create a joining user, a guest - player2
-	proxy2 := proxy.NewPeerToPeer()
+	proxy2 := p2p.NewPeerToPeer()
 	bd2 := NewBackend("", cs.Addr, proxy2)
 	bd2.SignalServerURL = "ws://" + cs.Addr + "/lobby"
 

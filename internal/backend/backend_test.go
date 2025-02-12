@@ -11,7 +11,7 @@ import (
 	"connectrpc.com/connect"
 	v1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/gen/multi/v1/multiv1connect"
-	"github.com/dimspell/gladiator/internal/backend/proxy"
+	"github.com/dimspell/gladiator/internal/backend/proxy/direct"
 	"github.com/dimspell/gladiator/internal/console"
 )
 
@@ -134,7 +134,7 @@ func (m *mockCharacterClient) ListCharacters(context.Context, *connect.Request[v
 	return m.ListCharactersResponse, nil
 }
 
-func helperNewBackend(tb testing.TB) (bd *Backend, px *proxy.LAN, cs *console.Console) {
+func helperNewBackend(tb testing.TB) (bd *Backend, px *direct.LAN, cs *console.Console) {
 	tb.Helper()
 
 	cs = &console.Console{
@@ -142,7 +142,7 @@ func helperNewBackend(tb testing.TB) (bd *Backend, px *proxy.LAN, cs *console.Co
 	}
 	ts := httptest.NewServer(http.HandlerFunc(cs.HandleWebSocket))
 
-	px = proxy.NewLAN("198.51.100.1")
+	px = direct.NewLAN("198.51.100.1")
 
 	bd = &Backend{
 		// Replace the HTTP schema prefix for websocket connection.

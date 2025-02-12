@@ -1,4 +1,4 @@
-package proxy
+package p2p
 
 import (
 	"context"
@@ -293,10 +293,10 @@ func (h *PeerToPeerMessageHandler) handleHostMigration(ctx context.Context, newH
 		oldPeer.Terminate()
 	}
 
-	//if oldPeer.UserID == h.session.GetUserID() {
+	// if oldPeer.UserID == h.session.GetUserID() {
 	//	// I am the host, not sure what to do
 	//	panic("not implemented")
-	//}
+	// }
 
 	newHostPeer, ok := h.peerManager.GetPeer(newHost.ID())
 	if !ok {

@@ -1,4 +1,4 @@
-package proxy
+package p2p
 
 import (
 	"container/ring"

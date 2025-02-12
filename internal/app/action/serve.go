@@ -10,7 +10,7 @@ import (
 
 	"github.com/dimspell/gladiator/internal/app/logger"
 	"github.com/dimspell/gladiator/internal/backend"
-	"github.com/dimspell/gladiator/internal/backend/proxy"
+	"github.com/dimspell/gladiator/internal/backend/proxy/direct"
 	"github.com/dimspell/gladiator/internal/console"
 	"github.com/dimspell/gladiator/internal/console/database"
 	"github.com/lmittmann/tint"
@@ -105,7 +105,7 @@ func ServeCommand() *cli.Command {
 			),
 		)
 
-		bd := backend.NewBackend(backendAddr, consoleAddr, proxy.NewLAN(myIpAddr))
+		bd := backend.NewBackend(backendAddr, consoleAddr, direct.NewLAN(myIpAddr))
 
 		// TODO: Name the URL in the parameters
 		bd.SignalServerURL = defaultLobbyAddr

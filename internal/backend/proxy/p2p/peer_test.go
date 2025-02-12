@@ -1,4 +1,4 @@
-package proxy
+package p2p
 
 import (
 	"context"
@@ -82,7 +82,7 @@ func (m *mockRedirect) Write(p []byte) (n int, err error) {
 	return n, nil
 }
 
-func TestPipeMessageHandling(t *testing.T) {
+func TestNewPipe(t *testing.T) {
 	defer goleak.VerifyNone(t)
 
 	logger.SetPlainTextLogger(os.Stderr, slog.LevelDebug)

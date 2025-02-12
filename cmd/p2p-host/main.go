@@ -14,6 +14,7 @@ import (
 	"github.com/dimspell/gladiator/internal/app/logger"
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/proxy"
+	"github.com/dimspell/gladiator/internal/backend/proxy/p2p"
 	"github.com/dimspell/gladiator/internal/backend/redirect"
 	"github.com/dimspell/gladiator/internal/model"
 )
@@ -34,7 +35,7 @@ func main() {
 	ctx := context.Background()
 
 	gm := multiv1connect.NewGameServiceClient(httpClient, fmt.Sprintf("http://%s/grpc", consoleUri))
-	px := proxy.NewPeerToPeer()
+	px := p2p.NewPeerToPeer()
 	px.NewUDPRedirect = redirect.NewNoop
 	px.NewTCPRedirect = redirect.NewLineReader
 

@@ -1,9 +1,10 @@
-package proxy
+package p2p
 
 import (
 	"sync"
 
 	"github.com/dimspell/gladiator/internal/backend/bsession"
+	"github.com/dimspell/gladiator/internal/backend/proxy"
 )
 
 type SessionStore struct {
@@ -33,7 +34,7 @@ func (ss *SessionStore) DeleteSession(session *bsession.Session) {
 // SessionMapping maps sessions to their peers.
 type SessionMapping struct {
 	IpRing *IpRing
-	Game   *GameRoom
+	Game   *proxy.GameRoom
 	Peers  map[string]*Peer
 }
 

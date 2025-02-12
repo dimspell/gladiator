@@ -7,7 +7,7 @@ import (
 	"connectrpc.com/connect"
 	v1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/internal/backend/bsession"
-	"github.com/dimspell/gladiator/internal/backend/proxy"
+	"github.com/dimspell/gladiator/internal/backend/proxy/direct"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -41,7 +41,7 @@ func TestBackend_HandleListGames(t *testing.T) {
 
 	t.Run("with one game", func(t *testing.T) {
 		b := &Backend{
-			Proxy: proxy.NewLAN("127.0.100.1"),
+			Proxy: direct.NewLAN("127.0.100.1"),
 			gameClient: &mockGameClient{
 				ListGamesResponse: connect.NewResponse(&v1.ListGamesResponse{Games: []*v1.Game{
 					{
@@ -68,7 +68,7 @@ func TestBackend_HandleListGames(t *testing.T) {
 
 	t.Run("with games", func(t *testing.T) {
 		b := &Backend{
-			Proxy: proxy.NewLAN("127.0.100.1"),
+			Proxy: direct.NewLAN("127.0.100.1"),
 			gameClient: &mockGameClient{
 				ListGamesResponse: connect.NewResponse(&v1.ListGamesResponse{Games: []*v1.Game{
 					{

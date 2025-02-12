@@ -8,7 +8,7 @@ import (
 
 	"github.com/dimspell/gladiator/internal/app/logger"
 	"github.com/dimspell/gladiator/internal/backend"
-	"github.com/dimspell/gladiator/internal/backend/proxy"
+	"github.com/dimspell/gladiator/internal/backend/proxy/p2p"
 	"github.com/lmittmann/tint"
 	"github.com/urfave/cli/v3"
 )
@@ -56,7 +56,7 @@ func BackendCommand() *cli.Command {
 		)
 
 		// bd := backend.NewBackend(backendAddr, consoleAddr, backend.NewLAN(myIpAddr))
-		bd := backend.NewBackend(backendAddr, consoleAddr, proxy.NewPeerToPeer())
+		bd := backend.NewBackend(backendAddr, consoleAddr, p2p.NewPeerToPeer())
 
 		// TODO: Name the URL in the parameters
 		bd.SignalServerURL = defaultLobbyAddr
