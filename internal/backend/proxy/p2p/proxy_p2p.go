@@ -81,7 +81,7 @@ func (p *PeerToPeer) CreateRoom(params proxy.CreateParams, session *bsession.Ses
 func (p *PeerToPeer) HostRoom(ctx context.Context, params proxy.HostParams, session *bsession.Session) error {
 	peers, ok := p.SessionStore.sessions[session]
 	if !ok {
-		return fmt.Errorf("no game mananged for session: %s", session.GetUserID())
+		return fmt.Errorf("no game mananged for session: %d", session.GetUserID())
 	}
 	if peers.Game == nil || peers.Game.ID != params.GameID {
 		return fmt.Errorf("no game room found")
@@ -149,7 +149,7 @@ func (p *PeerToPeer) SelectGame(params proxy.GameData, session *bsession.Session
 func (p *PeerToPeer) GetPlayerAddr(params proxy.GetPlayerAddrParams, session *bsession.Session) (net.IP, error) {
 	peer, ok := p.SessionStore.GetPeer(session, params.UserID)
 	if !ok {
-		return nil, fmt.Errorf("could not find peer with user ID: %s", params.UserID)
+		return nil, fmt.Errorf("could not find peer with user ID: %d", params.UserID)
 	}
 
 	return peer.Addr.IP, nil
@@ -161,7 +161,7 @@ func (p *PeerToPeer) Join(ctx context.Context, params proxy.JoinParams, session 
 	// FIXME: Use function instead
 	mapping, exist := p.SessionStore.GetSession(session)
 	if !exist {
-		return nil, fmt.Errorf("could not find current session among the peers for user ID: %s", session.GetUserID())
+		return nil, fmt.Errorf("could not find current session among the peers for user ID: %d", session.GetUserID())
 	}
 
 	peer := &Peer{
@@ -185,7 +185,7 @@ func (p *PeerToPeer) Join(ctx context.Context, params proxy.JoinParams, session 
 func (p *PeerToPeer) ConnectToPlayer(ctx context.Context, params proxy.GetPlayerAddrParams, session *bsession.Session) (net.IP, error) {
 	peer, ok := p.SessionStore.GetPeer(session, params.UserID)
 	if !ok {
-		return nil, fmt.Errorf("could not find peer with user ID: %s", params.UserID)
+		return nil, fmt.Errorf("could not find peer with user ID: %d", params.UserID)
 	}
 
 	if peer.Connected == nil {
@@ -272,7 +272,7 @@ func (p *PeerManagerImpl) CreatePeer(player wire.Player) (*Peer, error) {
 	// createPeer sets up the peer connection channels.
 	mapping, ok := p.store.GetSession(p.session)
 	if !ok {
-		return nil, fmt.Errorf("could not find mapping for user ID: %s", p.session.GetUserID())
+		return nil, fmt.Errorf("could not find mapping for user ID: %d", p.session.GetUserID())
 	}
 	if peer, found := mapping.Peers[player.UserID]; found {
 		slog.Debug("Reusing peer", "userId", player.ID())

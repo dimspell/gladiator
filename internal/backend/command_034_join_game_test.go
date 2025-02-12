@@ -55,15 +55,15 @@ func TestBackend_HandleJoinGame(t *testing.T) {
 			ClassType:   byte(v1.ClassType_Archer),
 			IPAddress:   "192.168.121.212",
 		},
-		Players: map[string]wire.Player{
-			"1": {
+		Players: map[int64]wire.Player{
+			1: {
 				UserID:      1,
 				Username:    "archer",
 				CharacterID: 1,
 				ClassType:   byte(v1.ClassType_Archer),
 				IPAddress:   "192.168.121.212",
 			},
-			"2": {
+			2: {
 				UserID:      2,
 				Username:    "mage",
 				CharacterID: 2,

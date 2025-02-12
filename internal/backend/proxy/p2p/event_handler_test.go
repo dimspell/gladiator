@@ -2,7 +2,6 @@ package p2p
 
 import (
 	"context"
-	"strconv"
 	"testing"
 
 	"github.com/dimspell/gladiator/internal/backend/redirect"
@@ -12,40 +11,40 @@ import (
 )
 
 type mockSession struct {
-	ID string
+	ID int64
 }
 
-func (m mockSession) GetUserID() string {
+func (m mockSession) GetUserID() int64 {
 	return m.ID
 }
 
-func (m mockSession) SendRTCICECandidate(_ context.Context, _ webrtc.ICECandidateInit, _ string) error {
+func (m mockSession) SendRTCICECandidate(_ context.Context, _ webrtc.ICECandidateInit, _ int64) error {
 	return nil
 }
 
-func (m mockSession) SendRTCOffer(_ context.Context, _ webrtc.SessionDescription, _ string) error {
+func (m mockSession) SendRTCOffer(_ context.Context, _ webrtc.SessionDescription, _ int64) error {
 	return nil
 }
 
-func (m mockSession) SendRTCAnswer(_ context.Context, _ webrtc.SessionDescription, _ string) error {
+func (m mockSession) SendRTCAnswer(_ context.Context, _ webrtc.SessionDescription, _ int64) error {
 	return nil
 }
 
 type mockPeerManager struct {
 	host  *Peer
-	peers map[int]*Peer
+	peers map[int64]*Peer
 }
 
 func (m *mockPeerManager) AddPeer(peer *Peer) {
 	m.peers[peer.UserID] = peer
 }
 
-func (m *mockPeerManager) GetPeer(peerId string) (*Peer, bool) {
+func (m *mockPeerManager) GetPeer(peerId int64) (*Peer, bool) {
 	p, ok := m.peers[peerId]
 	return p, ok
 }
 
-func (m *mockPeerManager) RemovePeer(peerId string) {
+func (m *mockPeerManager) RemovePeer(peerId int64) {
 	delete(m.peers, peerId)
 }
 
@@ -55,7 +54,7 @@ func (m *mockPeerManager) CreatePeer(player wire.Player) (*Peer, error) {
 		return nil, err
 	}
 	return &Peer{
-		UserID:     strconv.Itoa(int(player.UserID)),
+		UserID:     player.UserID,
 		Addr:       nil,
 		Mode:       0,
 		Connection: peerConnection,
@@ -77,10 +76,10 @@ func TestPeerToPeerMessageHandler_handleJoinRoom(t *testing.T) {
 	t.Run("I am host", func(t *testing.T) {
 		peerManager := &mockPeerManager{
 			// host: player2,
-			peers: map[string]*Peer{},
+			peers: map[int64]*Peer{},
 		}
 		h := &PeerToPeerMessageHandler{
-			session:        &mockSession{ID: "1"},
+			session:        &mockSession{ID: 1},
 			peerManager:    peerManager,
 			newTCPRedirect: redirect.NewNoop,
 			newUDPRedirect: redirect.NewNoop,
@@ -93,15 +92,15 @@ func TestPeerToPeerMessageHandler_handleJoinRoom(t *testing.T) {
 		assert.Len(t, peerManager.peers, 1)
 	})
 	t.Run("I am guest", func(t *testing.T) {
-		host := &Peer{UserID: "1"}
+		host := &Peer{UserID: 1}
 		peerManager := &mockPeerManager{
 			host: host,
-			peers: map[string]*Peer{
-				"1": host,
+			peers: map[int64]*Peer{
+				1: host,
 			},
 		}
 		h := &PeerToPeerMessageHandler{
-			session:        &mockSession{ID: "2"},
+			session:        &mockSession{ID: 2},
 			peerManager:    peerManager,
 			newTCPRedirect: redirect.NewNoop,
 			newUDPRedirect: redirect.NewNoop,
@@ -142,7 +141,7 @@ func TestPeerToPeerMessageHandler_handleHostMigration(t *testing.T) {
 
 	t.Run("Host left, I am a guest, other become host", func(t *testing.T) {
 		player1 := &Peer{
-			UserID:     "1", // host
+			UserID:     1, // host
 			Addr:       nil,
 			Mode:       0,
 			Connection: nil,
@@ -151,7 +150,7 @@ func TestPeerToPeerMessageHandler_handleHostMigration(t *testing.T) {
 			PipeUDP:    nil,
 		}
 		player3 := &Peer{
-			UserID:     "3", // to-be-host
+			UserID:     3, // to-be-host
 			Addr:       nil,
 			Mode:       0,
 			Connection: nil,
@@ -162,13 +161,13 @@ func TestPeerToPeerMessageHandler_handleHostMigration(t *testing.T) {
 
 		peerManager := &mockPeerManager{
 			host: player1,
-			peers: map[string]*Peer{
-				"1": player1,
-				"3": player3,
+			peers: map[int64]*Peer{
+				1: player1,
+				3: player3,
 			},
 		}
 		h := &PeerToPeerMessageHandler{
-			session:        &mockSession{ID: "2"},
+			session:        &mockSession{ID: 2},
 			peerManager:    peerManager,
 			newTCPRedirect: redirect.NewNoop,
 			newUDPRedirect: redirect.NewNoop,
@@ -176,7 +175,7 @@ func TestPeerToPeerMessageHandler_handleHostMigration(t *testing.T) {
 		if err := h.handleHostMigration(context.TODO(), wire.Player{UserID: 3}); err != nil {
 			t.Error(err)
 		}
-		if peerManager.host.UserID != "3" {
+		if peerManager.host.UserID != 3 {
 			t.Error("host not migrated")
 		}
 	})

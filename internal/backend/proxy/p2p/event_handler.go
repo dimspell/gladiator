@@ -65,7 +65,7 @@ func (h *PeerToPeerMessageHandler) Handle(ctx context.Context, payload []byte) e
 			lgr.Error(errDecodingRTCOffer, "error", err)
 			return err
 		}
-		if userId := strconv.FormatInt(h.session.GetUserID(), 64); msg.To != userId {
+		if userId := strconv.FormatInt(h.session.GetUserID(), 10); msg.To != userId {
 			return nil
 		}
 		fromUserId, err := strconv.ParseInt(msg.From, 10, 64)
@@ -79,7 +79,7 @@ func (h *PeerToPeerMessageHandler) Handle(ctx context.Context, payload []byte) e
 			lgr.Error(errDecodingRTCAnswer, "error", err)
 			return err
 		}
-		if userId := strconv.FormatInt(h.session.GetUserID(), 64); msg.To != userId {
+		if userId := strconv.FormatInt(h.session.GetUserID(), 10); msg.To != userId {
 			return nil
 		}
 		fromUserId, err := strconv.ParseInt(msg.From, 10, 64)
