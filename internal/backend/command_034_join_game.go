@@ -35,7 +35,7 @@ func (b *Backend) HandleJoinGame(ctx context.Context, session *bsession.Session,
 	}
 
 	myIpAddr, err := b.Proxy.Join(ctx, proxy.JoinParams{
-		HostUserID: fmt.Sprintf("%d", respGame.Msg.GetGame().HostUserId),
+		HostUserID: respGame.Msg.GetGame().HostUserId,
 		HostUserIP: respGame.Msg.GetGame().HostIpAddress,
 		GameID:     respGame.Msg.GetGame().GetName(),
 	}, session)
@@ -61,7 +61,7 @@ func (b *Backend) HandleJoinGame(ctx context.Context, session *bsession.Session,
 
 		ps := proxy.GetPlayerAddrParams{
 			GameID:     respGame.Msg.GetGame().GetName(),
-			UserID:     fmt.Sprintf("%d", player.UserId),
+			UserID:     player.UserId,
 			IPAddress:  player.IpAddress,
 			HostUserID: fmt.Sprintf("%d", respGame.Msg.GetGame().HostUserId),
 		}

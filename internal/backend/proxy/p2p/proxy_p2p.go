@@ -72,7 +72,7 @@ func (p *PeerToPeer) CreateRoom(params proxy.CreateParams, session *bsession.Ses
 	p.SessionStore.SetSession(session, &SessionMapping{
 		Game:   gameRoom,
 		IpRing: NewIpRing(),
-		Peers:  make(map[string]*Peer), // FIXME: Add size limit
+		Peers:  make(map[int64]*Peer), // FIXME: Add size limit
 	})
 
 	return ipAddr, nil
@@ -109,25 +109,25 @@ func (p *PeerToPeer) SelectGame(params proxy.GameData, session *bsession.Session
 
 	ipRing := NewIpRing()
 
-	peers := map[string]*Peer{}
+	peers := map[int64]*Peer{}
 	for _, player := range params.ToWirePlayers() {
 		peerConnection, err := webrtc.NewPeerConnection(p.WebRTCConfig)
 		if err != nil {
 			return err
 		}
 
-		isCurrentUser := session.GetUserID() == player.ID()
-		isHostUser := gameRoom.Host.ID() == player.ID()
+		isCurrentUser := session.GetUserID() == player.UserID
+		isHostUser := gameRoom.Host.UserID == player.UserID
 
 		peer, err := NewPeer(peerConnection,
 			ipRing,
-			player.ID(),
+			player.UserID,
 			isCurrentUser,
 			isHostUser)
 		if err != nil {
 			return err
 		}
-		peers[player.ID()] = peer
+		peers[player.UserID] = peer
 
 		// if !isCurrentUser {
 		// if err := peer.setupPeerConnection(context.TODO(), session, player, false); err != nil {
@@ -242,11 +242,11 @@ func (p *PeerManagerImpl) AddPeer(peer *Peer) {
 	p.store.AddPeer(p.session, peer)
 }
 
-func (p *PeerManagerImpl) GetPeer(peerId string) (*Peer, bool) {
+func (p *PeerManagerImpl) GetPeer(peerId int64) (*Peer, bool) {
 	return p.store.GetPeer(p.session, peerId)
 }
 
-func (p *PeerManagerImpl) RemovePeer(peerId string) {
+func (p *PeerManagerImpl) RemovePeer(peerId int64) {
 	p.store.RemovePeer(p.session, peerId)
 }
 
@@ -255,7 +255,7 @@ func (p *PeerManagerImpl) Host() (*Peer, bool) {
 	if !ok {
 		return nil, false
 	}
-	userId := mapping.Game.Host.ID()
+	userId := mapping.Game.Host.UserID
 	host, ok := mapping.Peers[userId]
 	return host, ok
 }
@@ -274,7 +274,7 @@ func (p *PeerManagerImpl) CreatePeer(player wire.Player) (*Peer, error) {
 	if !ok {
 		return nil, fmt.Errorf("could not find mapping for user ID: %s", p.session.GetUserID())
 	}
-	if peer, found := mapping.Peers[player.ID()]; found {
+	if peer, found := mapping.Peers[player.UserID]; found {
 		slog.Debug("Reusing peer", "userId", player.ID())
 		return peer, nil
 	}
@@ -290,7 +290,7 @@ func (p *PeerManagerImpl) CreatePeer(player wire.Player) (*Peer, error) {
 	isHost := gameRoom.Host.UserID == player.UserID
 	isCurrentUser := gameRoom.Host.UserID == p.session.UserID
 
-	peer, err := NewPeer(peerConnection, mapping.IpRing, player.ID(), isCurrentUser, isHost)
+	peer, err := NewPeer(peerConnection, mapping.IpRing, player.UserID, isCurrentUser, isHost)
 	if err != nil {
 		return nil, err
 	}

@@ -21,9 +21,9 @@ import (
 )
 
 const (
-	consoleUri  = "127.0.0.1:2137"
-	roomId      = "room"
-	otherUserId = 1
+	consoleUri        = "127.0.0.1:2137"
+	roomId            = "room"
+	otherUserId int64 = 1
 )
 
 var (
@@ -107,7 +107,7 @@ func main() {
 
 	addr, err := px.GetPlayerAddr(proxy.GetPlayerAddrParams{
 		GameID:     roomId,
-		UserID:     fmt.Sprintf("%d", otherUserId),
+		UserID:     otherUserId,
 		IPAddress:  "127.0.1.2",
 		HostUserID: fmt.Sprintf("%d", otherUserId),
 	}, session)
@@ -129,7 +129,7 @@ func main() {
 	slog.Info("joined game", "players", join.Msg.Players)
 
 	if _, err := px.Join(ctx, proxy.JoinParams{
-		HostUserID: fmt.Sprintf("%d", otherUserId),
+		HostUserID: otherUserId,
 		GameID:     roomId,
 		HostUserIP: "127.0.1.2",
 	}, session); err != nil {
@@ -139,7 +139,7 @@ func main() {
 
 	addr2, err := px.ConnectToPlayer(ctx, proxy.GetPlayerAddrParams{
 		GameID:     roomId,
-		UserID:     fmt.Sprintf("%d", otherUserId),
+		UserID:     otherUserId,
 		IPAddress:  "127.0.1.2",
 		HostUserID: fmt.Sprintf("%d", otherUserId),
 	}, session)

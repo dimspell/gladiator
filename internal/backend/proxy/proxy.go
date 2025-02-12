@@ -77,14 +77,14 @@ func (d *GameData) FindHostUser() (wire.Player, error) {
 }
 
 type JoinParams struct {
-	HostUserID string
+	HostUserID int64
 	GameID     string
 	HostUserIP string
 }
 
 type GetPlayerAddrParams struct {
 	GameID     string
-	UserID     string
+	UserID     int64
 	IPAddress  string
 	HostUserID string
 }

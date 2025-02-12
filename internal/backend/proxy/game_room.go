@@ -13,13 +13,13 @@ type GameRoom struct {
 	Name string
 
 	Host    wire.Player
-	Players map[string]wire.Player
+	Players map[int64]wire.Player
 }
 
 func NewGameRoom(name string, host wire.Player) *GameRoom {
 	return &GameRoom{
-		Players: map[string]wire.Player{
-			host.ID(): host,
+		Players: map[int64]wire.Player{
+			host.UserID: host,
 		},
 		Host: host,
 		ID:   name,
@@ -33,11 +33,11 @@ func (g *GameRoom) SetHost(player wire.Player) {
 	g.Unlock()
 }
 
-func (g *GameRoom) GetPlayer(id string) (wire.Player, bool) {
+func (g *GameRoom) GetPlayer(userId int64) (wire.Player, bool) {
 	g.RLock()
 	defer g.RUnlock()
 
-	player, ok := g.Players[id]
+	player, ok := g.Players[userId]
 	if !ok {
 		return wire.Player{}, false
 	}
@@ -46,13 +46,13 @@ func (g *GameRoom) GetPlayer(id string) (wire.Player, bool) {
 
 func (g *GameRoom) SetPlayer(player wire.Player) {
 	g.Lock()
-	g.Players[player.ID()] = player
+	g.Players[player.UserID] = player
 	g.Unlock()
 }
 
-func (g *GameRoom) DeletePlayer(playerId string) {
+func (g *GameRoom) DeletePlayer(userId int64) {
 	g.Lock()
-	delete(g.Players, playerId)
+	delete(g.Players, userId)
 	g.Unlock()
 }
 

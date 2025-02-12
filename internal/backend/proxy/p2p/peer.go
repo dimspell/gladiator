@@ -16,7 +16,7 @@ import (
 
 type Peer struct {
 	// UserID uniquely identifies the peer
-	UserID string
+	UserID int64
 
 	// Addr contains network addressing information
 	Addr *redirect.Addressing
@@ -33,7 +33,7 @@ type Peer struct {
 	PipeUDP *Pipe
 }
 
-func NewPeer(connection *webrtc.PeerConnection, r *IpRing, userId string, isCurrentUser, isHost bool) (*Peer, error) {
+func NewPeer(connection *webrtc.PeerConnection, r *IpRing, userId int64, isCurrentUser, isHost bool) (*Peer, error) {
 	switch true {
 	case isCurrentUser:
 		return &Peer{
@@ -97,7 +97,7 @@ func (p *Peer) setupPeerConnection(ctx context.Context, session PeerInterface, p
 			return
 		}
 
-		if err := session.SendRTCICECandidate(ctx, candidate.ToJSON(), player.ID()); err != nil {
+		if err := session.SendRTCICECandidate(ctx, candidate.ToJSON(), player.UserID); err != nil {
 			slog.Error("Could not send ICE candidate",
 				"fromID", session.GetUserID(),
 				"toID", player.UserID,
@@ -127,7 +127,7 @@ func (p *Peer) handleNegotiation(ctx context.Context, session PeerInterface, pla
 	}
 
 	if sendRTCOffer {
-		if err := session.SendRTCOffer(ctx, offer, player.ID()); err != nil {
+		if err := session.SendRTCOffer(ctx, offer, player.UserID); err != nil {
 			return fmt.Errorf("failed to send RTC offer to peer %d: %w", player.UserID, err)
 		}
 	}
@@ -135,7 +135,7 @@ func (p *Peer) handleNegotiation(ctx context.Context, session PeerInterface, pla
 	return nil
 }
 
-func (p *Peer) createDataChannels(ctx context.Context, newTCPRedirect, newUDPRedirect redirect.NewRedirect, myUserId string) error {
+func (p *Peer) createDataChannels(ctx context.Context, newTCPRedirect, newUDPRedirect redirect.NewRedirect, myUserId int64) error {
 	guestTCP, err := newTCPRedirect(p.Mode, p.Addr)
 	if err != nil {
 		return fmt.Errorf("failed to create TCP redirect: %w", err)
@@ -164,8 +164,8 @@ func (p *Peer) createDataChannels(ctx context.Context, newTCPRedirect, newUDPRed
 	return nil
 }
 
-func (p *Peer) channelName(proto string, from, to string) string {
-	return fmt.Sprintf("/redirect/proto/%s/user/%s/to/%s", proto, from, to)
+func (p *Peer) channelName(proto string, from, to int64) string {
+	return fmt.Sprintf("/redirect/proto/%s/user/%d/to/%d", proto, from, to)
 }
 
 func (p *Peer) createDataChannel(ctx context.Context, label string, redir redirect.Redirect) (*Pipe, error) {

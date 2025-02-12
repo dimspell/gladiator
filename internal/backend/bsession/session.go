@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"strconv"
 	"sync"
 	"time"
 
@@ -62,7 +63,7 @@ func (s *Session) UpdateCharacter(character *multiv1.Character) {
 	s.Unlock()
 }
 
-func (s *Session) GetUserID() string { return fmt.Sprintf("%d", s.UserID) }
+func (s *Session) GetUserID() int64 { return s.UserID }
 
 func (s *Session) Send(packetType packet.Code, payload []byte) error {
 	return sendPacket(s.Conn, packetType, payload)
@@ -169,22 +170,22 @@ func (s *Session) SendEvent(ctx context.Context, eventType wire.EventType, conte
 	return wire.Write(ctx, s.wsConn, wire.Compose(
 		eventType,
 		wire.Message{
-			From:    s.GetUserID(),
+			From:    strconv.Itoa(int(s.GetUserID())),
 			Type:    eventType,
 			Content: content,
 		}),
 	)
 }
 
-func (s *Session) SendEventTo(ctx context.Context, eventType wire.EventType, content any, recipientId string) error {
+func (s *Session) SendEventTo(ctx context.Context, eventType wire.EventType, content any, recipientId int64) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Second*3)
 	defer cancel()
 
 	return wire.Write(ctx, s.wsConn, wire.Compose(
 		eventType,
 		wire.Message{
-			From:    s.GetUserID(),
-			To:      recipientId,
+			From:    strconv.Itoa(int(s.GetUserID())),
+			To:      strconv.Itoa(int(recipientId)),
 			Type:    eventType,
 			Content: content,
 		}),
@@ -226,18 +227,18 @@ func (s *Session) SendSetRoomReady(ctx context.Context, gameRoomId string) error
 	return s.SendEvent(ctx, wire.SetRoomReady, gameRoomId)
 }
 
-func (s *Session) SendRTCICECandidate(ctx context.Context, candidate webrtc.ICECandidateInit, recipientId string) error {
+func (s *Session) SendRTCICECandidate(ctx context.Context, candidate webrtc.ICECandidateInit, recipientId int64) error {
 	return s.SendEventTo(ctx, wire.RTCICECandidate, candidate, recipientId)
 }
 
-func (s *Session) SendRTCOffer(ctx context.Context, offer webrtc.SessionDescription, recipientId string) error {
+func (s *Session) SendRTCOffer(ctx context.Context, offer webrtc.SessionDescription, recipientId int64) error {
 	return s.SendEventTo(ctx, wire.RTCOffer, wire.Offer{
 		Player: s.ToPlayer(nil),
 		Offer:  offer,
 	}, recipientId)
 }
 
-func (s *Session) SendRTCAnswer(ctx context.Context, answer webrtc.SessionDescription, recipientId string) error {
+func (s *Session) SendRTCAnswer(ctx context.Context, answer webrtc.SessionDescription, recipientId int64) error {
 	return s.SendEventTo(ctx, wire.RTCAnswer, wire.Offer{
 		Player: s.ToPlayer(nil),
 		Offer:  answer,

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strconv"
 
 	"github.com/dimspell/gladiator/internal/backend/redirect"
 	"github.com/dimspell/gladiator/internal/wire"
@@ -21,8 +22,8 @@ const (
 
 type PeerManager interface {
 	AddPeer(peer *Peer)
-	GetPeer(peerId string) (*Peer, bool)
-	RemovePeer(peerId string)
+	GetPeer(peerId int64) (*Peer, bool)
+	RemovePeer(peerId int64)
 	CreatePeer(player wire.Player) (*Peer, error)
 
 	Host() (*Peer, bool)
@@ -30,11 +31,11 @@ type PeerManager interface {
 }
 
 type PeerInterface interface {
-	GetUserID() string
+	GetUserID() int64
 
-	SendRTCICECandidate(context.Context, webrtc.ICECandidateInit, string) error
-	SendRTCOffer(context.Context, webrtc.SessionDescription, string) error
-	SendRTCAnswer(context.Context, webrtc.SessionDescription, string) error
+	SendRTCICECandidate(ctx context.Context, candidate webrtc.ICECandidateInit, recipientId int64) error
+	SendRTCOffer(ctx context.Context, offer webrtc.SessionDescription, recipientId int64) error
+	SendRTCAnswer(ctx context.Context, offer webrtc.SessionDescription, recipientId int64) error
 }
 
 type PeerToPeerMessageHandler struct {
@@ -64,27 +65,39 @@ func (h *PeerToPeerMessageHandler) Handle(ctx context.Context, payload []byte) e
 			lgr.Error(errDecodingRTCOffer, "error", err)
 			return err
 		}
-		if msg.To != h.session.GetUserID() {
+		if userId := strconv.FormatInt(h.session.GetUserID(), 64); msg.To != userId {
 			return nil
 		}
-		return h.handleRTCOffer(ctx, msg.Content, msg.From)
+		fromUserId, err := strconv.ParseInt(msg.From, 10, 64)
+		if err != nil || fromUserId <= 0 {
+			return err
+		}
+		return h.handleRTCOffer(ctx, msg.Content, fromUserId)
 	case wire.RTCAnswer:
 		_, msg, err := wire.DecodeTyped[wire.Offer](payload)
 		if err != nil {
 			lgr.Error(errDecodingRTCAnswer, "error", err)
 			return err
 		}
-		if msg.To != h.session.GetUserID() {
+		if userId := strconv.FormatInt(h.session.GetUserID(), 64); msg.To != userId {
 			return nil
 		}
-		return h.handleRTCAnswer(ctx, msg.Content, msg.From)
+		fromUserId, err := strconv.ParseInt(msg.From, 10, 64)
+		if err != nil || fromUserId <= 0 {
+			return err
+		}
+		return h.handleRTCAnswer(ctx, msg.Content, fromUserId)
 	case wire.RTCICECandidate:
 		_, msg, err := wire.DecodeTyped[webrtc.ICECandidateInit](payload)
 		if err != nil {
 			lgr.Error(errDecodingRTCCandidate, "error", err)
 			return err
 		}
-		return h.handleRTCCandidate(ctx, msg.Content, msg.From)
+		fromUserId, err := strconv.ParseInt(msg.From, 10, 64)
+		if err != nil || fromUserId <= 0 {
+			return err
+		}
+		return h.handleRTCCandidate(ctx, msg.Content, fromUserId)
 	case wire.LeaveRoom, wire.LeaveLobby:
 		_, msg, err := wire.DecodeTyped[wire.Player](payload)
 		if err != nil {
@@ -118,12 +131,12 @@ func (h *PeerToPeerMessageHandler) handleJoinRoom(ctx context.Context, player wi
 		return fmt.Errorf("context cancelled while handling join room: %w", err)
 	}
 
-	if player.ID() == h.session.GetUserID() {
+	if player.UserID == h.session.GetUserID() {
 		slog.Debug("Player is already joined", "userId", player.UserID, "sessionID", h.session.GetUserID())
 		return nil
 	}
 
-	peer, connected := h.peerManager.GetPeer(player.ID())
+	peer, connected := h.peerManager.GetPeer(player.UserID)
 	if connected && peer.Connection != nil {
 		logger.Debug("Peer already exists, ignoring join", "userId", player.UserID)
 		return nil
@@ -155,7 +168,7 @@ func (h *PeerToPeerMessageHandler) handleJoinRoom(ctx context.Context, player wi
 // to the other peer.
 //
 // The RTC offer is usually handled by the guest player, who responds to a host.
-func (h *PeerToPeerMessageHandler) handleRTCOffer(ctx context.Context, offer wire.Offer, fromUserId string) error {
+func (h *PeerToPeerMessageHandler) handleRTCOffer(ctx context.Context, offer wire.Offer, fromUserId int64) error {
 	logger := slog.With(
 		"from", fromUserId,
 		"sessionID", h.session.GetUserID(),
@@ -166,7 +179,7 @@ func (h *PeerToPeerMessageHandler) handleRTCOffer(ctx context.Context, offer wir
 		return fmt.Errorf("context cancelled while handling RTC offer: %w", err)
 	}
 
-	peer, found := h.peerManager.GetPeer(offer.Player.ID())
+	peer, found := h.peerManager.GetPeer(offer.Player.UserID)
 	if !found {
 		// logger.Warn("Could not add a peer", "userId", offer.Player.UserID, "error", err)
 		return fmt.Errorf("could not add peer: %s", offer.Player.ID())
@@ -231,7 +244,7 @@ func (h *PeerToPeerMessageHandler) handleRTCOffer(ctx context.Context, offer wir
 }
 
 // handleRTCAnswer handles the incoming RTCAnswer from another peer.
-func (h *PeerToPeerMessageHandler) handleRTCAnswer(ctx context.Context, offer wire.Offer, fromUserId string) error {
+func (h *PeerToPeerMessageHandler) handleRTCAnswer(ctx context.Context, offer wire.Offer, fromUserId int64) error {
 	slog.Debug("RTC_ANSWER", "from", fromUserId)
 
 	answer := webrtc.SessionDescription{
@@ -248,7 +261,7 @@ func (h *PeerToPeerMessageHandler) handleRTCAnswer(ctx context.Context, offer wi
 	return nil
 }
 
-func (h *PeerToPeerMessageHandler) handleRTCCandidate(ctx context.Context, candidate webrtc.ICECandidateInit, fromUserId string) error {
+func (h *PeerToPeerMessageHandler) handleRTCCandidate(ctx context.Context, candidate webrtc.ICECandidateInit, fromUserId int64) error {
 	slog.Debug("RTC_ICE_CANDIDATE", "from", fromUserId)
 
 	peer, ok := h.peerManager.GetPeer(fromUserId)
@@ -264,7 +277,7 @@ func (h *PeerToPeerMessageHandler) handleLeaveRoom(ctx context.Context, player w
 
 	slog.Debug("LEAVE_ROOM OR LEAVE_LOBBY")
 
-	peer, ok := h.peerManager.GetPeer(player.ID())
+	peer, ok := h.peerManager.GetPeer(player.UserID)
 	if !ok {
 		// fmt.Errorf("could not find peer %q", m.From)
 		return nil
@@ -275,7 +288,7 @@ func (h *PeerToPeerMessageHandler) handleLeaveRoom(ctx context.Context, player w
 	}
 
 	slog.Info("User left", "peer", peer.UserID)
-	h.peerManager.RemovePeer(player.ID())
+	h.peerManager.RemovePeer(player.UserID)
 	return nil
 }
 
@@ -298,7 +311,7 @@ func (h *PeerToPeerMessageHandler) handleHostMigration(ctx context.Context, newH
 	//	panic("not implemented")
 	// }
 
-	newHostPeer, ok := h.peerManager.GetPeer(newHost.ID())
+	newHostPeer, ok := h.peerManager.GetPeer(newHost.UserID)
 	if !ok {
 		panic("could not find peer of new host")
 	}

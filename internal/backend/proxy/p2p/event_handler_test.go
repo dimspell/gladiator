@@ -33,7 +33,7 @@ func (m mockSession) SendRTCAnswer(_ context.Context, _ webrtc.SessionDescriptio
 
 type mockPeerManager struct {
 	host  *Peer
-	peers map[string]*Peer
+	peers map[int]*Peer
 }
 
 func (m *mockPeerManager) AddPeer(peer *Peer) {
@@ -85,13 +85,34 @@ func TestPeerToPeerMessageHandler_handleJoinRoom(t *testing.T) {
 			newTCPRedirect: redirect.NewNoop,
 			newUDPRedirect: redirect.NewNoop,
 		}
-		if err := h.handleJoinRoom(context.TODO(), wire.Player{UserID: 2}); err != nil {
+		other := wire.Player{UserID: 2}
+		if err := h.handleJoinRoom(context.TODO(), other); err != nil {
 			t.Errorf("handleJoinRoom returned error: %v", err)
 			return
 		}
 		assert.Len(t, peerManager.peers, 1)
 	})
-	t.Run("I am guest", func(t *testing.T) {})
+	t.Run("I am guest", func(t *testing.T) {
+		host := &Peer{UserID: "1"}
+		peerManager := &mockPeerManager{
+			host: host,
+			peers: map[string]*Peer{
+				"1": host,
+			},
+		}
+		h := &PeerToPeerMessageHandler{
+			session:        &mockSession{ID: "2"},
+			peerManager:    peerManager,
+			newTCPRedirect: redirect.NewNoop,
+			newUDPRedirect: redirect.NewNoop,
+		}
+		other := wire.Player{UserID: 3}
+		if err := h.handleJoinRoom(context.TODO(), other); err != nil {
+			t.Errorf("handleJoinRoom returned error: %v", err)
+			return
+		}
+		assert.Len(t, peerManager.peers, 2)
+	})
 }
 
 func TestPeerToPeerMessageHandler_handleRTCOffer(t *testing.T) {
@@ -120,8 +141,8 @@ func TestPeerToPeerMessageHandler_handleHostMigration(t *testing.T) {
 	t.Run("Host left, I am a guest, I will become new host", func(t *testing.T) {})
 
 	t.Run("Host left, I am a guest, other become host", func(t *testing.T) {
-		player2 := &Peer{
-			UserID:     "2", // host
+		player1 := &Peer{
+			UserID:     "1", // host
 			Addr:       nil,
 			Mode:       0,
 			Connection: nil,
@@ -140,14 +161,14 @@ func TestPeerToPeerMessageHandler_handleHostMigration(t *testing.T) {
 		}
 
 		peerManager := &mockPeerManager{
-			host: player2,
+			host: player1,
 			peers: map[string]*Peer{
-				"2": player2,
+				"1": player1,
 				"3": player3,
 			},
 		}
 		h := &PeerToPeerMessageHandler{
-			session:        &mockSession{ID: "1"},
+			session:        &mockSession{ID: "2"},
 			peerManager:    peerManager,
 			newTCPRedirect: redirect.NewNoop,
 			newUDPRedirect: redirect.NewNoop,

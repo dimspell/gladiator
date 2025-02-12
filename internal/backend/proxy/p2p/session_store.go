@@ -35,10 +35,10 @@ func (ss *SessionStore) DeleteSession(session *bsession.Session) {
 type SessionMapping struct {
 	IpRing *IpRing
 	Game   *proxy.GameRoom
-	Peers  map[string]*Peer
+	Peers  map[int64]*Peer
 }
 
-func (ss *SessionStore) GetPeer(session *bsession.Session, userId string) (*Peer, bool) {
+func (ss *SessionStore) GetPeer(session *bsession.Session, userId int64) (*Peer, bool) {
 	ss.mutex.RLock()
 	defer ss.mutex.RUnlock()
 
@@ -64,7 +64,7 @@ func (ss *SessionStore) AddPeer(session *bsession.Session, peer *Peer) {
 	mapping.Peers[peer.UserID] = peer
 }
 
-func (ss *SessionStore) RemovePeer(session *bsession.Session, userId string) {
+func (ss *SessionStore) RemovePeer(session *bsession.Session, userId int64) {
 	ss.mutex.Lock()
 	defer ss.mutex.Unlock()
 

@@ -50,7 +50,7 @@ func (b *Backend) HandleSelectGame(ctx context.Context, session *bsession.Sessio
 
 		ps := proxy.GetPlayerAddrParams{
 			GameID:     respGame.Msg.GetGame().GetName(),
-			UserID:     fmt.Sprintf("%d", player.UserId),
+			UserID:     player.UserId,
 			IPAddress:  player.IpAddress,
 			HostUserID: fmt.Sprintf("%d", respGame.Msg.GetGame().HostUserId),
 		}

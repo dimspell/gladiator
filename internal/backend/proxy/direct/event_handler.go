@@ -49,7 +49,7 @@ func (l *LanMessageHandler) Handle(ctx context.Context, payload []byte) error {
 			return nil
 		}
 
-		gameRoom.DeletePlayer(player.ID())
+		gameRoom.DeletePlayer(player.UserID)
 	case wire.HostMigration:
 		_, msg, err := wire.DecodeTyped[wire.Player](payload)
 		if err != nil {
