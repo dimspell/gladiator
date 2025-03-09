@@ -13,6 +13,7 @@ import (
 	"github.com/pion/webrtc/v4"
 )
 
+// Peer represents a connected player in a game room.
 type Peer struct {
 	// UserID uniquely identifies the peer
 	UserID int64

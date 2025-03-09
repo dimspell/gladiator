@@ -11,6 +11,9 @@ import (
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 )
 
+// GameManager coordinates peer connections and game state, while Game represents
+// an active game session with connected peers. The package uses WebRTC for direct
+// communication between players and maintains IP address allocation for the network.
 type GameManager struct {
 	config  webrtc.Configuration
 	session *bsession.Session
@@ -18,12 +21,18 @@ type GameManager struct {
 	Game *Game
 }
 
+// Reset clears the current game state for the session.
 func (g *GameManager) Reset() {
 	g.Game.Close()
 	g.Game = nil
 }
 
-// CreatePeer sets up the peer connection channels.
+// CreatePeer sets up the peer connection channels for the given player. If a peer
+// connection already exists for the player, it returns the existing peer. Otherwise,
+// it creates a new peer connection and returns a new Peer instance.
+//
+// If the GameManager has no active game, it returns an error. If there is an error
+// creating the new peer connection, it returns the error.
 func (g *GameManager) CreatePeer(player wire.Player) (*Peer, error) {
 	if g.Game == nil {
 		return nil, fmt.Errorf("could not find mapping for user ID: %d", g.session.GetUserID())
@@ -70,6 +79,7 @@ func (g *GameManager) SetHost(peer *Peer, newHost wire.Player) {
 	g.Game.mtx.Unlock()
 }
 
+// AddPeer adds a peer to the game.
 func (g *GameManager) AddPeer(peer *Peer) {
 	if g.Game == nil {
 		return
@@ -81,6 +91,7 @@ func (g *GameManager) AddPeer(peer *Peer) {
 	g.Game.Peers[peer.UserID] = peer
 }
 
+// GetPeer retrieves a peer by UserID.
 func (g *GameManager) GetPeer(userId int64) (*Peer, bool) {
 	if g.Game == nil {
 		return nil, false
@@ -104,6 +115,7 @@ func (g *GameManager) RemovePeer(userId int64) {
 	delete(g.Game.Peers, userId)
 }
 
+// Game represents a game room.
 type Game struct {
 	mtx sync.Mutex
 
