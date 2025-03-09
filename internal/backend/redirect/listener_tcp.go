@@ -13,13 +13,14 @@ import (
 var _ Redirect = (*ListenerTCP)(nil)
 
 type ListenerTCP struct {
-	listenerTCP net.Listener
-	logger      *slog.Logger
+	listener net.Listener
+	logger   *slog.Logger
 
-	mu      sync.RWMutex
-	connTCP net.Conn
+	mu   sync.RWMutex
+	conn net.Conn
 }
 
+// ListenTCP initializes a TCP listener on the given IP and port.
 func ListenTCP(ipv4 string, portNumber string) (*ListenerTCP, error) {
 	if net.ParseIP(ipv4) == nil {
 		return nil, fmt.Errorf("listen-tcp: invalid IPv4 address format")
@@ -29,62 +30,71 @@ func ListenTCP(ipv4 string, portNumber string) (*ListenerTCP, error) {
 		portNumber = defaultTcpPort
 	}
 
-	tcpListener, err := net.Listen("tcp", net.JoinHostPort(ipv4, portNumber))
+	listener, err := net.Listen("tcp", net.JoinHostPort(ipv4, portNumber))
 	if err != nil {
 		return nil, err
 	}
 
 	logger := slog.With(
 		slog.String("redirect", "listen-tcp"),
-		slog.String("addr", tcpListener.Addr().String()),
+		slog.String("address", listener.Addr().String()),
 	)
-	logger.Info("Listening TCP")
+	logger.Info("TCP listener started")
 
 	return &ListenerTCP{
-		listenerTCP: tcpListener,
-		logger:      logger,
+		listener: listener,
+		logger:   logger,
 	}, nil
 }
 
+// Run listens for incoming TCP connections and handles them.
 func (p *ListenerTCP) Run(ctx context.Context, rw io.Writer) error {
 	defer func() {
-		p.logger.Info("Closing listener")
-
-		if err := p.listenerTCP.Close(); err != nil {
-			p.logger.Error("Could not close listener", "error", err)
-			return
+		p.logger.Info("Shutting down TCP listener")
+		if err := p.listener.Close(); err != nil {
+			p.logger.Error("Error closing listener", "error", err)
 		}
 	}()
 
+	// Goroutine to handle shutdown on context cancellation
+	go func() {
+		<-ctx.Done()
+		p.logger.Info("Listener shutting down due to context cancellation")
+		p.listener.Close()
+	}()
+
 	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-			conn, err := p.listenerTCP.Accept()
-			if err != nil {
+		conn, err := p.listener.Accept()
+		if err != nil {
+			select {
+			case <-ctx.Done():
+				return ctx.Err() // Exit gracefully on context cancellation
+			default:
 				p.logger.Error("Failed to accept TCP connection", "error", err)
 				continue
 			}
-			p.logger.Debug("Accepted connection", "remote-addr", conn.RemoteAddr())
-
-			p.mu.Lock()
-			p.connTCP = conn
-			p.mu.Unlock()
-
-			go func() {
-				if err := p.handleConnection(ctx, conn, rw); err != nil {
-					p.logger.Error("Error handling connection", "error", err)
-				}
-			}()
 		}
+
+		p.logger.Debug("Accepted new connection", "remote-addr", conn.RemoteAddr())
+
+		// Store the latest active connection
+		p.mu.Lock()
+		p.conn = conn
+		p.mu.Unlock()
+
+		go func() {
+			if err := p.handleConnection(ctx, conn, rw); err != nil {
+				p.logger.Error("Error handling connection", "error", err)
+			}
+		}()
 	}
 }
 
+// handleConnection reads from the TCP connection and writes to the provided io.Writer.
 func (p *ListenerTCP) handleConnection(ctx context.Context, conn net.Conn, dc io.Writer) error {
 	defer func() {
 		p.mu.Lock()
-		p.connTCP = nil
+		p.conn = nil
 		p.mu.Unlock()
 
 		p.logger.Debug("Closing TCP connection", "remote-addr", conn.RemoteAddr())
@@ -94,58 +104,75 @@ func (p *ListenerTCP) handleConnection(ctx context.Context, conn net.Conn, dc io
 	}()
 
 	// Handle incoming data
-	buffer := make([]byte, 1024)
+	buf := make([]byte, 1024)
 
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
-			clear(buffer)
+			clear(buf)
 
-			n, err := conn.Read(buffer)
+			n, err := conn.Read(buf)
 			if err != nil {
-				if !errors.Is(err, io.EOF) {
-					p.logger.Warn("Error reading from TCP", "error", err)
+				if errors.Is(err, io.EOF) {
+					p.logger.Info("Client closed the connection")
+					return nil
 				}
-				return err
+				p.logger.Warn("Error reading from TCP connection", "error", err)
+				return fmt.Errorf("listener-tcp: failed to read data: %w", err)
 			}
 
-			if _, err := dc.Write(buffer[:n]); err != nil {
-				p.logger.Warn("Error writing to TCP", "error", err)
-				return err
-			}
+			p.logger.Debug("Received data", "size", n, "data", buf[:n])
 
-			p.logger.Debug("Received from client", "payload", buffer[0:n])
+			if _, err := dc.Write(buf[:n]); err != nil {
+				p.logger.Warn("Failed to write data", "error", err)
+				return fmt.Errorf("listener-tcp: failed to write to data channel: %w", err)
+			}
 		}
 	}
 }
 
+// Write sends data to the active TCP connection.
 func (p *ListenerTCP) Write(msg []byte) (int, error) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
-	if p.connTCP == nil {
-		return 0, fmt.Errorf("listener-tcp: no active TCP connection")
+	if p.conn == nil {
+		return 0, fmt.Errorf("listener-tcp: no active connection")
 	}
-	return p.connTCP.Write(msg)
+
+	n, err := p.conn.Write(msg)
+	if err != nil {
+		p.logger.Error("Failed to send data", "error", err)
+		return n, fmt.Errorf("listener-tcp: write failed: %w", err)
+	}
+
+	p.logger.Debug("Sent data", "size", n, "data", msg[:n])
+	return n, nil
 }
 
+// Close shuts down the listener and any active connection.
 func (p *ListenerTCP) Close() error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
 	var errConn, errListener error
 
-	// Close an existing TCP connection if any
-	if p.connTCP != nil {
-		errConn = p.connTCP.Close()
-		p.connTCP = nil
+	// Close active TCP connection if present
+	if p.conn != nil {
+		errConn = p.conn.Close()
+		p.conn = nil
 	}
 
 	// Close the TCP listener
-	errListener = p.listenerTCP.Close()
-	p.listenerTCP = nil
+	errListener = p.listener.Close()
+	p.listener = nil
 
-	return errors.Join(errConn, errListener)
+	if errConn != nil || errListener != nil {
+		return errors.Join(errConn, errListener)
+	}
+
+	p.logger.Info("TCP listener closed")
+	return nil
 }

@@ -11,89 +11,122 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+// Ensure ListenerUDP implements Redirect interface
 var _ Redirect = (*ListenerUDP)(nil)
 
 type ListenerUDP struct {
-	connUDP *net.UDPConn
+	conn *net.UDPConn
 
 	onceSetAddr sync.Once
-	udpAddr     *net.UDPAddr
-	logger      *slog.Logger
+	addr        *net.UDPAddr
+
+	logger *slog.Logger
 }
 
+// ListenUDP initializes a UDP listener on the given IP and port.
 func ListenUDP(ipv4 string, portNumber string) (*ListenerUDP, error) {
 	if portNumber == "" {
 		portNumber = "6113"
 	}
 	srcAddr, err := net.ResolveUDPAddr("udp", net.JoinHostPort(ipv4, portNumber))
 	if err != nil {
-		return nil, fmt.Errorf("listen-udp: could not resolve udp address: %w", err)
+		return nil, fmt.Errorf("listen-udp: failed to resolve address: %w", err)
 	}
 	srcConn, err := net.ListenUDP("udp", srcAddr)
 	if err != nil {
-		return nil, fmt.Errorf("listen-udp: could not listen UDP %w", err)
+		return nil, fmt.Errorf("listen-udp: failed to listen on UDP: %w", err)
 	}
 
 	logger := slog.With(
 		slog.String("redirect", "listen-tcp"),
 		slog.String("addr", srcAddr.String()),
 	)
-	logger.Info("Listening UDP")
+	logger.Info("UDP listener started")
 
 	p := ListenerUDP{
-		connUDP: srcConn,
-		logger:  logger,
+		conn:   srcConn,
+		logger: logger,
 	}
 	return &p, nil
 }
 
+// Run listens for incoming UDP messages and forwards them.
 func (p *ListenerUDP) Run(ctx context.Context, rw io.Writer) error {
 	defer func() {
-		p.logger.Warn("Closing UDP listener", "try-error", p.connUDP.Close())
+		p.logger.Info("Closing UDP listener")
+		if err := p.conn.Close(); err != nil {
+			p.logger.Error("Error closing UDP listener", "error", err)
+		}
 	}()
 
-	g, _ := errgroup.WithContext(ctx)
+	g, ctx := errgroup.WithContext(ctx)
+
+	// Goroutine to read incoming messages
 	g.Go(func() error {
+		buf := make([]byte, 1024)
+
 		for {
-			if ctx.Err() != nil {
+			select {
+			case <-ctx.Done():
 				return ctx.Err()
-			}
+			default:
+				clear(buf)
 
-			buf := make([]byte, 1024)
-			n, remoteAddr, err := p.connUDP.ReadFromUDP(buf)
-			if err != nil {
-				p.logger.Warn("Failed to read", "error", err)
-				return err
-			}
-			p.onceSetAddr.Do(func() {
-				p.setAddr(remoteAddr)
-			})
+				n, remoteAddr, err := p.conn.ReadFromUDP(buf)
+				if err != nil {
+					p.logger.Warn("Failed to read UDP message", "error", err)
+					return fmt.Errorf("listen-udp: read error: %w", err)
+				}
 
-			if _, err := rw.Write(buf[:n]); err != nil {
-				p.logger.Warn("Failed to write", "error", err, "payload", buf[0:n])
-				return err
-			}
+				// Set remote address once (used for sending messages back)
+				p.onceSetAddr.Do(func() {
+					p.setRemoteAddr(remoteAddr)
+				})
 
-			p.logger.Debug("Wrote", "payload", buf[0:n])
+				// Forward the received message
+				if _, err := rw.Write(buf[:n]); err != nil {
+					p.logger.Warn("Failed to write message", "error", err, "payload", buf[:n])
+					return fmt.Errorf("listen-udp: write error: %w", err)
+				}
+
+				p.logger.Debug("Received UDP message", "size", n, "data", buf[:n])
+			}
 		}
 	})
 
 	return g.Wait()
 }
 
+// Write sends a UDP message to the stored remote address.
 func (p *ListenerUDP) Write(msg []byte) (int, error) {
-	if p.udpAddr == nil || p.connUDP == nil {
-		return 0, io.EOF
+	if p.addr == nil || p.conn == nil {
+		return 0, fmt.Errorf("listen-udp: no remote address set")
 	}
-	// return p.connUDP.WriteToUDP(msg, p.udpAddr)
-	return p.connUDP.WriteTo(msg, p.udpAddr)
+
+	n, err := p.conn.WriteTo(msg, p.addr)
+	if err != nil {
+		p.logger.Warn("Failed to send UDP message", "error", err)
+		return n, fmt.Errorf("listen-udp: send failed: %w", err)
+	}
+
+	p.logger.Debug("Sent UDP message", "size", n, "data", msg)
+	return n, nil
 }
 
-func (p *ListenerUDP) setAddr(addr *net.UDPAddr) {
-	p.udpAddr = addr
-	p.logger = p.logger.With("remote-addr", addr)
+// setRemoteAddr safely sets the remote address for writing.
+func (p *ListenerUDP) setRemoteAddr(addr *net.UDPAddr) {
+	p.addr = addr
+	p.logger = p.logger.With("remote-addr", addr.String())
+	p.logger.Info("Remote UDP address set", "address", addr.String())
 }
 
+// Close shuts down the UDP listener.
 func (p *ListenerUDP) Close() error {
-	return p.connUDP.Close()
+	err := p.conn.Close()
+	if err != nil {
+		p.logger.Error("Failed to close UDP connection", "error", err)
+		return fmt.Errorf("listen-udp: close error: %w", err)
+	}
+	p.logger.Info("UDP listener closed")
+	return nil
 }

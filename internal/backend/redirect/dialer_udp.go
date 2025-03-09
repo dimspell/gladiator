@@ -10,14 +10,16 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+// Ensure DialerUDP implements Redirect interface
 var _ Redirect = (*DialerUDP)(nil)
 
 type DialerUDP struct {
-	udpAddr *net.UDPAddr
-	udpConn *net.UDPConn
-	logger  *slog.Logger
+	addr   *net.UDPAddr
+	conn   *net.UDPConn
+	logger *slog.Logger
 }
 
+// DialUDP establishes a UDP connection with the given IPv4 and port.
 func DialUDP(ipv4 string, portNumber string) (*DialerUDP, error) {
 	if net.ParseIP(ipv4) == nil {
 		return nil, fmt.Errorf("dial-udp: invalid IPv4 address format")
@@ -45,14 +47,15 @@ func DialUDP(ipv4 string, portNumber string) (*DialerUDP, error) {
 	logger.Info("Dialed via UDP")
 
 	return &DialerUDP{
-		udpAddr: udpAddr,
-		udpConn: udpConn,
-		logger:  logger,
+		addr:   udpAddr,
+		conn:   udpConn,
+		logger: logger,
 	}, nil
 }
 
+// Run handles reading from UDP and writing to the provided io.Writer.
 func (p *DialerUDP) Run(ctx context.Context, dc io.Writer) error {
-	if p.udpConn == nil {
+	if p.conn == nil {
 		return fmt.Errorf("dial-udp: udp connection is nil")
 	}
 
@@ -60,44 +63,49 @@ func (p *DialerUDP) Run(ctx context.Context, dc io.Writer) error {
 		p.logger.Info("Closing the UDP dialer")
 	}()
 
-	g, _ := errgroup.WithContext(ctx)
+	g, ctx := errgroup.WithContext(ctx)
 	g.Go(func() error {
+		buf := make([]byte, 1024) // Reuse buffer for efficiency
 		for {
-			if err := ctx.Err(); err != nil {
-				return err
-			}
+			select {
+			case <-ctx.Done():
+				return fmt.Errorf("dial-udp: context canceled: %w", ctx.Err())
+			default:
+				clear(buf)
 
-			buf := make([]byte, 1024)
-			n, addr, err := p.udpConn.ReadFromUDP(buf)
-			if err != nil {
-				return fmt.Errorf("dial-udp: could not read UDP message: %w", err)
-			}
+				n, addr, err := p.conn.ReadFromUDP(buf)
+				if err != nil {
+					p.logger.Error("Error reading from UDP server", "error", err)
+					return fmt.Errorf("dial-udp: failed to read UDP message: %w", err)
+				}
 
-			p.logger.Debug("Received UDP message", "message", buf[0:n], "length", n, "fromAddr", addr.String())
+				p.logger.Debug("Received UDP message", "size", n, "from", addr.String())
 
-			if _, err := dc.Write(buf[0:n]); err != nil {
-				return fmt.Errorf("dial-udp: writing to data channel failed: %w", err)
+				if _, err := dc.Write(buf[:n]); err != nil {
+					return fmt.Errorf("dial-udp: failed to write to data channel: %w", err)
+				}
 			}
 		}
 	})
-	g.Go(func() error {
-		<-ctx.Done()
-		p.udpConn.Close()
-		return ctx.Err()
-	})
-
 	return g.Wait()
 }
 
-func (p *DialerUDP) Write(msg []byte) (n int, err error) {
-	n, err = p.udpConn.Write(msg)
+// Write sends a message over the UDP connection.
+func (p *DialerUDP) Write(msg []byte) (int, error) {
+	n, err := p.conn.Write(msg)
 	if err != nil {
-		return n, fmt.Errorf("dial-udp: could not write UDP message: %w", err)
+		p.logger.Error("Failed to send UDP message", "error", err)
+		return n, fmt.Errorf("dial-udp: failed to write UDP message: %w", err)
 	}
-	p.logger.Debug("Wrote to proxy", "msg", msg)
-	return n, err
+	p.logger.Debug("Message sent", "size", n, "msg", msg)
+	return n, nil
 }
 
+// Close terminates the UDP connection.
 func (p *DialerUDP) Close() error {
-	return p.udpConn.Close()
+	err := p.conn.Close()
+	if err != nil {
+		p.logger.Error("Failed to close UDP connection", "error", err)
+	}
+	return err
 }
