@@ -158,6 +158,7 @@ func TestPeerToPeerMessageHandler_handleHostMigration(t *testing.T) {
 			PipeTCP:    nil,
 			PipeUDP:    nil,
 		}
+		newHostPlayer := wire.Player{UserID: 3}
 
 		peerManager := &mockPeerManager{
 			host: player1,
@@ -172,7 +173,7 @@ func TestPeerToPeerMessageHandler_handleHostMigration(t *testing.T) {
 			newTCPRedirect: redirect.NewNoop,
 			newUDPRedirect: redirect.NewNoop,
 		}
-		if err := h.handleHostMigration(context.TODO(), wire.Player{UserID: 3}); err != nil {
+		if err := h.handleHostMigration(t.Context(), newHostPlayer); err != nil {
 			t.Error(err)
 		}
 		if peerManager.host.UserID != 3 {

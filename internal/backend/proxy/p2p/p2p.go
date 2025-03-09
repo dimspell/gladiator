@@ -10,7 +10,6 @@ import (
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/proxy"
 	"github.com/dimspell/gladiator/internal/backend/redirect"
-	"github.com/dimspell/gladiator/internal/wire"
 	"github.com/pion/webrtc/v4"
 )
 
@@ -29,18 +28,7 @@ type PeerToPeer struct {
 }
 
 func NewPeerToPeer(iceServers ...webrtc.ICEServer) *PeerToPeer {
-	config := webrtc.Configuration{
-		ICEServers: []webrtc.ICEServer{
-			// {
-			// 	URLs: []string{"stun:stun.l.google.com:19302"},
-			// },
-			// {
-			// 	URLs:       []string{"turn:192.168.121.212:3478"},
-			// 	Username:   "username1",
-			// 	Credential: "password1",
-			// },
-		},
-	}
+	config := webrtc.Configuration{}
 	for _, server := range iceServers {
 		config.ICEServers = append(config.ICEServers, server)
 	}
@@ -50,40 +38,43 @@ func NewPeerToPeer(iceServers ...webrtc.ICEServer) *PeerToPeer {
 		WebRTCConfig:   config,
 		NewTCPRedirect: redirect.NewTCPRedirect,
 		NewUDPRedirect: redirect.NewUDPRedirect,
-		SessionStore:   &SessionStore{sessions: make(map[*bsession.Session]*SessionMapping)},
+		SessionStore:   &SessionStore{sessions: make(map[*bsession.Session]*GameManager)},
 	}
 }
 
 // CreateRoom creates a new game room and assigns the session as the host.
 // Returns the assigned IP address for the host player
 func (p *PeerToPeer) CreateRoom(params proxy.CreateParams, session *bsession.Session) (net.IP, error) {
-	p.Close(session)
+	//p.Close(session)
+
+	mapping, ok := p.SessionStore.GetSession(session)
+	if !ok {
+		return nil, fmt.Errorf("no game mananged for session: %d", session.GetUserID())
+	}
+
+	mapping.Reset()
 
 	ipAddr := net.IPv4(127, 0, 0, 1)
 	hostPlayer := session.ToPlayer(ipAddr)
 
-	gameRoom := proxy.NewGameRoom(params.GameID, hostPlayer)
-
-	// peer, err := p.CreatePeer(session, hostPlayer)
-	// if err != nil {
-	// 	return nil, fmt.Errorf("failed to create peer: %w", err)
-	// }
-
-	p.SessionStore.SetSession(session, &SessionMapping{
-		Game:   gameRoom,
+	gameRoom := &Game{
+		ID:     params.GameID,
+		Host:   hostPlayer,
+		Peers:  map[int64]*Peer{}, // FIXME: Add size limit
 		IpRing: NewIpRing(),
-		Peers:  make(map[int64]*Peer), // FIXME: Add size limit
-	})
+	}
+
+	mapping.Game = gameRoom
 
 	return ipAddr, nil
 }
 
 func (p *PeerToPeer) HostRoom(ctx context.Context, params proxy.HostParams, session *bsession.Session) error {
-	peers, ok := p.SessionStore.sessions[session]
+	mapping, ok := p.SessionStore.sessions[session]
 	if !ok {
 		return fmt.Errorf("no game mananged for session: %d", session.GetUserID())
 	}
-	if peers.Game == nil || peers.Game.ID != params.GameID {
+	if mapping.Game == nil || mapping.Game.ID != params.GameID {
 		return fmt.Errorf("no game room found")
 	}
 
@@ -99,17 +90,27 @@ func (p *PeerToPeer) GetHostIP(hostIpAddress net.IP, session *bsession.Session) 
 }
 
 func (p *PeerToPeer) SelectGame(params proxy.GameData, session *bsession.Session) error {
-	p.Close(session)
+	//p.Close(session)
+
+	mapping, ok := p.SessionStore.GetSession(session)
+	if !ok {
+		return fmt.Errorf("no game mananged for session: %d", session.GetUserID())
+	}
+
+	mapping.Reset()
 
 	hostPlayer, err := params.FindHostUser()
 	if err != nil {
 		return err
 	}
-	gameRoom := proxy.NewGameRoom(params.Game.GameId, hostPlayer)
 
-	ipRing := NewIpRing()
+	gameRoom := Game{
+		ID:     params.Game.GameId,
+		Host:   hostPlayer,
+		Peers:  map[int64]*Peer{}, // FIXME: Add size limit
+		IpRing: NewIpRing(),
+	}
 
-	peers := map[int64]*Peer{}
 	for _, player := range params.ToWirePlayers() {
 		peerConnection, err := webrtc.NewPeerConnection(p.WebRTCConfig)
 		if err != nil {
@@ -120,34 +121,30 @@ func (p *PeerToPeer) SelectGame(params proxy.GameData, session *bsession.Session
 		isHostUser := gameRoom.Host.UserID == player.UserID
 
 		peer, err := NewPeer(peerConnection,
-			ipRing,
+			gameRoom.IpRing,
 			player.UserID,
 			isCurrentUser,
 			isHostUser)
 		if err != nil {
 			return err
 		}
-		peers[player.UserID] = peer
+		gameRoom.Peers[player.UserID] = peer
 
 		// if !isCurrentUser {
 		// if err := peer.setupPeerConnection(context.TODO(), session, player, false); err != nil {
 		// 	return err
 		// }
-
-		gameRoom.SetPlayer(player)
 	}
-
-	p.SessionStore.SetSession(session, &SessionMapping{
-		Game:   gameRoom,
-		IpRing: ipRing,
-		Peers:  peers,
-	})
 
 	return nil
 }
 
 func (p *PeerToPeer) GetPlayerAddr(params proxy.GetPlayerAddrParams, session *bsession.Session) (net.IP, error) {
-	peer, ok := p.SessionStore.GetPeer(session, params.UserID)
+	mapping, ok := p.SessionStore.GetSession(session)
+	if !ok {
+		return nil, fmt.Errorf("no game mananged for session: %d", session.GetUserID())
+	}
+	peer, ok := mapping.GetPeer(params.UserID)
 	if !ok {
 		return nil, fmt.Errorf("could not find peer with user ID: %d", params.UserID)
 	}
@@ -158,10 +155,9 @@ func (p *PeerToPeer) GetPlayerAddr(params proxy.GetPlayerAddrParams, session *bs
 func (p *PeerToPeer) Join(ctx context.Context, params proxy.JoinParams, session *bsession.Session) (net.IP, error) {
 	ip := net.IPv4(127, 0, 0, 1)
 
-	// FIXME: Use function instead
-	mapping, exist := p.SessionStore.GetSession(session)
-	if !exist {
-		return nil, fmt.Errorf("could not find current session among the peers for user ID: %d", session.GetUserID())
+	mapping, ok := p.SessionStore.GetSession(session)
+	if !ok || mapping.Game == nil {
+		return nil, fmt.Errorf("no game mananged for session: %d", session.GetUserID())
 	}
 
 	peer := &Peer{
@@ -169,21 +165,23 @@ func (p *PeerToPeer) Join(ctx context.Context, params proxy.JoinParams, session 
 		Addr:   &redirect.Addressing{IP: ip},
 		Mode:   redirect.None,
 	}
-	mapping.Peers[session.GetUserID()] = peer
+	mapping.AddPeer(peer)
 
-	for _, pr := range mapping.Peers {
+	for _, pr := range mapping.Game.Peers {
 		ch := make(chan struct{}, 1)
 		pr.Connected = ch
 	}
-
-	gameRoom := mapping.Game
-	gameRoom.SetPlayer(session.ToPlayer(ip))
 
 	return ip, nil
 }
 
 func (p *PeerToPeer) ConnectToPlayer(ctx context.Context, params proxy.GetPlayerAddrParams, session *bsession.Session) (net.IP, error) {
-	peer, ok := p.SessionStore.GetPeer(session, params.UserID)
+	mapping, ok := p.SessionStore.GetSession(session)
+	if !ok || mapping.Game == nil {
+		return nil, fmt.Errorf("no game mananged for session: %d", session.GetUserID())
+	}
+
+	peer, ok := mapping.Game.Peers[params.UserID]
 	if !ok {
 		return nil, fmt.Errorf("could not find peer with user ID: %d", params.UserID)
 	}
@@ -219,84 +217,12 @@ func (p *PeerToPeer) Close(session *bsession.Session) {
 }
 
 func (p *PeerToPeer) NewWebSocketHandler(session *bsession.Session) proxy.MessageHandler {
-	impl := &PeerManagerImpl{
-		p.WebRTCConfig,
-		session,
-		p.SessionStore}
+	gameManager := p.SessionStore.Add(session, p.WebRTCConfig)
 
 	return &PeerToPeerMessageHandler{
 		session,
-		impl,
+		gameManager,
 		p.NewTCPRedirect,
 		p.NewUDPRedirect,
 	}
-}
-
-type PeerManagerImpl struct {
-	config  webrtc.Configuration
-	session *bsession.Session
-	store   *SessionStore
-}
-
-func (p *PeerManagerImpl) AddPeer(peer *Peer) {
-	p.store.AddPeer(p.session, peer)
-}
-
-func (p *PeerManagerImpl) GetPeer(peerId int64) (*Peer, bool) {
-	return p.store.GetPeer(p.session, peerId)
-}
-
-func (p *PeerManagerImpl) RemovePeer(peerId int64) {
-	p.store.RemovePeer(p.session, peerId)
-}
-
-func (p *PeerManagerImpl) Host() (*Peer, bool) {
-	mapping, ok := p.store.GetSession(p.session)
-	if !ok {
-		return nil, false
-	}
-	userId := mapping.Game.Host.UserID
-	host, ok := mapping.Peers[userId]
-	return host, ok
-}
-
-func (p *PeerManagerImpl) SetHost(peer *Peer, newHost wire.Player) {
-	mapping, ok := p.store.GetSession(p.session)
-	if !ok {
-		return
-	}
-	mapping.Game.Host = newHost
-}
-
-func (p *PeerManagerImpl) CreatePeer(player wire.Player) (*Peer, error) {
-	// createPeer sets up the peer connection channels.
-	mapping, ok := p.store.GetSession(p.session)
-	if !ok {
-		return nil, fmt.Errorf("could not find mapping for user ID: %d", p.session.GetUserID())
-	}
-	if peer, found := mapping.Peers[player.UserID]; found {
-		slog.Debug("Reusing peer", "userId", player.ID())
-		return peer, nil
-	}
-
-	peerConnection, err := webrtc.NewPeerConnection(p.config)
-	if err != nil {
-		return nil, err
-	}
-
-	gameRoom := mapping.Game
-	gameRoom.SetPlayer(player)
-
-	isHost := gameRoom.Host.UserID == player.UserID
-	isCurrentUser := gameRoom.Host.UserID == p.session.UserID
-
-	peer, err := NewPeer(peerConnection, mapping.IpRing, player.UserID, isCurrentUser, isHost)
-	if err != nil {
-		return nil, err
-	}
-
-	ch := make(chan struct{}, 1)
-	peer.Connected = ch
-
-	return peer, nil
 }

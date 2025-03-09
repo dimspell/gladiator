@@ -101,7 +101,7 @@ func TestNewPipe(t *testing.T) {
 		}
 		defer proxy.Close()
 
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
 		defer cancel()
 
 		pipe := NewPipe(ctx, dc, proxy)

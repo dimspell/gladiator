@@ -153,7 +153,7 @@ func TestWebRTC(t *testing.T) {
 	// session2.State.SetGameRoom(gameRoom)
 	//
 	// peers := map[string]*Peer{peer.UserID: peer}
-	// proxy2.manager.SessionStore[session2] = &SessionMapping{
+	// proxy2.manager.SessionStore[session2] = &GameManager{
 	// 	Game:  gameRoom,
 	// 	SessionStore: peers,
 	// }
