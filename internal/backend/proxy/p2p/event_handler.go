@@ -38,6 +38,16 @@ type PeerToPeerMessageHandler struct {
 	newUDPRedirect redirect.NewRedirect
 }
 
+// Handle is a generic function to handle event messages from the WebSocket.
+//
+// The sequence of events in a WebRTC connection establishment is crucial:
+//
+// 1. offer creation,
+// 2. offer setting (local description),
+// 3. offer sending,
+// 4. answer receiving,
+// 5. answer setting (remote description),
+// 6. ICE candidate exchange.
 func (h *PeerToPeerMessageHandler) Handle(ctx context.Context, payload []byte) error {
 	eventType := wire.ParseEventType(payload)
 	userID := h.session.GetUserID()
@@ -163,6 +173,8 @@ func (h *PeerToPeerMessageHandler) handleRTCOffer(ctx context.Context, offer wir
 		return err
 	}
 
+	// <-webrtc.GatheringCompletePromise(peer.Connection)
+
 	peer.Connection.OnDataChannel(func(dc *webrtc.DataChannel) {
 		logger.Debug("Data channel opened", "label", dc.Label())
 
@@ -214,6 +226,9 @@ func (h *PeerToPeerMessageHandler) handleRTCOffer(ctx context.Context, offer wir
 }
 
 // handleRTCAnswer handles the incoming RTCAnswer from another peer.
+//
+// The RTC answer is usually handled by the host, who received a message from
+// the guest player.
 func (h *PeerToPeerMessageHandler) handleRTCAnswer(ctx context.Context, offer wire.Offer, fromUserID int64) error {
 	logger := slog.With("from", fromUserID, "sessionID", h.session.GetUserID())
 	logger.Debug("Processing RTC_ANSWER", "from", fromUserID)
@@ -224,7 +239,7 @@ func (h *PeerToPeerMessageHandler) handleRTCAnswer(ctx context.Context, offer wi
 	}
 	peer, ok := h.peerManager.GetPeer(fromUserID)
 	if !ok {
-		return fmt.Errorf("could not find peer %q", fromUserID)
+		return fmt.Errorf("could not find peer %d", fromUserID)
 	}
 	if err := peer.Connection.SetRemoteDescription(answer); err != nil {
 		return fmt.Errorf("could not set remote description: %v", err)
@@ -237,7 +252,7 @@ func (h *PeerToPeerMessageHandler) handleRTCCandidate(ctx context.Context, candi
 
 	peer, ok := h.peerManager.GetPeer(fromUserId)
 	if !ok {
-		return fmt.Errorf("could not find peer %q", fromUserId)
+		return fmt.Errorf("could not find peer %d", fromUserId)
 	}
 
 	return peer.Connection.AddICECandidate(candidate)
