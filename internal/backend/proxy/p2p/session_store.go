@@ -113,6 +113,10 @@ func (g *GameManager) SetHost(peer *Peer, newHost wire.Player) {
 }
 
 func (g *GameManager) AddPeer(peer *Peer) {
+	if g.Game == nil {
+		return
+	}
+
 	g.Game.mtx.Lock()
 	defer g.Game.mtx.Unlock()
 
@@ -120,6 +124,10 @@ func (g *GameManager) AddPeer(peer *Peer) {
 }
 
 func (g *GameManager) GetPeer(userId int64) (*Peer, bool) {
+	if g.Game == nil {
+		return nil, false
+	}
+
 	g.Game.mtx.Lock()
 	defer g.Game.mtx.Unlock()
 
@@ -128,6 +136,10 @@ func (g *GameManager) GetPeer(userId int64) (*Peer, bool) {
 }
 
 func (g *GameManager) RemovePeer(userId int64) {
+	if g.Game == nil {
+		return
+	}
+
 	g.Game.mtx.Lock()
 	defer g.Game.mtx.Unlock()
 
