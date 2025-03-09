@@ -7,7 +7,7 @@ import (
 	"connectrpc.com/connect"
 	v1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/internal/backend/bsession"
-	"github.com/dimspell/gladiator/internal/backend/proxy"
+	"github.com/dimspell/gladiator/internal/backend/proxy/direct"
 	"github.com/dimspell/gladiator/internal/wire"
 	"github.com/stretchr/testify/assert"
 )
@@ -45,7 +45,7 @@ func TestBackend_HandleJoinGame(t *testing.T) {
 	conn := &mockConn{}
 	session := &bsession.Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
 
-	px.BySession[session] = &proxy.GameRoom{
+	px.BySession[session] = &direct.GameRoom{
 		ID:   "gameId",
 		Name: "gameId",
 		Host: wire.Player{

@@ -7,13 +7,12 @@ import (
 
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/packet"
-	"github.com/dimspell/gladiator/internal/backend/proxy"
 	"github.com/dimspell/gladiator/internal/wire"
 )
 
 type LanMessageHandler struct {
 	session   *bsession.Session
-	BySession map[*bsession.Session]*proxy.GameRoom
+	BySession map[*bsession.Session]*GameRoom
 }
 
 func (l *LanMessageHandler) Handle(ctx context.Context, payload []byte) error {

@@ -11,7 +11,6 @@ import (
 	"github.com/dimspell/gladiator/internal/backend/redirect"
 	"github.com/dimspell/gladiator/internal/wire"
 	"github.com/pion/webrtc/v4"
-	"golang.org/x/sync/errgroup"
 )
 
 type Peer struct {
@@ -220,10 +219,20 @@ func (p *Peer) Terminate() {
 		// p.mu.RUnlock()
 
 		if err := p.Connection.Close(); err != nil {
-			slog.Error("Failed to close WebRTC connection",
-				"userId", p.UserID,
-				"error", err)
+			slog.Error("Failed to close WebRTC connection", "userId", p.UserID, "error", err)
 			return
+		}
+	}
+
+	if p.PipeUDP != nil {
+		if err := p.PipeUDP.Close(); err != nil {
+			slog.Error("Failed to close UDP connection", "error", err)
+		}
+	}
+
+	if p.PipeTCP != nil {
+		if err := p.PipeTCP.Close(); err != nil {
+			slog.Error("Failed to close TCP connection", "error", err)
 		}
 	}
 }
@@ -246,36 +255,20 @@ type DataChannel interface {
 }
 
 func NewPipe(ctx context.Context, dc DataChannel, proxy redirect.Redirect) *Pipe {
-	// FIXME: Return an error instead of panicking
-	if proxy == nil {
-		panic("proxy is nil")
-	}
-
 	pipe := &Pipe{
 		dc:     dc,
 		proxy:  proxy,
 		logger: slog.With("label", dc.Label()),
 	}
 
-	// FIXME: Pass the context from the caller
 	ctx, cancel := context.WithCancel(ctx)
 	pipe.done = cancel
 
-	g, ctx := errgroup.WithContext(ctx)
-	g.Go(func() error {
-		return proxy.Run(ctx, pipe)
-	})
-	g.Go(func() error {
-		select {
-		case <-ctx.Done():
-			slog.Debug("context done", "error", ctx.Err())
-			return ctx.Err()
-		}
-	})
 	go func() {
-		if err := g.Wait(); err != nil {
-			pipe.logger.Warn("proxy has failed", "error", err)
+		if err := proxy.Run(ctx, pipe); err != nil {
+			pipe.logger.Warn("Proxy failed", "error", err)
 			cancel()
+			return
 		}
 	}()
 

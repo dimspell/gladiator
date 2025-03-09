@@ -1,57 +1,15 @@
 package p2p
 
 import (
-	"errors"
 	"fmt"
-	"github.com/dimspell/gladiator/internal/wire"
-	"github.com/pion/webrtc/v4"
 	"log/slog"
 	"sync"
 
+	"github.com/dimspell/gladiator/internal/wire"
+	"github.com/pion/webrtc/v4"
+
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 )
-
-type SessionStore struct {
-	sessions map[*bsession.Session]*GameManager
-	mutex    sync.RWMutex
-}
-
-func (ss *SessionStore) GetSession(session *bsession.Session) (*GameManager, bool) {
-	ss.mutex.RLock()
-	defer ss.mutex.RUnlock()
-	mapping, exists := ss.sessions[session]
-	return mapping, exists
-}
-
-func (ss *SessionStore) DeleteSession(session *bsession.Session) {
-	ss.mutex.Lock()
-	defer ss.mutex.Unlock()
-	delete(ss.sessions, session)
-}
-
-func (ss *SessionStore) Add(session *bsession.Session, config webrtc.Configuration) *GameManager {
-	mapping := &GameManager{
-		session: session,
-		config:  config,
-	}
-
-	ss.mutex.Lock()
-	ss.sessions[session] = mapping
-	ss.mutex.Unlock()
-
-	return mapping
-}
-
-func (ss *SessionStore) Do(session *bsession.Session, doFn func(mapping *GameManager) error) error {
-	ss.mutex.RLock()
-	defer ss.mutex.RUnlock()
-
-	mapping, ok := ss.sessions[session]
-	if !ok {
-		return errors.New("session not found")
-	}
-	return doFn(mapping)
-}
 
 type GameManager struct {
 	config  webrtc.Configuration

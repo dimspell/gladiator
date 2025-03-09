@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/dimspell/gladiator/internal/backend/bsession"
@@ -45,9 +46,7 @@ func NewPeerToPeer(iceServers ...webrtc.ICEServer) *PeerToPeer {
 // CreateRoom creates a new game room and assigns the session as the host.
 // Returns the assigned IP address for the host player
 func (p *PeerToPeer) CreateRoom(params proxy.CreateParams, session *bsession.Session) (net.IP, error) {
-	//p.Close(session)
-
-	mapping, ok := p.SessionStore.GetSession(session)
+	mapping, ok := p.SessionStore.Get(session)
 	if !ok {
 		return nil, fmt.Errorf("no game mananged for session: %d", session.GetUserID())
 	}
@@ -90,9 +89,7 @@ func (p *PeerToPeer) GetHostIP(hostIpAddress net.IP, session *bsession.Session) 
 }
 
 func (p *PeerToPeer) SelectGame(params proxy.GameData, session *bsession.Session) error {
-	//p.Close(session)
-
-	mapping, ok := p.SessionStore.GetSession(session)
+	mapping, ok := p.SessionStore.Get(session)
 	if !ok {
 		return fmt.Errorf("no game mananged for session: %d", session.GetUserID())
 	}
@@ -104,7 +101,7 @@ func (p *PeerToPeer) SelectGame(params proxy.GameData, session *bsession.Session
 		return err
 	}
 
-	gameRoom := Game{
+	gameRoom := &Game{
 		ID:     params.Game.GameId,
 		Host:   hostPlayer,
 		Peers:  map[int64]*Peer{}, // FIXME: Add size limit
@@ -136,11 +133,13 @@ func (p *PeerToPeer) SelectGame(params proxy.GameData, session *bsession.Session
 		// }
 	}
 
+	mapping.Game = gameRoom
+
 	return nil
 }
 
 func (p *PeerToPeer) GetPlayerAddr(params proxy.GetPlayerAddrParams, session *bsession.Session) (net.IP, error) {
-	mapping, ok := p.SessionStore.GetSession(session)
+	mapping, ok := p.SessionStore.Get(session)
 	if !ok {
 		return nil, fmt.Errorf("no game mananged for session: %d", session.GetUserID())
 	}
@@ -155,7 +154,7 @@ func (p *PeerToPeer) GetPlayerAddr(params proxy.GetPlayerAddrParams, session *bs
 func (p *PeerToPeer) Join(ctx context.Context, params proxy.JoinParams, session *bsession.Session) (net.IP, error) {
 	ip := net.IPv4(127, 0, 0, 1)
 
-	mapping, ok := p.SessionStore.GetSession(session)
+	mapping, ok := p.SessionStore.Get(session)
 	if !ok || mapping.Game == nil {
 		return nil, fmt.Errorf("no game mananged for session: %d", session.GetUserID())
 	}
@@ -176,7 +175,7 @@ func (p *PeerToPeer) Join(ctx context.Context, params proxy.JoinParams, session 
 }
 
 func (p *PeerToPeer) ConnectToPlayer(ctx context.Context, params proxy.GetPlayerAddrParams, session *bsession.Session) (net.IP, error) {
-	mapping, ok := p.SessionStore.GetSession(session)
+	mapping, ok := p.SessionStore.Get(session)
 	if !ok || mapping.Game == nil {
 		return nil, fmt.Errorf("no game mananged for session: %d", session.GetUserID())
 	}
@@ -207,13 +206,13 @@ func (p *PeerToPeer) ConnectToPlayer(ctx context.Context, params proxy.GetPlayer
 }
 
 func (p *PeerToPeer) Close(session *bsession.Session) {
-	// if mapping, exists := p.SessionStore.GetSession(session); exists {
+	// if mapping, exists := p.SessionStore.Get(session); exists {
 	// 	for _, peer := range mapping.Peers {
 	// 		peer.Terminate()
 	// 	}
 	// }
 	//
-	// p.SessionStore.DeleteSession(session)
+	// p.SessionStore.Delete(session)
 }
 
 func (p *PeerToPeer) NewWebSocketHandler(session *bsession.Session) proxy.MessageHandler {
@@ -225,4 +224,35 @@ func (p *PeerToPeer) NewWebSocketHandler(session *bsession.Session) proxy.Messag
 		p.NewTCPRedirect,
 		p.NewUDPRedirect,
 	}
+}
+
+type SessionStore struct {
+	sessions map[*bsession.Session]*GameManager
+	mutex    sync.RWMutex
+}
+
+func (ss *SessionStore) Get(session *bsession.Session) (*GameManager, bool) {
+	ss.mutex.RLock()
+	defer ss.mutex.RUnlock()
+	mapping, exists := ss.sessions[session]
+	return mapping, exists
+}
+
+func (ss *SessionStore) Delete(session *bsession.Session) {
+	ss.mutex.Lock()
+	defer ss.mutex.Unlock()
+	delete(ss.sessions, session)
+}
+
+func (ss *SessionStore) Add(session *bsession.Session, config webrtc.Configuration) *GameManager {
+	mapping := &GameManager{
+		session: session,
+		config:  config,
+	}
+
+	ss.mutex.Lock()
+	ss.sessions[session] = mapping
+	ss.mutex.Unlock()
+
+	return mapping
 }

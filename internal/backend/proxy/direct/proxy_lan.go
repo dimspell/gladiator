@@ -15,7 +15,7 @@ type LAN struct {
 	MyIPAddress string
 
 	// FIXME: Not thread-safe
-	BySession map[*bsession.Session]*proxy.GameRoom
+	BySession map[*bsession.Session]*GameRoom
 }
 
 func NewLAN(myIPAddress string) *LAN {
@@ -25,7 +25,7 @@ func NewLAN(myIPAddress string) *LAN {
 
 	return &LAN{
 		MyIPAddress: myIPAddress,
-		BySession:   make(map[*bsession.Session]*proxy.GameRoom),
+		BySession:   make(map[*bsession.Session]*GameRoom),
 	}
 }
 
@@ -41,7 +41,7 @@ func (p *LAN) CreateRoom(params proxy.CreateParams, session *bsession.Session) (
 		return net.IP{}, fmt.Errorf("incorrect host IP address: %s", p.MyIPAddress)
 	}
 
-	p.BySession[session] = proxy.NewGameRoom(params.GameID, session.ToPlayer(ip))
+	p.BySession[session] = NewGameRoom(params.GameID, session.ToPlayer(ip))
 
 	return ip, nil
 }
@@ -61,7 +61,7 @@ func (p *LAN) SelectGame(params proxy.GameData, session *bsession.Session) error
 	if err != nil {
 		return err
 	}
-	gameRoom := proxy.NewGameRoom(params.Game.GameId, host)
+	gameRoom := NewGameRoom(params.Game.GameId, host)
 	for _, player := range params.ToWirePlayers() {
 		gameRoom.SetPlayer(player)
 	}
