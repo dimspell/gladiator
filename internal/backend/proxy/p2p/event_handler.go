@@ -23,19 +23,22 @@ type PeerManager interface {
 }
 
 type PeerInterface interface {
-	GetUserID() int64
-
 	SendRTCICECandidate(ctx context.Context, candidate webrtc.ICECandidateInit, recipientId int64) error
 	SendRTCOffer(ctx context.Context, offer webrtc.SessionDescription, recipientId int64) error
 	SendRTCAnswer(ctx context.Context, offer webrtc.SessionDescription, recipientId int64) error
 }
 
 type PeerToPeerMessageHandler struct {
+	// UserID is the identifier of the current user.
+	UserID int64
+
 	session     PeerInterface
 	peerManager PeerManager
 
 	newTCPRedirect redirect.NewRedirect
 	newUDPRedirect redirect.NewRedirect
+
+	logger *slog.Logger
 }
 
 // Handle is a generic function to handle event messages from the WebSocket.
@@ -50,27 +53,24 @@ type PeerToPeerMessageHandler struct {
 // 6. ICE candidate exchange.
 func (h *PeerToPeerMessageHandler) Handle(ctx context.Context, payload []byte) error {
 	eventType := wire.ParseEventType(payload)
-	userID := h.session.GetUserID()
-
-	logger := slog.With("payload", string(payload), "sessionID", userID)
 
 	switch eventType {
 	case wire.LobbyUsers, wire.JoinLobby, wire.CreateRoom:
 		return nil
 	case wire.JoinRoom:
-		return decodeAndHandle(ctx, logger, payload, wire.JoinRoom.String(), h.handleJoinRoom)
+		return decodeAndHandle(ctx, payload, wire.JoinRoom.String(), h.handleJoinRoom)
 	case wire.LeaveRoom, wire.LeaveLobby:
-		return decodeAndHandle(ctx, logger, payload, wire.LeaveRoom.String(), h.handleLeaveRoom)
+		return decodeAndHandle(ctx, payload, wire.LeaveRoom.String(), h.handleLeaveRoom)
 	case wire.HostMigration:
-		return decodeAndHandle(ctx, logger, payload, wire.HostMigration.String(), h.handleHostMigration)
+		return decodeAndHandle(ctx, payload, wire.HostMigration.String(), h.handleHostMigration)
 	case wire.RTCOffer:
-		return handleRTCMessage(ctx, logger, payload, wire.RTCOffer.String(), userID, h.handleRTCOffer)
+		return handleRTCMessage(ctx, payload, wire.RTCOffer.String(), h.UserID, h.handleRTCOffer)
 	case wire.RTCAnswer:
-		return handleRTCMessage(ctx, logger, payload, wire.RTCAnswer.String(), userID, h.handleRTCAnswer)
+		return handleRTCMessage(ctx, payload, wire.RTCAnswer.String(), h.UserID, h.handleRTCAnswer)
 	case wire.RTCICECandidate:
-		return handleRTCMessage(ctx, logger, payload, wire.RTCICECandidate.String(), userID, h.handleRTCCandidate)
+		return handleRTCMessage(ctx, payload, wire.RTCICECandidate.String(), h.UserID, h.handleRTCCandidate)
 	default:
-		logger.Debug("unknown wire message", "type", eventType.String())
+		h.logger.Debug("unknown wire message", "type", eventType.String())
 		return nil
 	}
 }
@@ -78,20 +78,20 @@ func (h *PeerToPeerMessageHandler) Handle(ctx context.Context, payload []byte) e
 const errDecodingPayload = "failed to decode payload for event: %s"
 
 // Generic handler for simple event messages
-func decodeAndHandle[T any](ctx context.Context, logger *slog.Logger, payload []byte, eventName string, handler func(context.Context, T) error) error {
+func decodeAndHandle[T any](ctx context.Context, payload []byte, eventName string, handler func(context.Context, T) error) error {
 	_, msg, err := wire.DecodeTyped[T](payload)
 	if err != nil {
-		logger.Error(fmt.Sprintf(errDecodingPayload, eventName), "error", err)
+		slog.Error(fmt.Sprintf(errDecodingPayload, eventName), "error", err, "payload", string(payload))
 		return err
 	}
 	return handler(ctx, msg.Content)
 }
 
 // Generic handler for RTC messages
-func handleRTCMessage[T any](ctx context.Context, logger *slog.Logger, payload []byte, eventName string, userID int64, handler func(context.Context, T, int64) error) error {
+func handleRTCMessage[T any](ctx context.Context, payload []byte, eventName string, userID int64, handler func(context.Context, T, int64) error) error {
 	_, msg, err := wire.DecodeTyped[T](payload)
 	if err != nil {
-		logger.Error(fmt.Sprintf(errDecodingPayload, eventName), "error", err)
+		slog.Error(fmt.Sprintf(errDecodingPayload, eventName), "error", err)
 		return err
 	}
 
@@ -108,14 +108,14 @@ func handleRTCMessage[T any](ctx context.Context, logger *slog.Logger, payload [
 }
 
 func (h *PeerToPeerMessageHandler) handleJoinRoom(ctx context.Context, player wire.Player) error {
-	logger := slog.With("playerId", player.ID(), "userID", h.session.GetUserID())
+	logger := h.logger.With("player_id", player.ID())
 
 	if err := ctx.Err(); err != nil {
 		return fmt.Errorf("context cancelled while handling join room: %w", err)
 	}
 
-	if player.UserID == h.session.GetUserID() {
-		slog.Debug("Player is already joined")
+	if player.UserID == h.UserID {
+		logger.Warn("Player is already joined")
 		return nil
 	}
 
@@ -135,10 +135,10 @@ func (h *PeerToPeerMessageHandler) handleJoinRoom(ctx context.Context, player wi
 
 	h.peerManager.AddPeer(peer)
 
-	if err := peer.setupPeerConnection(ctx, h.session, player, true); err != nil {
+	if err := peer.setupPeerConnection(ctx, logger, h.session, player, true); err != nil {
 		return err
 	}
-	if err := peer.createDataChannels(ctx, h.newTCPRedirect, h.newUDPRedirect, h.session.GetUserID()); err != nil {
+	if err := peer.createDataChannels(ctx, logger, h.newTCPRedirect, h.newUDPRedirect, h.UserID); err != nil {
 		return err
 	}
 
@@ -152,8 +152,8 @@ func (h *PeerToPeerMessageHandler) handleJoinRoom(ctx context.Context, player wi
 //
 // The RTC offer is usually handled by the guest player, who responds to a host.
 func (h *PeerToPeerMessageHandler) handleRTCOffer(ctx context.Context, offer wire.Offer, fromUserID int64) error {
-	logger := slog.With("from", fromUserID, "sessionID", h.session.GetUserID())
-	logger.Debug("Processing RTC_OFFER")
+	h.logger.Debug("Processing RTC_OFFER", "from", fromUserID)
+	logger := h.logger.With("from", fromUserID, "player_id", offer.Player.ID())
 
 	if err := ctx.Err(); err != nil {
 		return fmt.Errorf("context cancelled while handling RTC offer: %w", err)
@@ -169,41 +169,34 @@ func (h *PeerToPeerMessageHandler) handleRTCOffer(ctx context.Context, offer wir
 	// 	return err
 	// }
 
-	if err := peer.setupPeerConnection(ctx, h.session, offer.Player, false); err != nil {
+	if err := peer.setupPeerConnection(ctx, logger, h.session, offer.Player, false); err != nil {
 		return err
 	}
 
-	// <-webrtc.GatheringCompletePromise(peer.Connection)
-
 	peer.Connection.OnDataChannel(func(dc *webrtc.DataChannel) {
-		logger.Debug("Data channel opened", "label", dc.Label())
+		logger = h.logger.With("channel_id", dc.Label())
 
 		var redir redirect.Redirect
 		var err error
 		switch dc.Label() {
-		case peer.channelName("tcp", fromUserID, h.session.GetUserID()):
+		case peer.channelName("tcp", fromUserID, h.UserID):
 			redir, err = h.newTCPRedirect(peer.Mode, peer.Addr)
 			if err != nil {
 				logger.Error("Could not create TCP redirect", "error", err)
 				return
 			}
-			peer.PipeTCP = NewPipe(ctx, dc, redir)
-		case peer.channelName("udp", fromUserID, h.session.GetUserID()):
+			peer.PipeTCP = NewPipe(ctx, logger, dc, redir)
+		case peer.channelName("udp", fromUserID, h.UserID):
 			redir, err = h.newUDPRedirect(peer.Mode, peer.Addr)
 			if err != nil {
 				logger.Error("Could not create UDP redirect", "error", err)
 				return
 			}
-			peer.PipeUDP = NewPipe(ctx, dc, redir)
+			peer.PipeUDP = NewPipe(ctx, logger, dc, redir)
 		default:
-			logger.Error("Unknown channel", "label", dc.Label())
+			logger.Error("Unknown channel")
 			return
 		}
-
-		// dc.OnOpen(func() {
-		// 	logger.Debug("Data channel opened", "label", dc.Label())
-		// 	// dc.SendText("Hello from the server")
-		// })
 	})
 
 	if err := peer.Connection.SetRemoteDescription(offer.Offer); err != nil {
@@ -230,8 +223,7 @@ func (h *PeerToPeerMessageHandler) handleRTCOffer(ctx context.Context, offer wir
 // The RTC answer is usually handled by the host, who received a message from
 // the guest player.
 func (h *PeerToPeerMessageHandler) handleRTCAnswer(ctx context.Context, offer wire.Offer, fromUserID int64) error {
-	logger := slog.With("from", fromUserID, "sessionID", h.session.GetUserID())
-	logger.Debug("Processing RTC_ANSWER", "from", fromUserID)
+	h.logger.Debug("Processing RTC_ANSWER", "from", fromUserID)
 
 	answer := webrtc.SessionDescription{
 		Type: webrtc.SDPTypeAnswer,
@@ -248,8 +240,7 @@ func (h *PeerToPeerMessageHandler) handleRTCAnswer(ctx context.Context, offer wi
 }
 
 func (h *PeerToPeerMessageHandler) handleRTCCandidate(ctx context.Context, candidate webrtc.ICECandidateInit, fromUserID int64) error {
-	logger := slog.With("from", fromUserID, "sessionID", h.session.GetUserID())
-	logger.Debug("Processing RTC_CANDIDATE", "from", fromUserID)
+	h.logger.Debug("Processing RTC_CANDIDATE", "from", fromUserID)
 
 	peer, ok := h.peerManager.GetPeer(fromUserID)
 	if !ok {
@@ -263,21 +254,19 @@ func (h *PeerToPeerMessageHandler) handleRTCCandidate(ctx context.Context, candi
 }
 
 func (h *PeerToPeerMessageHandler) handleLeaveRoom(ctx context.Context, player wire.Player) error {
-	slog.Info("Other player is leaving", "playerId", player.ID())
-
-	slog.Debug("LEAVE_ROOM OR LEAVE_LOBBY")
+	h.logger.Info("Other player is leaving", "playerId", player.ID())
 
 	peer, ok := h.peerManager.GetPeer(player.UserID)
 	if !ok {
 		// fmt.Errorf("could not find peer %q", m.From)
 		return nil
 	}
-	if peer.UserID == h.session.GetUserID() {
+	if peer.UserID == h.UserID {
 		// return fmt.Errorf("peer %q is the same as the host, ignoring leave", m.From)
 		return nil
 	}
 
-	slog.Info("User left", "peer", peer.UserID)
+	h.logger.Info("User left", "peer", peer.UserID)
 	h.peerManager.RemovePeer(player.UserID)
 	return nil
 }

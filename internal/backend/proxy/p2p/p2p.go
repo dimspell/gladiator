@@ -192,9 +192,9 @@ func (p *PeerToPeer) ConnectToPlayer(ctx context.Context, params proxy.GetPlayer
 
 	select {
 	case <-ctx.Done():
-		slog.Error("timeout waiting for peer to connect", "userID", params.UserID)
+		slog.Error("timeout waiting for peer to connect", "user_id", params.UserID)
 	case <-peer.Connected:
-		slog.Debug("peer connected, user ID", "userID", params.UserID)
+		slog.Debug("peer connected, user ID", "user_id", params.UserID)
 	}
 
 	return peer.Addr.IP, nil
@@ -221,10 +221,12 @@ func (p *PeerToPeer) NewWebSocketHandler(session *bsession.Session) proxy.Messag
 	p.SessionStore.Add(session, gameManager)
 
 	return &PeerToPeerMessageHandler{
+		session.GetUserID(),
 		session,
 		gameManager,
 		p.NewTCPRedirect,
 		p.NewUDPRedirect,
+		slog.With("user_id", session.GetUserID()),
 	}
 }
 

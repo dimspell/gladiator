@@ -17,6 +17,7 @@ import (
 type mockDataChannel struct {
 	label     string
 	onMessage func(msg webrtc.DataChannelMessage)
+	onOpen    func()
 	onClose   func()
 	onError   func(err error)
 	closed    bool
@@ -26,6 +27,7 @@ type mockDataChannel struct {
 
 func (m *mockDataChannel) Label() string                                   { return m.label }
 func (m *mockDataChannel) OnMessage(f func(msg webrtc.DataChannelMessage)) { m.onMessage = f }
+func (m *mockDataChannel) OnOpen(f func())                                 { m.onOpen = f }
 func (m *mockDataChannel) OnClose(f func())                                { m.onClose = f }
 func (m *mockDataChannel) OnError(f func(err error))                       { m.onError = f }
 func (m *mockDataChannel) Send(data []byte) error {
@@ -45,6 +47,14 @@ type mockRedirect struct {
 	toProxy       chan []byte
 	toDataChannel chan []byte
 	t             *testing.T
+}
+
+func newMockRedirect(t *testing.T) *mockRedirect {
+	return &mockRedirect{
+		t:             t,
+		toProxy:       make(chan []byte, 1),
+		toDataChannel: make(chan []byte, 1),
+	}
 }
 
 func (m *mockRedirect) Run(ctx context.Context, dc io.Writer) error {
@@ -97,17 +107,13 @@ func TestNewPipe(t *testing.T) {
 		}
 		defer dc.Close()
 
-		proxy := &mockRedirect{
-			t:             t,
-			toProxy:       make(chan []byte, 1),
-			toDataChannel: make(chan []byte, 1),
-		}
+		proxy := newMockRedirect(t)
 		defer proxy.Close()
 
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
 
-		pipe := NewPipe(ctx, dc, proxy)
+		pipe := NewPipe(ctx, slog.Default(), dc, proxy)
 		defer pipe.Close()
 
 		// Test that the DataChannel receives messages from the proxy

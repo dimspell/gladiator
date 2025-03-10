@@ -65,19 +65,21 @@ func NewPeer(connection *webrtc.PeerConnection, r *IpRing, userID int64, isCurre
 }
 
 // setupPeerConnection initializes WebRTC event handlers.
-func (p *Peer) setupPeerConnection(ctx context.Context, session PeerInterface, player wire.Player, sendRTCOffer bool) error {
-	slog.Debug("Setting up peer connection", "userID", player.UserID)
+func (p *Peer) setupPeerConnection(ctx context.Context, logger *slog.Logger, session PeerInterface, player wire.Player, sendRTCOffer bool) error {
+	logger.Debug("Setting up peer connection")
 
 	p.Connection.OnICEConnectionStateChange(func(state webrtc.ICEConnectionState) {
-		slog.Debug("ICE connection state changed", "userID", player.UserID, "state", state.String())
+		logger.Debug("ICE connection state changed", "state", state.String())
 	})
 
 	p.Connection.OnConnectionStateChange(func(state webrtc.PeerConnectionState) {
 		switch state {
 		case webrtc.PeerConnectionStateConnected:
-			p.Connected <- struct{}{}
+			if p.Connected != nil {
+				p.Connected <- struct{}{}
+			}
 		case webrtc.PeerConnectionStateDisconnected:
-			slog.Error("Peer connection disconnected", "userID", player.UserID)
+			logger.Error("Peer connection disconnected")
 			p.Terminate()
 		}
 	})
@@ -87,13 +89,13 @@ func (p *Peer) setupPeerConnection(ctx context.Context, session PeerInterface, p
 			return
 		}
 		if err := session.SendRTCICECandidate(ctx, candidate.ToJSON(), player.UserID); err != nil {
-			slog.Error("Failed to send ICE candidate", "fromID", session.GetUserID(), "toID", player.UserID, "error", err)
+			logger.Error("Failed to send ICE candidate", "fromID", p.UserID, "toID", player.UserID, "error", err)
 		}
 	})
 
 	p.Connection.OnNegotiationNeeded(func() {
 		if err := p.handleNegotiation(ctx, session, player, sendRTCOffer); err != nil {
-			slog.Error("Failed to handle negotiation", "userID", player.UserID, "error", err)
+			logger.Error("Failed to handle negotiation", "userID", player.UserID, "error", err)
 		}
 	})
 
@@ -121,18 +123,18 @@ func (p *Peer) handleNegotiation(ctx context.Context, session PeerInterface, pla
 }
 
 // createDataChannels initializes WebRTC data channels for TCP and UDP.
-func (p *Peer) createDataChannels(ctx context.Context, newTCPRedirect, newUDPRedirect redirect.NewRedirect, myUserID int64) error {
-	if err := p.initDataChannel(ctx, "tcp", myUserID, newTCPRedirect); err != nil {
+func (p *Peer) createDataChannels(ctx context.Context, logger *slog.Logger, newTCPRedirect, newUDPRedirect redirect.NewRedirect, myUserID int64) error {
+	if err := p.initDataChannel(ctx, logger, "tcp", myUserID, newTCPRedirect); err != nil {
 		return err
 	}
-	if err := p.initDataChannel(ctx, "udp", myUserID, newUDPRedirect); err != nil {
+	if err := p.initDataChannel(ctx, logger, "udp", myUserID, newUDPRedirect); err != nil {
 		return err
 	}
 	return nil
 }
 
 // initDataChannel helps in setting up an individual data channel.
-func (p *Peer) initDataChannel(ctx context.Context, proto string, myUserID int64, newRedirect redirect.NewRedirect) error {
+func (p *Peer) initDataChannel(ctx context.Context, logger *slog.Logger, proto string, myUserID int64, newRedirect redirect.NewRedirect) error {
 	redir, err := newRedirect(p.Mode, p.Addr)
 	if err != nil {
 		return fmt.Errorf("failed to create %s redirect: %w", proto, err)
@@ -142,7 +144,7 @@ func (p *Peer) initDataChannel(ctx context.Context, proto string, myUserID int64
 		return nil
 	}
 
-	pipe, err := p.createDataChannel(ctx, p.channelName(proto, myUserID, p.UserID), redir)
+	pipe, err := p.createDataChannel(ctx, logger, p.channelName(proto, myUserID, p.UserID), redir)
 	if err != nil {
 		return fmt.Errorf("failed to create %s channel: %w", proto, err)
 	}
@@ -162,23 +164,16 @@ func (p *Peer) channelName(proto string, from, to int64) string {
 }
 
 // createDataChannel establishes a new WebRTC data channel.
-func (p *Peer) createDataChannel(ctx context.Context, label string, redir redirect.Redirect) (*Pipe, error) {
+func (p *Peer) createDataChannel(ctx context.Context, logger *slog.Logger, label string, redir redirect.Redirect) (*Pipe, error) {
 	dc, err := p.Connection.CreateDataChannel(label, nil)
 	if err != nil {
 		return nil, fmt.Errorf("could not create data channel %q: %w", label, err)
 	}
 
-	slog.Debug("Created data channel", "userID", p.UserID, "channel", label)
-	pipe := NewPipe(ctx, dc, redir)
+	logger = logger.With("channel_id", label)
+	logger.Debug("Created data channel")
 
-	dc.OnOpen(func() {
-		slog.Debug("Opened WebRTC channel", "userID", p.UserID, "channel", dc.Label())
-	})
-
-	dc.OnClose(func() {
-		slog.Info("DataChannel closed", "userID", p.UserID, "channel", label)
-		pipe.Close()
-	})
+	pipe := NewPipe(ctx, logger, dc, redir)
 
 	return pipe, nil
 }
@@ -194,10 +189,14 @@ func (p *Peer) Terminate() {
 	}
 
 	if p.PipeTCP != nil {
-		p.PipeTCP.Close()
+		if err := p.PipeTCP.Close(); err != nil {
+			slog.Error("Failed to close TCP pipe", "userID", p.UserID, "error", err)
+		}
 	}
 	if p.PipeUDP != nil {
-		p.PipeUDP.Close()
+		if err := p.PipeUDP.Close(); err != nil {
+			slog.Error("Failed to close UDP pipe", "userID", p.UserID, "error", err)
+		}
 	}
 }
 
@@ -211,22 +210,24 @@ type Pipe struct {
 
 // DataChannel defines required methods for WebRTC data channels.
 type DataChannel interface {
-	Label() string
-	OnError(func(err error))
-	OnMessage(func(msg webrtc.DataChannelMessage))
-	OnClose(func())
-	Send([]byte) error
 	io.Closer
+
+	OnOpen(func())
+	OnClose(func())
+	OnError(func(err error))
+	Label() string
+	OnMessage(func(msg webrtc.DataChannelMessage))
+	Send([]byte) error
 }
 
 // NewPipe creates and starts a new pipe.
-func NewPipe(ctx context.Context, dc DataChannel, proxy redirect.Redirect) *Pipe {
+func NewPipe(ctx context.Context, logger *slog.Logger, dc DataChannel, proxy redirect.Redirect) *Pipe {
 	ctx, cancel := context.WithCancel(ctx)
 	pipe := &Pipe{
 		dc:     dc,
 		proxy:  proxy,
 		done:   cancel,
-		logger: slog.With("label", dc.Label()),
+		logger: logger,
 	}
 
 	go func() {
@@ -235,6 +236,10 @@ func NewPipe(ctx context.Context, dc DataChannel, proxy redirect.Redirect) *Pipe
 			cancel()
 		}
 	}()
+
+	dc.OnOpen(func() {
+		pipe.logger.Debug("Opened WebRTC channel")
+	})
 
 	dc.OnError(func(err error) { pipe.logger.Warn("DataChannel error", "error", err) })
 	dc.OnClose(func() {

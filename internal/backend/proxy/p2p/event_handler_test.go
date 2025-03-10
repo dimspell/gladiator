@@ -2,10 +2,10 @@ package p2p
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"log/slog"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
@@ -22,10 +22,6 @@ type mockSession struct {
 	onSendRTCICECandidate func(webrtc.ICECandidateInit, int64)
 	onSendRTCOffer        func(wire.Offer)
 	onSendRTCAnswer       func(wire.Offer)
-}
-
-func (m mockSession) GetUserID() int64 {
-	return m.ID
 }
 
 func (m mockSession) SendRTCICECandidate(_ context.Context, candidate webrtc.ICECandidateInit, fromUserID int64) error {
@@ -83,7 +79,7 @@ func (m *mockPeerManager) CreatePeer(player wire.Player) (*Peer, error) {
 		Addr:       nil,
 		Mode:       0,
 		Connection: peerConnection,
-		Connected:  nil,
+		Connected:  make(chan struct{}),
 		PipeTCP:    nil,
 		PipeUDP:    nil,
 	}, nil
@@ -109,90 +105,110 @@ func waitToReceive[T any](ch chan T) T {
 }
 
 func TestPeerToPeerMessageHandler_Handle(t *testing.T) {
-	ctx := t.Context()
 	logger.SetPlainTextLogger(os.Stdout, slog.LevelDebug)
 
-	// Channels for synchronization
-	chanOffer := make(chan wire.Offer, 1)
-	chanAnswer := make(chan wire.Offer, 1)
+	t.Run("The first player is joining the solo host", func(t *testing.T) {
+		ctx := t.Context()
 
-	// For player1 (host)
-	host := &Peer{UserID: 1}
-	hostManager := &mockPeerManager{
-		host:  host,
-		peers: map[int64]*Peer{},
-	}
-	hostSession := &mockSession{ID: 1,
-		onSendRTCOffer: func(offer wire.Offer) {
-			chanOffer <- offer
-			close(chanOffer) // Close channel after sending offer
-		},
-	}
-	hostHandler := &PeerToPeerMessageHandler{
-		peerManager:    hostManager,
-		newTCPRedirect: redirect.NewNoop,
-		newUDPRedirect: redirect.NewNoop,
-		session:        hostSession,
-	}
+		// Channels for synchronization
+		chanOffer := make(chan wire.Offer, 1)
+		chanAnswer := make(chan wire.Offer, 1)
 
-	// For player 2 (guest)
-	guestManager := &mockPeerManager{}
-	first, _ := guestManager.CreatePeer(wire.Player{UserID: 1})
-	second, _ := guestManager.CreatePeer(wire.Player{UserID: 2})
-	guestManager.host = first
-	guestManager.peers = map[int64]*Peer{
-		1: first,
-		2: second,
-	}
-
-	guestSession := &mockSession{
-		ID: 2,
-		onSendRTCAnswer: func(offer wire.Offer) {
-			chanAnswer <- offer
-			close(chanAnswer) // Close channel after sending answer
-		},
-	}
-	guestHandler := &PeerToPeerMessageHandler{
-		peerManager:    guestManager,
-		newTCPRedirect: redirect.NewNoop,
-		newUDPRedirect: redirect.NewNoop,
-		session:        guestSession,
-	}
-
-	hostSession.onSendRTCICECandidate = func(ice webrtc.ICECandidateInit, fromUserID int64) {
-		if err := guestHandler.handleRTCCandidate(ctx, ice, fromUserID); err != nil {
-			log.Printf("AddICECandidate returned error: %v", err)
+		// For player1 (host)
+		host := &Peer{UserID: 1, Connected: make(chan struct{})}
+		hostManager := &mockPeerManager{
+			host:  host,
+			peers: map[int64]*Peer{},
 		}
-	}
-	guestSession.onSendRTCICECandidate = func(ice webrtc.ICECandidateInit, fromUserID int64) {
-		if err := hostHandler.handleRTCCandidate(ctx, ice, fromUserID); err != nil {
-			log.Printf("handleRTCCandidate returned error: %v", err)
+		hostSession := &mockSession{ID: 1,
+			onSendRTCOffer: func(offer wire.Offer) {
+				chanOffer <- offer
+				close(chanOffer) // Close channel after sending offer
+			},
 		}
-	}
+		hostHandler := &PeerToPeerMessageHandler{
+			UserID:         1,
+			peerManager:    hostManager,
+			newTCPRedirect: redirect.NewNoop,
+			newUDPRedirect: redirect.NewNoop,
+			session:        hostSession,
+			logger:         slog.With("user", "host"),
+		}
 
-	// New player is joining (host handles join)
-	guest := wire.Player{UserID: 2}
-	if err := hostHandler.handleJoinRoom(ctx, guest); err != nil {
-		t.Errorf("handleJoinRoom returned error: %v", err)
-		return
-	}
+		// For player 2 (guest)
+		guestManager := &mockPeerManager{}
+		first, _ := guestManager.CreatePeer(wire.Player{UserID: 1})
+		second, _ := guestManager.CreatePeer(wire.Player{UserID: 2})
+		guestManager.host = first
+		guestManager.peers = map[int64]*Peer{
+			1: first,
+			2: second,
+		}
 
-	// Send RTC Offer and handle it (guest handles RTC Offer)
-	offer := waitToReceive(chanOffer)
-	if err := guestHandler.handleRTCOffer(ctx, offer, host.UserID); err != nil {
-		log.Printf("handleRTCOffer: %v", err)
-		return
-	}
+		guestSession := &mockSession{
+			ID: 2,
+			onSendRTCAnswer: func(offer wire.Offer) {
+				chanAnswer <- offer
+				close(chanAnswer) // Close channel after sending answer
+			},
+		}
+		guestHandler := &PeerToPeerMessageHandler{
+			UserID:         2,
+			peerManager:    guestManager,
+			newTCPRedirect: redirect.NewNoop,
+			newUDPRedirect: redirect.NewNoop,
+			session:        guestSession,
+			logger:         slog.With("user", "guest"),
+		}
 
-	// Send RTC Answer and handle it (host handles RTC Answer)
-	answer := waitToReceive(chanAnswer)
-	if err := hostHandler.handleRTCAnswer(ctx, answer, guest.UserID); err != nil {
-		log.Printf("handleRTCAnswer: %v", err)
-		return
-	}
+		hostSession.onSendRTCICECandidate = func(ice webrtc.ICECandidateInit, fromUserID int64) {
+			if err := guestHandler.handleRTCCandidate(ctx, ice, fromUserID); err != nil {
+				log.Printf("AddICECandidate returned error: %v", err)
+			}
+		}
+		guestSession.onSendRTCICECandidate = func(ice webrtc.ICECandidateInit, fromUserID int64) {
+			if err := hostHandler.handleRTCCandidate(ctx, ice, fromUserID); err != nil {
+				log.Printf("handleRTCCandidate returned error: %v", err)
+			}
+		}
 
-	fmt.Println("End")
-	time.Sleep(time.Second * 3)
+		// New player is joining (host handles join)
+		guest := wire.Player{UserID: 2}
+		if err := hostHandler.handleJoinRoom(ctx, guest); err != nil {
+			t.Errorf("handleJoinRoom returned error: %v", err)
+			return
+		}
+
+		// Send RTC Offer and handle it (guest handles RTC Offer)
+		offer := waitToReceive(chanOffer)
+		if err := guestHandler.handleRTCOffer(ctx, offer, host.UserID); err != nil {
+			log.Printf("handleRTCOffer: %v", err)
+			return
+		}
+
+		// Send RTC Answer and handle it (host handles RTC Answer)
+		answer := waitToReceive(chanAnswer)
+		if err := hostHandler.handleRTCAnswer(ctx, answer, guest.UserID); err != nil {
+			log.Printf("handleRTCAnswer: %v", err)
+			return
+		}
+
+		select {
+		case <-second.Connected:
+			t.Logf("guest established connection with the host")
+			// return
+		case <-time.After(time.Second * 3):
+			t.Errorf("timed out waiting to connect")
+		}
+
+		var wg sync.WaitGroup
+		wg.Add(2)
+
+		second.Connection.OnDataChannel(func(dc *webrtc.DataChannel) {
+			wg.Done()
+		})
+		wg.Wait()
+	})
 }
 
 func TestPeerToPeerMessageHandler_handleLeave(t *testing.T) {
@@ -205,6 +221,7 @@ func TestPeerToPeerMessageHandler_handleLeave(t *testing.T) {
 		h := &PeerToPeerMessageHandler{
 			session:     &mockSession{ID: 1},
 			peerManager: peerManager,
+			logger:      slog.Default(),
 		}
 
 		leavingPlayer := wire.Player{UserID: 2}
@@ -248,10 +265,12 @@ func TestPeerToPeerMessageHandler_handleHostMigration(t *testing.T) {
 			},
 		}
 		h := &PeerToPeerMessageHandler{
+			UserID:         2,
 			session:        &mockSession{ID: 2},
 			peerManager:    peerManager,
 			newTCPRedirect: redirect.NewNoop,
 			newUDPRedirect: redirect.NewNoop,
+			logger:         slog.Default(),
 		}
 		if err := h.handleHostMigration(t.Context(), newHostPlayer); err != nil {
 			t.Error(err)
