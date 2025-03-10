@@ -247,15 +247,19 @@ func (h *PeerToPeerMessageHandler) handleRTCAnswer(ctx context.Context, offer wi
 	return nil
 }
 
-func (h *PeerToPeerMessageHandler) handleRTCCandidate(ctx context.Context, candidate webrtc.ICECandidateInit, fromUserId int64) error {
-	slog.Debug("RTC_ICE_CANDIDATE", "from", fromUserId)
+func (h *PeerToPeerMessageHandler) handleRTCCandidate(ctx context.Context, candidate webrtc.ICECandidateInit, fromUserID int64) error {
+	logger := slog.With("from", fromUserID, "sessionID", h.session.GetUserID())
+	logger.Debug("Processing RTC_CANDIDATE", "from", fromUserID)
 
-	peer, ok := h.peerManager.GetPeer(fromUserId)
+	peer, ok := h.peerManager.GetPeer(fromUserID)
 	if !ok {
-		return fmt.Errorf("could not find peer %d", fromUserId)
+		return fmt.Errorf("could not find peer %d", fromUserID)
 	}
 
-	return peer.Connection.AddICECandidate(candidate)
+	if err := peer.Connection.AddICECandidate(candidate); err != nil {
+		return fmt.Errorf("could not add ICECandidate: %w", err)
+	}
+	return nil
 }
 
 func (h *PeerToPeerMessageHandler) handleLeaveRoom(ctx context.Context, player wire.Player) error {
