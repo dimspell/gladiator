@@ -113,9 +113,6 @@ func TestPeerToPeerMessageHandler_Handle(t *testing.T) {
 	logger.SetPlainTextLogger(os.Stdout, slog.LevelDebug)
 
 	// Channels for synchronization
-	offerReceived := make(chan struct{}, 1)
-	answerReceived := make(chan struct{}, 1)
-
 	chanOffer := make(chan wire.Offer, 1)
 	chanAnswer := make(chan wire.Offer, 1)
 
@@ -125,18 +122,18 @@ func TestPeerToPeerMessageHandler_Handle(t *testing.T) {
 		host:  host,
 		peers: map[int64]*Peer{},
 	}
-	hostHandler := &PeerToPeerMessageHandler{
-		peerManager:    hostManager,
-		newTCPRedirect: redirect.NewNoop,
-		newUDPRedirect: redirect.NewNoop,
-	}
 	hostSession := &mockSession{ID: 1,
 		onSendRTCOffer: func(offer wire.Offer) {
 			chanOffer <- offer
 			close(chanOffer) // Close channel after sending offer
 		},
 	}
-	hostHandler.session = hostSession
+	hostHandler := &PeerToPeerMessageHandler{
+		peerManager:    hostManager,
+		newTCPRedirect: redirect.NewNoop,
+		newUDPRedirect: redirect.NewNoop,
+		session:        hostSession,
+	}
 
 	// For player 2 (guest)
 	guestManager := &mockPeerManager{}
@@ -148,11 +145,6 @@ func TestPeerToPeerMessageHandler_Handle(t *testing.T) {
 		2: second,
 	}
 
-	guestHandler := &PeerToPeerMessageHandler{
-		peerManager:    guestManager,
-		newTCPRedirect: redirect.NewNoop,
-		newUDPRedirect: redirect.NewNoop,
-	}
 	guestSession := &mockSession{
 		ID: 2,
 		onSendRTCAnswer: func(offer wire.Offer) {
@@ -160,18 +152,19 @@ func TestPeerToPeerMessageHandler_Handle(t *testing.T) {
 			close(chanAnswer) // Close channel after sending answer
 		},
 	}
-	guestHandler.session = guestSession
+	guestHandler := &PeerToPeerMessageHandler{
+		peerManager:    guestManager,
+		newTCPRedirect: redirect.NewNoop,
+		newUDPRedirect: redirect.NewNoop,
+		session:        guestSession,
+	}
 
 	hostSession.onSendRTCICECandidate = func(ice webrtc.ICECandidateInit, fromUserID int64) {
-		waitToReceive(answerReceived) // Wait until answer is received before handling ICE
-
 		if err := guestHandler.handleRTCCandidate(ctx, ice, fromUserID); err != nil {
 			log.Printf("AddICECandidate returned error: %v", err)
 		}
 	}
 	guestSession.onSendRTCICECandidate = func(ice webrtc.ICECandidateInit, fromUserID int64) {
-		waitToReceive(offerReceived) // Wait until offer is received before handling ICE
-
 		if err := hostHandler.handleRTCCandidate(ctx, ice, fromUserID); err != nil {
 			log.Printf("handleRTCCandidate returned error: %v", err)
 		}
@@ -190,8 +183,6 @@ func TestPeerToPeerMessageHandler_Handle(t *testing.T) {
 		log.Printf("handleRTCOffer: %v", err)
 		return
 	}
-	offerReceived <- struct{}{}
-	close(offerReceived)
 
 	// Send RTC Answer and handle it (host handles RTC Answer)
 	answer := waitToReceive(chanAnswer)
@@ -199,8 +190,6 @@ func TestPeerToPeerMessageHandler_Handle(t *testing.T) {
 		log.Printf("handleRTCAnswer: %v", err)
 		return
 	}
-	answerReceived <- struct{}{}
-	close(answerReceived)
 
 	fmt.Println("End")
 	time.Sleep(time.Second * 3)
