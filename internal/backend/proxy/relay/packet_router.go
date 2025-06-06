@@ -264,7 +264,15 @@ func (r *PacketRouter) readMessage(fromID string, pkt RelayPacket) {
 }
 
 func (r *PacketRouter) writeTCP(peerID string, pkt RelayPacket) {
-	host, ok := r.manager.hosts[peerID]
+	//r.manager.mu.Lock()
+	//defer r.manager.mu.Unlock()
+
+	ipAddress, ok := r.manager.peerIPs[peerID]
+	if !ok {
+		r.logger.Warn("ip address if peer not found, nothing to migrate", logging.PeerID(peerID))
+		return
+	}
+	host, ok := r.manager.hosts[ipAddress]
 	if !ok {
 		r.logger.Warn("peer not found, nothing to write", logging.PeerID(peerID))
 		return
@@ -276,7 +284,15 @@ func (r *PacketRouter) writeTCP(peerID string, pkt RelayPacket) {
 }
 
 func (r *PacketRouter) writeUDP(peerID string, pkt RelayPacket) {
-	host, ok := r.manager.hosts[peerID]
+	//r.manager.mu.Lock()
+	//defer r.manager.mu.Unlock()
+
+	ipAddress, ok := r.manager.peerIPs[peerID]
+	if !ok {
+		r.logger.Warn("ip address if peer not found, nothing to migrate", logging.PeerID(peerID))
+		return
+	}
+	host, ok := r.manager.hosts[ipAddress]
 	if !ok {
 		r.logger.Warn("peer not found, nothing to write", logging.PeerID(peerID))
 		return
@@ -340,15 +356,14 @@ func (r *PacketRouter) hostMigration(roomID string, pkt RelayPacket) {
 	}
 
 	// Someone else became a host
-
-	host, ok := r.manager.hosts[newHostID]
-	if !ok {
-		r.logger.Warn("peer not found, nothing to migrate", logging.PeerID(newHostID))
-		return
-	}
 	ipAddress, ok := r.manager.peerIPs[newHostID]
 	if !ok {
 		r.logger.Warn("ip address if peer not found, nothing to migrate", logging.PeerID(newHostID))
+		return
+	}
+	host, ok := r.manager.hosts[ipAddress]
+	if !ok {
+		r.logger.Warn("peer not found, nothing to migrate", logging.PeerID(newHostID))
 		return
 	}
 	r.manager.stopHost(host, ipAddress)
