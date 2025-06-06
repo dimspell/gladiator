@@ -15,7 +15,7 @@ import (
 )
 
 type RelayPacket struct {
-	Type    string `json:"type"` // "join", "leave", "data", "broadcast"
+	Type    string `json:"type"` // "join", "leave", "data", "broadcast", "migrate"
 	RoomID  string `json:"room"` // new!
 	FromID  string `json:"from"`
 	ToID    string `json:"to,omitempty"`
@@ -122,19 +122,19 @@ func (rs *RelayServer) relayLoop(peerID string, stream quic.Stream) {
 			break
 		}
 		if err != nil {
-			rs.logger.Warn("stream error when reading", logging.Error(err), slog.String("remoteID", peerID))
+			rs.logger.Warn("stream error when reading", logging.Error(err), logging.PeerID(peerID))
 			break
 		}
 
 		data, ok := verify(buf[:n])
 		if !ok {
-			rs.logger.Warn("signature check failed when reading", slog.String("remoteID", peerID))
+			rs.logger.Warn("signature check failed when reading", logging.PeerID(peerID))
 			continue
 		}
 
 		var pkt RelayPacket
 		if err := json.Unmarshal(data, &pkt); err != nil {
-			rs.logger.Warn("relay packet unmarshal error", logging.Error(err), slog.String("remoteID", peerID))
+			rs.logger.Warn("relay packet unmarshal error", logging.Error(err), logging.PeerID(peerID))
 			continue
 		}
 
@@ -164,13 +164,13 @@ func (rs *RelayServer) joinRoom(roomID, peerID string, stream quic.Stream) {
 	if !ok {
 		room = &Room{ID: roomID, Peers: make(map[string]*PeerConn)}
 		rs.rooms[roomID] = room
-		rs.logger.Info("new room created", slog.String("roomID", roomID), slog.String("peerID", peerID))
+		rs.logger.Info("new room created", logging.RoomID(roomID), logging.PeerID(peerID))
 	}
 
 	role := "guest"
 	if len(room.Peers) == 0 {
 		role = "host"
-		rs.logger.Info("user will become a host", slog.String("roomID", roomID), slog.String("peerID", peerID))
+		rs.logger.Info("user will become a host", logging.RoomID(roomID), logging.PeerID(peerID))
 	}
 
 	room.Peers[peerID] = &PeerConn{
@@ -180,7 +180,7 @@ func (rs *RelayServer) joinRoom(roomID, peerID string, stream quic.Stream) {
 		Stream: stream,
 	}
 	rs.peerToRooms[peerID] = roomID
-	rs.logger.Info("joined room", slog.String("roomID", roomID), slog.String("peerID", peerID))
+	rs.logger.Info("joined room", logging.RoomID(roomID), logging.PeerID(peerID))
 
 	// Notify about the new dynamic joiner
 	for _, peer := range room.Peers {
@@ -205,7 +205,7 @@ func (rs *RelayServer) leaveRoom(peerID, roomID string) {
 
 	room, ok := rs.rooms[roomID]
 	if !ok {
-		rs.logger.Warn("peer leaving the room which does not exist", slog.String("roomID", roomID), slog.String("peerID", peerID))
+		rs.logger.Warn("peer leaving the room which does not exist", logging.RoomID(roomID), logging.PeerID(peerID))
 		return
 	}
 
@@ -217,11 +217,11 @@ func (rs *RelayServer) leaveRoom(peerID, roomID string) {
 
 	delete(room.Peers, peerID)
 	delete(rs.peerToRooms, peerID)
-	rs.logger.Info("peer left room", slog.String("roomID", roomID), slog.String("peerID", peerID))
+	rs.logger.Info("peer left room", logging.RoomID(roomID), logging.PeerID(peerID))
 
 	if len(room.Peers) == 0 {
 		delete(rs.rooms, roomID)
-		rs.logger.Info("room deleted (empty)", slog.String("roomID", roomID))
+		rs.logger.Info("room deleted (empty)", logging.RoomID(roomID))
 		return
 	}
 
@@ -234,7 +234,7 @@ func (rs *RelayServer) leaveRoom(peerID, roomID string) {
 
 		// Migrate host
 		newHost.Role = "host"
-		rs.logger.Info("peer promoted to host", slog.String("newHostID", newHost.ID), slog.String("roomID", roomID))
+		rs.logger.Info("peer promoted to host", slog.String("newHostID", newHost.ID), logging.RoomID(roomID))
 
 		// Notify about the new host
 		for _, peer := range room.Peers {
@@ -259,7 +259,7 @@ func (rs *RelayServer) electNewHost(room *Room) *PeerConn {
 }
 
 func (rs *RelayServer) disconnected(peerID string) {
-	rs.logger.Info("disconnected from relay", slog.String("peerID", peerID))
+	rs.logger.Info("disconnected from relay", logging.PeerID(peerID))
 
 	rs.mu.Lock()
 	roomID, ok := rs.peerToRooms[peerID]
@@ -282,7 +282,7 @@ func (rs *RelayServer) cleanupPeers() {
 		for roomID, room := range rs.rooms {
 			for peerID, peer := range room.Peers {
 				if timeout.After(peer.LastSeen) {
-					rs.logger.Info("peer timed out", slog.String("peerID", peerID), slog.String("roomID", roomID))
+					rs.logger.Info("peer timed out", logging.PeerID(peerID), logging.RoomID(roomID))
 					toLeave = append(toLeave, peer)
 				}
 			}
