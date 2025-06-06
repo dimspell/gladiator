@@ -101,8 +101,10 @@ func (rs *RelayServer) handleConn(ctx context.Context, conn quic.Connection) {
 		return
 	}
 
+	rs.logger.Debug("Received packet", "data", data, "datastr", string(data))
+
 	var pkt RelayPacket
-	if err := json.Unmarshal(data, &pkt); err != nil || pkt.Type != "join" {
+	if err := json.Unmarshal(data, &pkt); err != nil {
 		rs.logger.Warn("first packet unmarshal error", logging.Error(err))
 		return
 	}

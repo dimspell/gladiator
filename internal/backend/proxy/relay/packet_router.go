@@ -177,8 +177,11 @@ func (r *PacketRouter) sendPacket(pkt RelayPacket) error {
 	if err != nil {
 		return fmt.Errorf("marshal packet failed: %w", err)
 	}
-	packet := sign(data)
-	_, err = r.stream.Write(packet)
+	//packet := sign(data)
+
+	r.logger.Debug("Sending packet", "data", data, "datastr", string(data))
+
+	_, err = r.stream.Write(data)
 	if err != nil {
 		return fmt.Errorf("write packet failed: %w", err)
 	}
@@ -201,6 +204,9 @@ func (r *PacketRouter) receiveLoop(stream quic.Stream) {
 			r.logger.Warn("received invalid packet - signature is incorrect")
 			continue
 		}
+
+		r.logger.Debug("Received packet", "data", data, "datastr", string(data))
+
 		var pkt RelayPacket
 		if err := json.Unmarshal(data, &pkt); err != nil {
 			r.logger.Warn("failed to unmarshal packet", logging.Error(err))
