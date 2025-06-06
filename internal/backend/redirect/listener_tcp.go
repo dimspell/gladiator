@@ -53,6 +53,9 @@ func ListenTCP(ipv4 string, portNumber string) (*ListenerTCP, error) {
 func (p *ListenerTCP) Run(ctx context.Context, onReceive func(p []byte) (err error)) error {
 	defer func() {
 		p.logger.Info("Shutting down TCP listener")
+		if p.listener == nil {
+			return
+		}
 		if err := p.listener.Close(); err != nil {
 			p.logger.Error("Error closing listener", "error", err)
 		}
