@@ -163,7 +163,7 @@ func (r *Relay) Join(ctx context.Context, params proxy.JoinParams) (net.IP, erro
 				})
 			}
 
-			if _, err := r.router.manager.StartHost(ipAddress, 6114, 6113, onTCPMessage, onUDPMessage); err != nil {
+			if _, err := r.router.manager.StartHost(peerID, ipAddress, 6114, 6113, onTCPMessage, onUDPMessage); err != nil {
 				return nil, err
 			}
 		} else {
@@ -176,7 +176,7 @@ func (r *Relay) Join(ctx context.Context, params proxy.JoinParams) (net.IP, erro
 				})
 			}
 
-			if _, err := r.router.manager.StartHost(ipAddress, 0, 6113, nil, onUDPMessage); err != nil {
+			if _, err := r.router.manager.StartHost(peerID, ipAddress, 0, 6113, nil, onUDPMessage); err != nil {
 				return nil, err
 			}
 		}

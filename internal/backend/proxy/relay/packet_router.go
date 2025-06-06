@@ -271,13 +271,9 @@ func (r *PacketRouter) writeTCP(peerID string, pkt RelayPacket) {
 	log.Printf("Manager PeerIPs: %+v", r.manager.peerIPs)
 	log.Printf("Manager IPToPeer: %+v", r.manager.ipToPeerID)
 	log.Printf("Manager Hosts: %+v", r.manager.hosts)
+	log.Printf("Manager Peer Hosts: %+v", r.manager.peerHosts)
 
-	ipAddress, ok := r.manager.peerIPs[peerID]
-	if !ok {
-		r.logger.Warn("ip address if peer not found, nothing to migrate", logging.PeerID(peerID))
-		return
-	}
-	host, ok := r.manager.hosts[ipAddress]
+	host, ok := r.manager.peerHosts[peerID]
 	if !ok {
 		r.logger.Warn("peer not found, nothing to write", logging.PeerID(peerID))
 		return
@@ -292,12 +288,7 @@ func (r *PacketRouter) writeUDP(peerID string, pkt RelayPacket) {
 	//r.manager.mu.Lock()
 	//defer r.manager.mu.Unlock()
 
-	ipAddress, ok := r.manager.peerIPs[peerID]
-	if !ok {
-		r.logger.Warn("ip address if peer not found, nothing to migrate", logging.PeerID(peerID))
-		return
-	}
-	host, ok := r.manager.hosts[ipAddress]
+	host, ok := r.manager.peerHosts[peerID]
 	if !ok {
 		r.logger.Warn("peer not found, nothing to write", logging.PeerID(peerID))
 		return
@@ -334,7 +325,8 @@ func (r *PacketRouter) dynamicJoin(roomID string, peerID string, pkt RelayPacket
 	}
 
 	// TODO: It must be local addr
-	if _, err := r.manager.StartGuestHost("127.0.0.1", 6114, 6113, onTCPMessage, onUDPMessage); err != nil {
+	host, err := r.manager.StartGuestHost(peerID, "127.0.0.1", 6114, 6113, onTCPMessage, onUDPMessage)
+	if err != nil {
 		r.logger.Warn("failed to start guest host", logging.Error(err), logging.PeerID(peerID))
 		// TODO: Unassign IP address
 		return
@@ -342,6 +334,8 @@ func (r *PacketRouter) dynamicJoin(roomID string, peerID string, pkt RelayPacket
 	r.manager.mu.Lock()
 	r.manager.peerIPs[peerID] = ip
 	r.manager.ipToPeerID[ip] = peerID
+	r.manager.hosts[ip] = host
+	r.manager.peerHosts[peerID] = host
 	r.manager.mu.Unlock()
 }
 
@@ -397,7 +391,7 @@ func (r *PacketRouter) hostMigration(roomID string, pkt RelayPacket) {
 	}
 
 	var err error
-	host, err = r.manager.StartHost(ipAddress, 6114, 6113, onTCPMessage, onUDPMessage)
+	host, err = r.manager.StartHost(newHostID, ipAddress, 6114, 6113, onTCPMessage, onUDPMessage)
 	if err != nil {
 		r.logger.Warn("failed to start host", logging.Error(err), logging.PeerID(newHostID))
 		return

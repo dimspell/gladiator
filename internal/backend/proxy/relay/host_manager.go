@@ -19,6 +19,8 @@ import (
 type HostManager struct {
 	// key: ip
 	hosts map[string]*FakeHost
+	// key: remoteID
+	peerHosts map[string]*FakeHost
 
 	// key: remoteID, value: localIP
 	peerIPs map[string]string
@@ -31,6 +33,7 @@ type HostManager struct {
 func NewManager() *HostManager {
 	return &HostManager{
 		hosts:      make(map[string]*FakeHost),
+		peerHosts:  make(map[string]*FakeHost),
 		peerIPs:    make(map[string]string),
 		ipToPeerID: make(map[string]string),
 	}
@@ -75,6 +78,7 @@ func (hm *HostManager) assignIP(remoteID string) (string, error) {
 
 // StartGuestHost adds new dynamic joiner
 func (hm *HostManager) StartGuestHost(
+	peerIP string,
 	ipAddress string,
 	realTCPPort, realUDPPort int,
 	onReceiveTCP, onReceiveUDP func([]byte) error,
@@ -147,11 +151,13 @@ func (hm *HostManager) StartGuestHost(
 	}(host)
 
 	hm.hosts[ipAddress] = host
+	hm.peerHosts[peerIP] = host
 	return host, nil
 }
 
 // StartHost starts a fake host on a loopback IP
 func (hm *HostManager) StartHost(
+	peerID string,
 	ipAddress string,
 	realTCPPort, realUDPPort int,
 	onReceiveTCP, onReceiveUDP func([]byte) error,
@@ -223,6 +229,7 @@ func (hm *HostManager) StartHost(
 	}(host)
 
 	hm.hosts[ipAddress] = host
+	hm.peerHosts[peerID] = host
 	return host, nil
 }
 
