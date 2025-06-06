@@ -2,10 +2,11 @@ package redirect
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"net"
+	"time"
 
 	"golang.org/x/sync/errgroup"
 )
@@ -73,8 +74,13 @@ func (p *DialerUDP) Run(ctx context.Context, onReceive func(p []byte) (err error
 			default:
 				clear(buf)
 
+				p.conn.SetReadDeadline(time.Now().Add(10 * time.Second))
 				n, addr, err := p.conn.ReadFromUDP(buf)
 				if err != nil {
+					var ne net.Error
+					if errors.As(err, &ne) && ne.Timeout() {
+						continue
+					}
 					p.logger.Error("Error reading from UDP server", "error", err)
 					return fmt.Errorf("dial-udp: failed to read UDP message: %w", err)
 				}

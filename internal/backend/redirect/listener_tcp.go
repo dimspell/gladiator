@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net"
 	"sync"
+	"time"
 )
 
 var _ Redirect = (*ListenerTCP)(nil)
@@ -115,8 +116,13 @@ func (p *ListenerTCP) handleConnection(ctx context.Context, conn net.Conn, onRec
 		default:
 			clear(buf)
 
+			conn.SetReadDeadline(time.Now().Add(10 * time.Second))
 			n, err := conn.Read(buf)
 			if err != nil {
+				var ne net.Error
+				if errors.As(err, &ne) && ne.Timeout() {
+					continue
+				}
 				if errors.Is(err, io.EOF) {
 					p.logger.Info("Client closed the connection")
 					return nil

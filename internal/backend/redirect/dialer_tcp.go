@@ -2,6 +2,7 @@ package redirect
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -62,9 +63,13 @@ func (p *DialerTCP) Run(ctx context.Context, onReceive func(p []byte) (err error
 				return fmt.Errorf("tcp-dial: context canceled: %w", ctx.Err())
 			default:
 				clear(buf)
-
+				p.conn.SetReadDeadline(time.Now().Add(10 * time.Second))
 				n, err := p.conn.Read(buf)
 				if err != nil {
+					var ne net.Error
+					if errors.As(err, &ne) && ne.Timeout() {
+						continue
+					}
 					if err == io.EOF {
 						p.logger.Info("Connection closed by server")
 						return nil

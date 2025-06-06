@@ -2,11 +2,12 @@ package redirect
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"net"
 	"sync"
+	"time"
 
 	"golang.org/x/sync/errgroup"
 )
@@ -72,8 +73,13 @@ func (p *ListenerUDP) Run(ctx context.Context, onReceive func(p []byte) (err err
 			default:
 				clear(buf)
 
+				p.conn.SetReadDeadline(time.Now().Add(10 * time.Second))
 				n, remoteAddr, err := p.conn.ReadFromUDP(buf)
 				if err != nil {
+					var ne net.Error
+					if errors.As(err, &ne) && ne.Timeout() {
+						continue
+					}
 					p.logger.Warn("Failed to read UDP message", "error", err)
 					return fmt.Errorf("listen-udp: read error: %w", err)
 				}
