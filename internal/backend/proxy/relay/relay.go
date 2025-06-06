@@ -64,6 +64,7 @@ func (r *Relay) GetHostIP(ip net.IP) net.IP {
 
 func (r *Relay) CreateRoom(params proxy.CreateParams) (net.IP, error) {
 	r.router.Reset()
+	r.router.selfID = remoteID(r.session.UserID)
 	r.router.currentHostID = remoteID(r.session.UserID)
 
 	ctx := context.Background()
@@ -85,6 +86,7 @@ func (r *Relay) HostRoom(ctx context.Context, params proxy.HostParams) error {
 
 func (r *Relay) SelectGame(data proxy.GameData) error {
 	r.router.Reset()
+	r.router.selfID = remoteID(r.session.UserID)
 
 	host, err := data.FindHostUser()
 	if err != nil {
