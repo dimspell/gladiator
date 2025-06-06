@@ -267,6 +267,11 @@ func (r *PacketRouter) writeTCP(peerID string, pkt RelayPacket) {
 	//r.manager.mu.Lock()
 	//defer r.manager.mu.Unlock()
 
+	log.Printf("RelayPacketTCP: %+v", pkt)
+	log.Printf("Manager PeerIPs: %+v", r.manager.peerIPs)
+	log.Printf("Manager IPToPeer: %+v", r.manager.ipToPeerID)
+	log.Printf("Manager Hosts: %+v", r.manager.hosts)
+
 	ipAddress, ok := r.manager.peerIPs[peerID]
 	if !ok {
 		r.logger.Warn("ip address if peer not found, nothing to migrate", logging.PeerID(peerID))
@@ -332,6 +337,10 @@ func (r *PacketRouter) dynamicJoin(roomID string, peerID string, pkt RelayPacket
 		// TODO: Unassign IP address
 		return
 	}
+	r.manager.mu.Lock()
+	r.manager.peerIPs[peerID] = ip
+	r.manager.ipToPeerID[ip] = peerID
+	r.manager.mu.Unlock()
 }
 
 func (r *PacketRouter) leaveRoom(peerID string) {

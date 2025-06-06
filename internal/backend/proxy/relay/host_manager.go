@@ -17,9 +17,14 @@ import (
 )
 
 type HostManager struct {
-	hosts      map[string]*FakeHost // key: ip
-	peerIPs    map[string]string    // key: remoteID, value: localIP
-	ipToPeerID map[string]string    // reverse map - fakeLAN IP => remoteID
+	// key: ip
+	hosts map[string]*FakeHost
+
+	// key: remoteID, value: localIP
+	peerIPs map[string]string
+
+	// reverse map - fakeLAN IP => remoteID
+	ipToPeerID map[string]string
 	mu         sync.Mutex
 }
 
