@@ -73,9 +73,9 @@ func (hm *HostManager) StartGuestHost(
 	ipAddress string,
 	realTCPPort, realUDPPort int,
 	onReceiveTCP, onReceiveUDP func([]byte) error,
-) error {
+) (*FakeHost, error) {
 	if net.ParseIP(ipAddress) == nil {
-		return fmt.Errorf("invalid IP address: %s", ipAddress)
+		return nil, fmt.Errorf("invalid IP address: %s", ipAddress)
 	}
 
 	hm.mu.Lock()
@@ -83,7 +83,7 @@ func (hm *HostManager) StartGuestHost(
 
 	if _, exists := hm.hosts[ipAddress]; exists {
 		log.Printf("Already started guest IP %s\n", ipAddress)
-		return fmt.Errorf("host %s already running", ipAddress)
+		return nil, fmt.Errorf("host %s already running", ipAddress)
 	}
 
 	var err error
@@ -93,7 +93,7 @@ func (hm *HostManager) StartGuestHost(
 	if realTCPPort > 0 {
 		tcpProxy, err = redirect.DialTCP(ipAddress, strconv.Itoa(realTCPPort))
 		if err != nil {
-			return fmt.Errorf("failed to dial TCP: %w", err)
+			return nil, fmt.Errorf("failed to dial TCP: %w", err)
 		}
 	}
 
@@ -101,7 +101,7 @@ func (hm *HostManager) StartGuestHost(
 	if realUDPPort > 0 {
 		udpProxy, err = redirect.DialUDP(ipAddress, strconv.Itoa(realUDPPort))
 		if err != nil {
-			return fmt.Errorf("failed to dial UDP: %w", err)
+			return nil, fmt.Errorf("failed to dial UDP: %w", err)
 		}
 	}
 
@@ -142,7 +142,7 @@ func (hm *HostManager) StartGuestHost(
 	}(host)
 
 	hm.hosts[ipAddress] = host
-	return nil
+	return host, nil
 }
 
 // StartHost starts a fake host on a loopback IP
@@ -150,16 +150,16 @@ func (hm *HostManager) StartHost(
 	ipAddress string,
 	realTCPPort, realUDPPort int,
 	onReceiveTCP, onReceiveUDP func([]byte) error,
-) error {
+) (*FakeHost, error) {
 	if net.ParseIP(ipAddress) == nil {
-		return fmt.Errorf("invalid IP address: %s", ipAddress)
+		return nil, fmt.Errorf("invalid IP address: %s", ipAddress)
 	}
 
 	hm.mu.Lock()
 	defer hm.mu.Unlock()
 
 	if _, exists := hm.hosts[ipAddress]; exists {
-		return fmt.Errorf("host %s already running", ipAddress)
+		return nil, fmt.Errorf("host %s already running", ipAddress)
 	}
 
 	var err error
@@ -169,7 +169,7 @@ func (hm *HostManager) StartHost(
 	if realTCPPort > 0 {
 		tcpProxy, err = redirect.ListenTCP(ipAddress, strconv.Itoa(realTCPPort))
 		if err != nil {
-			return fmt.Errorf("failed to dial TCP: %w", err)
+			return nil, fmt.Errorf("failed to dial TCP: %w", err)
 		}
 	}
 
@@ -177,7 +177,7 @@ func (hm *HostManager) StartHost(
 	if realUDPPort > 0 {
 		udpProxy, err = redirect.ListenUDP(ipAddress, strconv.Itoa(realUDPPort))
 		if err != nil {
-			return fmt.Errorf("failed to dial UDP: %w", err)
+			return nil, fmt.Errorf("failed to dial UDP: %w", err)
 		}
 	}
 
@@ -218,7 +218,7 @@ func (hm *HostManager) StartHost(
 	}(host)
 
 	hm.hosts[ipAddress] = host
-	return nil
+	return host, nil
 }
 
 func (hm *HostManager) RemoveByIP(ipAddrOrPrefix string) {

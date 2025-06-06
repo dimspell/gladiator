@@ -130,11 +130,13 @@ func (r *Relay) Join(ctx context.Context, params proxy.JoinParams) (net.IP, erro
 		return nil, fmt.Errorf("failed connect to the relay server: %w", err)
 	}
 
-	r.router.sendPacket(RelayPacket{
+	if err := r.router.sendPacket(RelayPacket{
 		Type:    "broadcast",
 		RoomID:  roomID,
 		Payload: []byte("Hello everyone!"),
-	})
+	}); err != nil {
+		return nil, err
+	}
 
 	hostID := remoteID(params.HostUserID)
 
@@ -157,7 +159,7 @@ func (r *Relay) Join(ctx context.Context, params proxy.JoinParams) (net.IP, erro
 				})
 			}
 
-			if err := r.router.manager.StartHost(ipAddress, 6114, 6113, onTCPMessage, onUDPMessage); err != nil {
+			if _, err := r.router.manager.StartHost(ipAddress, 6114, 6113, onTCPMessage, onUDPMessage); err != nil {
 				return nil, err
 			}
 		} else {
@@ -170,7 +172,7 @@ func (r *Relay) Join(ctx context.Context, params proxy.JoinParams) (net.IP, erro
 				})
 			}
 
-			if err := r.router.manager.StartHost(ipAddress, 0, 6113, nil, onUDPMessage); err != nil {
+			if _, err := r.router.manager.StartHost(ipAddress, 0, 6113, nil, onUDPMessage); err != nil {
 				return nil, err
 			}
 		}

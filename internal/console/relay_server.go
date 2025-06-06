@@ -243,7 +243,7 @@ func (rs *RelayServer) leaveRoom(peerID, roomID string) {
 				RoomID:  roomID,
 				FromID:  "system",
 				ToID:    peer.ID,
-				Payload: nil,
+				Payload: []byte(newHost.ID),
 			}
 			rs.sendSigned(peer.Stream, pkt)
 		}
