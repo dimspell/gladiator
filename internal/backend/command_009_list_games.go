@@ -50,7 +50,7 @@ func (b *Backend) HandleListGames(ctx context.Context, session *bsession.Session
 		response = append(response, byte(0))                   // Null byte
 	}
 
-	return session.Send(packet.ListGames, response)
+	return session.SendFromBackend(packet.ListGames, response)
 }
 
 type ListGamesRequest []byte

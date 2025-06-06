@@ -12,7 +12,7 @@ func TestAppendCharacterToLobby(t *testing.T) {
 	conn := &mockConn{}
 	session := &bsession.Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
 
-	assert.NoError(t, session.Send(packet.ReceiveMessage, AppendCharacterToLobby("user", model.ClassTypeMage, 0)))
+	assert.NoError(t, session.SendFromBackend(packet.ReceiveMessage, AppendCharacterToLobby("user", model.ClassTypeMage, 0)))
 	assert.Equal(t, []byte{
 		255, 15, // packet code
 		21, 0, // packet length
@@ -27,7 +27,7 @@ func TestRemoveCharacterFromLobby(t *testing.T) {
 	conn := &mockConn{}
 	session := &bsession.Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
 
-	assert.NoError(t, session.Send(packet.ReceiveMessage, RemoveCharacterFromLobby("user")))
+	assert.NoError(t, session.SendFromBackend(packet.ReceiveMessage, RemoveCharacterFromLobby("user")))
 	assert.Equal(t, []byte{
 		255, 15, // packet code
 		21, 0, // packet length
@@ -42,7 +42,7 @@ func TestNewGlobalMessage(t *testing.T) {
 	conn := &mockConn{}
 	session := &bsession.Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
 
-	assert.NoError(t, session.Send(packet.ReceiveMessage, NewGlobalMessage("admin", "global message")))
+	assert.NoError(t, session.SendFromBackend(packet.ReceiveMessage, NewGlobalMessage("admin", "global message")))
 	assert.Equal(t, []byte{
 		255, 15, // packet code
 		37, 0, // packet length
@@ -58,7 +58,7 @@ func TestNewSystemMessage(t *testing.T) {
 	conn := &mockConn{}
 	session := &bsession.Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
 
-	assert.NoError(t, session.Send(packet.ReceiveMessage, NewLobbyMessage("user", "lobby message")))
+	assert.NoError(t, session.SendFromBackend(packet.ReceiveMessage, NewLobbyMessage("user", "lobby message")))
 	assert.Equal(t, []byte{
 		255, 15, // packet code
 		35, 0, // packet length
@@ -67,7 +67,7 @@ func TestNewSystemMessage(t *testing.T) {
 		0, 0, 0, 0, // unused
 		'u', 's', 'e', 'r', 0, // user name
 		'l', 'o', 'b', 'b', 'y', ' ', 'm', 'e', 's', 's', 'a', 'g', 'e', 0,
-		//'u', 'n', 'k', 'n', 'o', 'w', 'n', 0,
+		// 'u', 'n', 'k', 'n', 'o', 'w', 'n', 0,
 	}, conn.Written)
 }
 
@@ -75,13 +75,13 @@ func TestSetChannelName(t *testing.T) {
 	conn := &mockConn{}
 	session := &bsession.Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
 
-	assert.NoError(t, session.Send(packet.ReceiveMessage, SetChannelName("DISPEL")))
+	assert.NoError(t, session.SendFromBackend(packet.ReceiveMessage, SetChannelName("DISPEL")))
 	assert.Equal(t, []byte{
 		255, 15, // packet code
 		24, 0, // packet length
 		7, 0, 0, 0, // op code
 		0, 0, 0, 0, // unused
-		0, 0, 0, 0, //unused
+		0, 0, 0, 0, // unused
 		0,                               // unused
 		'D', 'I', 'S', 'P', 'E', 'L', 0, // channel name
 	}, conn.Written)

@@ -42,7 +42,7 @@ func (b *Backend) HandleGetCharacterSpells(ctx context.Context, session *bsessio
 		}
 	}
 
-	return session.Send(packet.GetCharacterSpells, character.Spells)
+	return session.SendFromBackend(packet.GetCharacterSpells, character.Spells)
 }
 
 type GetCharacterSpellsRequest []byte

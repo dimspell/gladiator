@@ -13,13 +13,13 @@ func (b *Backend) HandleSelectChannel(ctx context.Context, session *bsession.Ses
 	serverName, channelName, err := req.Parse()
 	slog.Info("Selected channel", "serverName", serverName, "channelName", channelName, "error", err)
 
-	if err := session.Send(packet.ReceiveMessage, SetChannelName(channelName)); err != nil {
+	if err := session.SendFromBackend(packet.ReceiveMessage, SetChannelName(channelName)); err != nil {
 		return err
 	}
 
 	if serverName == "DISPEL" && channelName == "DISPEL" {
 		for idx, user := range session.State.GetLobbyUsers() {
-			session.Send(packet.ReceiveMessage, AppendCharacterToLobby(user.Username, model.ClassType(user.ClassType), uint32(idx)))
+			session.SendFromBackend(packet.ReceiveMessage, AppendCharacterToLobby(user.Username, model.ClassType(user.ClassType), uint32(idx)))
 		}
 		// session.Send(ReceiveMessage, NewGlobalMessage("admin", "hello"))
 	}

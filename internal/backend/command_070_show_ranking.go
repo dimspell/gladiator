@@ -38,7 +38,7 @@ func (b *Backend) HandleShowRanking(ctx context.Context, session *bsession.Sessi
 
 	ranking := model.RankingToBytes(respRanking.Msg)
 
-	return session.Send(packet.ShowRanking, ranking)
+	return session.SendFromBackend(packet.ShowRanking, ranking)
 }
 
 type RankingRequest []byte

@@ -87,7 +87,7 @@ func (b *Backend) HandleJoinGame(ctx context.Context, session *bsession.Session,
 		response = append(response, byte(0))                         // Null byte
 	}
 
-	return session.Send(packet.JoinGame, response)
+	return session.SendFromBackend(packet.JoinGame, response)
 }
 
 type JoinGameRequest []byte
