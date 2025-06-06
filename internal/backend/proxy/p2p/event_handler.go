@@ -45,11 +45,11 @@ type PeerToPeerMessageHandler struct {
 //
 // The sequence of events in a WebRTC connection establishment is crucial:
 //
-// 1. offer creation,
-// 2. offer setting (local description),
-// 3. offer sending,
-// 4. answer receiving,
-// 5. answer setting (remote description),
+// 1. Offer creation,
+// 2. Offer setting (local description),
+// 3. Offer sending,
+// 4. Answer receiving
+// 5. Answer setting (remote description),
 // 6. ICE candidate exchange.
 func (h *PeerToPeerMessageHandler) Handle(ctx context.Context, payload []byte) error {
 	eventType := wire.ParseEventType(payload)
@@ -231,7 +231,7 @@ func (h *PeerToPeerMessageHandler) handleRTCOffer(ctx context.Context, offer wir
 // The RTC answer is usually handled by the host, who received a message from
 // the guest player.
 func (h *PeerToPeerMessageHandler) handleRTCAnswer(ctx context.Context, offer wire.Offer, fromUserID int64) error {
-	h.logger.Debug("Processing RTC_ANSWER", "from", fromUserID)
+	// h.logger.Debug("Processing RTC_ANSWER", "from", fromUserID)
 
 	answer := webrtc.SessionDescription{
 		Type: webrtc.SDPTypeAnswer,
