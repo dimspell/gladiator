@@ -24,7 +24,7 @@ type Backend struct {
 
 	ConnectedSessions sync.Map
 
-	CreateProxy ProxyCreator
+	CreateProxy Proxy
 
 	characterClient multiv1connect.CharacterServiceClient
 	gameClient      multiv1connect.GameServiceClient
@@ -32,7 +32,7 @@ type Backend struct {
 	rankingClient   multiv1connect.RankingServiceClient
 }
 
-func NewBackend(backendAddr, consoleAddr string, createProxy ProxyCreator) *Backend {
+func NewBackend(backendAddr, consoleAddr string, createProxy Proxy) *Backend {
 	characterClient, gameClient, userClient, rankingClient := createServiceClients(consoleAddr)
 
 	return &Backend{

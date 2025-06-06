@@ -75,7 +75,7 @@ func (b *Backend) RegisterNewObserver(ctx context.Context, session *bsession.Ses
 	return session.StartObserver(ctx, observe)
 }
 
-type ProxyCreator interface {
+type Proxy interface {
 	// Create creates a proxy for the session
 	Create(session *bsession.Session) proxy.ProxyClient
 }
