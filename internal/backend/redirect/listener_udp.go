@@ -23,7 +23,7 @@ type ListenerUDP struct {
 	logger *slog.Logger
 }
 
-// ListenUDP initializes a UDP listener on the given IP and port.
+// ListenUDP initializes the UDP listener on the given IP and port.
 func ListenUDP(ipv4 string, portNumber string) (*ListenerUDP, error) {
 	if portNumber == "" {
 		portNumber = "6113"
@@ -50,8 +50,8 @@ func ListenUDP(ipv4 string, portNumber string) (*ListenerUDP, error) {
 	return &p, nil
 }
 
-// Run listens for incoming UDP messages and forwards them.
-func (p *ListenerUDP) Run(ctx context.Context, rw io.Writer) error {
+// Run listens for incoming UDP messages from the game client and forwards them.
+func (p *ListenerUDP) Run(ctx context.Context, onReceive func(p []byte) (err error)) error {
 	defer func() {
 		p.logger.Info("Closing UDP listener")
 		if err := p.conn.Close(); err != nil {
@@ -84,7 +84,7 @@ func (p *ListenerUDP) Run(ctx context.Context, rw io.Writer) error {
 				})
 
 				// Forward the received message
-				if _, err := rw.Write(buf[:n]); err != nil {
+				if err := onReceive(buf[:n]); err != nil {
 					p.logger.Warn("Failed to write message", "error", err, "payload", buf[:n])
 					return fmt.Errorf("listen-udp: write error: %w", err)
 				}
@@ -97,7 +97,7 @@ func (p *ListenerUDP) Run(ctx context.Context, rw io.Writer) error {
 	return g.Wait()
 }
 
-// Write sends a UDP message to the stored remote address.
+// Write sends the UDP packet to the game client (stored remote address).
 func (p *ListenerUDP) Write(msg []byte) (int, error) {
 	if p.addr == nil || p.conn == nil {
 		return 0, fmt.Errorf("listen-udp: no remote address set")

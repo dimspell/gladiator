@@ -47,8 +47,9 @@ func ListenTCP(ipv4 string, portNumber string) (*ListenerTCP, error) {
 	}, nil
 }
 
-// Run listens for incoming TCP connections and handles them.
-func (p *ListenerTCP) Run(ctx context.Context, rw io.Writer) error {
+// Run listens for incoming TCP connection from the game client and forwards the
+// received data.
+func (p *ListenerTCP) Run(ctx context.Context, onReceive func(p []byte) (err error)) error {
 	defer func() {
 		p.logger.Info("Shutting down TCP listener")
 		if err := p.listener.Close(); err != nil {
@@ -83,15 +84,16 @@ func (p *ListenerTCP) Run(ctx context.Context, rw io.Writer) error {
 		p.mu.Unlock()
 
 		go func() {
-			if err := p.handleConnection(ctx, conn, rw); err != nil {
+			if err := p.handleConnection(ctx, conn, onReceive); err != nil {
 				p.logger.Error("Error handling connection", "error", err)
 			}
 		}()
 	}
 }
 
-// handleConnection reads from the TCP connection and writes to the provided io.Writer.
-func (p *ListenerTCP) handleConnection(ctx context.Context, conn net.Conn, dc io.Writer) error {
+// handleConnection reads from the TCP connection and forwards the data received
+// from the game client.
+func (p *ListenerTCP) handleConnection(ctx context.Context, conn net.Conn, onReceive func(p []byte) (err error)) error {
 	defer func() {
 		p.mu.Lock()
 		p.conn = nil
@@ -125,7 +127,7 @@ func (p *ListenerTCP) handleConnection(ctx context.Context, conn net.Conn, dc io
 
 			p.logger.Debug("Received data", "size", n, "data", buf[:n])
 
-			if _, err := dc.Write(buf[:n]); err != nil {
+			if err := onReceive(buf[:n]); err != nil {
 				p.logger.Warn("Failed to write data", "error", err)
 				return fmt.Errorf("listener-tcp: failed to write to data channel: %w", err)
 			}
@@ -133,7 +135,7 @@ func (p *ListenerTCP) handleConnection(ctx context.Context, conn net.Conn, dc io
 	}
 }
 
-// Write sends data to the active TCP connection.
+// Write sends data to the active TCP connection (game client).
 func (p *ListenerTCP) Write(msg []byte) (int, error) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()

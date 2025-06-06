@@ -233,14 +233,16 @@ func (s *Session) SendRTCICECandidate(ctx context.Context, candidate webrtc.ICEC
 
 func (s *Session) SendRTCOffer(ctx context.Context, offer webrtc.SessionDescription, recipientId int64) error {
 	return s.SendEventTo(ctx, wire.RTCOffer, wire.Offer{
-		Player: s.ToPlayer(nil),
-		Offer:  offer,
+		CreatorID:   s.UserID,
+		RecipientID: recipientId,
+		Offer:       offer,
 	}, recipientId)
 }
 
 func (s *Session) SendRTCAnswer(ctx context.Context, answer webrtc.SessionDescription, recipientId int64) error {
 	return s.SendEventTo(ctx, wire.RTCAnswer, wire.Offer{
-		Player: s.ToPlayer(nil),
-		Offer:  answer,
+		CreatorID:   s.UserID,
+		RecipientID: recipientId,
+		Offer:       answer,
 	}, recipientId)
 }

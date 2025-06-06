@@ -428,7 +428,7 @@ func helperStartGameServer(t testing.TB) {
 // 		t.Run(tt.name, func(t *testing.T) {
 // 			p := NewPeerToPeer()
 // 			session := &Session{
-// 				UserID:   1,
+// 				CreatorID:   1,
 // 				Username: "testuser",
 // 				State:    NewState(),
 // 			}

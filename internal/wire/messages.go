@@ -30,8 +30,10 @@ func (m Message) Encode() []byte {
 }
 
 type Offer struct {
-	Player Player                    `json:"player"`
-	Offer  webrtc.SessionDescription `json:"offer"`
+	// CreatorID is the user ID of the author the RTCOffer or RTCAnswer.
+	CreatorID   int64                     `json:"creatorID"`
+	RecipientID int64                     `json:"recipientID"`
+	Offer       webrtc.SessionDescription `json:"offer"`
 }
 
 type User struct {

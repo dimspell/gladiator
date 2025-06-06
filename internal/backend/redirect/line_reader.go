@@ -21,7 +21,7 @@ func NewLineReader(_ Mode, _ *Addressing) (Redirect, error) {
 }
 
 // Run reads from stdin and writes to the provided io.Writer.
-func (p *LineReader) Run(ctx context.Context, rw io.Writer) error {
+func (p *LineReader) Run(ctx context.Context, onReceive func(p []byte) (err error)) error {
 	scanner := bufio.NewScanner(os.Stdin)
 
 	p.logger.Info("LineReader started, waiting for input...")
@@ -33,7 +33,7 @@ func (p *LineReader) Run(ctx context.Context, rw io.Writer) error {
 			return ctx.Err()
 		default:
 			line := scanner.Text()
-			if _, err := rw.Write([]byte(line + "\n")); err != nil {
+			if err := onReceive([]byte(line + "\n")); err != nil {
 				p.logger.Error("Failed to write line", "error", err)
 				return fmt.Errorf("line-reader: failed to write output: %w", err)
 			}

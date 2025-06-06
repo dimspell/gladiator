@@ -59,7 +59,7 @@ func (us *UserSession) Send(ctx context.Context, payload []byte) {
 		return
 	}
 
-	// slog.Debug("Lobby is sending a signal", "to", us.UserID, "type", wire.EventType(payload[0]).String(), "payload", string(payload[1:]))
+	// slog.Debug("Lobby is sending a signal", "to", us.CreatorID, "type", wire.EventType(payload[0]).String(), "payload", string(payload[1:]))
 
 	if err := wire.Write(ctx, us.wsConn, payload); err != nil {
 		slog.Warn("Could not send a WS message", "to", us.UserID, "error", err)

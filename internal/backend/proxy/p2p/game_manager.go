@@ -91,7 +91,7 @@ func (g *GameManager) AddPeer(peer *Peer) {
 	g.Game.Peers[peer.UserID] = peer
 }
 
-// GetPeer retrieves a peer by UserID.
+// GetPeer retrieves a peer by CreatorID.
 func (g *GameManager) GetPeer(userId int64) (*Peer, bool) {
 	if g.Game == nil {
 		return nil, false

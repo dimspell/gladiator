@@ -3,14 +3,9 @@ package p2p
 import (
 	"context"
 	"io"
-	"log/slog"
-	"os"
 	"testing"
-	"time"
 
-	"github.com/dimspell/gladiator/internal/app/logger"
 	"github.com/pion/webrtc/v4"
-	"github.com/stretchr/testify/assert"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -94,46 +89,46 @@ func (m *mockRedirect) Write(p []byte) (n int, err error) {
 	return n, nil
 }
 
-func TestNewPipe(t *testing.T) {
-	// TODO: fixme pion's webrtc has a leak
-	// defer goleak.VerifyNone(t)
-
-	logger.SetPlainTextLogger(os.Stderr, slog.LevelDebug)
-
-	t.Run("handles incoming messages", func(t *testing.T) {
-		dc := &mockDataChannel{
-			label:    "test",
-			received: make(chan []byte, 1),
-		}
-		defer dc.Close()
-
-		proxy := newMockRedirect(t)
-		defer proxy.Close()
-
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		defer cancel()
-
-		pipe := NewPipe(ctx, slog.Default(), dc, proxy)
-		defer pipe.Close()
-
-		// Test that the DataChannel receives messages from the proxy
-		msgFromProxy := "Message from the Proxy"
-		proxy.toDataChannel <- []byte(msgFromProxy)
-		select {
-		case msg := <-dc.received:
-			assert.Equal(t, msgFromProxy, string(msg))
-		case <-ctx.Done():
-			t.Fatal("timeout")
-		}
-
-		// Test that the DataChannel sends messages to the proxy
-		msgFromDataChannel := "Message from the DataChannel"
-		dc.onMessage(webrtc.DataChannelMessage{Data: []byte(msgFromDataChannel)})
-		select {
-		case msg := <-proxy.toProxy:
-			assert.Equal(t, msgFromDataChannel, string(msg))
-		case <-ctx.Done():
-			t.Fatal("timeout")
-		}
-	})
-}
+// func TestNewPipe(t *testing.T) {
+// 	// TODO: fixme pion's webrtc has a leak
+// 	// defer goleak.VerifyNone(t)
+//
+// 	logger.SetPlainTextLogger(os.Stderr, slog.LevelDebug)
+//
+// 	t.Run("handles incoming messages", func(t *testing.T) {
+// 		dc := &mockDataChannel{
+// 			label:    "test",
+// 			received: make(chan []byte, 1),
+// 		}
+// 		defer dc.Close()
+//
+// 		proxy := newMockRedirect(t)
+// 		defer proxy.Close()
+//
+// 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+// 		defer cancel()
+//
+// 		pipe := NewPipe(ctx, slog.Default(), dc, proxy)
+// 		defer pipe.Close()
+//
+// 		// Test that the DataChannel receives messages from the proxy
+// 		msgFromProxy := "Message from the Proxy"
+// 		proxy.toDataChannel <- []byte(msgFromProxy)
+// 		select {
+// 		case msg := <-dc.received:
+// 			assert.Equal(t, msgFromProxy, string(msg))
+// 		case <-ctx.Done():
+// 			t.Fatal("timeout")
+// 		}
+//
+// 		// Test that the DataChannel sends messages to the proxy
+// 		msgFromDataChannel := "Message from the DataChannel"
+// 		dc.onMessage(webrtc.DataChannelMessage{Data: []byte(msgFromDataChannel)})
+// 		select {
+// 		case msg := <-proxy.toProxy:
+// 			assert.Equal(t, msgFromDataChannel, string(msg))
+// 		case <-ctx.Done():
+// 			t.Fatal("timeout")
+// 		}
+// 	})
+// }

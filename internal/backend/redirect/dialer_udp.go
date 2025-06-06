@@ -53,8 +53,8 @@ func DialUDP(ipv4 string, portNumber string) (*DialerUDP, error) {
 	}, nil
 }
 
-// Run handles reading from UDP and writing to the provided io.Writer.
-func (p *DialerUDP) Run(ctx context.Context, dc io.Writer) error {
+// Run handles reading from UDP and forwards data received from the game client.
+func (p *DialerUDP) Run(ctx context.Context, onReceive func(p []byte) (err error)) error {
 	if p.conn == nil {
 		return fmt.Errorf("dial-udp: udp connection is nil")
 	}
@@ -81,8 +81,8 @@ func (p *DialerUDP) Run(ctx context.Context, dc io.Writer) error {
 
 				p.logger.Debug("Received UDP message", "size", n, "from", addr.String())
 
-				if _, err := dc.Write(buf[:n]); err != nil {
-					return fmt.Errorf("dial-udp: failed to write to data channel: %w", err)
+				if err := onReceive(buf[:n]); err != nil {
+					return fmt.Errorf("dial-udp: failed to handle data received from game client: %w", err)
 				}
 			}
 		}
@@ -90,7 +90,7 @@ func (p *DialerUDP) Run(ctx context.Context, dc io.Writer) error {
 	return g.Wait()
 }
 
-// Write sends a message over the UDP connection.
+// Write sends a message over the UDP connection to the game client.
 func (p *DialerUDP) Write(msg []byte) (int, error) {
 	n, err := p.conn.Write(msg)
 	if err != nil {

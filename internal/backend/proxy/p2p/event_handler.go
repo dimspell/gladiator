@@ -135,7 +135,7 @@ func (h *PeerToPeerMessageHandler) handleJoinRoom(ctx context.Context, player wi
 
 	h.peerManager.AddPeer(peer)
 
-	if err := peer.setupPeerConnection(ctx, logger, h.session, player, true); err != nil {
+	if err := peer.setupPeerConnection(ctx, logger, h.session, player.UserID, true); err != nil {
 		return err
 	}
 	if err := peer.createDataChannels(ctx, logger, h.newTCPRedirect, h.newUDPRedirect, h.UserID); err != nil {
@@ -152,47 +152,55 @@ func (h *PeerToPeerMessageHandler) handleJoinRoom(ctx context.Context, player wi
 //
 // The RTC offer is usually handled by the guest player, who responds to a host.
 func (h *PeerToPeerMessageHandler) handleRTCOffer(ctx context.Context, offer wire.Offer, fromUserID int64) error {
-	h.logger.Debug("Processing RTC_OFFER", "from", fromUserID)
-	logger := h.logger.With("from", fromUserID, "player_id", offer.Player.ID())
+	logger := h.logger.With("from", fromUserID, "player_id", offer.CreatorID)
 
 	if err := ctx.Err(); err != nil {
 		return fmt.Errorf("context cancelled while handling RTC offer: %w", err)
 	}
 
-	peer, found := h.peerManager.GetPeer(offer.Player.UserID)
+	peer, found := h.peerManager.GetPeer(offer.CreatorID)
 	if !found {
-		// logger.Warn("Could not add a peer", "userId", offer.Player.UserID, "error", err)
-		return fmt.Errorf("could not add peer: %s", offer.Player.ID())
+		return fmt.Errorf("could find peer to add RTC-Offer: %d", offer.CreatorID)
 	}
-	// peer, err := h.createPeer(h.session, offer.Player)
-	// if err != nil {
-	// 	return err
-	// }
 
-	if err := peer.setupPeerConnection(ctx, logger, h.session, offer.Player, false); err != nil {
+	if err := peer.setupPeerConnection(ctx, logger, h.session, offer.CreatorID, false); err != nil {
 		return err
 	}
 
 	peer.Connection.OnDataChannel(func(dc *webrtc.DataChannel) {
 		logger = h.logger.With("channel_id", dc.Label())
 
-		var redir redirect.Redirect
-		var err error
+		// var redir redirect.Redirect
+		// var err error
 		switch dc.Label() {
-		case peer.channelName("tcp", fromUserID, h.UserID):
-			redir, err = h.newTCPRedirect(peer.Mode, peer.Addr)
+		case peer.channelName("game", fromUserID, h.UserID):
+			redirTCP, err := h.newTCPRedirect(peer.Mode, peer.Addr)
 			if err != nil {
 				logger.Error("Could not create TCP redirect", "error", err)
 				return
 			}
-			peer.PipeTCP = NewPipe(ctx, logger, dc, redir)
-		case peer.channelName("udp", fromUserID, h.UserID):
-			redir, err = h.newUDPRedirect(peer.Mode, peer.Addr)
+			redirUDP, err := h.newUDPRedirect(peer.Mode, peer.Addr)
 			if err != nil {
 				logger.Error("Could not create UDP redirect", "error", err)
 				return
 			}
-			peer.PipeUDP = NewPipe(ctx, logger, dc, redir)
+
+			peer.PipeRouter = NewPipeRouter(ctx, logger, dc, redirTCP, redirUDP)
+
+		// case peer.channelName("tcp", fromUserID, h.CreatorID):
+		// 	redir, err = h.newTCPRedirect(peer.Mode, peer.Addr)
+		// 	if err != nil {
+		// 		logger.Error("Could not create TCP redirect", "error", err)
+		// 		return
+		// 	}
+		// 	peer.PipeTCP = NewPipe(ctx, logger, dc, redir)
+		// case peer.channelName("udp", fromUserID, h.CreatorID):
+		// 	redir, err = h.newUDPRedirect(peer.Mode, peer.Addr)
+		// 	if err != nil {
+		// 		logger.Error("Could not create UDP redirect", "error", err)
+		// 		return
+		// 	}
+		// 	peer.PipeUDP = NewPipe(ctx, logger, dc, redir)
 		default:
 			logger.Error("Unknown channel")
 			return
@@ -239,12 +247,12 @@ func (h *PeerToPeerMessageHandler) handleRTCAnswer(ctx context.Context, offer wi
 	return nil
 }
 
-func (h *PeerToPeerMessageHandler) handleRTCCandidate(ctx context.Context, candidate webrtc.ICECandidateInit, fromUserID int64) error {
-	h.logger.Debug("Processing RTC_CANDIDATE", "from", fromUserID)
+func (h *PeerToPeerMessageHandler) handleRTCCandidate(ctx context.Context, candidate webrtc.ICECandidateInit, otherUserId int64) error {
+	h.logger.Debug("Adding RTC_ICE_CANDIDATE", "forUserId", otherUserId)
 
-	peer, ok := h.peerManager.GetPeer(fromUserID)
+	peer, ok := h.peerManager.GetPeer(otherUserId)
 	if !ok {
-		return fmt.Errorf("could not find peer %d", fromUserID)
+		return fmt.Errorf("could not find peer %d", otherUserId)
 	}
 
 	if err := peer.Connection.AddICECandidate(candidate); err != nil {
@@ -285,7 +293,7 @@ func (h *PeerToPeerMessageHandler) handleHostMigration(ctx context.Context, newH
 		oldPeer.Terminate()
 	}
 
-	// if oldPeer.UserID == h.session.GetUserID() {
+	// if oldPeer.CreatorID == h.session.GetUserID() {
 	//	// I am the host, not sure what to do
 	//	panic("not implemented")
 	// }

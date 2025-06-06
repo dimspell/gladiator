@@ -2,7 +2,6 @@ package redirect
 
 import (
 	"context"
-	"io"
 )
 
 var _ Redirect = (*Noop)(nil)
@@ -21,6 +20,6 @@ func (r *Noop) Close() error {
 	return nil
 }
 
-func (r *Noop) Run(_ context.Context, _ io.Writer) error {
+func (r *Noop) Run(_ context.Context, _ func(p []byte) (err error)) error {
 	return nil
 }

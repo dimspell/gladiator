@@ -217,7 +217,7 @@ func Seed(queries *Queries) error {
 	// 		String: base64.StdEncoding.EncodeToString(inventory.ToBytes()),
 	// 		Valid:  true,
 	// 	},
-	// 	UserID: user2.ID,
+	// 	CreatorID: user2.ID,
 	// })
 	//
 	// gameRoom, err := queries.CreateGameRoom(context.TODO(), CreateGameRoomParams{
@@ -225,7 +225,7 @@ func Seed(queries *Queries) error {
 	// 	Password:      sql.NullString{Valid: false},
 	// 	MapID:         2,
 	// 	HostIpAddress: "192.168.121.169",
-	// 	// UserID:   user2.ID,
+	// 	// CreatorID:   user2.ID,
 	// })
 	// if err != nil {
 	// 	return err

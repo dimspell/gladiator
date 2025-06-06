@@ -100,7 +100,7 @@ func TestBackend_UpdateCharacterInfo(t *testing.T) {
 // func TestSession_SendChatMessage(t *testing.T) {
 //	ctx := context.Background()
 //	wsConn := &mockWS{}
-//	session := &Session{UserID: 1, Username: "hello"}
+//	session := &Session{CreatorID: 1, Username: "hello"}
 //	text := "Hello, World!"
 //	//if err := session.SendChatMessage(context.Background(), "Hello, World!"); err != nil {
 //	//	t.Error(err)
@@ -110,7 +110,7 @@ func TestBackend_UpdateCharacterInfo(t *testing.T) {
 //	if err := wire.Write(ctx, wsConn, wire.ComposeTyped(
 //		wire.Chat,
 //		wire.MessageContent[wire.ChatMessage]{
-//			From: fmt.Sprintf("%d", session.UserID),
+//			From: fmt.Sprintf("%d", session.CreatorID),
 //			Type: wire.Chat,
 //			Content: wire.ChatMessage{
 //				User: session.Username,

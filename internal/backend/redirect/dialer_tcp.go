@@ -42,8 +42,8 @@ func DialTCP(ipv4 string, portNumber string) (*DialerTCP, error) {
 	}, nil
 }
 
-// Run handles reading from TCP and writing to the provided io.Writer.
-func (p *DialerTCP) Run(ctx context.Context, dc io.Writer) error {
+// Run handles reading from TCP and forwards data received from the game client.
+func (p *DialerTCP) Run(ctx context.Context, onReceive func(p []byte) (err error)) error {
 	if p.conn == nil {
 		return fmt.Errorf("tcp-dial: tcp connection is nil")
 	}
@@ -75,8 +75,8 @@ func (p *DialerTCP) Run(ctx context.Context, dc io.Writer) error {
 
 				p.logger.Debug("Received TCP message", "size", n)
 
-				if _, err := dc.Write(buf[:n]); err != nil {
-					return fmt.Errorf("tcp-dial: failed to write to datachannel: %w", err)
+				if err := onReceive(buf[:n]); err != nil {
+					return fmt.Errorf("tcp-dial: failed to handle data received from the game client to: %w", err)
 				}
 			}
 		}
@@ -85,7 +85,7 @@ func (p *DialerTCP) Run(ctx context.Context, dc io.Writer) error {
 	return g.Wait()
 }
 
-// Write sends a message over the TCP connection.
+// Write sends a message over the TCP connection to the game client.
 func (p *DialerTCP) Write(msg []byte) (int, error) {
 	n, err := p.conn.Write(msg)
 	if err != nil {

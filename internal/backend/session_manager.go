@@ -49,7 +49,7 @@ func (b *Backend) RegisterNewObserver(ctx context.Context, session *bsession.Ses
 				return
 			}
 
-			// Read the broadcast & handle them as commands.
+			// Read the broadcast and handle them as commands.
 			p, err := session.ConsumeWebSocket(ctx)
 			if err != nil {
 				if errors.Is(err, context.Canceled) {
