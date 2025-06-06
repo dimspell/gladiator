@@ -567,7 +567,7 @@ func (mp *Multiplayer) DeleteUserSession(id int64) {
 	mp.sessionMutex.Unlock()
 }
 
-// forEachSession is a thread-safe method to iterate over all sessions entries.
+// forEachSession is a thread-safe method to iterate over all session entries.
 func (mp *Multiplayer) forEachSession(f func(session *UserSession) bool) {
 	mp.sessionMutex.RLock()
 	defer mp.sessionMutex.RUnlock()
@@ -578,7 +578,7 @@ func (mp *Multiplayer) forEachSession(f func(session *UserSession) bool) {
 	}
 }
 
-// listSession is a thread-safe method to retrieve the sessions list.
+// listSession is a thread-safe method to retrieve the session list.
 func (mp *Multiplayer) listSessions() []wire.Player {
 	mp.sessionMutex.RLock()
 	defer mp.sessionMutex.RUnlock()

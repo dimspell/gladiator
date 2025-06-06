@@ -22,28 +22,71 @@ import (
 )
 
 type Console struct {
-	Addr               string
-	RunMode            model.RunMode
-	DB                 *database.SQLite
-	CORSAllowedOrigins []string
-	Multiplayer        *Multiplayer
+	Addr    string        // TODO: Move to option
+	RunMode model.RunMode // TODO: Move to option
+	Config  *Config
+
+	DB          *database.SQLite
+	Multiplayer *Multiplayer
+	Relay       *Relay
 }
 
-func NewConsole(db *database.SQLite, addr string) *Console {
-	return &Console{
-		Addr:               addr,
-		DB:                 db,
+func NewConsole(db *database.SQLite, addr string, opts ...Option) *Console {
+	config := &Config{
 		CORSAllowedOrigins: []string{"*"},
-		Multiplayer:        NewMultiplayer(),
+		EnableRelayServer:  true,
+		RelayAddr:          ":9999",
+	}
+	for _, fn := range opts {
+		if err := fn(config); err != nil {
+			panic("failed to initialize config: " + err.Error())
+		}
+	}
+
+	var relay *Relay
+	var err error
+	if config.EnableRelayServer {
+		relay, err = NewRelay(config.RelayAddr)
+		if err != nil {
+			panic("failed to initialize relay: " + err.Error())
+		}
+	}
+
+	return &Console{
+		Addr:        addr,
+		DB:          db,
+		Multiplayer: NewMultiplayer(),
+		Relay:       relay,
+		Config:      config,
 	}
 }
 
-type Option func(*Console) error
+type Option func(*Config) error
+
+type Config struct {
+	CORSAllowedOrigins []string
+	EnableRelayServer  bool
+	RelayAddr          string
+}
 
 // TODO: For production replace it with []string{"https://dispel-multi.net"}
 func WithCORSAllowedOrigins(allowedOrigins []string) Option {
-	return func(c *Console) error {
+	return func(c *Config) error {
 		c.CORSAllowedOrigins = allowedOrigins
+		return nil
+	}
+}
+
+func WithRelayServerEnabled(enableRelayServer bool) Option {
+	return func(c *Config) error {
+		c.EnableRelayServer = enableRelayServer
+		return nil
+	}
+}
+
+func WithRelayAddr(relayAddr string) Option {
+	return func(c *Config) error {
+		c.RelayAddr = relayAddr
 		return nil
 	}
 }
@@ -76,7 +119,7 @@ func (c *Console) HttpRouter() http.Handler {
 		wellKnown := chi.NewRouter()
 		wellKnown.Use(slogchi.New(slog.Default()))
 		wellKnown.Use(cors.New(cors.Options{
-			AllowedOrigins:   c.CORSAllowedOrigins,
+			AllowedOrigins:   c.Config.CORSAllowedOrigins,
 			AllowCredentials: false,
 			Debug:            false,
 			AllowedMethods:   []string{http.MethodGet},
@@ -93,7 +136,7 @@ func (c *Console) HttpRouter() http.Handler {
 		api.Use(middleware.Timeout(5 * time.Second))
 		// api.Use(slogchi.New(slog.Default()))
 		api.Use(cors.New(cors.Options{
-			AllowedOrigins:   c.CORSAllowedOrigins,
+			AllowedOrigins:   c.Config.CORSAllowedOrigins,
 			AllowCredentials: false,
 			Debug:            false,
 			AllowedMethods: []string{
@@ -147,6 +190,7 @@ func (c *Console) Handlers() (start GracefulFunc, shutdown GracefulFunc) {
 		slog.Info("Configured console server", "addr", c.Addr)
 
 		go c.Multiplayer.Run(ctx)
+		go c.Relay.Start(ctx)
 
 		return httpServer.ListenAndServe()
 	}
