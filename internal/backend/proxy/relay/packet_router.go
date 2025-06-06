@@ -222,10 +222,11 @@ func (r *PacketRouter) receiveLoop(stream quic.Stream) {
 				break
 			}
 
-			if pkt.ToID != r.selfID {
-				r.logger.Warn("received packet from other peer does not match our own peer")
-				break
-			}
+			// TODO: Fixme - in broadcast it fails
+			//if pkt.ToID != r.selfID {
+			//	r.logger.Warn("received packet from other peer does not match our own peer")
+			//	break
+			//}
 
 			log.Printf("Received from %s: %s", pkt.FromID, string(pkt.Payload))
 
