@@ -65,22 +65,6 @@ func (hm *HostManager) assignIP(remoteID string) (string, error) {
 	return "", fmt.Errorf("no available IPs")
 }
 
-// func (hm *HostManager) AddRemotePeer(
-// 	remoteID string, port int,
-// 	onReceive func([]byte, *net.UDPAddr) ([]byte, error),
-// 	onTCP func(net.Conn, net.Addr),
-// ) (string, error) {
-// 	ip, err := hm.assignIP(remoteID)
-// 	if err != nil {
-// 		return "", err
-// 	}
-// 	err = hm.StartHost(ip, port, onReceive, onTCP)
-// 	if err != nil {
-// 		return "", err
-// 	}
-// 	return ip, nil
-// }
-
 // StartGuestHost adds new dynamic joiner
 func (hm *HostManager) StartGuestHost(ipAddress string, realTCPPort, realUDPPort int) error {
 	if net.ParseIP(ipAddress) == nil {
@@ -246,10 +230,11 @@ func (hm *HostManager) stopHost(host *FakeHost, ipAddress string) {
 	delete(hm.ipToPeerID, ipAddress)
 	delete(hm.peerIPs, remoteID)
 
-	log.Printf("Guest host at %s cleaned up", ipAddress)
+	log.Printf("Fake host at %s cleaned up", ipAddress)
 }
 
 // CleanupInactive does a cleanup of hosts that haven't been used in X seconds
+// TODO: Unused
 func (hm *HostManager) CleanupInactive(timeout time.Duration) {
 	hm.mu.Lock()
 	defer hm.mu.Unlock()
