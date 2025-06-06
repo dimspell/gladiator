@@ -61,7 +61,7 @@ func ServeCommand() *cli.Command {
 	cmd.Action = func(ctx context.Context, c *cli.Command) error {
 		consoleAddr := c.String("console-addr")
 		backendAddr := c.String("backend-addr")
-		myIpAddr := c.String("my-ip-addr")
+		//myIpAddr := c.String("my-ip-addr")
 
 		var (
 			db  *database.SQLite
