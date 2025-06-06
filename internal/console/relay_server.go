@@ -101,7 +101,7 @@ func (rs *RelayServer) handleConn(ctx context.Context, conn quic.Connection) {
 		return
 	}
 
-	rs.logger.Debug("Received packet", "data", data, "datastr", string(data))
+	rs.logger.Debug("First join packet", "data", data, "datastr", string(data))
 
 	var pkt RelayPacket
 	if err := json.Unmarshal(data, &pkt); err != nil {
@@ -136,6 +136,8 @@ func (rs *RelayServer) relayLoop(peerID string, stream quic.Stream) {
 			rs.logger.Warn("signature check failed when reading", logging.PeerID(peerID))
 			continue
 		}
+
+		rs.logger.Debug("Following relay packets", "data", data, "datastr", string(data))
 
 		var pkt RelayPacket
 		if err := json.Unmarshal(data, &pkt); err != nil {

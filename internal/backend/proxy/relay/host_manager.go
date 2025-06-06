@@ -119,7 +119,7 @@ func (hm *HostManager) StartGuestHost(
 	go func(host *FakeHost) {
 		g.Go(func() error {
 			return tcpProxy.Run(ctx, func(p []byte) (err error) {
-				log.Printf("[TCP]: TODO Received: %s", p)
+				log.Printf("[TCP]: Game sent: %s", p)
 
 				host.LastSeen = time.Now()
 				return onReceiveTCP(p)
@@ -128,7 +128,7 @@ func (hm *HostManager) StartGuestHost(
 
 		g.Go(func() error {
 			return udpProxy.Run(ctx, func(p []byte) (err error) {
-				log.Printf("[UDP]: TODO Received: %s", p)
+				log.Printf("[UDP]: Game sent: %s", p)
 
 				host.LastSeen = time.Now()
 				return onReceiveUDP(p)

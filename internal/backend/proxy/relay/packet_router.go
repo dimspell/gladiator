@@ -179,7 +179,7 @@ func (r *PacketRouter) sendPacket(pkt RelayPacket) error {
 	}
 	//packet := sign(data)
 
-	r.logger.Debug("Sending packet", "data", data, "datastr", string(data))
+	r.logger.Debug("Sending packet", "fromID", pkt.FromID, "data", pkt.Payload, "datastr", string(pkt.Payload), "toId", pkt.ToID)
 
 	_, err = r.stream.Write(data)
 	if err != nil {
