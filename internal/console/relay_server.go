@@ -198,7 +198,7 @@ func (rs *RelayServer) joinRoom(roomID, peerID string, stream quic.Stream) {
 		pkt := RelayPacket{
 			Type:    "join",
 			RoomID:  roomID,
-			FromID:  "system",
+			FromID:  peerID,
 			ToID:    peer.ID,
 			Payload: nil,
 		}
