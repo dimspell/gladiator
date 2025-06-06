@@ -314,6 +314,7 @@ func (r *PacketRouter) dynamicJoin(roomID string, peerID string, pkt RelayPacket
 		r.logger.Warn("failed to assign IP for the peer ", logging.Error(err), logging.PeerID(peerID))
 		return
 	}
+	//ip := "127.0.0.1"
 
 	onTCPMessage := func(p []byte) error {
 		return r.sendPacket(RelayPacket{
@@ -332,7 +333,8 @@ func (r *PacketRouter) dynamicJoin(roomID string, peerID string, pkt RelayPacket
 		})
 	}
 
-	if _, err := r.manager.StartGuestHost(ip, 6114, 6113, onTCPMessage, onUDPMessage); err != nil {
+	// TODO: It must be local addr
+	if _, err := r.manager.StartGuestHost("127.0.0.1", 6114, 6113, onTCPMessage, onUDPMessage); err != nil {
 		r.logger.Warn("failed to start guest host", logging.Error(err), logging.PeerID(peerID))
 		// TODO: Unassign IP address
 		return
