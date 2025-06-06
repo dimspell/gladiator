@@ -339,7 +339,13 @@ func (rs *RelayServer) broadcastFrom(roomID, fromID string, pkt RelayPacket) {
 }
 
 func (rs *RelayServer) sendSigned(stream quic.Stream, pkt RelayPacket) {
-	data, _ := json.Marshal(pkt)
-	packet := sign(data)
-	stream.Write(packet)
+	data, err := json.Marshal(pkt)
+	if err != nil {
+		slog.Error("json marshal failed", logging.Error(err))
+	}
+	//packet := sign(data)
+	if _, err := stream.Write(data); err != nil {
+		slog.Error("could not write the msg", logging.Error(err))
+		return
+	}
 }

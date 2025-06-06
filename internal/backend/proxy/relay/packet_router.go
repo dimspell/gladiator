@@ -1,6 +1,7 @@
 package relay
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"encoding/json"
@@ -181,6 +182,8 @@ func (r *PacketRouter) sendPacket(pkt RelayPacket) error {
 
 	r.logger.Debug("Sending packet", "fromID", pkt.FromID, "data", pkt.Payload, "datastr", string(pkt.Payload), "toId", pkt.ToID)
 
+	data = append(data, '\n')
+
 	_, err = r.stream.Write(data)
 	if err != nil {
 		return fmt.Errorf("write packet failed: %w", err)
@@ -207,40 +210,47 @@ func (r *PacketRouter) receiveLoop(stream quic.Stream) {
 
 		r.logger.Debug("Received packet", "data", data, "datastr", string(data))
 
-		var pkt RelayPacket
-		if err := json.Unmarshal(data, &pkt); err != nil {
-			r.logger.Warn("failed to unmarshal packet", logging.Error(err))
-			continue
-		}
+		d := json.NewDecoder(bytes.NewReader(data))
 
-		if pkt.ToID != r.selfID {
-			r.logger.Warn("received packet from other peer does not match our own peer")
-			continue
-		}
+		for {
+			var pkt RelayPacket
+			if err := d.Decode(&pkt); err != nil {
+				if err == io.EOF {
+					break
+				}
+				r.logger.Warn("failed to unmarshal packet", logging.Error(err))
+				break
+			}
 
-		log.Printf("Received from %s: %s", pkt.FromID, string(pkt.Payload))
+			if pkt.ToID != r.selfID {
+				r.logger.Warn("received packet from other peer does not match our own peer")
+				break
+			}
 
-		switch pkt.Type {
-		case "join":
-			r.dynamicJoin(pkt.RoomID, pkt.FromID, pkt)
+			log.Printf("Received from %s: %s", pkt.FromID, string(pkt.Payload))
 
-		case "data":
-			r.readMessage(pkt.FromID, pkt)
+			switch pkt.Type {
+			case "join":
+				r.dynamicJoin(pkt.RoomID, pkt.FromID, pkt)
 
-		case "tcp":
-			r.writeTCP(pkt.FromID, pkt)
+			case "data":
+				r.readMessage(pkt.FromID, pkt)
 
-		case "udp":
-			r.writeUDP(pkt.FromID, pkt)
+			case "tcp":
+				r.writeTCP(pkt.FromID, pkt)
 
-		case "broadcast":
-			r.readBroadcast(pkt.FromID, pkt)
+			case "udp":
+				r.writeUDP(pkt.FromID, pkt)
 
-		case "leave":
-			r.leaveRoom(pkt.FromID)
+			case "broadcast":
+				r.readBroadcast(pkt.FromID, pkt)
 
-		case "migrate":
-			r.hostMigration(pkt.RoomID, pkt)
+			case "leave":
+				r.leaveRoom(pkt.FromID)
+
+			case "migrate":
+				r.hostMigration(pkt.RoomID, pkt)
+			}
 		}
 	}
 }
