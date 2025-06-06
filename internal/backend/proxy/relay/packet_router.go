@@ -46,24 +46,22 @@ func (r *PacketRouter) Handle(ctx context.Context, payload []byte) error {
 	case wire.CreateRoom:
 		return nil
 	case wire.JoinRoom:
-		return decodeAndHandle(ctx, payload, wire.JoinRoom.String(), r.handleJoinRoom)
+		return decodeAndHandle(ctx, payload, wire.JoinRoom, r.handleJoinRoom)
 	case wire.LeaveRoom, wire.LeaveLobby:
-		return decodeAndHandle(ctx, payload, wire.LeaveRoom.String(), r.handleLeaveRoom)
+		return decodeAndHandle(ctx, payload, wire.LeaveRoom, r.handleLeaveRoom)
 	case wire.HostMigration:
-		return decodeAndHandle(ctx, payload, wire.HostMigration.String(), r.handleHostMigration)
+		return decodeAndHandle(ctx, payload, wire.HostMigration, r.handleHostMigration)
 	default:
 		r.logger.Debug("unknown wire message", "type", eventType.String())
 		return nil
 	}
 }
 
-const errDecodingPayload = "failed to decode payload for event: %s"
-
 // Generic handler for simple event messages
-func decodeAndHandle[T any](ctx context.Context, payload []byte, eventName string, handler func(context.Context, T) error) error {
+func decodeAndHandle[T any](ctx context.Context, payload []byte, eventType wire.EventType, handler func(context.Context, T) error) error {
 	_, msg, err := wire.DecodeTyped[T](payload)
 	if err != nil {
-		slog.Error(fmt.Sprintf(errDecodingPayload, eventName), "error", err, "payload", string(payload))
+		slog.Error(fmt.Sprintf("failed to decode payload for event: %s", eventType.String()), "error", err, "payload", string(payload))
 		return err
 	}
 	return handler(ctx, msg.Content)
@@ -104,6 +102,6 @@ func (r *PacketRouter) OnPeerLeave(peerID string) {
 	r.manager.RemoveByIP(fakeIP)
 }
 
-func (h *PacketRouter) handleHostMigration(ctx context.Context, player wire.Player) error {
+func (r *PacketRouter) handleHostMigration(ctx context.Context, player wire.Player) error {
 	return nil
 }
