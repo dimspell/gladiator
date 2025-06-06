@@ -13,7 +13,7 @@ import (
 )
 
 func TestBackend_HandleJoinGame(t *testing.T) {
-	b, px, _ := helperNewBackend(t)
+	b, _, _ := helperNewBackend(t)
 	b.gameClient = &mockGameClient{
 		GetGameResponse: connect.NewResponse(&v1.GetGameResponse{
 			Game: &v1.Game{
@@ -44,8 +44,10 @@ func TestBackend_HandleJoinGame(t *testing.T) {
 
 	conn := &mockConn{}
 	session := &bsession.Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
+	session.Proxy = b.CreateProxy.Create(session)
 
-	px.BySession[session] = &direct.GameRoom{
+	lan := session.Proxy.(*direct.LAN)
+	lan.GameRoom = &direct.GameRoom{
 		ID:   "gameId",
 		Name: "gameId",
 		Host: wire.Player{

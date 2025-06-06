@@ -26,6 +26,8 @@ func TestE2E_P2P(t *testing.T) {
 
 	helperStartGameServer(t)
 
+	proxy := &p2p.ProxyP2P{}
+
 	// redirectFunc := redirect.New
 
 	db, err := database.NewMemory()
@@ -56,9 +58,8 @@ func TestE2E_P2P(t *testing.T) {
 	// Remove the HTTP schema prefix
 	cs.Addr = ts.URL[len("http://"):]
 
-	proxy1 := p2p.NewPeerToPeer()
 	// proxy1.NewRedirect = redirectFunc
-	bd1 := NewBackend("", cs.Addr, proxy1)
+	bd1 := NewBackend("", cs.Addr, proxy)
 	bd1.SignalServerURL = "ws://" + cs.Addr + "/lobby"
 
 	conn1 := &mockConn{}
@@ -96,7 +97,7 @@ func TestE2E_P2P(t *testing.T) {
 		return
 	}
 
-	// Create new game room
+	// Create a new game room
 	assert.NoError(t, bd1.HandleCreateGame(ctx, session1, CreateGameRequest{
 		0, 0, 0, 0, // State
 		byte(v1.GameMap_FrozenLabyrinth), 0, 0, 0, // Map ID
@@ -130,9 +131,7 @@ func TestE2E_P2P(t *testing.T) {
 	assert.Equal(t, byte(v1.ClassType_Archer), room.Players[1].Character.ClassType)
 
 	// Other user
-	proxy2 := p2p.NewPeerToPeer()
-	// proxy2.NewRedirect = redirectFunc
-	bd2 := NewBackend("", cs.Addr, proxy2)
+	bd2 := NewBackend("", cs.Addr, proxy)
 	bd2.SignalServerURL = "ws://" + cs.Addr + "/lobby"
 
 	conn2 := &mockConn{}

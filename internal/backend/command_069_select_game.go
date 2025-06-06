@@ -33,10 +33,10 @@ func (b *Backend) HandleSelectGame(ctx context.Context, session *bsession.Sessio
 		return nil
 	}
 
-	if err := b.Proxy.SelectGame(proxy.GameData{
+	if err := session.Proxy.SelectGame(proxy.GameData{
 		Game:    respGame.Msg.GetGame(),
 		Players: respGame.Msg.GetPlayers(),
-	}, session); err != nil {
+	}); err != nil {
 		return err
 	}
 
@@ -54,7 +54,7 @@ func (b *Backend) HandleSelectGame(ctx context.Context, session *bsession.Sessio
 			IPAddress:  player.IpAddress,
 			HostUserID: fmt.Sprintf("%d", respGame.Msg.GetGame().HostUserId),
 		}
-		proxyIP, err := b.Proxy.GetPlayerAddr(ps, session)
+		proxyIP, err := session.Proxy.GetPlayerAddr(ps)
 
 		if err != nil {
 			slog.Warn("Not found a player with the provided ID",

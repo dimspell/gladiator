@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
-	"sync"
 	"time"
 
 	"github.com/dimspell/gladiator/internal/backend/bsession"
@@ -14,7 +13,13 @@ import (
 	"github.com/pion/webrtc/v4"
 )
 
-var _ proxy.Proxy = (*PeerToPeer)(nil)
+var _ proxy.ProxyClient = (*PeerToPeer)(nil)
+
+type ProxyP2P struct{}
+
+func (p *ProxyP2P) Create(session *bsession.Session) proxy.ProxyClient {
+	return NewPeerToPeer(session)
+}
 
 // PeerToPeer implements the Proxy interface for WebRTC-based peer-to-peer connections.
 // It manages game rooms, peer connections, and network addressing for multiplayer games
@@ -25,34 +30,51 @@ type PeerToPeer struct {
 	WebRTCConfig   webrtc.Configuration
 	NewTCPRedirect redirect.NewRedirect
 	NewUDPRedirect redirect.NewRedirect
-	SessionStore   *SessionStore
+
+	Session      *bsession.Session
+	GameManager  *GameManager
+	EventHandler *PeerToPeerMessageHandler
 }
 
-func NewPeerToPeer(iceServers ...webrtc.ICEServer) *PeerToPeer {
+func NewPeerToPeer(session *bsession.Session, iceServers ...webrtc.ICEServer) *PeerToPeer {
 	config := webrtc.Configuration{}
 	config.ICEServers = append(config.ICEServers, iceServers...)
 
-	return &PeerToPeer{
+	gameManager := &GameManager{
+		session: session,
+		config:  config,
+	}
+
+	p := &PeerToPeer{
 		hostIPAddress:  net.IPv4(127, 0, 1, 2),
 		WebRTCConfig:   config,
 		NewTCPRedirect: redirect.NewTCPRedirect,
 		NewUDPRedirect: redirect.NewUDPRedirect,
-		SessionStore:   &SessionStore{sessions: make(map[*bsession.Session]*GameManager)},
+		Session:        session,
+		GameManager:    gameManager,
 	}
+
+	handler := &PeerToPeerMessageHandler{
+		p.Session.GetUserID(),
+		p.Session,
+		p.GameManager,
+		p.NewTCPRedirect,
+		p.NewUDPRedirect,
+		slog.With("user_id", p.Session.GetUserID()),
+	}
+
+	p.EventHandler = handler
+
+	return p
 }
 
 // CreateRoom creates a new game room and assigns the session as the host.
 // Returns the assigned IP address for the host player
-func (p *PeerToPeer) CreateRoom(params proxy.CreateParams, session *bsession.Session) (net.IP, error) {
-	gameManager, ok := p.SessionStore.Get(session)
-	if !ok {
-		return nil, fmt.Errorf("no game mananged for session: %d", session.GetUserID())
-	}
-
-	gameManager.Reset()
+func (p *PeerToPeer) CreateRoom(params proxy.CreateParams) (net.IP, error) {
+	p.GameManager.Reset()
 
 	ipAddr := net.IPv4(127, 0, 0, 1)
-	hostPlayer := session.ToPlayer(ipAddr)
+	hostPlayer := p.Session.ToPlayer(ipAddr)
 
 	gameRoom := &Game{
 		ID:     params.GameID,
@@ -61,38 +83,29 @@ func (p *PeerToPeer) CreateRoom(params proxy.CreateParams, session *bsession.Ses
 		IpRing: NewIpRing(),
 	}
 
-	gameManager.Game = gameRoom
+	p.GameManager.Game = gameRoom
 
 	return ipAddr, nil
 }
 
-func (p *PeerToPeer) HostRoom(ctx context.Context, params proxy.HostParams, session *bsession.Session) error {
-	gameManager, ok := p.SessionStore.sessions[session]
-	if !ok {
-		return fmt.Errorf("no game mananged for session: %d", session.GetUserID())
-	}
-	if gameManager.Game == nil || gameManager.Game.ID != params.GameID {
+func (p *PeerToPeer) HostRoom(ctx context.Context, params proxy.HostParams) error {
+	if p.GameManager.Game == nil || p.GameManager.Game.ID != params.GameID {
 		return fmt.Errorf("no game room found")
 	}
 
-	if err := session.SendSetRoomReady(ctx, params.GameID); err != nil {
+	if err := p.Session.SendSetRoomReady(ctx, params.GameID); err != nil {
 		return fmt.Errorf("could not send set room ready: %w", err)
 	}
 
 	return nil
 }
 
-func (p *PeerToPeer) GetHostIP(hostIpAddress net.IP, session *bsession.Session) net.IP {
+func (p *PeerToPeer) GetHostIP(hostIpAddress net.IP) net.IP {
 	return p.hostIPAddress
 }
 
-func (p *PeerToPeer) SelectGame(params proxy.GameData, session *bsession.Session) error {
-	gameManager, ok := p.SessionStore.Get(session)
-	if !ok {
-		return fmt.Errorf("no game mananged for session: %d", session.GetUserID())
-	}
-
-	gameManager.Reset()
+func (p *PeerToPeer) SelectGame(params proxy.GameData) error {
+	p.GameManager.Reset()
 
 	hostPlayer, err := params.FindHostUser()
 	if err != nil {
@@ -112,7 +125,7 @@ func (p *PeerToPeer) SelectGame(params proxy.GameData, session *bsession.Session
 			return err
 		}
 
-		isCurrentUser := session.GetUserID() == player.UserID
+		isCurrentUser := p.Session.GetUserID() == player.UserID
 		isHostUser := gameRoom.Host.UserID == player.UserID
 
 		peer, err := NewPeer(peerConnection,
@@ -131,17 +144,13 @@ func (p *PeerToPeer) SelectGame(params proxy.GameData, session *bsession.Session
 		// }
 	}
 
-	gameManager.Game = gameRoom
+	p.GameManager.Game = gameRoom
 
 	return nil
 }
 
-func (p *PeerToPeer) GetPlayerAddr(params proxy.GetPlayerAddrParams, session *bsession.Session) (net.IP, error) {
-	gameManager, ok := p.SessionStore.Get(session)
-	if !ok {
-		return nil, fmt.Errorf("no game mananged for session: %d", session.GetUserID())
-	}
-	peer, ok := gameManager.GetPeer(params.UserID)
+func (p *PeerToPeer) GetPlayerAddr(params proxy.GetPlayerAddrParams) (net.IP, error) {
+	peer, ok := p.GameManager.GetPeer(params.UserID)
 	if !ok {
 		return nil, fmt.Errorf("could not find peer with user ID: %d", params.UserID)
 	}
@@ -149,22 +158,21 @@ func (p *PeerToPeer) GetPlayerAddr(params proxy.GetPlayerAddrParams, session *bs
 	return peer.Addr.IP, nil
 }
 
-func (p *PeerToPeer) Join(ctx context.Context, params proxy.JoinParams, session *bsession.Session) (net.IP, error) {
+func (p *PeerToPeer) Join(ctx context.Context, params proxy.JoinParams) (net.IP, error) {
 	ip := net.IPv4(127, 0, 0, 1)
 
-	gameManager, ok := p.SessionStore.Get(session)
-	if !ok || gameManager.Game == nil {
-		return nil, fmt.Errorf("no game mananged for session: %d", session.GetUserID())
+	if p.GameManager.Game == nil {
+		return nil, fmt.Errorf("no game mananged for session: %d", p.Session.GetUserID())
 	}
 
 	peer := &Peer{
-		UserID: session.GetUserID(),
+		UserID: p.Session.GetUserID(),
 		Addr:   &redirect.Addressing{IP: ip},
 		Mode:   redirect.None,
 	}
-	gameManager.AddPeer(peer)
+	p.GameManager.AddPeer(peer)
 
-	for _, pr := range gameManager.Game.Peers {
+	for _, pr := range p.GameManager.Game.Peers {
 		ch := make(chan struct{}, 1)
 		pr.Connected = ch
 	}
@@ -172,10 +180,10 @@ func (p *PeerToPeer) Join(ctx context.Context, params proxy.JoinParams, session 
 	return ip, nil
 }
 
-func (p *PeerToPeer) ConnectToPlayer(ctx context.Context, params proxy.GetPlayerAddrParams, session *bsession.Session) (net.IP, error) {
-	gameManager, ok := p.SessionStore.Get(session)
+func (p *PeerToPeer) ConnectToPlayer(ctx context.Context, params proxy.GetPlayerAddrParams) (net.IP, error) {
+	gameManager, ok := p.GameManager, p.GameManager != nil
 	if !ok || gameManager.Game == nil {
-		return nil, fmt.Errorf("no game mananged for session: %d", session.GetUserID())
+		return nil, fmt.Errorf("no game mananged for session: %d", p.Session.GetUserID())
 	}
 
 	peer, ok := gameManager.Game.Peers[params.UserID]
@@ -201,57 +209,15 @@ func (p *PeerToPeer) ConnectToPlayer(ctx context.Context, params proxy.GetPlayer
 }
 
 // Close closes the connection for a session.
-func (p *PeerToPeer) Close(session *bsession.Session) {
-	gameManager, ok := p.SessionStore.Get(session)
+func (p *PeerToPeer) Close() {
+	gameManager, ok := p.GameManager, p.GameManager != nil
 	if !ok {
 		return
 	}
 
 	gameManager.Reset()
-
-	p.SessionStore.Delete(session)
 }
 
-func (p *PeerToPeer) NewWebSocketHandler(session *bsession.Session) proxy.MessageHandler {
-	gameManager := &GameManager{
-		session: session,
-		config:  p.WebRTCConfig,
-	}
-
-	p.SessionStore.Add(session, gameManager)
-
-	return &PeerToPeerMessageHandler{
-		session.GetUserID(),
-		session,
-		gameManager,
-		p.NewTCPRedirect,
-		p.NewUDPRedirect,
-		slog.With("user_id", session.GetUserID()),
-	}
-}
-
-// SessionStore manages game managers for different sessions.
-type SessionStore struct {
-	sessions map[*bsession.Session]*GameManager
-	mutex    sync.RWMutex
-}
-
-// Get retrieves a game manager for a session.
-func (ss *SessionStore) Get(session *bsession.Session) (*GameManager, bool) {
-	ss.mutex.RLock()
-	defer ss.mutex.RUnlock()
-	gameManager, exists := ss.sessions[session]
-	return gameManager, exists
-}
-
-func (ss *SessionStore) Add(session *bsession.Session, manager *GameManager) {
-	ss.mutex.Lock()
-	ss.sessions[session] = manager
-	ss.mutex.Unlock()
-}
-
-func (ss *SessionStore) Delete(session *bsession.Session) {
-	ss.mutex.Lock()
-	delete(ss.sessions, session)
-	ss.mutex.Unlock()
+func (p *PeerToPeer) Handle(ctx context.Context, payload []byte) error {
+	return p.EventHandler.Handle(ctx, payload)
 }

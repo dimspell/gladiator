@@ -21,6 +21,8 @@ import (
 func TestWebRTC(t *testing.T) {
 	logger.SetColoredLogger(os.Stderr, slog.LevelDebug, false)
 
+	proxyCreator := &p2p.ProxyP2P{}
+
 	// Create in-memory database
 	db, err := database.NewMemory()
 	if err != nil {
@@ -60,8 +62,7 @@ func TestWebRTC(t *testing.T) {
 	}()
 
 	// Mock the hosting user's proxy - player1
-	proxy1 := p2p.NewPeerToPeer()
-	bd1 := NewBackend("", cs.Addr, proxy1)
+	bd1 := NewBackend("", cs.Addr, proxyCreator)
 	bd1.SignalServerURL = "ws://" + cs.Addr + "/lobby"
 
 	conn1 := &mockConn{}
@@ -90,7 +91,7 @@ func TestWebRTC(t *testing.T) {
 
 	// Create new game room by the player1
 	roomId := "room"
-	if _, err := proxy1.CreateRoom(proxy.CreateParams{GameID: roomId}, session1); err != nil {
+	if _, err := session1.Proxy.CreateRoom(proxy.CreateParams{GameID: roomId}); err != nil {
 		t.Fatalf("failed to create room: %v", err)
 		return
 	}
@@ -113,8 +114,7 @@ func TestWebRTC(t *testing.T) {
 	}
 
 	// Create a joining user, a guest - player2
-	proxy2 := p2p.NewPeerToPeer()
-	bd2 := NewBackend("", cs.Addr, proxy2)
+	bd2 := NewBackend("", cs.Addr, proxyCreator)
 	bd2.SignalServerURL = "ws://" + cs.Addr + "/lobby"
 
 	conn2 := &mockConn{}

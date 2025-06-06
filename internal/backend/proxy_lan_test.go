@@ -49,7 +49,7 @@ func TestE2E_LAN(t *testing.T) {
 	// Remove the HTTP schema prefix
 	cs.Addr = ts.URL[len("http://"):]
 
-	proxy1 := direct.NewLAN("198.51.100.1")
+	proxy1 := &direct.ProxyLAN{"198.51.100.1"}
 	bd1 := NewBackend("", cs.Addr, proxy1)
 	bd1.SignalServerURL = "ws://" + cs.Addr + "/lobby"
 
@@ -119,7 +119,7 @@ func TestE2E_LAN(t *testing.T) {
 	// Other user
 	conn2 := &mockConn{}
 
-	proxy2 := direct.NewLAN("198.51.100.2")
+	proxy2 := &direct.ProxyLAN{"198.51.100.2"}
 	bd2 := NewBackend("", cs.Addr, proxy2)
 	bd2.SignalServerURL = "ws://" + cs.Addr + "/lobby"
 

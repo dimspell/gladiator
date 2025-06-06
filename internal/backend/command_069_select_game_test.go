@@ -41,6 +41,7 @@ func TestBackend_HandleSelectGame(t *testing.T) {
 
 		conn := &mockConn{}
 		session := &bsession.Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "mage"}
+		session.Proxy = b.CreateProxy.Create(session)
 
 		assert.NoError(t, b.HandleSelectGame(context.Background(), session, SelectGameRequest{
 			'r', 'e', 't', 'r', 'e', 'a', 'a', 't', 0, // Game name
@@ -77,6 +78,7 @@ func TestBackend_HandleSelectGame(t *testing.T) {
 		}
 		conn := &mockConn{}
 		session := &bsession.Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
+		session.Proxy = b.CreateProxy.Create(session)
 
 		assert.NoError(t, b.HandleSelectGame(context.Background(), session, SelectGameRequest{
 			103, 97, 109, 101, 82, 111, 111, 109, 0, // Game name

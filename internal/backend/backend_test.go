@@ -134,7 +134,7 @@ func (m *mockCharacterClient) ListCharacters(context.Context, *connect.Request[v
 	return m.ListCharactersResponse, nil
 }
 
-func helperNewBackend(tb testing.TB) (bd *Backend, px *direct.LAN, cs *console.Console) {
+func helperNewBackend(tb testing.TB) (bd *Backend, px *direct.ProxyLAN, cs *console.Console) {
 	tb.Helper()
 
 	cs = &console.Console{
@@ -142,14 +142,14 @@ func helperNewBackend(tb testing.TB) (bd *Backend, px *direct.LAN, cs *console.C
 	}
 	ts := httptest.NewServer(http.HandlerFunc(cs.HandleWebSocket))
 
-	px = direct.NewLAN("198.51.100.1")
+	// Use bogon IP addressing for tests (https://datatracker.ietf.org/doc/rfc6752/).
+	px = &direct.ProxyLAN{"198.51.100.1"}
 
 	bd = &Backend{
 		// Replace the HTTP schema prefix for websocket connection.
 		SignalServerURL: "ws://" + ts.URL[len("http://"):],
 
-		// Use bogon IP addressing for tests (https://datatracker.ietf.org/doc/rfc6752/).
-		Proxy: px,
+		CreateProxy: px,
 	}
 
 	tb.Cleanup(func() {

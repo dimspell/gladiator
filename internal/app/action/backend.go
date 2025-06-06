@@ -55,8 +55,8 @@ func BackendCommand() *cli.Command {
 			),
 		)
 
-		// bd := backend.NewBackend(backendAddr, consoleAddr, backend.NewLAN(myIpAddr))
-		bd := backend.NewBackend(backendAddr, consoleAddr, p2p.NewPeerToPeer())
+		// bd := backend.NewBackend(backendAddr, consoleAddr, &direct.ProxyLAN{myIpAddr})
+		bd := backend.NewBackend(backendAddr, consoleAddr, &p2p.ProxyP2P{})
 
 		// TODO: Name the URL in the parameters
 		bd.SignalServerURL = defaultLobbyAddr

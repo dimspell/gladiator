@@ -105,7 +105,7 @@ func ServeCommand() *cli.Command {
 			),
 		)
 
-		bd := backend.NewBackend(backendAddr, consoleAddr, direct.NewLAN(myIpAddr))
+		bd := backend.NewBackend(backendAddr, consoleAddr, &direct.ProxyLAN{myIpAddr})
 
 		// TODO: Name the URL in the parameters
 		bd.SignalServerURL = defaultLobbyAddr

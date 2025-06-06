@@ -41,7 +41,7 @@ func TestBackend_HandleListGames(t *testing.T) {
 
 	t.Run("with one game", func(t *testing.T) {
 		b := &Backend{
-			Proxy: direct.NewLAN("127.0.100.1"),
+			CreateProxy: &direct.ProxyLAN{"127.0.100.1"},
 			gameClient: &mockGameClient{
 				ListGamesResponse: connect.NewResponse(&v1.ListGamesResponse{Games: []*v1.Game{
 					{
@@ -55,6 +55,7 @@ func TestBackend_HandleListGames(t *testing.T) {
 			}}
 		conn := &mockConn{}
 		session := &bsession.Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
+		session.Proxy = b.CreateProxy.Create(session)
 
 		assert.NoError(t, b.HandleListGames(context.Background(), session, ListGamesRequest{}))
 		assert.Len(t, conn.Written, 21)
@@ -62,13 +63,13 @@ func TestBackend_HandleListGames(t *testing.T) {
 		assert.Equal(t, []byte{255, 9, 21, 0}, conn.Written[0:4])                           // Header
 		assert.Equal(t, []byte{1, 0, 0, 0}, conn.Written[4:8])                              // Number of games
 		assert.Equal(t, []byte{127, 0, 21, 37}, conn.Written[8:12])                         // Host IP address
-		assert.Equal(t, []byte{'r', 'e', 't', 'r', 'e', 'a', 't', 0, 0}, conn.Written[12:]) // Room name & no password
+		assert.Equal(t, []byte{'r', 'e', 't', 'r', 'e', 'a', 't', 0, 0}, conn.Written[12:]) // Room name and no password
 
 	})
 
 	t.Run("with games", func(t *testing.T) {
 		b := &Backend{
-			Proxy: direct.NewLAN("127.0.100.1"),
+			CreateProxy: &direct.ProxyLAN{"127.0.100.1"},
 			gameClient: &mockGameClient{
 				ListGamesResponse: connect.NewResponse(&v1.ListGamesResponse{Games: []*v1.Game{
 					{
@@ -89,6 +90,7 @@ func TestBackend_HandleListGames(t *testing.T) {
 			}}
 		conn := &mockConn{}
 		session := &bsession.Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
+		session.Proxy = b.CreateProxy.Create(session)
 
 		assert.NoError(t, b.HandleListGames(context.Background(), session, ListGamesRequest{}))
 		assert.Len(t, conn.Written, 39)

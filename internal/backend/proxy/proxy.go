@@ -6,35 +6,33 @@ import (
 	"net"
 
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
-	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/wire"
 )
 
-// Proxy is an interface that defines methods for managing game rooms and player
-// connections. It provides functionality for creating and hosting game rooms,
-// joining game sessions, and retrieving player IP addresses.
-type Proxy interface {
+// ProxyClient is an interface that defines methods for managing game rooms and
+// player connections. It provides functionality for creating and hosting game
+// rooms, joining game sessions, and retrieving player IP addresses.
+type ProxyClient interface {
 	HostProxy
 	SelectProxy
 	JoinProxy
 
-	Close(session *bsession.Session)
-
-	NewWebSocketHandler(session *bsession.Session) MessageHandler
+	Close()
+	Handle(ctx context.Context, payload []byte) error
 }
 
 type HostProxy interface {
-	// GetHostIP is used when game attempts to list the IP address of the game
-	// room. This function can be used to override the IP address.
-	GetHostIP(net.IP, *bsession.Session) net.IP
+	// GetHostIP is used when the game attempts to list the IP address of the
+	// game room. This function can be used to override the IP address.
+	GetHostIP(net.IP) net.IP
 
 	// CreateRoom creates a new game room with the provided parameters and returns
 	// the IP address of the game host.
-	CreateRoom(CreateParams, *bsession.Session) (net.IP, error)
+	CreateRoom(CreateParams) (net.IP, error)
 
 	// HostRoom creates a new game room with the provided parameters and returns
 	// an error if the operation fails.
-	HostRoom(context.Context, HostParams, *bsession.Session) error
+	HostRoom(context.Context, HostParams) error
 }
 
 type CreateParams struct {
@@ -46,13 +44,13 @@ type HostParams struct {
 }
 
 type SelectProxy interface {
-	SelectGame(GameData, *bsession.Session) error
-	GetPlayerAddr(GetPlayerAddrParams, *bsession.Session) (net.IP, error)
+	SelectGame(GameData) error
+	GetPlayerAddr(GetPlayerAddrParams) (net.IP, error)
 }
 
 type JoinProxy interface {
-	Join(context.Context, JoinParams, *bsession.Session) (net.IP, error)
-	ConnectToPlayer(context.Context, GetPlayerAddrParams, *bsession.Session) (net.IP, error)
+	Join(context.Context, JoinParams) (net.IP, error)
+	ConnectToPlayer(context.Context, GetPlayerAddrParams) (net.IP, error)
 }
 
 type GameData struct {
@@ -89,9 +87,7 @@ type GetPlayerAddrParams struct {
 	HostUserID string
 }
 
-type MessageHandler interface {
-	Handle(ctx context.Context, payload []byte) error
-}
+type MessageHandler func(ctx context.Context, payload []byte) error
 
 func toWirePlayer(player *multiv1.Player) wire.Player {
 	return wire.Player{

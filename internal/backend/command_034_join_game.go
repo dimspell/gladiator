@@ -34,11 +34,11 @@ func (b *Backend) HandleJoinGame(ctx context.Context, session *bsession.Session,
 		return err
 	}
 
-	myIpAddr, err := b.Proxy.Join(ctx, proxy.JoinParams{
+	myIpAddr, err := session.Proxy.Join(ctx, proxy.JoinParams{
 		HostUserID: respGame.Msg.GetGame().HostUserId,
 		HostUserIP: respGame.Msg.GetGame().HostIpAddress,
 		GameID:     respGame.Msg.GetGame().GetName(),
-	}, session)
+	})
 	if err != nil {
 		return err
 	}
@@ -65,7 +65,7 @@ func (b *Backend) HandleJoinGame(ctx context.Context, session *bsession.Session,
 			IPAddress:  player.IpAddress,
 			HostUserID: fmt.Sprintf("%d", respGame.Msg.GetGame().HostUserId),
 		}
-		proxyIP, err := b.Proxy.ConnectToPlayer(ctx, ps, session)
+		proxyIP, err := session.Proxy.ConnectToPlayer(ctx, ps)
 		if err != nil {
 			return err
 		}

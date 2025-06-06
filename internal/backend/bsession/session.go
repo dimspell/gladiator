@@ -12,6 +12,7 @@ import (
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/internal/app/logger"
 	"github.com/dimspell/gladiator/internal/backend/packet"
+	"github.com/dimspell/gladiator/internal/backend/proxy"
 	"github.com/dimspell/gladiator/internal/model"
 	"github.com/dimspell/gladiator/internal/wire"
 	"github.com/google/uuid"
@@ -37,6 +38,7 @@ type Session struct {
 	wsConn                *websocket.Conn
 
 	State *SessionState
+	Proxy proxy.ProxyClient
 }
 
 func NewSession(tcpConn net.Conn) *Session {

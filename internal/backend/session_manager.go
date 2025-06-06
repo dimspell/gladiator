@@ -3,7 +3,6 @@ package backend
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net"
 
@@ -14,9 +13,10 @@ import (
 )
 
 func (b *Backend) AddSession(tcpConn net.Conn) *bsession.Session {
-	slog.Debug("New session", "backend", fmt.Sprintf("%p", b.Proxy))
+	slog.Debug("New session")
 
 	session := bsession.NewSession(tcpConn)
+	session.Proxy = b.CreateProxy.Create(session)
 
 	b.ConnectedSessions.Store(session.ID, session)
 	return session
@@ -25,7 +25,9 @@ func (b *Backend) AddSession(tcpConn net.Conn) *bsession.Session {
 func (b *Backend) CloseSession(session *bsession.Session) error {
 	slog.Info("Session closed", "session", session.ID)
 
-	b.Proxy.Close(session)
+	if session.Proxy != nil {
+		session.Proxy.Close()
+	}
 	session.StopObserver()
 
 	b.ConnectedSessions.Delete(session.ID)
@@ -40,8 +42,8 @@ func (b *Backend) ConnectToLobby(ctx context.Context, user *multiv1.User, sessio
 
 func (b *Backend) RegisterNewObserver(ctx context.Context, session *bsession.Session) error {
 	handlers := []proxy.MessageHandler{
-		NewLobbyEventHandler(session),
-		b.Proxy.NewWebSocketHandler(session),
+		NewLobbyEventHandler(session).Handle,
+		session.Proxy.Handle,
 	}
 	observe := func(ctx context.Context, wsConn *websocket.Conn) {
 		for {
@@ -62,8 +64,8 @@ func (b *Backend) RegisterNewObserver(ctx context.Context, session *bsession.Ses
 			// slog.Debug("Signal from lobby", "type", et.String(), "session", session.ID, "payload", string(p[1:]))
 
 			// TODO: Register handlers and handle them here.
-			for _, handler := range handlers {
-				if err := handler.Handle(ctx, p); err != nil {
+			for _, handleFn := range handlers {
+				if err := handleFn(ctx, p); err != nil {
 					slog.Error("Error handling message", "session", session.ID, "error", err)
 					return
 				}
@@ -71,4 +73,9 @@ func (b *Backend) RegisterNewObserver(ctx context.Context, session *bsession.Ses
 		}
 	}
 	return session.StartObserver(ctx, observe)
+}
+
+type ProxyCreator interface {
+	// Create creates a proxy for the session
+	Create(session *bsession.Session) proxy.ProxyClient
 }

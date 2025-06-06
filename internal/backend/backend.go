@@ -14,7 +14,6 @@ import (
 	"github.com/dimspell/gladiator/gen/multi/v1/multiv1connect"
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/packet"
-	"github.com/dimspell/gladiator/internal/backend/proxy"
 )
 
 type Backend struct {
@@ -25,7 +24,7 @@ type Backend struct {
 
 	ConnectedSessions sync.Map
 
-	Proxy proxy.Proxy
+	CreateProxy ProxyCreator
 
 	characterClient multiv1connect.CharacterServiceClient
 	gameClient      multiv1connect.GameServiceClient
@@ -33,12 +32,12 @@ type Backend struct {
 	rankingClient   multiv1connect.RankingServiceClient
 }
 
-func NewBackend(backendAddr, consoleAddr string, gameProxy proxy.Proxy) *Backend {
+func NewBackend(backendAddr, consoleAddr string, createProxy ProxyCreator) *Backend {
 	characterClient, gameClient, userClient, rankingClient := createServiceClients(consoleAddr)
 
 	return &Backend{
-		Addr:  backendAddr,
-		Proxy: gameProxy,
+		Addr:        backendAddr,
+		CreateProxy: createProxy,
 
 		characterClient: characterClient,
 		gameClient:      gameClient,

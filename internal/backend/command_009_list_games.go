@@ -38,7 +38,7 @@ func (b *Backend) HandleListGames(ctx context.Context, session *bsession.Session
 		lobby := model.LobbyRoom{
 			Name:          room.Name,
 			Password:      room.Password,
-			HostIPAddress: b.Proxy.GetHostIP(roomIP, session).To4(),
+			HostIPAddress: session.Proxy.GetHostIP(roomIP).To4(),
 		}
 
 		// response = append(response, lobby.ToBytes()...)
