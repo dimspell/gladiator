@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net"
 	"sync"
+	"time"
 
 	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"github.com/dimspell/gladiator/internal/backend/bsession"
@@ -107,7 +108,10 @@ func (r *PacketRouter) connect(ctx context.Context, roomID string) error {
 		InsecureSkipVerify: true,
 		NextProtos:         []string{"game-relay"},
 	}
-	conn, err := quic.DialAddr(ctx, r.relayAddr, tlsConf, nil)
+	conn, err := quic.DialAddr(ctx, r.relayAddr, tlsConf, &quic.Config{
+		MaxIdleTimeout:  300 * time.Second,
+		KeepAlivePeriod: 250 * time.Second,
+	})
 	if err != nil {
 		return fmt.Errorf("quic dial failed: %w", err)
 	}

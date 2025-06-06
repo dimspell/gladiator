@@ -62,7 +62,9 @@ func (p *ListenerTCP) Run(ctx context.Context, onReceive func(p []byte) (err err
 	go func() {
 		<-ctx.Done()
 		p.logger.Info("Listener shutting down due to context cancellation")
-		p.listener.Close()
+		if p.listener != nil {
+			p.listener.Close()
+		}
 	}()
 
 	for {

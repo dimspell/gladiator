@@ -52,7 +52,10 @@ func NewQUICRelay(addr string) (*RelayServer, error) {
 		Certificates:       []tls.Certificate{generateSelfSigned()},
 	}
 
-	listener, err := quic.ListenAddr(addr, tlsConf, nil)
+	listener, err := quic.ListenAddr(addr, tlsConf, &quic.Config{
+		MaxIdleTimeout:  300 * time.Second,
+		KeepAlivePeriod: 250 * time.Second,
+	})
 	if err != nil {
 		return nil, err
 	}
