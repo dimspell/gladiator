@@ -234,10 +234,10 @@ func (r *PacketRouter) receiveLoop(stream quic.Stream) {
 		// rs.sendTo(pkt.RoomID, pkt.ToID, pkt)
 
 		case "tcp":
-			r.writeTCP(pkt.ToID, pkt)
+			r.writeTCP(pkt.FromID, pkt)
 
 		case "udp":
-			r.writeUDP(pkt.ToID, pkt)
+			r.writeUDP(pkt.FromID, pkt)
 
 		case "broadcast":
 			// rs.broadcastFrom(pkt.RoomID, pkt.FromID, pkt)
