@@ -170,16 +170,16 @@ func verify(packet []byte) ([]byte, bool) {
 }
 
 type RelayPacket struct {
-	Type    string `json:"type"` // "join", "leave", "data", "broadcast", "migrate"
+	Type    string `json:"type"` // "join", "leave", "data", "broadcast", "migrate", "tcp", "udp"
 	RoomID  string `json:"room"`
 	FromID  string `json:"from"`
 	ToID    string `json:"to,omitempty"`
 	Payload []byte `json:"payload"`
 }
 
-func (r *PacketRouter) sendPacket(pkt RelayPacket) {
+func (r *PacketRouter) sendPacket(pkt RelayPacket) error {
 	if r.stream == nil {
-		return
+		return fmt.Errorf("stream is nil")
 	}
 
 	// Always associate who sending the packet
@@ -187,14 +187,14 @@ func (r *PacketRouter) sendPacket(pkt RelayPacket) {
 
 	data, err := json.Marshal(pkt)
 	if err != nil {
-		log.Printf("Marshal error: %v", err)
-		return
+		return fmt.Errorf("marshal packet failed: %w", err)
 	}
 	packet := sign(data)
 	_, err = r.stream.Write(packet)
 	if err != nil {
-		log.Printf("Send error: %v", err)
+		return fmt.Errorf("write packet failed: %w", err)
 	}
+	return nil
 }
 
 func (r *PacketRouter) receiveLoop(stream quic.Stream) {
@@ -231,7 +231,13 @@ func (r *PacketRouter) receiveLoop(stream quic.Stream) {
 			// rs.joinRoom(pkt.RoomID, pkt.FromID, stream)
 
 		case "data":
-			// rs.sendTo(pkt.RoomID, pkt.ToID, pkt)
+		// rs.sendTo(pkt.RoomID, pkt.ToID, pkt)
+
+		case "tcp":
+			r.writeTCP(pkt.ToID, pkt)
+
+		case "udp":
+			r.writeUDP(pkt.ToID, pkt)
 
 		case "broadcast":
 			// rs.broadcastFrom(pkt.RoomID, pkt.FromID, pkt)
@@ -242,5 +248,29 @@ func (r *PacketRouter) receiveLoop(stream quic.Stream) {
 		case "migrate":
 			// host migration
 		}
+	}
+}
+
+func (r *PacketRouter) writeTCP(peerID string, pkt RelayPacket) {
+	host, ok := r.manager.hosts[peerID]
+	if !ok {
+		r.logger.Warn("peer not found, nothing to write", logging.PeerID(peerID))
+		return
+	}
+	if _, err := host.ProxyTCP.Write(pkt.Payload); err != nil {
+		r.logger.Warn("failed to write packet", logging.Error(err))
+		return
+	}
+}
+
+func (r *PacketRouter) writeUDP(peerID string, pkt RelayPacket) {
+	host, ok := r.manager.hosts[peerID]
+	if !ok {
+		r.logger.Warn("peer not found, nothing to write", logging.PeerID(peerID))
+		return
+	}
+	if _, err := host.ProxyUDP.Write(pkt.Payload); err != nil {
+		r.logger.Warn("failed to write packet", logging.Error(err))
+		return
 	}
 }

@@ -4,13 +4,16 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"log/slog"
 	"net"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"github.com/dimspell/gladiator/internal/backend/redirect"
+	"golang.org/x/sync/errgroup"
 )
 
 type HostManager struct {
@@ -31,10 +34,10 @@ func NewManager() *HostManager {
 type FakeHost struct {
 	IP       string
 	LastSeen time.Time
-	StopChan chan struct{}
 
 	ProxyUDP redirect.Redirect
 	ProxyTCP redirect.Redirect
+	StopFunc context.CancelFunc
 }
 
 // func (hm *HostManager) GetHost(key string) *FakeHost {
@@ -66,7 +69,11 @@ func (hm *HostManager) assignIP(remoteID string) (string, error) {
 }
 
 // StartGuestHost adds new dynamic joiner
-func (hm *HostManager) StartGuestHost(ipAddress string, realTCPPort, realUDPPort int) error {
+func (hm *HostManager) StartGuestHost(
+	ipAddress string,
+	realTCPPort, realUDPPort int,
+	onReceiveTCP, onReceiveUDP func([]byte) error,
+) error {
 	if net.ParseIP(ipAddress) == nil {
 		return fmt.Errorf("invalid IP address: %s", ipAddress)
 	}
@@ -79,8 +86,6 @@ func (hm *HostManager) StartGuestHost(ipAddress string, realTCPPort, realUDPPort
 		return fmt.Errorf("host %s already running", ipAddress)
 	}
 
-	ctx := context.TODO()
-
 	var err error
 	var tcpProxy, udpProxy redirect.Redirect
 
@@ -90,13 +95,6 @@ func (hm *HostManager) StartGuestHost(ipAddress string, realTCPPort, realUDPPort
 		if err != nil {
 			return fmt.Errorf("failed to dial TCP: %w", err)
 		}
-
-		go tcpProxy.Run(ctx, func(p []byte) (err error) {
-			log.Printf("[TCP]: TODO Received: %s", p)
-
-			hm.hosts[ipAddress].LastSeen = time.Now()
-			return nil
-		})
 	}
 
 	// UDP dialer
@@ -105,28 +103,54 @@ func (hm *HostManager) StartGuestHost(ipAddress string, realTCPPort, realUDPPort
 		if err != nil {
 			return fmt.Errorf("failed to dial UDP: %w", err)
 		}
-		go udpProxy.Run(ctx, func(p []byte) (err error) {
-			log.Printf("[UDP]: TODO Received: %s", p)
-
-			hm.hosts[ipAddress].LastSeen = time.Now()
-			return nil
-		})
 	}
 
-	// Save connection if needed
-	hm.hosts[ipAddress] = &FakeHost{
+	g, ctx := errgroup.WithContext(context.Background())
+	ctx, cancel := context.WithCancel(ctx)
+
+	host := &FakeHost{
 		IP:       ipAddress,
 		LastSeen: time.Now(),
-		StopChan: make(chan struct{}), // FIXME: Unused
+		StopFunc: cancel,
 		ProxyTCP: tcpProxy,
 		ProxyUDP: udpProxy,
 	}
 
+	go func(host *FakeHost) {
+		g.Go(func() error {
+			return tcpProxy.Run(ctx, func(p []byte) (err error) {
+				log.Printf("[TCP]: TODO Received: %s", p)
+
+				host.LastSeen = time.Now()
+				return onReceiveTCP(p)
+			})
+		})
+
+		g.Go(func() error {
+			return udpProxy.Run(ctx, func(p []byte) (err error) {
+				log.Printf("[UDP]: TODO Received: %s", p)
+
+				host.LastSeen = time.Now()
+				return onReceiveUDP(p)
+			})
+		})
+
+		if err := g.Wait(); err != nil {
+			slog.Warn("UDP/TCP fake host failed", logging.Error(err))
+			return
+		}
+	}(host)
+
+	hm.hosts[ipAddress] = host
 	return nil
 }
 
 // StartHost starts a fake host on a loopback IP
-func (hm *HostManager) StartHost(ipAddress string, realTCPPort, realUDPPort int) error {
+func (hm *HostManager) StartHost(
+	ipAddress string,
+	realTCPPort, realUDPPort int,
+	onReceiveTCP, onReceiveUDP func([]byte) error,
+) error {
 	if net.ParseIP(ipAddress) == nil {
 		return fmt.Errorf("invalid IP address: %s", ipAddress)
 	}
@@ -138,8 +162,6 @@ func (hm *HostManager) StartHost(ipAddress string, realTCPPort, realUDPPort int)
 		return fmt.Errorf("host %s already running", ipAddress)
 	}
 
-	ctx := context.TODO()
-
 	var err error
 	var tcpProxy, udpProxy redirect.Redirect
 
@@ -149,13 +171,6 @@ func (hm *HostManager) StartHost(ipAddress string, realTCPPort, realUDPPort int)
 		if err != nil {
 			return fmt.Errorf("failed to dial TCP: %w", err)
 		}
-
-		go tcpProxy.Run(ctx, func(p []byte) (err error) {
-			log.Printf("[TCP]: TODO Received: %s", p)
-
-			hm.hosts[ipAddress].LastSeen = time.Now()
-			return nil
-		})
 	}
 
 	// UDP listener
@@ -164,21 +179,45 @@ func (hm *HostManager) StartHost(ipAddress string, realTCPPort, realUDPPort int)
 		if err != nil {
 			return fmt.Errorf("failed to dial UDP: %w", err)
 		}
-		go udpProxy.Run(ctx, func(p []byte) (err error) {
-			log.Printf("[UDP]: TODO Received: %s", p)
-
-			hm.hosts[ipAddress].LastSeen = time.Now()
-			return nil
-		})
 	}
 
-	hm.hosts[ipAddress] = &FakeHost{
+	g, ctx := errgroup.WithContext(context.Background())
+	ctx, cancel := context.WithCancel(ctx)
+
+	host := &FakeHost{
 		IP:       ipAddress,
 		LastSeen: time.Now(),
-		StopChan: make(chan struct{}), // FIXME: Unused
+		StopFunc: cancel,
 		ProxyTCP: tcpProxy,
 		ProxyUDP: udpProxy,
 	}
+
+	go func(host *FakeHost) {
+		g.Go(func() error {
+			return tcpProxy.Run(ctx, func(p []byte) (err error) {
+				log.Printf("[TCP]: TODO Received: %s", p)
+
+				host.LastSeen = time.Now()
+				return onReceiveTCP(p)
+			})
+		})
+
+		g.Go(func() error {
+			return udpProxy.Run(ctx, func(p []byte) (err error) {
+				log.Printf("[UDP]: TODO Received: %s", p)
+
+				host.LastSeen = time.Now()
+				return onReceiveUDP(p)
+			})
+		})
+
+		if err := g.Wait(); err != nil {
+			slog.Warn("UDP/TCP fake host failed", logging.Error(err))
+			return
+		}
+	}(host)
+
+	hm.hosts[ipAddress] = host
 	return nil
 }
 
@@ -194,7 +233,7 @@ func (hm *HostManager) RemoveByIP(ipAddrOrPrefix string) {
 }
 
 func (hm *HostManager) RemoveByRemoteID(remoteID string) {
-	log.Printf("Cleaning up guest host for peer %s (%s)", remoteID)
+	log.Printf("Cleaning up guest host for peer %s", remoteID)
 
 	hm.mu.Lock()
 	defer hm.mu.Unlock()
@@ -214,7 +253,8 @@ func (hm *HostManager) RemoveByRemoteID(remoteID string) {
 
 func (hm *HostManager) stopHost(host *FakeHost, ipAddress string) {
 	// Trigger a stop
-	close(host.StopChan)
+	// close(host.StopChan)
+	host.StopFunc()
 
 	// Close the connections
 	if p := host.ProxyTCP; p != nil {

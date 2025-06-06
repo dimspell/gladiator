@@ -15,7 +15,7 @@ import (
 )
 
 type RelayPacket struct {
-	Type    string `json:"type"` // "join", "leave", "data", "broadcast", "migrate"
+	Type    string `json:"type"` // "join", "leave", "data", "broadcast", "migrate", "tcp", "udp"
 	RoomID  string `json:"room"` // new!
 	FromID  string `json:"from"`
 	ToID    string `json:"to,omitempty"`
@@ -142,7 +142,7 @@ func (rs *RelayServer) relayLoop(peerID string, stream quic.Stream) {
 		// case "join":
 		// 	rs.joinRoom(pkt.RoomID, pkt.FromID, stream)
 
-		case "data":
+		case "data", "udp", "tcp":
 			rs.sendTo(pkt.RoomID, pkt.ToID, pkt)
 
 		case "broadcast":

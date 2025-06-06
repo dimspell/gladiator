@@ -140,11 +140,37 @@ func (r *Relay) Join(ctx context.Context, params proxy.JoinParams) (net.IP, erro
 
 	for peerID, ipAddress := range r.router.manager.peerIPs {
 		if peerID == hostID {
-			if err := r.router.manager.StartHost(ipAddress, 6114, 6113); err != nil {
+			onTCPMessage := func(p []byte) error {
+				return r.router.sendPacket(RelayPacket{
+					Type:    "tcp",
+					RoomID:  roomID,
+					ToID:    peerID,
+					Payload: p,
+				})
+			}
+			onUDPMessage := func(p []byte) error {
+				return r.router.sendPacket(RelayPacket{
+					Type:    "udp",
+					RoomID:  roomID,
+					ToID:    peerID,
+					Payload: p,
+				})
+			}
+
+			if err := r.router.manager.StartHost(ipAddress, 6114, 6113, onTCPMessage, onUDPMessage); err != nil {
 				return nil, err
 			}
 		} else {
-			if err := r.router.manager.StartHost(ipAddress, 0, 6113); err != nil {
+			onUDPMessage := func(p []byte) error {
+				return r.router.sendPacket(RelayPacket{
+					Type:    "udp",
+					RoomID:  roomID,
+					ToID:    peerID,
+					Payload: p,
+				})
+			}
+
+			if err := r.router.manager.StartHost(ipAddress, 0, 6113, nil, onUDPMessage); err != nil {
 				return nil, err
 			}
 		}
