@@ -13,11 +13,12 @@ import (
 var _ proxy.ProxyClient = (*Relay)(nil)
 
 type ProxyRelay struct {
+	RelayAddr string
 	// TODO: Manage a list of opened proxies and help to close them
 }
 
 func (p *ProxyRelay) Create(session *bsession.Session) proxy.ProxyClient {
-	return NewRelay(nil, session)
+	return NewRelay(&Config{RelayAddr: p.RelayAddr}, session)
 }
 
 type Relay struct {
@@ -30,6 +31,7 @@ type Relay struct {
 }
 
 type Config struct {
+	RelayAddr string
 }
 
 func NewRelay(config *Config, session *bsession.Session) *Relay {
@@ -38,7 +40,7 @@ func NewRelay(config *Config, session *bsession.Session) *Relay {
 	manager := NewManager()
 
 	router := &PacketRouter{
-		relayAddr: "localhost:9999",
+		relayAddr: config.RelayAddr,
 		logger:    slog.With(slog.String("proxy", "relay"), slog.String("sessionId", session.ID)),
 		selfID:    remoteID(session.UserID),
 		session:   session,
