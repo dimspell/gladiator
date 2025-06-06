@@ -15,7 +15,7 @@ func (b *Backend) HandleListChannels(ctx context.Context, session *bsession.Sess
 		response = append(response, channel...)
 		response = append(response, 0)
 	}
-	return session.SendFromBackend(packet.ListChannels, response)
+	return session.SendToGame(packet.ListChannels, response)
 }
 
 type ListChannelsRequest []byte

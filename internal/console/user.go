@@ -66,12 +66,12 @@ func (s *userServiceServer) AuthenticateUser(ctx context.Context, req *connect.R
 	if err != nil {
 		return nil, connect.NewError(connect.CodeUnauthenticated, fmt.Errorf("incorrect password or username"))
 		// slog.Debug("packet-41: could not find a user", "username", data.Username)
-		// return session.SendFromBackend(ClientAuthentication, []byte{0, 0, 0, 0})
+		// return session.SendToGame(ClientAuthentication, []byte{0, 0, 0, 0})
 	}
 
 	if !auth.CheckPassword(req.Msg.Password, user.Password) {
 		// slog.Debug("packet-41: incorrect password")
-		// return session.SendFromBackend(ClientAuthentication, []byte{0, 0, 0, 0})
+		// return session.SendToGame(ClientAuthentication, []byte{0, 0, 0, 0})
 		return nil, connect.NewError(connect.CodeUnauthenticated, fmt.Errorf("incorrect password or username"))
 	}
 

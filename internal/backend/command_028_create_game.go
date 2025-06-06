@@ -63,7 +63,7 @@ func (b *Backend) HandleCreateGame(ctx context.Context, session *bsession.Sessio
 		break
 	}
 
-	return session.SendFromBackend(packet.CreateGame, response)
+	return session.SendToGame(packet.CreateGame, response)
 }
 
 type CreateGameRequest []byte

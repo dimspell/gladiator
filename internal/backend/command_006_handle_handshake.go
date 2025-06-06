@@ -29,7 +29,7 @@ func (b *Backend) HandleAuthorizationHandshake(session *bsession.Session, req Au
 	}
 
 	if string(data.AuthKey) != "68XIPSID" {
-		if err := session.SendFromBackend(packet.AuthorizationHandshake, []byte{0, 0, 0, 0}); err != nil {
+		if err := session.SendToGame(packet.AuthorizationHandshake, []byte{0, 0, 0, 0}); err != nil {
 			return err
 		}
 
@@ -38,14 +38,14 @@ func (b *Backend) HandleAuthorizationHandshake(session *bsession.Session, req Au
 	}
 
 	if data.VersionNumber != 3 {
-		if err := session.SendFromBackend(packet.AuthorizationHandshake, []byte{0, 0, 0, 0}); err != nil {
+		if err := session.SendToGame(packet.AuthorizationHandshake, []byte{0, 0, 0, 0}); err != nil {
 			return err
 		}
 
 		return fmt.Errorf("packet-6: invalid version number: %d", data.VersionNumber)
 	}
 
-	return session.SendFromBackend(packet.AuthorizationHandshake, []byte("ENET\x00"))
+	return session.SendToGame(packet.AuthorizationHandshake, []byte("ENET\x00"))
 }
 
 type AuthorizationHandshakeRequest []byte

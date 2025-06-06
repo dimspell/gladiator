@@ -65,7 +65,7 @@ func (s *Session) UpdateCharacter(character *multiv1.Character) {
 
 func (s *Session) GetUserID() int64 { return s.UserID }
 
-func (s *Session) SendFromBackend(packetType packet.Code, payload []byte) error {
+func (s *Session) SendToGame(packetType packet.Code, payload []byte) error {
 	return sendPacket(s.Conn, packetType, payload)
 }
 

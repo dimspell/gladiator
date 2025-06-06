@@ -65,7 +65,7 @@ func (l *LanMessageHandler) Handle(ctx context.Context, payload []byte) error {
 		copy(response[0:4], []byte{1, 0, 0, 0})
 		copy(response[4:], ip.To4())
 
-		if err := l.session.SendFromBackend(packet.HostMigration, response); err != nil {
+		if err := l.session.SendToGame(packet.HostMigration, response); err != nil {
 			slog.Error("Failed to send host migration response", "error", err)
 			return nil
 		}

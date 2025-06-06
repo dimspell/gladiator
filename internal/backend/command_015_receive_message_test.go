@@ -12,7 +12,7 @@ func TestAppendCharacterToLobby(t *testing.T) {
 	conn := &mockConn{}
 	session := &bsession.Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
 
-	assert.NoError(t, session.SendFromBackend(packet.ReceiveMessage, AppendCharacterToLobby("user", model.ClassTypeMage, 0)))
+	assert.NoError(t, session.SendToGame(packet.ReceiveMessage, AppendCharacterToLobby("user", model.ClassTypeMage, 0)))
 	assert.Equal(t, []byte{
 		255, 15, // packet code
 		21, 0, // packet length
@@ -27,7 +27,7 @@ func TestRemoveCharacterFromLobby(t *testing.T) {
 	conn := &mockConn{}
 	session := &bsession.Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
 
-	assert.NoError(t, session.SendFromBackend(packet.ReceiveMessage, RemoveCharacterFromLobby("user")))
+	assert.NoError(t, session.SendToGame(packet.ReceiveMessage, RemoveCharacterFromLobby("user")))
 	assert.Equal(t, []byte{
 		255, 15, // packet code
 		21, 0, // packet length
@@ -42,7 +42,7 @@ func TestNewGlobalMessage(t *testing.T) {
 	conn := &mockConn{}
 	session := &bsession.Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
 
-	assert.NoError(t, session.SendFromBackend(packet.ReceiveMessage, NewGlobalMessage("admin", "global message")))
+	assert.NoError(t, session.SendToGame(packet.ReceiveMessage, NewGlobalMessage("admin", "global message")))
 	assert.Equal(t, []byte{
 		255, 15, // packet code
 		37, 0, // packet length
@@ -58,7 +58,7 @@ func TestNewSystemMessage(t *testing.T) {
 	conn := &mockConn{}
 	session := &bsession.Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
 
-	assert.NoError(t, session.SendFromBackend(packet.ReceiveMessage, NewLobbyMessage("user", "lobby message")))
+	assert.NoError(t, session.SendToGame(packet.ReceiveMessage, NewLobbyMessage("user", "lobby message")))
 	assert.Equal(t, []byte{
 		255, 15, // packet code
 		35, 0, // packet length
@@ -75,7 +75,7 @@ func TestSetChannelName(t *testing.T) {
 	conn := &mockConn{}
 	session := &bsession.Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
 
-	assert.NoError(t, session.SendFromBackend(packet.ReceiveMessage, SetChannelName("DISPEL")))
+	assert.NoError(t, session.SendToGame(packet.ReceiveMessage, SetChannelName("DISPEL")))
 	assert.Equal(t, []byte{
 		255, 15, // packet code
 		24, 0, // packet length

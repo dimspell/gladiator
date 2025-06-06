@@ -83,7 +83,7 @@ func (b *Backend) HandleSelectGame(ctx context.Context, session *bsession.Sessio
 		response = append(response, byte(0))                         // Null byte
 	}
 
-	return session.SendFromBackend(packet.SelectGame, response)
+	return session.SendToGame(packet.SelectGame, response)
 }
 
 type SelectGameRequest []byte

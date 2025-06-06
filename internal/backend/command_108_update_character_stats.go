@@ -37,7 +37,7 @@ func (b *Backend) HandleUpdateCharacterStats(ctx context.Context, session *bsess
 		return err
 	}
 
-	return session.SendFromBackend(packet.UpdateCharacterStats, []byte{})
+	return session.SendToGame(packet.UpdateCharacterStats, []byte{})
 }
 
 type UpdateCharacterStatsRequest []byte

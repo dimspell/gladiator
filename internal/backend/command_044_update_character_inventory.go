@@ -31,7 +31,7 @@ func (b *Backend) HandleUpdateCharacterInventory(ctx context.Context, session *b
 		return err
 	}
 
-	return session.SendFromBackend(packet.UpdateCharacterInventory, []byte{1, 0, 0, 0})
+	return session.SendToGame(packet.UpdateCharacterInventory, []byte{1, 0, 0, 0})
 }
 
 type UpdateCharacterInventoryRequest []byte

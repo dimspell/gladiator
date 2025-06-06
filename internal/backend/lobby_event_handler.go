@@ -30,7 +30,7 @@ func (h *LobbyEventHandler) Handle(ctx context.Context, payload []byte) error {
 			return nil
 		}
 		// if err := session.Send(ReceiveMessage, NewGlobalMessage(msg.Content.User, msg.Content.Text)); err != nil {
-		if err := h.Session.SendFromBackend(packet.ReceiveMessage, NewLobbyMessage(msg.Content.User, msg.Content.Text)); err != nil {
+		if err := h.Session.SendToGame(packet.ReceiveMessage, NewLobbyMessage(msg.Content.User, msg.Content.Text)); err != nil {
 			slog.Error("Error writing chat message over the backend wire", "session", h.Session.ID, "error", err)
 			return nil
 		}
@@ -58,7 +58,7 @@ func (h *LobbyEventHandler) Handle(ctx context.Context, payload []byte) error {
 		h.Session.State.UpdateLobbyUsers(lobbyUsers)
 		idx := uint32(len(lobbyUsers))
 
-		if err := h.Session.SendFromBackend(packet.ReceiveMessage, AppendCharacterToLobby(player.Username, model.ClassType(player.ClassType), idx)); err != nil {
+		if err := h.Session.SendToGame(packet.ReceiveMessage, AppendCharacterToLobby(player.Username, model.ClassType(player.ClassType), idx)); err != nil {
 			slog.Warn("Error appending lobby user", "session", h.Session.ID, "error", err)
 			return nil
 		}
@@ -71,7 +71,7 @@ func (h *LobbyEventHandler) Handle(ctx context.Context, payload []byte) error {
 
 		h.Session.State.DeleteLobbyUser(msg.Content.UserID)
 
-		if err := h.Session.SendFromBackend(packet.ReceiveMessage, RemoveCharacterFromLobby(msg.Content.Username)); err != nil {
+		if err := h.Session.SendToGame(packet.ReceiveMessage, RemoveCharacterFromLobby(msg.Content.Username)); err != nil {
 			slog.Warn("Error appending lobby user", "session", h.Session.ID, "error", err)
 			return nil
 		}

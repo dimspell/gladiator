@@ -31,14 +31,14 @@ func (b *Backend) HandleCreateCharacter(ctx context.Context, session *bsession.S
 		}))
 	if err != nil {
 		slog.Error("Could not create a character", "err", err)
-		return session.SendFromBackend(packet.CreateCharacter, []byte{0, 0, 0, 0})
+		return session.SendToGame(packet.CreateCharacter, []byte{0, 0, 0, 0})
 	}
 
 	slog.Info("packet-92: new character created",
 		"character", respChar.Msg.Character.CharacterName,
 		"username", data.Username)
 
-	return session.SendFromBackend(packet.CreateCharacter, []byte{1, 0, 0, 0})
+	return session.SendToGame(packet.CreateCharacter, []byte{1, 0, 0, 0})
 }
 
 // TODO: check if there is any additional not recognised byte at the end like slot number
