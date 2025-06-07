@@ -1,6 +1,7 @@
 package console
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"encoding/json"
@@ -139,24 +140,24 @@ func (rs *RelayServer) relayLoop(peerID string, stream quic.Stream) {
 
 		rs.logger.Debug("Following relay packets", "data", data, "datastr", string(data))
 
-		var pkt RelayPacket
-		if err := json.Unmarshal(data, &pkt); err != nil {
-			rs.logger.Warn("relay packet unmarshal error", logging.Error(err), logging.PeerID(peerID))
-			continue
-		}
+		d := json.NewDecoder(bytes.NewReader(data))
+		for {
+			var pkt RelayPacket
+			if err := d.Decode(&pkt); err != nil {
+				rs.logger.Warn("relay packet unmarshal error", logging.Error(err), logging.PeerID(peerID))
+				break
+			}
 
-		switch pkt.Type {
-		// case "join":
-		// 	rs.joinRoom(pkt.RoomID, pkt.FromID, stream)
+			switch pkt.Type {
+			case "data", "udp", "tcp":
+				rs.sendTo(pkt.RoomID, pkt.ToID, pkt)
 
-		case "data", "udp", "tcp":
-			rs.sendTo(pkt.RoomID, pkt.ToID, pkt)
+			case "broadcast":
+				rs.broadcastFrom(pkt.RoomID, pkt.FromID, pkt)
 
-		case "broadcast":
-			rs.broadcastFrom(pkt.RoomID, pkt.FromID, pkt)
-
-		case "leave":
-			rs.leaveRoom(pkt.FromID, pkt.RoomID)
+			case "leave":
+				rs.leaveRoom(pkt.FromID, pkt.RoomID)
+			}
 		}
 	}
 
@@ -343,7 +344,8 @@ func (rs *RelayServer) sendSigned(stream quic.Stream, pkt RelayPacket) {
 	if err != nil {
 		slog.Error("json marshal failed", logging.Error(err))
 	}
-	//packet := sign(data)
+	// packet := sign(data)
+	data = append(data, '\n')
 	if _, err := stream.Write(data); err != nil {
 		slog.Error("could not write the msg", logging.Error(err))
 		return
