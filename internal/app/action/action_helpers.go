@@ -41,7 +41,7 @@ func selectProxy(c *cli.Command) (p backend.Proxy, err error) {
 	switch c.String("proxy") {
 	case "lan":
 		myIPAddr := c.String("lan-my-ip-addr")
-		if ip := net.ParseIP(myIPAddr); ip == nil || len(ip) != 4 {
+		if ip := net.ParseIP(myIPAddr); ip == nil {
 			return nil, fmt.Errorf("invalid lan-my-ip-addr: %q", myIPAddr)
 		}
 		return &direct.ProxyLAN{myIPAddr}, nil
