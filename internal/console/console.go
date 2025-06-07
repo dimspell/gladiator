@@ -12,9 +12,11 @@ import (
 
 	"github.com/dimspell/gladiator/gen/multi/v1/multiv1connect"
 	"github.com/dimspell/gladiator/internal/console/database"
+	"github.com/dimspell/gladiator/internal/metrics"
 	"github.com/dimspell/gladiator/internal/model"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/cors"
 	slogchi "github.com/samber/slog-chi"
 	"golang.org/x/net/http2"
@@ -51,6 +53,9 @@ func NewConsole(db *database.SQLite, addr string, opts ...Option) *Console {
 			panic("failed to initialize relay: " + err.Error())
 		}
 	}
+
+	metrics.InitConsole()
+	metrics.InitLanRelay()
 
 	return &Console{
 		Addr:        addr,
@@ -112,7 +117,7 @@ func (c *Console) HttpRouter() http.Handler {
 			w.WriteHeader(http.StatusOK)
 			renderJSON(w, r, map[string]string{"status": "OK"})
 		})
-		// mux.Get("/_metrics", promhttp.Handler().ServeHTTP)
+		mux.Get("/_metrics", promhttp.Handler().ServeHTTP)
 	}
 
 	{ // Set up routes used by the launcher
