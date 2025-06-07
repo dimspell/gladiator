@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"io"
 	"log"
 	"log/slog"
@@ -76,6 +77,9 @@ func (rs *RelayServer) Start(ctx context.Context) error {
 	for {
 		conn, err := rs.listener.Accept(ctx)
 		if err != nil {
+			if errors.Is(err, context.Canceled) {
+				return nil
+			}
 			slog.Warn("Relay server failed to accept", logging.Error(err))
 			continue
 		}
