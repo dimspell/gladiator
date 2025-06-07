@@ -139,22 +139,22 @@ func (r *PacketRouter) connect(ctx context.Context, roomID string) error {
 var hmacKey = []byte("shared-secret-key")
 
 func sign(data []byte) []byte {
-	//mac := hmac.New(sha256.New, hmacKey)
-	//mac.Write(data)
-	//return append(mac.Sum(nil), data...)
+	// mac := hmac.New(sha256.New, hmacKey)
+	// mac.Write(data)
+	// return append(mac.Sum(nil), data...)
 	return data
 }
 
 func verify(packet []byte) ([]byte, bool) {
-	//if len(packet) < 32 {
+	// if len(packet) < 32 {
 	//	return nil, false
-	//}
-	//sig := packet[:32]
-	//data := packet[32:]
-	//mac := hmac.New(sha256.New, hmacKey)
-	//mac.Write(data)
-	//expected := mac.Sum(nil)
-	//return data, hmac.Equal(sig, expected)
+	// }
+	// sig := packet[:32]
+	// data := packet[32:]
+	// mac := hmac.New(sha256.New, hmacKey)
+	// mac.Write(data)
+	// expected := mac.Sum(nil)
+	// return data, hmac.Equal(sig, expected)
 	return packet, true
 }
 
@@ -178,7 +178,7 @@ func (r *PacketRouter) sendPacket(pkt RelayPacket) error {
 	if err != nil {
 		return fmt.Errorf("marshal packet failed: %w", err)
 	}
-	//packet := sign(data)
+	// packet := sign(data)
 
 	r.logger.Debug("Sending packet", "fromID", pkt.FromID, "data", pkt.Payload, "datastr", string(pkt.Payload), "toId", pkt.ToID)
 
@@ -223,10 +223,10 @@ func (r *PacketRouter) receiveLoop(stream quic.Stream) {
 			}
 
 			// TODO: Fixme - in broadcast it fails
-			//if pkt.ToID != r.selfID {
+			// if pkt.ToID != r.selfID {
 			//	r.logger.Warn("received packet from other peer does not match our own peer")
 			//	break
-			//}
+			// }
 
 			log.Printf("Received from %s: %s", pkt.FromID, string(pkt.Payload))
 
@@ -264,14 +264,8 @@ func (r *PacketRouter) readMessage(fromID string, pkt RelayPacket) {
 }
 
 func (r *PacketRouter) writeTCP(peerID string, pkt RelayPacket) {
-	//r.manager.mu.Lock()
-	//defer r.manager.mu.Unlock()
-
-	log.Printf("RelayPacketTCP: %+v", pkt)
-	log.Printf("Manager PeerIPs: %+v", r.manager.peerIPs)
-	log.Printf("Manager IPToPeer: %+v", r.manager.ipToPeerID)
-	log.Printf("Manager Hosts: %+v", r.manager.hosts)
-	log.Printf("Manager Peer Hosts: %+v", r.manager.peerHosts)
+	// r.manager.mu.Lock()
+	// defer r.manager.mu.Unlock()
 
 	host, ok := r.manager.peerHosts[peerID]
 	if !ok {
@@ -285,8 +279,8 @@ func (r *PacketRouter) writeTCP(peerID string, pkt RelayPacket) {
 }
 
 func (r *PacketRouter) writeUDP(peerID string, pkt RelayPacket) {
-	//r.manager.mu.Lock()
-	//defer r.manager.mu.Unlock()
+	// r.manager.mu.Lock()
+	// defer r.manager.mu.Unlock()
 
 	host, ok := r.manager.peerHosts[peerID]
 	if !ok {
@@ -305,7 +299,7 @@ func (r *PacketRouter) dynamicJoin(roomID string, peerID string, pkt RelayPacket
 		r.logger.Warn("failed to assign IP for the peer ", logging.Error(err), logging.PeerID(peerID))
 		return
 	}
-	//ip := "127.0.0.1"
+	// ip := "127.0.0.1"
 
 	onTCPMessage := func(p []byte) error {
 		return r.sendPacket(RelayPacket{

@@ -40,11 +40,11 @@ type Room struct {
 }
 
 type RelayServer struct {
-	listener    *quic.Listener
-	mu          sync.Mutex
-	rooms       map[string]*Room  // keyed by roomID
-	peerToRooms map[string]string // key: peerID, value: roomID
-	logger      *slog.Logger
+	listener      *quic.Listener
+	mu            sync.Mutex
+	rooms         map[string]*Room  // keyed by roomID
+	peerToRoomIDs map[string]string // key: peerID, value: roomID
+	logger        *slog.Logger
 }
 
 func NewQUICRelay(addr string) (*RelayServer, error) {
@@ -63,10 +63,10 @@ func NewQUICRelay(addr string) (*RelayServer, error) {
 	}
 
 	return &RelayServer{
-		listener:    listener,
-		rooms:       make(map[string]*Room),
-		peerToRooms: make(map[string]string),
-		logger:      slog.With(slog.String("component", "relay")),
+		listener:      listener,
+		rooms:         make(map[string]*Room),
+		peerToRoomIDs: make(map[string]string),
+		logger:        slog.With(slog.String("component", "relay")),
 	}, nil
 }
 
@@ -102,8 +102,6 @@ func (rs *RelayServer) handleConn(ctx context.Context, conn quic.Connection) {
 		rs.logger.Warn("signature failed from client", slog.String("remoteAddr", conn.RemoteAddr().String()))
 		return
 	}
-
-	rs.logger.Debug("First join packet", "data", data, "datastr", string(data))
 
 	var pkt RelayPacket
 	if err := json.Unmarshal(data, &pkt); err != nil {
@@ -194,7 +192,7 @@ func (rs *RelayServer) joinRoom(roomID, peerID string, stream quic.Stream) {
 		Role:   role,
 		Stream: stream,
 	}
-	rs.peerToRooms[peerID] = roomID
+	rs.peerToRoomIDs[peerID] = roomID
 	rs.logger.Info("joined room", logging.RoomID(roomID), logging.PeerID(peerID))
 
 	// Notify about the new dynamic joiner
@@ -233,7 +231,7 @@ func (rs *RelayServer) leaveRoom(peerID, roomID string) {
 	defer leaver.Stream.Close()
 
 	delete(room.Peers, peerID)
-	delete(rs.peerToRooms, peerID)
+	delete(rs.peerToRoomIDs, peerID)
 	rs.logger.Info("peer left room", logging.RoomID(roomID), logging.PeerID(peerID))
 
 	if len(room.Peers) == 0 {
@@ -283,7 +281,7 @@ func (rs *RelayServer) disconnected(peerID string) {
 	rs.logger.Info("disconnected from relay", logging.PeerID(peerID))
 
 	rs.mu.Lock()
-	roomID, ok := rs.peerToRooms[peerID]
+	roomID, ok := rs.peerToRoomIDs[peerID]
 	if !ok {
 		rs.mu.Unlock()
 		return
