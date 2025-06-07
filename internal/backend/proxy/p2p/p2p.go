@@ -15,10 +15,12 @@ import (
 
 var _ proxy.ProxyClient = (*PeerToPeer)(nil)
 
-type ProxyP2P struct{}
+type ProxyP2P struct {
+	ICEServers []webrtc.ICEServer
+}
 
 func (p *ProxyP2P) Create(session *bsession.Session) proxy.ProxyClient {
-	return NewPeerToPeer(session)
+	return NewPeerToPeer(session, p.ICEServers...)
 }
 
 // PeerToPeer implements the Proxy interface for WebRTC-based peer-to-peer connections.

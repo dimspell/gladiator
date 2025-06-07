@@ -11,6 +11,7 @@ import (
 	"github.com/dimspell/gladiator/internal/backend/proxy/p2p"
 	"github.com/dimspell/gladiator/internal/backend/proxy/relay"
 	"github.com/dimspell/gladiator/internal/console/database"
+	"github.com/pion/webrtc/v4"
 	"github.com/urfave/cli/v3"
 )
 
@@ -46,7 +47,18 @@ func selectProxy(c *cli.Command) (p backend.Proxy, err error) {
 		}
 		return &direct.ProxyLAN{myIPAddr}, nil
 	case "webrtc-beta":
-		return &p2p.ProxyP2P{}, nil
+		return &p2p.ProxyP2P{
+			ICEServers: []webrtc.ICEServer{
+				{
+					URLs: []string{"stun:stun.l.google.com:19302"},
+				},
+				{
+					URLs:       []string{"turn:127.0.0.1:3478"},
+					Username:   "username2",
+					Credential: "password2",
+				},
+			},
+		}, nil
 	case "relay-beta":
 		relayAddr := c.String("relay-addr")
 		return &relay.ProxyRelay{RelayAddr: relayAddr}, nil
