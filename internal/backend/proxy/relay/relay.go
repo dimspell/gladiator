@@ -190,6 +190,7 @@ func (r *Relay) ConnectToPlayer(ctx context.Context, params proxy.GetPlayerAddrP
 }
 
 func (r *Relay) Close() {
+	r.players = make(map[string]net.IP)
 	r.router.Reset()
 }
 
