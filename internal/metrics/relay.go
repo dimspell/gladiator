@@ -29,15 +29,15 @@ var (
 			Help: "Current number of connected peers",
 		})
 
-	RTTPerRoom = prometheus.NewGaugeVec(
+	PeersInRoom = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: "gladiator_relay_avg_rtt_ms",
-			Help: "Average RTT per room (ms)",
+			Name: "gladiator_relay_peers_in_room",
+			Help: "Current number of peers in the the room",
 		},
 		[]string{"room_id"},
 	)
 )
 
 func InitLanRelay() {
-	prometheus.MustRegister(PacketIn, PacketOut, ActiveRooms, ConnectedPeers, RTTPerRoom)
+	prometheus.MustRegister(PacketIn, PacketOut, ActiveRooms, ConnectedPeers, PeersInRoom)
 }

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/dimspell/gladiator/internal/app/logger/logging"
+	"github.com/dimspell/gladiator/internal/metrics"
 	quic "github.com/quic-go/quic-go"
 )
 
@@ -113,6 +114,7 @@ func (rs *RelayServer) handleConn(ctx context.Context, conn quic.Connection) {
 		rs.logger.Warn("invalid join packet", logging.Error(err))
 		return
 	}
+	metrics.PacketIn.Inc()
 
 	rs.joinRoom(pkt.RoomID, pkt.FromID, stream)
 
@@ -120,6 +122,9 @@ func (rs *RelayServer) handleConn(ctx context.Context, conn quic.Connection) {
 }
 
 func (rs *RelayServer) relayLoop(peerID string, stream quic.Stream) {
+	metrics.ConnectedPeers.Inc()
+	defer metrics.ConnectedPeers.Dec()
+
 	buf := make([]byte, 4096)
 
 	for {
@@ -147,6 +152,7 @@ func (rs *RelayServer) relayLoop(peerID string, stream quic.Stream) {
 				rs.logger.Warn("relay packet unmarshal error", logging.Error(err), logging.PeerID(peerID))
 				break
 			}
+			metrics.PacketIn.Inc()
 
 			switch pkt.Type {
 			case "data", "udp", "tcp":
@@ -173,6 +179,7 @@ func (rs *RelayServer) joinRoom(roomID, peerID string, stream quic.Stream) {
 		room = &Room{ID: roomID, Peers: make(map[string]*PeerConn)}
 		rs.rooms[roomID] = room
 		rs.logger.Info("new room created", logging.RoomID(roomID), logging.PeerID(peerID))
+		metrics.ActiveRooms.Inc()
 	}
 
 	role := "guest"
@@ -205,6 +212,8 @@ func (rs *RelayServer) joinRoom(roomID, peerID string, stream quic.Stream) {
 		}
 		rs.sendSigned(peer.Stream, pkt)
 	}
+
+	metrics.PeersInRoom.WithLabelValues(roomID).Set(float64(len(room.Peers)))
 }
 
 func (rs *RelayServer) leaveRoom(peerID, roomID string) {
@@ -230,8 +239,12 @@ func (rs *RelayServer) leaveRoom(peerID, roomID string) {
 	if len(room.Peers) == 0 {
 		delete(rs.rooms, roomID)
 		rs.logger.Info("room deleted (empty)", logging.RoomID(roomID))
+		metrics.ActiveRooms.Dec()
+		metrics.PeersInRoom.DeleteLabelValues(roomID)
 		return
 	}
+
+	metrics.PeersInRoom.WithLabelValues(roomID).Set(float64(len(room.Peers)))
 
 	if wasHost {
 		// Elect the new host
@@ -350,4 +363,6 @@ func (rs *RelayServer) sendSigned(stream quic.Stream, pkt RelayPacket) {
 		slog.Error("could not write the msg", logging.Error(err))
 		return
 	}
+
+	metrics.PacketOut.Inc()
 }
