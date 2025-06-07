@@ -12,6 +12,7 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/data/binding"
 	"github.com/dimspell/gladiator/internal/backend"
+	"github.com/dimspell/gladiator/internal/backend/proxy/direct"
 	"github.com/dimspell/gladiator/internal/console"
 	"github.com/dimspell/gladiator/internal/console/database"
 	"github.com/dimspell/gladiator/internal/model"
@@ -183,7 +184,7 @@ func (c *Controller) StartBackend(consoleAddr, myIPAddress string) error {
 		}
 	}()
 
-	c.Backend = backend.NewBackend("127.0.0.1:6112", consoleAddr, backend.NewLAN(myIPAddress))
+	c.Backend = backend.NewBackend("127.0.0.1:6112", consoleAddr, &direct.ProxyLAN{myIPAddress})
 	if err := c.Backend.Start(); err != nil {
 		cancel()
 		return err

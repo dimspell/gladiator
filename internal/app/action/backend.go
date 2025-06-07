@@ -2,13 +2,13 @@ package action
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"os"
 	"time"
 
 	"github.com/dimspell/gladiator/internal/app/logger"
 	"github.com/dimspell/gladiator/internal/backend"
-	"github.com/dimspell/gladiator/internal/backend/proxy/p2p"
 	"github.com/lmittmann/tint"
 	"github.com/urfave/cli/v3"
 )
@@ -29,9 +29,23 @@ func BackendCommand() *cli.Command {
 				Usage: "Port for the backend server",
 			},
 			&cli.StringFlag{
-				Name:  "my-ip-addr",
+				Name:  "proxy",
+				Value: defaultProxyType,
+				Usage: fmt.Sprintf("Proxy type to use. Possible values are: %q, %q, %q", "lan", "webrtc-beta", "relay-beta"),
+			},
+			&cli.StringFlag{
+				Name:  "lan-my-ip-addr",
 				Value: defaultMyIPAddr,
-				Usage: "IP address used in intercommunication between the users",
+				Usage: "IP address used in intercommunication between the users (only in lan proxy)",
+			},
+			&cli.StringFlag{
+				Name:  "relay-addr",
+				Value: defaultRelayAddr,
+				Usage: "Address of the relay server (only in relay proxy)",
+			},
+			&cli.StringFlag{
+				Name:  "lobby-addr",
+				Value: defaultLobbyAddr,
 			},
 		},
 	}
@@ -39,7 +53,6 @@ func BackendCommand() *cli.Command {
 	cmd.Action = func(ctx context.Context, c *cli.Command) error {
 		consoleAddr := c.String("console-addr")
 		backendAddr := c.String("backend-addr")
-		// myIpAddr := c.String("my-ip-addr")
 
 		// logger.PacketLogger = slog.New(packetlogger.New(os.Stderr, &packetlogger.Options{
 		//	Level: slog.LevelDebug,
@@ -55,11 +68,13 @@ func BackendCommand() *cli.Command {
 			),
 		)
 
-		// bd := backend.NewBackend(backendAddr, consoleAddr, &direct.ProxyLAN{myIpAddr})
-		bd := backend.NewBackend(backendAddr, consoleAddr, &p2p.ProxyP2P{})
+		px, err := selectProxy(c)
+		if err != nil {
+			return err
+		}
 
-		// TODO: Name the URL in the parameters
-		bd.SignalServerURL = defaultLobbyAddr
+		bd := backend.NewBackend(backendAddr, consoleAddr, px)
+		bd.SignalServerURL = c.String("lobby-addr")
 
 		if err := bd.Start(); err != nil {
 			return err

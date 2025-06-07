@@ -101,7 +101,6 @@ func NewApp(version, commit, buildDate string) {
 		action.BackendCommand(),
 		action.ServeCommand(),
 		action.TurnCommand(),
-		action.LobbyCommand(),
 	)
 	if guiCmd := action.GUICommand(app.Version); guiCmd != nil {
 		app.Commands = append(app.Commands, guiCmd)

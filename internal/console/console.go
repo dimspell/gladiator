@@ -204,6 +204,7 @@ func (c *Console) Handlers() (start GracefulFunc, shutdown GracefulFunc) {
 		slog.Info("Started shutting down the console server")
 
 		c.Multiplayer.Stop()
+		c.Relay.Stop(ctx)
 
 		if err := httpServer.Shutdown(ctx); err != nil {
 			slog.Error("Failed shutting down the console server", "error", err)

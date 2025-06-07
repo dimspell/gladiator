@@ -2,11 +2,9 @@ package action
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 
 	"github.com/dimspell/gladiator/internal/console"
-	"github.com/dimspell/gladiator/internal/console/database"
 	"github.com/urfave/cli/v3"
 )
 
@@ -36,27 +34,9 @@ func ConsoleCommand() *cli.Command {
 	cmd.Action = func(ctx context.Context, c *cli.Command) error {
 		consoleAddr := cmd.String("console-addr")
 
-		var (
-			db  *database.SQLite
-			err error
-		)
-		switch c.String("database-type") {
-		case "memory":
-			db, err = database.NewMemory()
-			if err != nil {
-				return err
-			}
-		case "sqlite":
-			db, err = database.NewLocal(c.String("sqlite-path"))
-			if err != nil {
-				return err
-			}
-		default:
-			return fmt.Errorf("unknown database type: %q", c.String("database-type"))
-		}
-
-		if err := database.Seed(db.Write); err != nil {
-			slog.Warn("Seed queries failed", "error", err)
+		db, err := selectDatabaseType(c)
+		if err != nil {
+			return err
 		}
 		defer func() {
 			if err := db.Close(); err != nil {

@@ -15,7 +15,7 @@ func TurnCommand() *cli.Command {
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:  "turn-public-ip",
-				Value: "127.0.0.1",
+				Value: defaultTurnPublicIP,
 			},
 			&cli.IntFlag{
 				Name:  "turn-port",

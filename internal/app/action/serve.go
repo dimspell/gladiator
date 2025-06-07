@@ -10,19 +10,10 @@ import (
 
 	"github.com/dimspell/gladiator/internal/app/logger"
 	"github.com/dimspell/gladiator/internal/backend"
-	"github.com/dimspell/gladiator/internal/backend/proxy/direct"
 	"github.com/dimspell/gladiator/internal/console"
-	"github.com/dimspell/gladiator/internal/console/database"
 	"github.com/lmittmann/tint"
 	"github.com/urfave/cli/v3"
 	"golang.org/x/sync/errgroup"
-)
-
-const (
-	defaultConsoleAddr = "127.0.0.1:2137"
-	defaultBackendAddr = "127.0.0.1:6112"
-	defaultLobbyAddr   = "ws://127.0.0.1:2137/lobby"
-	defaultMyIPAddr    = "127.0.0.1"
 )
 
 func ServeCommand() *cli.Command {
@@ -41,18 +32,32 @@ func ServeCommand() *cli.Command {
 				Usage: "Port for the backend server",
 			},
 			&cli.StringFlag{
-				Name:  "my-ip-addr",
+				Name:  "proxy",
+				Value: defaultProxyType,
+				Usage: fmt.Sprintf("Proxy type to use. Possible values are: %q, %q, %q", "lan", "webrtc-beta", "relay-beta"),
+			},
+			&cli.StringFlag{
+				Name:  "lan-my-ip-addr",
 				Value: defaultMyIPAddr,
-				Usage: "IP address used in intercommunication between the users",
+				Usage: "IP address used in intercommunication between the users (only in lan proxy)",
+			},
+			&cli.StringFlag{
+				Name:  "relay-addr",
+				Value: defaultRelayAddr,
+				Usage: "Address of the relay server (only in relay proxy)",
+			},
+			&cli.StringFlag{
+				Name:  "lobby-addr",
+				Value: defaultLobbyAddr,
 			},
 			&cli.StringFlag{
 				Name:  "database-type",
-				Value: "memory",
+				Value: defaultDatabaseType,
 				Usage: "Database type (memory, sqlite)",
 			},
 			&cli.StringFlag{
 				Name:  "sqlite-path",
-				Value: "dispel-multi.sqlite",
+				Value: defaultDatabasePath,
 				Usage: "Path to sqlite database file",
 			},
 		},
@@ -61,35 +66,16 @@ func ServeCommand() *cli.Command {
 	cmd.Action = func(ctx context.Context, c *cli.Command) error {
 		consoleAddr := c.String("console-addr")
 		backendAddr := c.String("backend-addr")
-		//myIpAddr := c.String("my-ip-addr")
 
-		var (
-			db  *database.SQLite
-			err error
-		)
-		switch c.String("database-type") {
-		case "memory":
-			db, err = database.NewMemory()
-			if err != nil {
-				return err
-			}
-		case "sqlite":
-			db, err = database.NewLocal(c.String("sqlite-path"))
-			if err != nil {
-				return err
-			}
-		default:
-			return fmt.Errorf("unknown database type: %q", c.String("database-type"))
+		db, err := selectDatabaseType(c)
+		if err != nil {
+			return err
 		}
 		defer func() {
 			if err := db.Close(); err != nil {
 				slog.Error("Failed to close database", "error", err)
 			}
 		}()
-
-		if err := database.Seed(db.Write); err != nil {
-			slog.Warn("Seed queries failed", "error", err)
-		}
 
 		// logger.PacketLogger = slog.New(packetlogger.New(os.Stderr, &packetlogger.Options{
 		//	Level: slog.LevelDebug,
@@ -105,11 +91,13 @@ func ServeCommand() *cli.Command {
 			),
 		)
 
-		bd := backend.NewBackend(backendAddr, consoleAddr, &relay.ProxyRelay{RelayAddr: fmt.Sprintf("%s:9999", defaultMyIPAddr)})
-		//bd := backend.NewBackend(backendAddr, consoleAddr, &direct.ProxyLAN{myIpAddr})
+		px, err := selectProxy(c)
+		if err != nil {
+			return err
+		}
 
-		// TODO: Name the URL in the parameters
-		bd.SignalServerURL = defaultLobbyAddr
+		bd := backend.NewBackend(backendAddr, consoleAddr, px)
+		bd.SignalServerURL = c.String("lobby-addr")
 
 		con := console.NewConsole(db, consoleAddr)
 
