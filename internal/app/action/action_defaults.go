@@ -6,11 +6,11 @@ const (
 	defaultLobbyAddr   = "ws://127.0.0.1:2137/lobby"
 
 	// SQLite config
+	defaultDatabasePath = "dispel-multi.sqlite"
 	defaultDatabaseType = "memory"
 
 	// Proxy config
-	defaultProxyType    = "lan"
-	defaultDatabasePath = "dispel-multi.sqlite"
+	defaultProxyType = "lan"
 
 	// For LAN Proxy
 	defaultMyIPAddr = "127.0.0.1"
