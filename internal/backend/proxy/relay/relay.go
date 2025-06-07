@@ -13,12 +13,16 @@ import (
 var _ proxy.ProxyClient = (*Relay)(nil)
 
 type ProxyRelay struct {
+	// Proxies []*Relay
 	RelayAddr string
-	// TODO: Manage a list of opened proxies and help to close them
 }
 
 func (p *ProxyRelay) Create(session *bsession.Session) proxy.ProxyClient {
-	return NewRelay(&Config{RelayAddr: p.RelayAddr}, session)
+	px := NewRelay(&Config{RelayAddr: p.RelayAddr}, session)
+	// TODO: Manage a list of opened proxies and help to close them
+	// FIXME: Not threadsafe, no closer
+	// p.Proxies = append(p.Proxies, px)
+	return px
 }
 
 type Relay struct {
