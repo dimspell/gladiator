@@ -48,12 +48,6 @@ type FakeHost struct {
 	StopFunc context.CancelFunc
 }
 
-// func (hm *HostManager) GetHost(key string) *FakeHost {
-// 	hm.mu.Lock()
-// 	defer hm.mu.Unlock()
-// 	return hm.hosts[key]
-// }
-
 // Dynamic IP Allocator
 func (hm *HostManager) assignIP(remoteID string) (string, error) {
 	hm.mu.Lock()

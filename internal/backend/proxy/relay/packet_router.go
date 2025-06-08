@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"log/slog"
 	"net"
 	"sync"
@@ -211,7 +210,6 @@ func (r *PacketRouter) receiveLoop(stream quic.Stream) {
 		r.logger.Debug("Received packet", "data", data, "datastr", string(data))
 
 		d := json.NewDecoder(bytes.NewReader(data))
-
 		for {
 			var pkt RelayPacket
 			if err := d.Decode(&pkt); err != nil {
@@ -222,13 +220,10 @@ func (r *PacketRouter) receiveLoop(stream quic.Stream) {
 				break
 			}
 
-			// TODO: Fixme - in broadcast it fails
-			// if pkt.ToID != r.selfID {
-			//	r.logger.Warn("received packet from other peer does not match our own peer")
-			//	break
-			// }
-
-			log.Printf("Received from %s: %s", pkt.FromID, string(pkt.Payload))
+			if pkt.ToID != "" || pkt.ToID != r.selfID {
+				r.logger.Warn("received packet from other peer does not match our own peer")
+				break
+			}
 
 			switch pkt.Type {
 			case "join":
