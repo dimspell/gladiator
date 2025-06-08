@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/packet"
 	"github.com/dimspell/gladiator/internal/model"
@@ -13,7 +12,7 @@ import (
 
 func (b *Backend) HandleSelectChannel(ctx context.Context, session *bsession.Session, req SelectChannelRequest) error {
 	serverName, channelName, err := req.Parse()
-	slog.Info("Selected channel", "serverName", serverName, "channelName", channelName, logging.Error(err))
+	slog.Info("Selected channel", "serverName", serverName, "channelName", channelName, "error", err)
 
 	if err := session.SendToGame(packet.ReceiveMessage, SetChannelName(channelName)); err != nil {
 		return err

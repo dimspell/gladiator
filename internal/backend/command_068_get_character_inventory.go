@@ -51,7 +51,7 @@ func (b *Backend) HandleGetCharacterInventory(ctx context.Context, session *bses
 
 	inventory := resp.Msg.GetCharacter().GetInventory()
 	if len(inventory) != 207 {
-		slog.Warn("packet-68: inventory array should be 207-chars long", "inventory", inventory, logging.Error(err))
+		slog.Warn("packet-68: inventory array should be 207-chars long", "inventory", inventory)
 		return nil
 	}
 
