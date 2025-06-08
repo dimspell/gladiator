@@ -14,11 +14,25 @@ import (
 var _ Redirect = (*ListenerTCP)(nil)
 
 type ListenerTCP struct {
-	listener net.Listener
+	listener TCPListener
 	logger   *slog.Logger
 
 	mu   sync.RWMutex
-	conn net.Conn
+	conn TCPConn
+}
+
+type TCPListener interface {
+	Accept() (net.Conn, error)
+	Close() error
+	Addr() net.Addr
+}
+
+type TCPConn interface {
+	Read(b []byte) (n int, err error)
+	Write(b []byte) (n int, err error)
+	Close() error
+	SetReadDeadline(t time.Time) error
+	RemoteAddr() net.Addr
 }
 
 // ListenTCP initializes a TCP listener on the given IP and port.
@@ -99,7 +113,7 @@ func (p *ListenerTCP) Run(ctx context.Context, onReceive func(p []byte) (err err
 
 // handleConnection reads from the TCP connection and forwards the data received
 // from the game client.
-func (p *ListenerTCP) handleConnection(ctx context.Context, conn net.Conn, onReceive func(p []byte) (err error)) error {
+func (p *ListenerTCP) handleConnection(ctx context.Context, conn TCPConn, onReceive func(p []byte) (err error)) error {
 	defer func() {
 		p.mu.Lock()
 		p.conn = nil
