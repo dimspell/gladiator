@@ -87,11 +87,14 @@ func decodeAndHandle[T any](
 
 // handleJoinRoom handles the event when new dynamic joiner has arrived (player who connected mid-game)
 func (r *PacketRouter) handleJoinRoom(ctx context.Context, player wire.Player) error {
+	slog.Error("Not handled JOIN_ROOM", "player", player.UserID)
 	// Handled in QUIC stream
 	return nil
 }
 
 func (r *PacketRouter) handleLeaveRoom(ctx context.Context, player wire.Player) error {
+	slog.Error("Not handled LEAVE_ROOM", "player", player.UserID)
+
 	peerID := remoteID(player.UserID)
 	if r.selfID == peerID {
 		return nil
@@ -174,11 +177,14 @@ func (r *PacketRouter) startHostProbe(ctx context.Context, addr string, onDiscon
 
 	// Check if the game server is still running
 	go func() {
+		time.Sleep(10 * time.Second)
+
 		buf := make([]byte, 1)
 		for {
 			select {
 			case <-ctx.Done():
 				slog.Error("CONTEXT CANCELLED")
+				continue
 				//return
 			default:
 				_ = conn.SetReadDeadline(time.Now().Add(5 * time.Second))
@@ -189,14 +195,12 @@ func (r *PacketRouter) startHostProbe(ctx context.Context, addr string, onDiscon
 						continue
 					}
 
-					// Otherwise - reset connection with the relay server
-					once.Do(onDisconnect)
-
-					if err == io.EOF {
-						return
-					}
-
 					slog.Error("connection read error", logging.Error(err))
+
+					// Otherwise - reset connection with the relay server
+					if errors.Is(err, io.EOF) {
+						once.Do(onDisconnect)
+					}
 					return
 				}
 			}
@@ -204,6 +208,14 @@ func (r *PacketRouter) startHostProbe(ctx context.Context, addr string, onDiscon
 	}()
 
 	return nil
+}
+
+func (r *PacketRouter) stop(host *FakeHost, peerID string, ipAddress string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	slog.Info("Stopping host", logging.PeerID(peerID), "ip", ipAddress, "lastSeen", host.LastSeen)
+	r.manager.stopHost(host, ipAddress)
 }
 
 var hmacKey = []byte("shared-secret-key")
