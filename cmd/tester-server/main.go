@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/dimspell/gladiator/internal/app/logger"
+	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -82,7 +83,7 @@ func (p *Proxy) listenUDP(ctx context.Context) error {
 			if buf[0] == 26 {
 				response := []byte{27, 0, 2, 0}
 				if _, err = udpConn.WriteTo(response, addr); err != nil {
-					slog.Error("Failed to send UDP response", "error", err)
+					slog.Error("Failed to send UDP response", logging.Error(err))
 				}
 				slog.Debug("Sent UDP response", "data", response)
 			}
@@ -138,19 +139,19 @@ func (p *Proxy) listenTCP(ctx context.Context) error {
 				buf := make([]byte, 1024)
 				n, err := conn.Read(buf)
 				if err != nil {
-					slog.Error("TCP: error reading", "error", err)
+					slog.Error("TCP: error reading", logging.Error(err))
 					return
 				}
 
 				slog.Debug("TCP packet received", "data", buf[:n], "string", string(buf[:n]))
 
 				if _, err := conn.Write([]byte{35, 35, 116, 101, 115, 116, 0}); err != nil {
-					slog.Error("Failed to send TCP response", "error", err)
+					slog.Error("Failed to send TCP response", logging.Error(err))
 				}
 			}
 		}
 	}
-
+ 
 	// Close the listener when the application closes.
 	defer l.Close()
 	for {
@@ -161,7 +162,7 @@ func (p *Proxy) listenTCP(ctx context.Context) error {
 			// Listen for an incoming connection.
 			conn, err := l.Accept()
 			if err != nil {
-				slog.Error("Error accepting TCP connection", "error", err)
+				slog.Error("Error accepting TCP connection", logging.Error(err))
 				return err
 			}
 			slog.Info("Accepted new TCP connection", "addr", conn.RemoteAddr().String())

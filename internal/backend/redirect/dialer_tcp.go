@@ -9,6 +9,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -74,7 +75,7 @@ func (p *DialerTCP) Run(ctx context.Context, onReceive func(p []byte) (err error
 						p.logger.Info("Connection closed by server")
 						return nil
 					}
-					p.logger.Error("Error reading from server", "error", err)
+					p.logger.Error("Error reading from server", logging.Error(err))
 					return err
 				}
 
@@ -94,7 +95,7 @@ func (p *DialerTCP) Run(ctx context.Context, onReceive func(p []byte) (err error
 func (p *DialerTCP) Write(msg []byte) (int, error) {
 	n, err := p.conn.Write(msg)
 	if err != nil {
-		p.logger.Error("Failed to send message", "error", err)
+		p.logger.Error("Failed to send message", logging.Error(err))
 		return n, err
 	}
 	p.logger.Debug("Message sent", "size", n, "msg", msg)
@@ -105,7 +106,7 @@ func (p *DialerTCP) Write(msg []byte) (int, error) {
 func (p *DialerTCP) Close() error {
 	err := p.conn.Close()
 	if err != nil {
-		p.logger.Error("Failed to close TCP connection", "error", err)
+		p.logger.Error("Failed to close TCP connection", logging.Error(err))
 	}
 	return err
 }

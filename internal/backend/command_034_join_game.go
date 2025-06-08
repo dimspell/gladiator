@@ -9,6 +9,7 @@ import (
 
 	"connectrpc.com/connect"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
+	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/packet"
 	"github.com/dimspell/gladiator/internal/backend/proxy"
@@ -23,7 +24,7 @@ func (b *Backend) HandleJoinGame(ctx context.Context, session *bsession.Session,
 
 	data, err := req.Parse()
 	if err != nil {
-		slog.Warn("Invalid packet", "error", err)
+		slog.Warn("Invalid packet", logging.Error(err))
 		return nil
 	}
 
@@ -42,14 +43,14 @@ func (b *Backend) HandleJoinGame(ctx context.Context, session *bsession.Session,
 	if err != nil {
 		return err
 	}
-
+ 
 	respJoin, err := b.gameClient.JoinGame(ctx, connect.NewRequest(&multiv1.JoinGameRequest{
 		UserId:     session.UserID,
 		GameRoomId: respGame.Msg.Game.GetGameId(),
 		IpAddress:  myIpAddr.To4().String(),
 	}))
 	if err != nil {
-		slog.Error("Could not join game room", "error", err)
+		slog.Error("Could not join game room", logging.Error(err))
 		return nil
 	}
 

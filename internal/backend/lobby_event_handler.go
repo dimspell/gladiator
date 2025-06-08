@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 
+	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/packet"
 	"github.com/dimspell/gladiator/internal/model"
@@ -26,19 +27,19 @@ func (h *LobbyEventHandler) Handle(ctx context.Context, payload []byte) error {
 	case wire.Chat:
 		_, msg, err := wire.DecodeTyped[wire.ChatMessage](payload)
 		if err != nil {
-			slog.Warn("Could not decode the message", "session", h.Session.ID, "error", err, "event", eventType.String(), "payload", payload)
+			slog.Warn("Could not decode the message", "session", h.Session.ID, logging.Error(err), "event", eventType.String(), "payload", payload)
 			return nil
 		}
 		// if err := session.Send(ReceiveMessage, NewGlobalMessage(msg.Content.User, msg.Content.Text)); err != nil {
 		if err := h.Session.SendToGame(packet.ReceiveMessage, NewLobbyMessage(msg.Content.User, msg.Content.Text)); err != nil {
-			slog.Error("Error writing chat message over the backend wire", "session", h.Session.ID, "error", err)
+			slog.Error("Error writing chat message over the backend wire", "session", h.Session.ID, logging.Error(err))
 			return nil
 		}
 	case wire.LobbyUsers:
 		// TODO: Handle it. Note: It should be sent only once.
 		_, msg, err := wire.DecodeTyped[[]wire.Player](payload)
 		if err != nil {
-			slog.Warn("Could not decode the message", "session", h.Session.ID, "error", err, "event", eventType.String(), "payload", payload)
+			slog.Warn("Could not decode the message", "session", h.Session.ID, logging.Error(err), "event", eventType.String(), "payload", payload)
 			return nil
 		}
 
@@ -46,7 +47,7 @@ func (h *LobbyEventHandler) Handle(ctx context.Context, payload []byte) error {
 	case wire.JoinLobby:
 		_, msg, err := wire.DecodeTyped[wire.Player](payload)
 		if err != nil {
-			slog.Warn("Could not decode the message", "session", h.Session.ID, "error", err, "event", eventType.String(), "payload", payload)
+			slog.Warn("Could not decode the message", "session", h.Session.ID, logging.Error(err), "event", eventType.String(), "payload", payload)
 			return nil
 		}
 		if msg.Content.UserID == h.Session.UserID {
@@ -59,20 +60,20 @@ func (h *LobbyEventHandler) Handle(ctx context.Context, payload []byte) error {
 		idx := uint32(len(lobbyUsers))
 
 		if err := h.Session.SendToGame(packet.ReceiveMessage, AppendCharacterToLobby(player.Username, model.ClassType(player.ClassType), idx)); err != nil {
-			slog.Warn("Error appending lobby user", "session", h.Session.ID, "error", err)
+			slog.Warn("Error appending lobby user", "session", h.Session.ID, logging.Error(err))
 			return nil
 		}
 	case wire.LeaveLobby:
 		_, msg, err := wire.DecodeTyped[wire.Player](payload)
 		if err != nil {
-			slog.Warn("Could not decode the message", "session", h.Session.ID, "error", err, "event", eventType.String(), "payload", payload)
+			slog.Warn("Could not decode the message", "session", h.Session.ID, logging.Error(err), "event", eventType.String(), "payload", payload)
 			return nil
 		}
 
 		h.Session.State.DeleteLobbyUser(msg.Content.UserID)
 
 		if err := h.Session.SendToGame(packet.ReceiveMessage, RemoveCharacterFromLobby(msg.Content.Username)); err != nil {
-			slog.Warn("Error appending lobby user", "session", h.Session.ID, "error", err)
+			slog.Warn("Error appending lobby user", "session", h.Session.ID, logging.Error(err))
 			return nil
 		}
 	default:

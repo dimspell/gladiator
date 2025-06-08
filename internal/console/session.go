@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
+	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"github.com/dimspell/gladiator/internal/wire"
 )
 
@@ -43,7 +44,7 @@ func (us *UserSession) ReadNext(ctx context.Context) ([]byte, error) {
 	_, payload, err := us.wsConn.Read(ctx)
 	if err != nil {
 		// TODO: Make the log more clear that the user has disconnected
-		slog.Warn("Could not read the message", "error", err, "closeError", websocket.CloseStatus(err))
+		slog.Warn("Could not read the message", logging.Error(err), "closeError", websocket.CloseStatus(err))
 		return nil, err
 	}
 	return payload, nil
@@ -59,10 +60,8 @@ func (us *UserSession) Send(ctx context.Context, payload []byte) {
 		return
 	}
 
-	// slog.Debug("Lobby is sending a signal", "to", us.CreatorID, "type", wire.EventType(payload[0]).String(), "payload", string(payload[1:]))
-
 	if err := wire.Write(ctx, us.wsConn, payload); err != nil {
-		slog.Warn("Could not send a WS message", "to", us.UserID, "error", err)
+		slog.Warn("Could not send a WS message", "to", us.UserID, logging.Error(err))
 		us.Connected = false
 		// TODO: There is no logic to disconnect and remove the failing session
 	}

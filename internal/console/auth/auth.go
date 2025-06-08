@@ -3,6 +3,7 @@ package auth
 import (
 	"log/slog"
 
+	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -13,7 +14,7 @@ func NewPassword(text string) (Password, error) {
 	// TODO: Use salt and pepper
 	pwd, err := bcrypt.GenerateFromPassword([]byte(text), 14)
 	if err != nil {
-		slog.Warn("Could not hash password", "error", err)
+		slog.Warn("Could not hash password", logging.Error(err))
 	}
 	return pwd, err
 }

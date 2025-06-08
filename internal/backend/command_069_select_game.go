@@ -8,6 +8,7 @@ import (
 
 	"connectrpc.com/connect"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
+	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/packet"
 	"github.com/dimspell/gladiator/internal/backend/proxy"
@@ -21,7 +22,7 @@ func (b *Backend) HandleSelectGame(ctx context.Context, session *bsession.Sessio
 
 	data, err := req.Parse()
 	if err != nil {
-		slog.Warn("Invalid packet", "error", err)
+		slog.Warn("Invalid packet", logging.Error(err))
 		return nil
 	}
 
@@ -29,7 +30,7 @@ func (b *Backend) HandleSelectGame(ctx context.Context, session *bsession.Sessio
 		GameRoomId: data.RoomName,
 	}))
 	if err != nil {
-		slog.Warn("No game found", "room", data.RoomName, "error", err)
+		slog.Warn("No game found", "room", data.RoomName, logging.Error(err))
 		return nil
 	}
 
@@ -60,7 +61,7 @@ func (b *Backend) HandleSelectGame(ctx context.Context, session *bsession.Sessio
 			slog.Warn("Not found a player with the provided ID",
 				"player", player.Username,
 				"proxyIP", proxyIP,
-				"error", err,
+				logging.Error(err),
 				"gameID", ps.GameID,
 				"userId", ps.UserID,
 				"ipAddress", ps.IPAddress,

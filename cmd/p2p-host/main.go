@@ -12,6 +12,7 @@ import (
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/gen/multi/v1/multiv1connect"
 	"github.com/dimspell/gladiator/internal/app/logger"
+	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/proxy"
 	"github.com/dimspell/gladiator/internal/backend/proxy/p2p"
@@ -35,9 +36,6 @@ func main() {
 	ctx := context.Background()
 
 	gm := multiv1connect.NewGameServiceClient(httpClient, fmt.Sprintf("http://%s/grpc", consoleUri))
-	px := p2p.NewPeerToPeer()
-	px.NewUDPRedirect = redirect.NewNoop
-	px.NewTCPRedirect = redirect.NewLineReader
 
 	session := &bsession.Session{
 		ID:          "session-host",
@@ -51,30 +49,32 @@ func main() {
 		UserId:   1,
 		Username: meName,
 	}
+	p2pProxy := p2p.ProxyP2P{}
+	px := p2pProxy.Create(session).(*p2p.PeerToPeer)
+	px.NewUDPRedirect = redirect.NewNoop
+	px.NewTCPRedirect = redirect.NewLineReader
 
 	if err := session.ConnectOverWebsocket(ctx, user1, fmt.Sprintf("ws://%s/lobby", consoleUri)); err != nil {
-		slog.Error("failed to connect over websocket", "error", err)
+		slog.Error("failed to connect over websocket", logging.Error(err))
 		return
 	}
 	slog.Info("connected over websocket")
 
 	if err := session.JoinLobby(ctx); err != nil {
-		slog.Error("failed to join lobby over websocket", "error", err)
+		slog.Error("failed to join lobby over websocket", logging.Error(err))
 		return
 	}
 	slog.Info("joined lobby over websocket")
 
 	go func() {
-		handler := px.NewWebSocketHandler(session)
-
 		for {
 			payload, err := session.ConsumeWebSocket(ctx)
 			if err != nil {
-				slog.Error("failed to consume websocket", "error", err)
+				slog.Error("failed to consume websocket", logging.Error(err))
 				return
 			}
-			if err := handler.Handle(ctx, payload); err != nil {
-				slog.Error("failed to handle websocket", "error", err)
+			if err := px.Handle(ctx, payload); err != nil {
+				slog.Error("failed to handle websocket", logging.Error(err))
 				return
 			}
 		}
@@ -88,19 +88,19 @@ func main() {
 		HostIpAddress: "127.0.1.2", // Not used for P2P traffic
 	}))
 	if err != nil {
-		slog.Error("failed to create game over console", "error", err)
+		slog.Error("failed to create game over console", logging.Error(err))
 		return
 	}
 	slog.Info("created game over console")
 
-	if _, err := px.CreateRoom(proxy.CreateParams{GameID: game.Msg.Game.GameId}, session); err != nil {
-		slog.Error("failed to create room over proxy", "error", err)
+	if _, err := px.CreateRoom(proxy.CreateParams{GameID: game.Msg.Game.GameId}); err != nil {
+		slog.Error("failed to create room over proxy", logging.Error(err))
 		return
 	}
 	slog.Info("created room over proxy")
 
-	if err := px.HostRoom(ctx, proxy.HostParams{GameID: game.Msg.Game.GameId}, session); err != nil {
-		slog.Error("failed to host room over proxy", "error", err)
+	if err := px.HostRoom(ctx, proxy.HostParams{GameID: game.Msg.Game.GameId}); err != nil {
+		slog.Error("failed to host room over proxy", logging.Error(err))
 		return
 	}
 	slog.Info("created a host room over proxy")

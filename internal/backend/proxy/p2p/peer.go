@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net"
 
+	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"github.com/dimspell/gladiator/internal/backend/redirect"
 	"github.com/pion/webrtc/v4"
 	"golang.org/x/sync/errgroup"
@@ -90,7 +91,7 @@ func (p *Peer) setupPeerConnection(ctx context.Context, logger *slog.Logger, ses
 			return
 		}
 		if err := session.SendRTCICECandidate(ctx, candidate.ToJSON(), playerId); err != nil {
-			logger.Error("Failed to send ICE candidate", "fromID", p.UserID, "toID", playerId, "error", err)
+			logger.Error("Failed to send ICE candidate", "fromID", p.UserID, "toID", playerId, logging.Error(err))
 		}
 	})
 
@@ -98,7 +99,7 @@ func (p *Peer) setupPeerConnection(ctx context.Context, logger *slog.Logger, ses
 		slog.With("user", playerId).Debug("Negotiation needed")
 
 		if err := p.handleNegotiation(ctx, session, playerId, sendRTCOffer); err != nil {
-			logger.Error("Failed to handle negotiation", "userID", playerId, "error", err)
+			logger.Error("Failed to handle negotiation", "userID", playerId, logging.Error(err))
 		}
 	})
 
@@ -170,24 +171,24 @@ func (p *Peer) Terminate() {
 
 	if p.Connection != nil {
 		if err := p.Connection.GracefulClose(); err != nil {
-			slog.Error("Failed to close WebRTC connection", "userID", p.UserID, "error", err)
+			slog.Error("Failed to close WebRTC connection", "userID", p.UserID, logging.Error(err))
 		}
 	}
 
 	if p.PipeRouter != nil {
 		if err := p.PipeRouter.Close(); err != nil {
-			slog.Error("Failed to close the game pipe router", "userID", p.UserID, "error", err)
+			slog.Error("Failed to close the game pipe router", "userID", p.UserID, logging.Error(err))
 		}
 	}
 
 	// if p.PipeTCP != nil {
 	// 	if err := p.PipeTCP.Close(); err != nil {
-	// 		slog.Error("Failed to close TCP pipe", "userID", p.CreatorID, "error", err)
+	// 		slog.Error("Failed to close TCP pipe", "userID", p.CreatorID, logging.Error(err))
 	// 	}
 	// }
 	// if p.PipeUDP != nil {
 	// 	if err := p.PipeUDP.Close(); err != nil {
-	// 		slog.Error("Failed to close UDP pipe", "userID", p.CreatorID, "error", err)
+	// 		slog.Error("Failed to close UDP pipe", "userID", p.CreatorID, logging.Error(err))
 	// 	}
 	// }
 }
@@ -232,7 +233,7 @@ func NewPipeRouter(ctx context.Context, logger *slog.Logger, dc DataChannel, tcp
 
 	go func() {
 		if err := g.Wait(); err != nil {
-			pipe.logger.Warn("Proxy failed", "error", err)
+			pipe.logger.Warn("Proxy failed", logging.Error(err))
 			cancel()
 
 			pipe.logger.Warn("Closing data-channel", "error", dc.Close())
@@ -243,7 +244,7 @@ func NewPipeRouter(ctx context.Context, logger *slog.Logger, dc DataChannel, tcp
 		pipe.logger.Debug("Opened WebRTC channel")
 	})
 
-	dc.OnError(func(err error) { pipe.logger.Warn("DataChannel error", "error", err) })
+	dc.OnError(func(err error) { pipe.logger.Warn("DataChannel error", logging.Error(err)) })
 	dc.OnClose(func() {
 		pipe.logger.Debug("Closing pipe")
 		pipe.Close()
@@ -254,11 +255,11 @@ func NewPipeRouter(ctx context.Context, logger *slog.Logger, dc DataChannel, tcp
 		switch msg.Data[0] {
 		case 'T':
 			if _, err := tcpProxy.Write(msg.Data[1:]); err != nil {
-				pipe.logger.Warn("Failed to write to proxy", "error", err, "data", msg.Data)
+				pipe.logger.Warn("Failed to write to proxy", logging.Error(err), "data", msg.Data)
 			}
 		case 'U':
 			if _, err := udpProxy.Write(msg.Data[1:]); err != nil {
-				pipe.logger.Warn("Failed to write to proxy", "error", err, "data", msg.Data)
+				pipe.logger.Warn("Failed to write to proxy", logging.Error(err), "data", msg.Data)
 			}
 		}
 	})

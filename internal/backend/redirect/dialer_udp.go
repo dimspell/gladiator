@@ -8,6 +8,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -81,7 +82,7 @@ func (p *DialerUDP) Run(ctx context.Context, onReceive func(p []byte) (err error
 					if errors.As(err, &ne) && ne.Timeout() {
 						continue
 					}
-					p.logger.Error("Error reading from UDP server", "error", err)
+					p.logger.Error("Error reading from UDP server", logging.Error(err))
 					return fmt.Errorf("dial-udp: failed to read UDP message: %w", err)
 				}
 
@@ -100,7 +101,7 @@ func (p *DialerUDP) Run(ctx context.Context, onReceive func(p []byte) (err error
 func (p *DialerUDP) Write(msg []byte) (int, error) {
 	n, err := p.conn.Write(msg)
 	if err != nil {
-		p.logger.Error("Failed to send UDP message", "error", err)
+		p.logger.Error("Failed to send UDP message", logging.Error(err))
 		return n, fmt.Errorf("dial-udp: failed to write UDP message: %w", err)
 	}
 	p.logger.Debug("Message sent", "size", n, "msg", msg)
@@ -111,7 +112,7 @@ func (p *DialerUDP) Write(msg []byte) (int, error) {
 func (p *DialerUDP) Close() error {
 	err := p.conn.Close()
 	if err != nil {
-		p.logger.Error("Failed to close UDP connection", "error", err)
+		p.logger.Error("Failed to close UDP connection", logging.Error(err))
 	}
 	return err
 }

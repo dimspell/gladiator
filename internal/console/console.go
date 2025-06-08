@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/dimspell/gladiator/gen/multi/v1/multiv1connect"
+	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"github.com/dimspell/gladiator/internal/console/database"
 	"github.com/dimspell/gladiator/internal/metrics"
 	"github.com/dimspell/gladiator/internal/model"
@@ -33,12 +34,16 @@ type Console struct {
 	Relay       *Relay
 }
 
-func NewConsole(db *database.SQLite, addr string, opts ...Option) *Console {
-	config := &Config{
+func DefaultConfig() *Config {
+	return &Config{
 		CORSAllowedOrigins: []string{"*"},
 		EnableRelayServer:  true,
 		RelayAddr:          ":9999",
 	}
+}
+
+func NewConsole(db *database.SQLite, addr string, opts ...Option) *Console {
+	config := DefaultConfig()
 	for _, fn := range opts {
 		if err := fn(config); err != nil {
 			panic("failed to initialize config: " + err.Error())
@@ -207,7 +212,7 @@ func (c *Console) Handlers() (start GracefulFunc, shutdown GracefulFunc) {
 		c.Relay.Stop(ctx)
 
 		if err := httpServer.Shutdown(ctx); err != nil {
-			slog.Error("Failed shutting down the console server", "error", err)
+			slog.Error("Failed shutting down the console server", logging.Error(err))
 			return err
 		}
 		slog.Info("Shut down the console server")

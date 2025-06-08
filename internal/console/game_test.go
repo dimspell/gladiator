@@ -22,13 +22,8 @@ func TestGameServiceServer_CreateGame(t *testing.T) {
 		Password: "secret",
 		MapId:    multiv1.GameMap_FrozenLabyrinth,
 
-		Host: &multiv1.Player{
-			UserId:      10,
-			Username:    "user",
-			CharacterId: 12,
-			ClassType:   multiv1.ClassType_Mage,
-			IpAddress:   "192.168.100.1",
-		},
+		HostIpAddress: "192.168.100.1",
+		HostUserId:    10,
 	}))
 	if err != nil {
 		t.Error(err)
@@ -73,13 +68,8 @@ func TestGameServiceServer_ListGames(t *testing.T) {
 		Password: "secret",
 		MapId:    multiv1.GameMap_FrozenLabyrinth,
 
-		Host: &multiv1.Player{
-			UserId:      10,
-			Username:    "user",
-			CharacterId: 12,
-			ClassType:   multiv1.ClassType_Mage,
-			IpAddress:   "192.168.100.1",
-		},
+		HostIpAddress: "192.168.100.1",
+		HostUserId:    10,
 	}))
 	if err != nil {
 		t.Error(err)
@@ -120,13 +110,8 @@ func TestGameServiceServer_GetGame(t *testing.T) {
 		Password: "secret",
 		MapId:    multiv1.GameMap_FrozenLabyrinth,
 
-		Host: &multiv1.Player{
-			UserId:      10,
-			Username:    "user",
-			CharacterId: 12,
-			ClassType:   multiv1.ClassType_Mage,
-			IpAddress:   "192.168.100.1",
-		},
+		HostIpAddress: "192.168.100.1",
+		HostUserId:    10,
 	}))
 	if err != nil {
 		t.Error(err)
@@ -166,26 +151,17 @@ func TestGameServiceServer_JoinGame(t *testing.T) {
 		Password: "secret",
 		MapId:    multiv1.GameMap_FrozenLabyrinth,
 
-		Host: &multiv1.Player{
-			UserId:      10,
-			Username:    "user",
-			CharacterId: 12,
-			ClassType:   multiv1.ClassType_Mage,
-			IpAddress:   "192.168.100.1",
-		},
+		HostIpAddress: "192.168.100.1",
+		HostUserId:    10,
 	})); err != nil {
 		t.Error(err)
 		return
 	}
 
 	resp, err := g.JoinGame(context.Background(), connect.NewRequest(&multiv1.JoinGameRequest{
-		UserId:        5,
-		UserName:      "other",
-		CharacterId:   40,
-		CharacterName: "warrior",
-		GameRoomId:    gameId,
-		IpAddress:     "192.168.100.201",
-		ClassType:     multiv1.ClassType_Warrior,
+		UserId:     5,
+		GameRoomId: gameId,
+		IpAddress:  "192.168.100.201",
 	}))
 	if err != nil {
 		t.Error(err)

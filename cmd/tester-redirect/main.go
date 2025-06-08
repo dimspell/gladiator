@@ -61,16 +61,28 @@ func main() {
 
 	g, ctx := errgroup.WithContext(ctx)
 	g.Go(func() error {
-		return listenerTCP.Run(ctx, redirectTCP)
+		return listenerTCP.Run(ctx, func(p []byte) (err error) {
+			_, err = redirectTCP.Write(p)
+			return err
+		})
 	})
 	g.Go(func() error {
-		return listenerUDP.Run(ctx, redirectUDP)
+		return listenerUDP.Run(ctx, func(p []byte) (err error) {
+			_, err = redirectUDP.Write(p)
+			return err
+		})
 	})
 	g.Go(func() error {
-		return dialTCP.Run(ctx, listenerTCP)
+		return dialTCP.Run(ctx, func(p []byte) (err error) {
+			_, err = listenerTCP.Write(p)
+			return err
+		})
 	})
 	g.Go(func() error {
-		return dialUDP.Run(ctx, listenerUDP)
+		return dialUDP.Run(ctx, func(p []byte) (err error) {
+			_, err = listenerUDP.Write(p)
+			return err
+		})
 	})
 	if err := g.Wait(); err != nil {
 		log.Println(err)

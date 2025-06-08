@@ -8,6 +8,7 @@ import (
 
 	"connectrpc.com/connect"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
+	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/packet"
 	"github.com/dimspell/gladiator/internal/model"
@@ -21,7 +22,7 @@ func (b *Backend) HandleShowRanking(ctx context.Context, session *bsession.Sessi
 
 	data, err := req.Parse()
 	if err != nil {
-		slog.Warn("Invalid packet", "error", err)
+		slog.Warn("Invalid packet", logging.Error(err))
 		return nil
 	}
 
@@ -37,7 +38,7 @@ func (b *Backend) HandleShowRanking(ctx context.Context, session *bsession.Sessi
 	}
 
 	ranking := model.RankingToBytes(respRanking.Msg)
-
+ 
 	return session.SendToGame(packet.ShowRanking, ranking)
 }
 

@@ -11,6 +11,7 @@ import (
 
 	"github.com/coder/websocket"
 	v1 "github.com/dimspell/gladiator/gen/multi/v1"
+	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"github.com/dimspell/gladiator/internal/wire"
 )
 
@@ -68,70 +69,6 @@ func (mp *Multiplayer) Run(ctx context.Context) {
 	}
 }
 
-const (
-	// ErrLobbyNotFound error when lobby room was not found.
-	ErrLobbyNotFound = iota
-
-	// ErrLobbyAborted error when stopped while attempting to join.
-	ErrLobbyAborted
-
-	// ErrLobbyMissingPlayers when attempting to join empty lobby room.
-	ErrLobbyMissingPlayers
-
-	// ErrLobbyFull when no more players can join this lobby room.
-	ErrLobbyFull
-)
-
-const (
-	StateLobbyStarting = iota
-	StateLobbyReady
-	StateLobbyShuttingDown
-	StateLobbyShutDown
-	StatePlayerAlreadyConnected
-	StatePlayerConnected
-	StatePlayerDisconnected
-)
-
-// type LobbyRoom struct {
-// 	Name     string
-// 	Members  *Members
-// 	Messages chan icesignal.Message
-// }
-
-// func (h *SignalServer) GetChannel(channelName string) (*Channel, bool) {
-// 	h.RLock()
-// 	channel, ok := h.Channels[channelName]
-// 	h.RUnlock()
-// 	return channel, ok
-// }
-//
-// func (h *SignalServer) SetChannel(channelName string, channel *Channel) {
-// 	h.Lock()
-// 	h.Channels[channelName] = channel
-// 	h.Unlock()
-// }
-//
-// func (h *SignalServer) DeleteChannel(channelName string) {
-// 	h.Lock()
-// 	delete(h.Channels, channelName)
-// 	h.Unlock()
-// }
-//
-// func (s *SignalServer) Join(ctx context.Context, channelName string) *Channel {
-// 	if existing, ok := s.GetChannel(channelName); ok {
-// 		return existing
-// 	}
-//
-// 	c := &Channel{
-// 		Name:     channelName,
-// 		Messages: make(chan icesignal.Message),
-// 	}
-// 	s.SetChannel(channelName, c)
-// 	go c.Run(ctx)
-// 	return c
-// 	// }
-// }
-
 // HandleIncomingMessage handles the incoming message pump by dispatching
 // commands based on the message type.
 func (mp *Multiplayer) HandleIncomingMessage(ctx context.Context, msg wire.Message) {
@@ -186,10 +123,10 @@ func (mp *Multiplayer) HandleSession(ctx context.Context, session *UserSession) 
 				// connection reset by peer
 				return nil
 			case websocket.StatusNormalClosure:
-				slog.Debug("Closing because of", "error", err)
+				slog.Debug("Closing because of", logging.Error(err))
 				return err
 			default:
-				slog.Error("Could not handle the message", "error", err)
+				slog.Error("Could not handle the message", logging.Error(err))
 				return err
 			}
 		}
@@ -197,7 +134,7 @@ func (mp *Multiplayer) HandleSession(ctx context.Context, session *UserSession) 
 		// Enqueue message
 		_, m, err := wire.Decode(payload)
 		if err != nil {
-			slog.Error("Could not decode the message", "error", err, "payload", string(payload))
+			slog.Error("Could not decode the message", logging.Error(err), "payload", string(payload))
 			return err
 		}
 		mp.Messages <- m
@@ -296,6 +233,7 @@ func (mp *Multiplayer) JoinRoom(roomId string, userId int64, ipAddr string) (Gam
 
 	// Check if player was already added to game room
 	if _, ok := room.Players[userId]; ok {
+		slog.Warn("User already joined a room", "room", roomId, "user", userId)
 		return GameRoom{}, fmt.Errorf("user session %d already joined", userId)
 	}
 
@@ -398,9 +336,6 @@ func (mp *Multiplayer) AnnounceJoin(room GameRoom, userId int64) {
 	for id, session := range room.Players {
 		if id == userId {
 			continue
-		}
-		if userId == 0 {
-			panic("userId is zero")
 		}
 		session.Send(ctx, wire.Compose(wire.JoinRoom, wire.Message{
 			To:   strconv.Itoa(int(id)),
@@ -515,7 +450,7 @@ func (mp *Multiplayer) SetPlayerDisconnected(session *UserSession) {
 
 	// Close the websocket connection
 	if err := session.wsConn.CloseNow(); err != nil {
-		slog.Debug("Could not close the connection", "user", session.UserID, "error", err)
+		slog.Debug("Could not close the connection", "user", session.UserID, logging.Error(err))
 	}
 
 	// Kick the user from the game room (if any)

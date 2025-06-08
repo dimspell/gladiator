@@ -9,6 +9,7 @@ import (
 	"connectrpc.com/connect"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/gen/multi/v1/multiv1connect"
+	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"github.com/dimspell/gladiator/internal/console/auth"
 	"github.com/dimspell/gladiator/internal/console/database"
 )
@@ -27,7 +28,7 @@ func (s *userServiceServer) CreateUser(ctx context.Context, req *connect.Request
 
 	password, err := auth.NewPassword(req.Msg.Password)
 	if err != nil {
-		slog.Warn("could not hash the password", "err", err)
+		slog.Warn("could not hash the password", logging.Error(err))
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 

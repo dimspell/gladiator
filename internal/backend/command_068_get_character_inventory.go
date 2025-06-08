@@ -8,6 +8,7 @@ import (
 
 	"connectrpc.com/connect"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
+	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/packet"
 )
@@ -26,7 +27,7 @@ func (b *Backend) HandleGetCharacterInventory(ctx context.Context, session *bses
 
 	data, err := req.Parse()
 	if err != nil {
-		slog.Warn("Invalid packet", "error", err)
+		slog.Warn("Invalid packet", logging.Error(err))
 		return nil
 	}
 
@@ -50,7 +51,7 @@ func (b *Backend) HandleGetCharacterInventory(ctx context.Context, session *bses
 
 	inventory := resp.Msg.GetCharacter().GetInventory()
 	if len(inventory) != 207 {
-		slog.Warn("packet-68: inventory array should be 207-chars long", "inventory", inventory, "err", err)
+		slog.Warn("packet-68: inventory array should be 207-chars long", "inventory", inventory, logging.Error(err))
 		return nil
 	}
 

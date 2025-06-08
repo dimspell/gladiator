@@ -5,9 +5,9 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
-	"log"
 	"log/slog"
 	"net"
 	"sync"
@@ -32,11 +32,16 @@ type PacketRouter struct {
 	currentHostID string
 	relayConn     quic.Connection
 	stream        quic.Stream
+	pingTicker    *time.Ticker
 }
 
 func (r *PacketRouter) Reset() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+
+	if r.pingTicker != nil {
+		r.pingTicker.Stop()
+	}
 
 	if r.relayConn != nil {
 		_ = r.relayConn.CloseWithError(0, "done")
@@ -110,8 +115,8 @@ func (r *PacketRouter) connect(ctx context.Context, roomID string) error {
 		NextProtos:         []string{"game-relay"},
 	}
 	conn, err := quic.DialAddr(ctx, r.relayAddr, tlsConf, &quic.Config{
-		MaxIdleTimeout:  300 * time.Second,
-		KeepAlivePeriod: 250 * time.Second,
+		MaxIdleTimeout:  45 * time.Second,
+		KeepAlivePeriod: 30 * time.Second,
 	})
 	if err != nil {
 		return fmt.Errorf("quic dial failed: %w", err)
@@ -125,13 +130,68 @@ func (r *PacketRouter) connect(ctx context.Context, roomID string) error {
 	r.stream = stream
 
 	// Send "join" packet
-	r.sendPacket(RelayPacket{
+	if err := r.sendPacket(RelayPacket{
 		Type:   "join",
 		RoomID: roomID,
-	})
+	}); err != nil {
+		return fmt.Errorf("send join packet failed: %w", err)
+	}
 
 	// Start receiver
 	go r.receiveLoop(stream)
+
+	return nil
+}
+
+func (r *PacketRouter) startPing(ctx context.Context) {
+	r.mu.Lock()
+	if r.pingTicker != nil {
+		r.pingTicker.Stop()
+	}
+	r.pingTicker = time.NewTicker(15 * time.Second)
+	r.mu.Unlock()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-r.pingTicker.C:
+			// Send a packet to the relay server to keep it announced, when
+			// playing alone
+			r.sendPacket(RelayPacket{Type: "ping"})
+		}
+	}
+}
+
+func (r *PacketRouter) startHostProbe(ctx context.Context, addr string, onDisconnect func()) error {
+	// Check if the connection to the game server can be established
+	conn, err := net.Dial("tcp", addr)
+	if err != nil {
+		return fmt.Errorf("could not connect to game server: %w", err)
+	}
+
+	// Check if the game server is still running
+	go func() {
+		buf := make([]byte, 1)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				_ = conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+
+				if _, err := conn.Read(buf); err != nil {
+					var ne net.Error
+					if errors.As(err, &ne) && ne.Timeout() {
+						continue
+					}
+
+					// Otherwise - reset connection with the relay server
+					onDisconnect()
+				}
+			}
+		}
+	}()
 
 	return nil
 }
@@ -211,7 +271,6 @@ func (r *PacketRouter) receiveLoop(stream quic.Stream) {
 		r.logger.Debug("Received packet", "data", data, "datastr", string(data))
 
 		d := json.NewDecoder(bytes.NewReader(data))
-
 		for {
 			var pkt RelayPacket
 			if err := d.Decode(&pkt); err != nil {
@@ -222,13 +281,10 @@ func (r *PacketRouter) receiveLoop(stream quic.Stream) {
 				break
 			}
 
-			// TODO: Fixme - in broadcast it fails
-			// if pkt.ToID != r.selfID {
-			//	r.logger.Warn("received packet from other peer does not match our own peer")
-			//	break
-			// }
-
-			log.Printf("Received from %s: %s", pkt.FromID, string(pkt.Payload))
+			if pkt.ToID != "" || pkt.ToID != r.selfID {
+				r.logger.Warn("received packet from other peer does not match our own peer")
+				break
+			}
 
 			switch pkt.Type {
 			case "join":

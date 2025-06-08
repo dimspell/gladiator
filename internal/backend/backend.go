@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/dimspell/gladiator/gen/multi/v1/multiv1connect"
+	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/packet"
 )
@@ -83,7 +84,7 @@ func (b *Backend) Start() error {
 	// Listen for incoming connections.
 	listener, err := net.Listen("tcp4", b.Addr)
 	if err != nil {
-		slog.Error("Could not start listening on port 6112", "err", err)
+		slog.Error("Could not start listening on port 6112", logging.Error(err))
 		return err
 	}
 	b.listener = listener
@@ -109,7 +110,7 @@ func (b *Backend) Shutdown() {
 
 		// TODO: Send a packet to close the connection (malformed 255-21?)
 		if err := session.Conn.Close(); err != nil {
-			slog.Error("Could not close session", "err", err, "session", session.ID)
+			slog.Error("Could not close session", logging.Error(err), "session", session.ID)
 		}
 
 		return true
@@ -117,7 +118,7 @@ func (b *Backend) Shutdown() {
 
 	if b.listener != nil {
 		if err := b.listener.Close(); err != nil {
-			slog.Warn("Could not close listener", "err", err)
+			slog.Warn("Could not close listener", logging.Error(err))
 		}
 		b.listener = nil
 	}
@@ -138,7 +139,7 @@ func (b *Backend) Listen() {
 			if errors.Is(err, net.ErrClosed) {
 				return
 			}
-			slog.Warn("Error, when accepting incoming connection", "err", err)
+			slog.Warn("Error, when accepting incoming connection", logging.Error(err))
 			continue
 		}
 		slog.Info("Accepted connection",
@@ -150,7 +151,7 @@ func (b *Backend) Listen() {
 		go func() {
 			if err := b.handleClient(conn); err != nil {
 				slog.Warn("Communication with client has failed",
-					"err", err)
+					logging.Error(err))
 			}
 		}()
 	}
@@ -163,24 +164,24 @@ func (b *Backend) handleClient(conn net.Conn) error {
 	session, err := b.handshake(conn)
 	if err != nil {
 		if err2 := conn.Close(); err2 != nil {
-			slog.Error("Could not close connection in handshake", "err", err)
+			slog.Error("Could not close connection in handshake", logging.Error(err))
 			return errors.Join(err, err2)
 		}
 		if err == io.EOF {
 			return nil
 		}
-		slog.Warn("Handshake failed", "error", err)
+		slog.Warn("Handshake failed", logging.Error(err))
 		return err
 	}
 	defer func() {
 		if err := b.CloseSession(session); err != nil {
-			slog.Warn("Close session failed", "err", err)
+			slog.Warn("Close session failed", logging.Error(err))
 		}
 	}()
 
 	for {
 		if err := b.handleCommands(ctx, session); err != nil {
-			slog.Warn("Command failed", "err", err)
+			slog.Warn("Command failed", logging.Error(err))
 			return err
 		}
 	}

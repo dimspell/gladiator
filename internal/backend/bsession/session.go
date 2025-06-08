@@ -49,6 +49,10 @@ func NewSession(tcpConn net.Conn) *Session {
 	}
 }
 
+func (s *Session) Stop() {
+	s.observerDone()
+}
+
 func (s *Session) SetLogonData(user *multiv1.User) {
 	s.Lock()
 	s.UserID = user.UserId
