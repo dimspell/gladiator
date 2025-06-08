@@ -152,6 +152,7 @@ func (rs *RelayServer) relayLoop(peerID string, stream quic.Stream) {
 			var pkt RelayPacket
 			if err := d.Decode(&pkt); err != nil {
 				if err == io.EOF {
+					// TODO: Maybe clear(buf) is needed?
 					break
 				}
 				rs.logger.Warn("relay packet unmarshal error", logging.Error(err), logging.PeerID(peerID))
