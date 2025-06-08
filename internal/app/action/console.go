@@ -2,10 +2,9 @@ package action
 
 import (
 	"context"
-	"log/slog"
-
 	"github.com/dimspell/gladiator/internal/console"
 	"github.com/urfave/cli/v3"
+	"log/slog"
 )
 
 func ConsoleCommand() *cli.Command {
@@ -44,7 +43,12 @@ func ConsoleCommand() *cli.Command {
 			}
 		}()
 
-		con := console.NewConsole(db, consoleAddr)
+		co, err := selectConsoleOptions(c)
+		if err != nil {
+			return err
+		}
+		con := console.NewConsole(db, consoleAddr, co...)
+
 		start, stop := con.Handlers()
 		return con.Graceful(ctx, start, stop)
 	}

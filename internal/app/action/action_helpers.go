@@ -2,6 +2,7 @@ package action
 
 import (
 	"fmt"
+	"github.com/dimspell/gladiator/internal/console"
 	"log/slog"
 	"net"
 
@@ -65,4 +66,13 @@ func selectProxy(c *cli.Command) (p backend.Proxy, err error) {
 	default:
 		return nil, fmt.Errorf("unknown proxy: %q", c.String("proxy"))
 	}
+}
+
+func selectConsoleOptions(c *cli.Command) ([]console.Option, error) {
+	var options []console.Option
+
+	consoleHost, _, _ := net.SplitHostPort(c.String("console-addr"))
+	options = append(options, console.WithRelayAddr(net.JoinHostPort(consoleHost, "9999")))
+
+	return options, nil
 }

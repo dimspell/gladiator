@@ -99,7 +99,11 @@ func ServeCommand() *cli.Command {
 		bd := backend.NewBackend(backendAddr, consoleAddr, px)
 		bd.SignalServerURL = c.String("lobby-addr")
 
-		con := console.NewConsole(db, consoleAddr)
+		co, err := selectConsoleOptions(c)
+		if err != nil {
+			return err
+		}
+		con := console.NewConsole(db, consoleAddr, co...)
 
 		startConsole, stopConsole := con.Handlers()
 
