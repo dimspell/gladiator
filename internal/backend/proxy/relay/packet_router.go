@@ -188,6 +188,7 @@ func (r *PacketRouter) startHostProbe(ctx context.Context, addr string, onDiscon
 
 					// Otherwise - reset connection with the relay server
 					onDisconnect()
+					return
 				}
 			}
 		}

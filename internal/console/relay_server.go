@@ -145,7 +145,7 @@ func (rs *RelayServer) relayLoop(peerID string, stream quic.Stream) {
 			continue
 		}
 
-		rs.logger.Debug("Following relay packets", "data", data, "datastr", string(data))
+		rs.logger.Debug("[RELAY]", "data", data)
 
 		d := json.NewDecoder(bytes.NewReader(data))
 		for {
