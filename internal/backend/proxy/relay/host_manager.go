@@ -72,7 +72,7 @@ func (hm *HostManager) assignIP(remoteID string) (string, error) {
 
 // StartGuestHost adds new dynamic joiner
 func (hm *HostManager) StartGuestHost(
-	peerIP string,
+	peerID string,
 	ipAddress string,
 	realTCPPort, realUDPPort int,
 	onReceiveTCP, onReceiveUDP func([]byte) error,
@@ -126,6 +126,8 @@ func (hm *HostManager) StartGuestHost(
 		g.Go(func() error {
 			wg.Done()
 			return tcpProxy.Run(ctx, func(p []byte) (err error) {
+				slog.Debug("[TCP] GameClient => Remote", "data", p, logging.PeerID(peerID))
+
 				host.LastSeen = time.Now()
 				return onReceiveTCP(p)
 			})
@@ -134,6 +136,8 @@ func (hm *HostManager) StartGuestHost(
 		g.Go(func() error {
 			wg.Done()
 			return udpProxy.Run(ctx, func(p []byte) (err error) {
+				slog.Debug("[UDP] GameClient => Remote", "data", p, logging.PeerID(peerID))
+
 				host.LastSeen = time.Now()
 				return onReceiveUDP(p)
 			})
@@ -147,7 +151,7 @@ func (hm *HostManager) StartGuestHost(
 	}(host)
 
 	hm.hosts[ipAddress] = host
-	hm.peerHosts[peerIP] = host
+	hm.peerHosts[peerID] = host
 
 	wg.Wait()
 	return host, nil
@@ -208,6 +212,8 @@ func (hm *HostManager) StartHost(
 		g.Go(func() error {
 			wg.Done()
 			return tcpProxy.Run(ctx, func(p []byte) (err error) {
+				slog.Debug("[TCP] GameClient => Remote", "data", p, logging.PeerID(peerID))
+
 				host.LastSeen = time.Now()
 				return onReceiveTCP(p)
 			})
@@ -216,6 +222,8 @@ func (hm *HostManager) StartHost(
 		g.Go(func() error {
 			wg.Done()
 			return udpProxy.Run(ctx, func(p []byte) (err error) {
+				slog.Debug("[UDP] GameClient => Remote", "data", p, logging.PeerID(peerID))
+
 				host.LastSeen = time.Now()
 				return onReceiveUDP(p)
 			})
