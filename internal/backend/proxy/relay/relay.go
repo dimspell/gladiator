@@ -85,6 +85,9 @@ func (r *Relay) HostRoom(ctx context.Context, params proxy.HostParams) error {
 	if err := r.session.SendSetRoomReady(ctx, params.GameID); err != nil {
 		return fmt.Errorf("could not send set room ready: %w", err)
 	}
+
+	go r.router.startPing(ctx)
+
 	return nil
 }
 
