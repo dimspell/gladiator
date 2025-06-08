@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -155,9 +156,44 @@ func (r *PacketRouter) startPing(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-r.pingTicker.C:
+			// Send a packet to the relay server to keep it announced, when
+			// playing alone
 			r.sendPacket(RelayPacket{Type: "ping"})
 		}
 	}
+}
+
+func (r *PacketRouter) startHostProbe(ctx context.Context, addr string, onDisconnect func()) error {
+	// Check if the connection to the game server can be established
+	conn, err := net.Dial("tcp", addr)
+	if err != nil {
+		return fmt.Errorf("could not connect to game server: %w", err)
+	}
+
+	// Check if the game server is still running
+	go func() {
+		buf := make([]byte, 1)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				_ = conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+
+				if _, err := conn.Read(buf); err != nil {
+					var ne net.Error
+					if errors.As(err, &ne) && ne.Timeout() {
+						continue
+					}
+
+					// Otherwise - reset connection with the relay server
+					onDisconnect()
+				}
+			}
+		}
+	}()
+
+	return nil
 }
 
 var hmacKey = []byte("shared-secret-key")

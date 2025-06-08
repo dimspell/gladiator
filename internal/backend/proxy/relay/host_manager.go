@@ -119,25 +119,27 @@ func (hm *HostManager) StartGuestHost(
 		ProxyUDP: udpProxy,
 	}
 
+	var wg sync.WaitGroup
+	wg.Add(3)
+
 	go func(host *FakeHost) {
 		g.Go(func() error {
+			wg.Done()
 			return tcpProxy.Run(ctx, func(p []byte) (err error) {
-				log.Printf("[TCP]: Game sent: %s", p)
-
 				host.LastSeen = time.Now()
 				return onReceiveTCP(p)
 			})
 		})
 
 		g.Go(func() error {
+			wg.Done()
 			return udpProxy.Run(ctx, func(p []byte) (err error) {
-				log.Printf("[UDP]: Game sent: %s", p)
-
 				host.LastSeen = time.Now()
 				return onReceiveUDP(p)
 			})
 		})
 
+		wg.Done()
 		if err := g.Wait(); err != nil {
 			slog.Warn("UDP/TCP fake host failed", logging.Error(err))
 			return
@@ -146,6 +148,8 @@ func (hm *HostManager) StartGuestHost(
 
 	hm.hosts[ipAddress] = host
 	hm.peerHosts[peerIP] = host
+
+	wg.Wait()
 	return host, nil
 }
 
@@ -174,7 +178,7 @@ func (hm *HostManager) StartHost(
 	if realTCPPort > 0 {
 		tcpProxy, err = redirect.ListenTCP(ipAddress, strconv.Itoa(realTCPPort))
 		if err != nil {
-			return nil, fmt.Errorf("failed to dial TCP: %w", err)
+			return nil, fmt.Errorf("failed to listen on TCP: %w", err)
 		}
 	}
 
@@ -182,7 +186,7 @@ func (hm *HostManager) StartHost(
 	if realUDPPort > 0 {
 		udpProxy, err = redirect.ListenUDP(ipAddress, strconv.Itoa(realUDPPort))
 		if err != nil {
-			return nil, fmt.Errorf("failed to dial UDP: %w", err)
+			return nil, fmt.Errorf("failed to listen on UDP: %w", err)
 		}
 	}
 
@@ -197,25 +201,27 @@ func (hm *HostManager) StartHost(
 		ProxyUDP: udpProxy,
 	}
 
+	var wg sync.WaitGroup
+	wg.Add(3)
+
 	go func(host *FakeHost) {
 		g.Go(func() error {
+			wg.Done()
 			return tcpProxy.Run(ctx, func(p []byte) (err error) {
-				log.Printf("[TCP]: TODO Received: %s", p)
-
 				host.LastSeen = time.Now()
 				return onReceiveTCP(p)
 			})
 		})
 
 		g.Go(func() error {
+			wg.Done()
 			return udpProxy.Run(ctx, func(p []byte) (err error) {
-				log.Printf("[UDP]: TODO Received: %s", p)
-
 				host.LastSeen = time.Now()
 				return onReceiveUDP(p)
 			})
 		})
 
+		wg.Done()
 		if err := g.Wait(); err != nil {
 			slog.Warn("UDP/TCP fake host failed", logging.Error(err))
 			return
@@ -224,6 +230,8 @@ func (hm *HostManager) StartHost(
 
 	hm.hosts[ipAddress] = host
 	hm.peerHosts[peerID] = host
+
+	wg.Wait()
 	return host, nil
 }
 
