@@ -233,6 +233,7 @@ func (mp *Multiplayer) JoinRoom(roomId string, userId int64, ipAddr string) (Gam
 
 	// Check if player was already added to game room
 	if _, ok := room.Players[userId]; ok {
+		slog.Warn("User already joined a room", "room", roomId, "user", userId)
 		return GameRoom{}, fmt.Errorf("user session %d already joined", userId)
 	}
 
