@@ -64,7 +64,7 @@ func ListenTCP(ipv4 string, portNumber string) (*ListenerTCP, error) {
 
 // Run listens for incoming TCP connection from the game client and forwards the
 // received data.
-func (p *ListenerTCP) Run(ctx context.Context, onReceive func(p []byte) (err error)) error {
+func (p *ListenerTCP) Run(ctx context.Context, onReceive func(p []byte) (err error)) (err error) {
 	go func() {
 		<-ctx.Done()
 		p.logger.Info("Listener shutting down due to context cancellation")
@@ -74,7 +74,13 @@ func (p *ListenerTCP) Run(ctx context.Context, onReceive func(p []byte) (err err
 	for {
 		conn, err := p.listener.Accept()
 		if err != nil {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
 			if errors.Is(err, net.ErrClosed) {
+				return nil
+			}
+			if errors.Is(err, io.EOF) {
 				return nil
 			}
 
