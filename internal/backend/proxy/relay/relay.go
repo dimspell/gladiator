@@ -88,7 +88,10 @@ func (r *Relay) HostRoom(ctx context.Context, params proxy.HostParams) error {
 	}
 
 	go r.router.startPing(ctx)
-	if err := r.router.startHostProbe(ctx, net.JoinHostPort("127.0.0.1", "6114"), r.router.Reset); err != nil {
+	if err := r.router.startHostProbe(ctx, net.JoinHostPort("127.0.0.1", "6114"), func() {
+		slog.Warn("Game server went offline")
+		r.router.Reset()
+	}); err != nil {
 		return fmt.Errorf("failed start the game server probe: %w", err)
 	}
 
@@ -179,8 +182,8 @@ func (r *Relay) Join(ctx context.Context, params proxy.JoinParams) (net.IP, erro
 				return nil, err
 			}
 			if err := r.router.startHostProbe(ctx, net.JoinHostPort(ipAddress, "6114"), func() {
-				slog.Warn("Host went offline", logging.PeerID(peerID), "lastSeen", host.LastSeen)
-				host.StopFunc()
+				slog.Warn("Host went offline", logging.PeerID(peerID), "lastSeen", host.LastSeen, "ip", ipAddress)
+				//host.StopFunc()
 			}); err != nil {
 				return nil, fmt.Errorf("failed start the game server probe: %w", err)
 			}

@@ -170,13 +170,16 @@ func (r *PacketRouter) startHostProbe(ctx context.Context, addr string, onDiscon
 		return fmt.Errorf("could not connect to game server: %w", err)
 	}
 
+	var once sync.Once
+
 	// Check if the game server is still running
 	go func() {
 		buf := make([]byte, 1)
 		for {
 			select {
 			case <-ctx.Done():
-				return
+				slog.Error("CONTEXT CANCELLED")
+				//return
 			default:
 				_ = conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 
@@ -187,7 +190,13 @@ func (r *PacketRouter) startHostProbe(ctx context.Context, addr string, onDiscon
 					}
 
 					// Otherwise - reset connection with the relay server
-					onDisconnect()
+					once.Do(onDisconnect)
+
+					if err == io.EOF {
+						return
+					}
+
+					slog.Error("connection read error", logging.Error(err))
 					return
 				}
 			}
@@ -279,11 +288,6 @@ func (r *PacketRouter) receiveLoop(stream quic.Stream) {
 					break
 				}
 				r.logger.Warn("failed to unmarshal packet", logging.Error(err))
-				break
-			}
-
-			if pkt.ToID != "" || pkt.ToID != r.selfID {
-				r.logger.Warn("received packet from other peer does not match our own peer")
 				break
 			}
 
@@ -392,6 +396,8 @@ func (r *PacketRouter) dynamicJoin(roomID string, peerID string, pkt RelayPacket
 	r.manager.hosts[ip] = host
 	r.manager.peerHosts[peerID] = host
 	r.manager.mu.Unlock()
+
+	// TODO: There is no probe for checking if it exist?
 }
 
 func (r *PacketRouter) leaveRoom(peerID string) {
