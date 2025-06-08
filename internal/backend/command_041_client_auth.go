@@ -7,6 +7,7 @@ import (
 
 	"connectrpc.com/connect"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
+	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/packet"
 )
@@ -18,7 +19,7 @@ func (b *Backend) HandleClientAuthentication(ctx context.Context, session *bsess
 
 	data, err := req.Parse()
 	if err != nil {
-		slog.Warn("Invalid packet", "error", err)
+		slog.Warn("Invalid packet", logging.Error(err))
 		return nil
 	}
 
@@ -28,13 +29,13 @@ func (b *Backend) HandleClientAuthentication(ctx context.Context, session *bsess
 		Password: data.Password,
 	}))
 	if err != nil {
-		slog.Debug("packet-41: could not sign in", "err", err)
+		slog.Debug("packet-41: could not sign in", logging.Error(err))
 		return session.SendToGame(packet.ClientAuthentication, []byte{0, 0, 0, 0})
 	}
 
 	// Connect to the lobby server.
 	if err = b.ConnectToLobby(ctx, user.Msg.User, session); err != nil {
-		slog.Debug("packet-41: could not connect to lobby", "err", err)
+		slog.Debug("packet-41: could not connect to lobby", logging.Error(err))
 		return session.SendToGame(packet.ClientAuthentication, []byte{0, 0, 0, 0})
 	}
 

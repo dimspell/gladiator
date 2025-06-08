@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+
+	"github.com/dimspell/gladiator/internal/app/logger/logging"
 )
 
 // LineReader reads lines from stdin and writes to an io.Writer.
@@ -33,14 +35,14 @@ func (p *LineReader) Run(ctx context.Context, onReceive func(p []byte) (err erro
 		default:
 			line := scanner.Text()
 			if err := onReceive([]byte(line + "\n")); err != nil {
-				p.logger.Error("Failed to write line", "error", err)
+				p.logger.Error("Failed to write line", logging.Error(err))
 				return fmt.Errorf("line-reader: failed to write output: %w", err)
 			}
 		}
 	}
 
 	if err := scanner.Err(); err != nil {
-		p.logger.Error("Error reading input", "error", err)
+		p.logger.Error("Error reading input", logging.Error(err))
 		return fmt.Errorf("line-reader: error reading input: %w", err)
 	}
 
@@ -52,7 +54,7 @@ func (p *LineReader) Run(ctx context.Context, onReceive func(p []byte) (err erro
 func (p *LineReader) Write(msg []byte) (int, error) {
 	n, err := fmt.Fprintf(os.Stdout, "%s\n", msg)
 	if err != nil {
-		p.logger.Error("Failed to write to stdout", "error", err)
+		p.logger.Error("Failed to write to stdout", logging.Error(err))
 		return n, fmt.Errorf("line-reader: failed to write to stdout: %w", err)
 	}
 	return n, nil

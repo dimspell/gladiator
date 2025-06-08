@@ -7,6 +7,7 @@ import (
 
 	"connectrpc.com/connect"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
+	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/packet"
 )
@@ -18,7 +19,7 @@ func (b *Backend) HandleGetCharacterSpells(ctx context.Context, session *bsessio
 
 	data, err := req.Parse()
 	if err != nil {
-		slog.Warn("Invalid packet", "error", err)
+		slog.Warn("Invalid packet", logging.Error(err))
 		return nil
 	}
 
@@ -33,7 +34,7 @@ func (b *Backend) HandleGetCharacterSpells(ctx context.Context, session *bsessio
 	character := respChar.Msg.Character
 
 	if len(character.Spells) != 43 {
-		slog.Warn("packet-72: spells array should be 43-chars long", "spells", character.Spells, "err", err)
+		slog.Warn("packet-72: spells array should be 43-chars long", "spells", character.Spells, logging.Error(err))
 		return nil
 	}
 	for i := 0; i < 41; i++ {

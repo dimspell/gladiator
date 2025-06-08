@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net"
 
+	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/packet"
 	"github.com/dimspell/gladiator/internal/backend/proxy"
@@ -90,7 +91,7 @@ func (p *LAN) Join(ctx context.Context, params proxy.JoinParams) (net.IP, error)
 	}
 
 	if p.GameRoom == nil {
-		return nil, fmt.Errorf("could not find current session among the peers for user ID: %s", p.Session.GetUserID())
+		return nil, fmt.Errorf("could not find current session among the peers for user ID: %d", p.Session.UserID)
 	}
 	p.GameRoom.SetPlayer(p.Session.ToPlayer(ip))
 
@@ -162,7 +163,7 @@ func (p *LAN) Handle(ctx context.Context, payload []byte) error {
 		copy(response[4:], ip.To4())
 
 		if err := p.Session.SendToGame(packet.HostMigration, response); err != nil {
-			slog.Error("Failed to send host migration response", "error", err)
+			slog.Error("Failed to send host migration response", logging.Error(err))
 			return nil
 		}
 	default:

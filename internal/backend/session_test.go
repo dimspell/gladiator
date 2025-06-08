@@ -1,4 +1,4 @@
-package bsession
+package backend
 
 import (
 	"context"
@@ -10,6 +10,7 @@ import (
 
 	v1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/internal/app/logger"
+	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/model"
 	"github.com/stretchr/testify/assert"
 )
@@ -21,9 +22,9 @@ func TestBackend_RegisterNewObserver(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	b, _ := helperNewBackend(t)
+	b, _, _ := helperNewBackend(t)
 	conn := &mockConn{RemoteAddress: &net.IPAddr{IP: net.ParseIP("127.0.0.1")}}
-	session := &Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
+	session := &bsession.Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
 
 	if err := b.ConnectToLobby(ctx, &v1.User{UserId: session.UserID, Username: session.Username}, session); err != nil {
 		t.Error(err)
@@ -32,7 +33,7 @@ func TestBackend_RegisterNewObserver(t *testing.T) {
 	if len(conn.Written) != 0 {
 		t.Error("expected no data written to the backend client")
 	}
-	session.observerDone()
+	session.Stop()
 }
 
 func TestBackend_UpdateCharacterInfo(t *testing.T) {
@@ -41,9 +42,9 @@ func TestBackend_UpdateCharacterInfo(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	b, cs := helperNewBackend(t)
+	b, _, cs := helperNewBackend(t)
 	conn := &mockConn{}
-	session := &Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
+	session := &bsession.Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
 
 	// Authentication
 	if err := b.ConnectToLobby(ctx, &v1.User{UserId: session.UserID, Username: session.Username}, session); err != nil {
@@ -56,7 +57,7 @@ func TestBackend_UpdateCharacterInfo(t *testing.T) {
 	session.ClassType = model.ClassTypeMage
 
 	// First call, after approved character selection
-	if err := b.JoinLobby(ctx, session); err != nil {
+	if err := session.JoinLobby(ctx); err != nil {
 		t.Error(err)
 		return
 	}
@@ -64,7 +65,7 @@ func TestBackend_UpdateCharacterInfo(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	defer session.observerDone()
+	defer session.Stop()
 
 	us, ok := cs.Multiplayer.GetUserSession(2137)
 	if !ok {
@@ -87,41 +88,3 @@ func TestBackend_UpdateCharacterInfo(t *testing.T) {
 	time.Sleep(1 * time.Second)
 	cs.Multiplayer.DebugState()
 }
-
-// type mockWS struct {
-//	Written []byte
-// }
-//
-// func (m *mockWS) Write(ctx context.Context, messageType websocket.MessageType, p []byte) error {
-//	m.Written = append(m.Written, p...)
-//	return nil
-// }
-//
-// func TestSession_SendChatMessage(t *testing.T) {
-//	ctx := context.Background()
-//	wsConn := &mockWS{}
-//	session := &Session{CreatorID: 1, Username: "hello"}
-//	text := "Hello, World!"
-//	//if err := session.SendChatMessage(context.Background(), "Hello, World!"); err != nil {
-//	//	t.Error(err)
-//	//	return
-//	//}
-//
-//	if err := wire.Write(ctx, wsConn, wire.ComposeTyped(
-//		wire.Chat,
-//		wire.MessageContent[wire.ChatMessage]{
-//			From: fmt.Sprintf("%d", session.CreatorID),
-//			Type: wire.Chat,
-//			Content: wire.ChatMessage{
-//				User: session.Username,
-//				Text: text,
-//			},
-//		}),
-//	); err != nil {
-//		t.Error(err)
-//		return
-//	}
-//
-//	fmt.Println(wsConn.Written)
-//	fmt.Println(string(wsConn.Written))
-// }

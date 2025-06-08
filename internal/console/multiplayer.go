@@ -11,6 +11,7 @@ import (
 
 	"github.com/coder/websocket"
 	v1 "github.com/dimspell/gladiator/gen/multi/v1"
+	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"github.com/dimspell/gladiator/internal/wire"
 )
 
@@ -186,10 +187,10 @@ func (mp *Multiplayer) HandleSession(ctx context.Context, session *UserSession) 
 				// connection reset by peer
 				return nil
 			case websocket.StatusNormalClosure:
-				slog.Debug("Closing because of", "error", err)
+				slog.Debug("Closing because of", logging.Error(err))
 				return err
 			default:
-				slog.Error("Could not handle the message", "error", err)
+				slog.Error("Could not handle the message", logging.Error(err))
 				return err
 			}
 		}
@@ -197,7 +198,7 @@ func (mp *Multiplayer) HandleSession(ctx context.Context, session *UserSession) 
 		// Enqueue message
 		_, m, err := wire.Decode(payload)
 		if err != nil {
-			slog.Error("Could not decode the message", "error", err, "payload", string(payload))
+			slog.Error("Could not decode the message", logging.Error(err), "payload", string(payload))
 			return err
 		}
 		mp.Messages <- m
@@ -399,9 +400,6 @@ func (mp *Multiplayer) AnnounceJoin(room GameRoom, userId int64) {
 		if id == userId {
 			continue
 		}
-		if userId == 0 {
-			panic("userId is zero")
-		}
 		session.Send(ctx, wire.Compose(wire.JoinRoom, wire.Message{
 			To:   strconv.Itoa(int(id)),
 			From: strconv.Itoa(int(userId)),
@@ -515,7 +513,7 @@ func (mp *Multiplayer) SetPlayerDisconnected(session *UserSession) {
 
 	// Close the websocket connection
 	if err := session.wsConn.CloseNow(); err != nil {
-		slog.Debug("Could not close the connection", "user", session.UserID, "error", err)
+		slog.Debug("Could not close the connection", "user", session.UserID, logging.Error(err))
 	}
 
 	// Kick the user from the game room (if any)

@@ -9,6 +9,8 @@ import (
 	"net"
 	"sync"
 	"time"
+
+	"github.com/dimspell/gladiator/internal/app/logger/logging"
 )
 
 var _ Redirect = (*ListenerTCP)(nil)
@@ -84,7 +86,7 @@ func (p *ListenerTCP) Run(ctx context.Context, onReceive func(p []byte) (err err
 				return nil
 			}
 
-			p.logger.Error("Failed to accept TCP connection", "error", err)
+			p.logger.Error("Failed to accept TCP connection", logging.Error(err))
 			continue
 		}
 
@@ -101,7 +103,7 @@ func (p *ListenerTCP) Run(ctx context.Context, onReceive func(p []byte) (err err
 
 		go func() {
 			if err := p.handleConnection(ctx, conn, onReceive); err != nil {
-				p.logger.Error("Error handling connection", "error", err)
+				p.logger.Error("Error handling connection", logging.Error(err))
 			}
 		}()
 	}
@@ -113,7 +115,7 @@ func (p *ListenerTCP) handleConnection(ctx context.Context, conn TCPConn, onRece
 	defer func() {
 		p.logger.Debug("Closing TCP connection", "remote-addr", conn.RemoteAddr())
 		if err := conn.Close(); err != nil {
-			p.logger.Warn("Error closing TCP connection", "error", err)
+			p.logger.Warn("Error closing TCP connection", logging.Error(err))
 		}
 	}()
 
@@ -139,14 +141,14 @@ func (p *ListenerTCP) handleConnection(ctx context.Context, conn TCPConn, onRece
 					p.logger.Info("Client closed the connection")
 					return nil
 				}
-				p.logger.Warn("Error reading from TCP connection", "error", err)
+				p.logger.Warn("Error reading from TCP connection", logging.Error(err))
 				return fmt.Errorf("listener-tcp: failed to read data: %w", err)
 			}
 
 			p.logger.Debug("Received packet from the game client", "size", n, "data", buf[:n])
 
 			if err := onReceive(buf[:n]); err != nil {
-				p.logger.Warn("Failed to write data", "error", err)
+				p.logger.Warn("Failed to write data", logging.Error(err))
 				return fmt.Errorf("listener-tcp: failed to write to data channel: %w", err)
 			}
 		}
@@ -164,7 +166,7 @@ func (p *ListenerTCP) Write(msg []byte) (int, error) {
 
 	n, err := p.conn.Write(msg)
 	if err != nil {
-		p.logger.Error("Failed to send data", "error", err)
+		p.logger.Error("Failed to send data", logging.Error(err))
 		return n, fmt.Errorf("listener-tcp: write failed: %w", err)
 	}
 

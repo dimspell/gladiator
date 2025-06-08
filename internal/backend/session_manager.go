@@ -8,6 +8,7 @@ import (
 
 	"github.com/coder/websocket"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
+	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/proxy"
 )
@@ -57,7 +58,7 @@ func (b *Backend) RegisterNewObserver(ctx context.Context, session *bsession.Ses
 				if errors.Is(err, context.Canceled) {
 					return
 				}
-				slog.Error("Error reading from WebSocket", "session", session.ID, "error", err)
+				slog.Error("Error reading from WebSocket", "session", session.ID, logging.Error(err))
 				return
 			}
 
@@ -66,7 +67,7 @@ func (b *Backend) RegisterNewObserver(ctx context.Context, session *bsession.Ses
 			// TODO: Register handlers and handle them here.
 			for _, handleFn := range handlers {
 				if err := handleFn(ctx, p); err != nil {
-					slog.Error("Error handling message", "session", session.ID, "error", err)
+					slog.Error("Error handling message", "session", session.ID, logging.Error(err))
 					return
 				}
 			}

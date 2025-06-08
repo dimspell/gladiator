@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -56,7 +57,7 @@ func (p *ListenerUDP) Run(ctx context.Context, onReceive func(p []byte) (err err
 	defer func() {
 		p.logger.Info("Closing UDP listener")
 		if err := p.conn.Close(); err != nil {
-			p.logger.Error("Error closing UDP listener", "error", err)
+			p.logger.Error("Error closing UDP listener", logging.Error(err))
 		}
 	}()
 
@@ -80,7 +81,7 @@ func (p *ListenerUDP) Run(ctx context.Context, onReceive func(p []byte) (err err
 					if errors.As(err, &ne) && ne.Timeout() {
 						continue
 					}
-					p.logger.Warn("Failed to read UDP message", "error", err)
+					p.logger.Warn("Failed to read UDP message", logging.Error(err))
 					return fmt.Errorf("listen-udp: read error: %w", err)
 				}
 
@@ -91,7 +92,7 @@ func (p *ListenerUDP) Run(ctx context.Context, onReceive func(p []byte) (err err
 
 				// Forward the received message
 				if err := onReceive(buf[:n]); err != nil {
-					p.logger.Warn("Failed to write message", "error", err, "payload", buf[:n])
+					p.logger.Warn("Failed to write message", logging.Error(err), "payload", buf[:n])
 					return fmt.Errorf("listen-udp: write error: %w", err)
 				}
 
@@ -111,7 +112,7 @@ func (p *ListenerUDP) Write(msg []byte) (int, error) {
 
 	n, err := p.conn.WriteTo(msg, p.addr)
 	if err != nil {
-		p.logger.Warn("Failed to send UDP message", "error", err)
+		p.logger.Warn("Failed to send UDP message", logging.Error(err))
 		return n, fmt.Errorf("listen-udp: send failed: %w", err)
 	}
 
@@ -130,7 +131,7 @@ func (p *ListenerUDP) setRemoteAddr(addr *net.UDPAddr) {
 func (p *ListenerUDP) Close() error {
 	err := p.conn.Close()
 	if err != nil {
-		p.logger.Error("Failed to close UDP connection", "error", err)
+		p.logger.Error("Failed to close UDP connection", logging.Error(err))
 		return fmt.Errorf("listen-udp: close error: %w", err)
 	}
 	p.logger.Info("UDP listener closed")

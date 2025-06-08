@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/dimspell/gladiator/internal/app/logger"
+	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"github.com/dimspell/gladiator/internal/backend"
 	"github.com/dimspell/gladiator/internal/console"
 	"github.com/lmittmann/tint"
@@ -73,7 +74,7 @@ func ServeCommand() *cli.Command {
 		}
 		defer func() {
 			if err := db.Close(); err != nil {
-				slog.Error("Failed to close database", "error", err)
+				slog.Error("Failed to close database", logging.Error(err))
 			}
 		}()
 

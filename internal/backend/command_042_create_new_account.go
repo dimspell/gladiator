@@ -7,6 +7,7 @@ import (
 
 	"connectrpc.com/connect"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
+	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/packet"
 )
@@ -15,7 +16,7 @@ import (
 func (b *Backend) HandleCreateNewAccount(ctx context.Context, session *bsession.Session, req CreateNewAccountRequest) error {
 	data, err := req.Parse()
 	if err != nil {
-		slog.Warn("Invalid packet", "error", err)
+		slog.Warn("Invalid packet", logging.Error(err))
 		return nil
 	}
 
@@ -24,7 +25,7 @@ func (b *Backend) HandleCreateNewAccount(ctx context.Context, session *bsession.
 		Password: data.Password,
 	}))
 	if err != nil {
-		slog.Warn("packet-42: could not save new user into database", "err", err)
+		slog.Warn("packet-42: could not save new user into database", logging.Error(err))
 		return session.SendToGame(packet.CreateNewAccount, []byte{0, 0, 0, 0})
 	}
 

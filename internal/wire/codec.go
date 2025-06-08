@@ -5,6 +5,7 @@ import (
 	"io"
 	"log/slog"
 
+	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"github.com/fxamacker/cbor/v2"
 )
 
@@ -58,7 +59,7 @@ func MustEncode(m any) []byte {
 func Encode(m any) ([]byte, error) {
 	out, err := DefaultCodec.Marshal(m)
 	if err != nil {
-		slog.Error("Could not marshal the websocket message", "error", err)
+		slog.Error("Could not marshal the websocket message", logging.Error(err))
 		return nil, err
 	}
 	return out, nil

@@ -11,6 +11,7 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/data/binding"
+	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"github.com/dimspell/gladiator/internal/backend"
 	"github.com/dimspell/gladiator/internal/backend/proxy/direct"
 	"github.com/dimspell/gladiator/internal/console"
@@ -79,7 +80,7 @@ func (c *Controller) StartConsole(databaseType, databasePath, consoleAddr string
 
 	// Update the database to the latest migration
 	if err := database.Seed(db.Write); err != nil {
-		slog.Warn("Seed queries failed, likely it was run already", "error", err)
+		slog.Warn("Seed queries failed, likely it was run already", logging.Error(err))
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())

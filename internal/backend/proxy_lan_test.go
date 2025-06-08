@@ -39,6 +39,7 @@ func TestE2E_LAN(t *testing.T) {
 
 	cs := &console.Console{
 		Multiplayer: console.NewMultiplayer(),
+		Config:      console.DefaultConfig(),
 		DB:          db,
 	}
 	ts := httptest.NewServer(cs.HttpRouter())

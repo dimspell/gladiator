@@ -13,6 +13,7 @@ import (
 
 	v1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/internal/app/logger"
+	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"github.com/dimspell/gladiator/internal/backend/packet"
 	"github.com/dimspell/gladiator/internal/backend/proxy/p2p"
 	"github.com/dimspell/gladiator/internal/console"
@@ -48,6 +49,7 @@ func TestE2E_P2P(t *testing.T) {
 
 	cs := &console.Console{
 		Multiplayer: console.NewMultiplayer(),
+		Config:      console.DefaultConfig(),
 		DB:          db,
 	}
 	ts := httptest.NewServer(cs.HttpRouter())
@@ -319,7 +321,7 @@ func helperStartGameServer(t testing.TB) {
 				resp := append([]byte{27, 0}, buf[1:n]...)
 				_, err := udpConn.WriteToUDP(resp, udpAddr)
 				if err != nil {
-					slog.Debug("Failed to write to UDP", "error", err)
+					slog.Debug("Failed to write to UDP", logging.Error(err))
 					return
 				}
 				slog.Debug("UDP response", "response", string(resp))

@@ -45,7 +45,7 @@ func TestConsole_Handlers(t *testing.T) {
 	})
 
 	t.Run("Connect to websocket", func(t *testing.T) {
-		c := &Console{}
+		c := &Console{Config: DefaultConfig()}
 		ts := httptest.NewServer(c.HttpRouter())
 		defer ts.Close()
 

@@ -11,6 +11,7 @@ import (
 	"connectrpc.com/connect"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/gen/multi/v1/multiv1connect"
+	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"github.com/dimspell/gladiator/internal/console/database"
 	"github.com/dimspell/gladiator/internal/model"
 )
@@ -29,7 +30,7 @@ func (s *characterServiceServer) ListCharacters(ctx context.Context, req *connec
 
 	user, err := s.DB.Read.GetUserByID(ctx, req.Msg.UserId)
 	if err != nil {
-		slog.Warn("could not get user", "err", err, "user_id", req.Msg.GetUserId())
+		slog.Warn("could not get user", logging.Error(err), "user_id", req.Msg.GetUserId())
 		return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("user not found"))
 	}
 

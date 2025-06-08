@@ -2,9 +2,11 @@ package action
 
 import (
 	"context"
+	"log/slog"
+
+	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"github.com/dimspell/gladiator/internal/console"
 	"github.com/urfave/cli/v3"
-	"log/slog"
 )
 
 func ConsoleCommand() *cli.Command {
@@ -39,7 +41,7 @@ func ConsoleCommand() *cli.Command {
 		}
 		defer func() {
 			if err := db.Close(); err != nil {
-				slog.Error("Failed to close database", "error", err)
+				slog.Error("Failed to close database", logging.Error(err))
 			}
 		}()
 

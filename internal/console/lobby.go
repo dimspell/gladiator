@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/coder/websocket"
+	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"github.com/dimspell/gladiator/internal/wire"
 )
 
@@ -37,7 +38,7 @@ func (c *Console) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		slog.Error("Could not accept the connection",
-			"error", err,
+			logging.Error(err),
 			"origin", r.Header.Get("Origin"),
 			"userId", userID,
 			"channelName", channelName)

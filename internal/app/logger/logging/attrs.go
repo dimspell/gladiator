@@ -2,15 +2,13 @@ package logging
 
 import (
 	"log/slog"
-
-	"github.com/dimspell/gladiator/internal/backend/bsession"
 )
 
-func SessionID(session *bsession.Session) slog.Attr {
-	return slog.String("sessionId", session.ID)
-}
-
 func Error(err error) slog.Attr {
+	if err == nil {
+		slog.Error("Going to log nil error")
+		return slog.String("error", "<nil>")
+	}
 	return slog.String("error", err.Error())
 }
 

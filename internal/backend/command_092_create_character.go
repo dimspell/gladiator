@@ -7,6 +7,7 @@ import (
 
 	"connectrpc.com/connect"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
+	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/packet"
 	"github.com/dimspell/gladiator/internal/model"
@@ -19,7 +20,7 @@ func (b *Backend) HandleCreateCharacter(ctx context.Context, session *bsession.S
 
 	data, err := req.Parse()
 	if err != nil {
-		slog.Warn("Invalid packet", "error", err)
+		slog.Warn("Invalid packet", logging.Error(err))
 		return nil
 	}
 
@@ -30,7 +31,7 @@ func (b *Backend) HandleCreateCharacter(ctx context.Context, session *bsession.S
 			Stats:         data.Info,
 		}))
 	if err != nil {
-		slog.Error("Could not create a character", "err", err)
+		slog.Error("Could not create a character", logging.Error(err))
 		return session.SendToGame(packet.CreateCharacter, []byte{0, 0, 0, 0})
 	}
 
@@ -43,7 +44,7 @@ func (b *Backend) HandleCreateCharacter(ctx context.Context, session *bsession.S
 
 // TODO: check if there is any additional not recognised byte at the end like slot number
 type CreateCharacterRequest []byte
-
+  
 type CreateCharacterRequestData struct {
 	Info          []byte
 	ParsedInfo    model.CharacterInfo

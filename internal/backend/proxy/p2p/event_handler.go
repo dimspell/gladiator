@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"strconv"
 
+	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"github.com/dimspell/gladiator/internal/backend/redirect"
 	"github.com/dimspell/gladiator/internal/wire"
 	"github.com/pion/webrtc/v4"
@@ -81,7 +82,7 @@ const errDecodingPayload = "failed to decode payload for event: %s"
 func decodeAndHandle[T any](ctx context.Context, payload []byte, eventName string, handler func(context.Context, T) error) error {
 	_, msg, err := wire.DecodeTyped[T](payload)
 	if err != nil {
-		slog.Error(fmt.Sprintf(errDecodingPayload, eventName), "error", err, "payload", string(payload))
+		slog.Error(fmt.Sprintf(errDecodingPayload, eventName), logging.Error(err), "payload", string(payload))
 		return err
 	}
 	return handler(ctx, msg.Content)
@@ -91,7 +92,7 @@ func decodeAndHandle[T any](ctx context.Context, payload []byte, eventName strin
 func handleRTCMessage[T any](ctx context.Context, payload []byte, eventName string, userID int64, handler func(context.Context, T, int64) error) error {
 	_, msg, err := wire.DecodeTyped[T](payload)
 	if err != nil {
-		slog.Error(fmt.Sprintf(errDecodingPayload, eventName), "error", err)
+		slog.Error(fmt.Sprintf(errDecodingPayload, eventName), logging.Error(err))
 		return err
 	}
 
@@ -129,7 +130,7 @@ func (h *PeerToPeerMessageHandler) handleJoinRoom(ctx context.Context, player wi
 
 	peer, err := h.peerManager.CreatePeer(player)
 	if err != nil {
-		logger.Warn("Could not add a peer", "error", err)
+		logger.Warn("Could not add a peer", logging.Error(err))
 		return err
 	}
 
@@ -176,12 +177,12 @@ func (h *PeerToPeerMessageHandler) handleRTCOffer(ctx context.Context, offer wir
 		case peer.channelName("game", fromUserID, h.UserID):
 			redirTCP, err := h.newTCPRedirect(peer.Mode, peer.Addr)
 			if err != nil {
-				logger.Error("Could not create TCP redirect", "error", err)
+				logger.Error("Could not create TCP redirect", logging.Error(err))
 				return
 			}
 			redirUDP, err := h.newUDPRedirect(peer.Mode, peer.Addr)
 			if err != nil {
-				logger.Error("Could not create UDP redirect", "error", err)
+				logger.Error("Could not create UDP redirect", logging.Error(err))
 				return
 			}
 
@@ -190,14 +191,14 @@ func (h *PeerToPeerMessageHandler) handleRTCOffer(ctx context.Context, offer wir
 		// case peer.channelName("tcp", fromUserID, h.CreatorID):
 		// 	redir, err = h.newTCPRedirect(peer.Mode, peer.Addr)
 		// 	if err != nil {
-		// 		logger.Error("Could not create TCP redirect", "error", err)
+		// 		logger.Error("Could not create TCP redirect", logging.Error(err))
 		// 		return
 		// 	}
 		// 	peer.PipeTCP = NewPipe(ctx, logger, dc, redir)
 		// case peer.channelName("udp", fromUserID, h.CreatorID):
 		// 	redir, err = h.newUDPRedirect(peer.Mode, peer.Addr)
 		// 	if err != nil {
-		// 		logger.Error("Could not create UDP redirect", "error", err)
+		// 		logger.Error("Could not create UDP redirect", logging.Error(err))
 		// 		return
 		// 	}
 		// 	peer.PipeUDP = NewPipe(ctx, logger, dc, redir)
