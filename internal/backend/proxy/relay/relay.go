@@ -183,7 +183,7 @@ func (r *Relay) Join(ctx context.Context, params proxy.JoinParams) (net.IP, erro
 			}
 			if err := r.router.startHostProbe(ctx, net.JoinHostPort(ipAddress, "6114"), func() {
 				slog.Warn("Host went offline", logging.PeerID(peerID), "lastSeen", host.LastSeen, "ip", ipAddress)
-				//host.StopFunc()
+				host.StopFunc()
 			}); err != nil {
 				return nil, fmt.Errorf("failed start the game server probe: %w", err)
 			}
