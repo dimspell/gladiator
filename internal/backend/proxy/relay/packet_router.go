@@ -31,11 +31,16 @@ type PacketRouter struct {
 	currentHostID string
 	relayConn     quic.Connection
 	stream        quic.Stream
+	pingTicker    *time.Ticker
 }
 
 func (r *PacketRouter) Reset() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+
+	if r.pingTicker != nil {
+		r.pingTicker.Stop()
+	}
 
 	if r.relayConn != nil {
 		_ = r.relayConn.CloseWithError(0, "done")
@@ -109,8 +114,8 @@ func (r *PacketRouter) connect(ctx context.Context, roomID string) error {
 		NextProtos:         []string{"game-relay"},
 	}
 	conn, err := quic.DialAddr(ctx, r.relayAddr, tlsConf, &quic.Config{
-		MaxIdleTimeout:  300 * time.Second,
-		KeepAlivePeriod: 250 * time.Second,
+		MaxIdleTimeout:  45 * time.Second,
+		KeepAlivePeriod: 30 * time.Second,
 	})
 	if err != nil {
 		return fmt.Errorf("quic dial failed: %w", err)
@@ -124,15 +129,35 @@ func (r *PacketRouter) connect(ctx context.Context, roomID string) error {
 	r.stream = stream
 
 	// Send "join" packet
-	r.sendPacket(RelayPacket{
+	if err := r.sendPacket(RelayPacket{
 		Type:   "join",
 		RoomID: roomID,
-	})
+	}); err != nil {
+		return fmt.Errorf("send join packet failed: %w", err)
+	}
 
 	// Start receiver
 	go r.receiveLoop(stream)
 
 	return nil
+}
+
+func (r *PacketRouter) startPing(ctx context.Context) {
+	r.mu.Lock()
+	if r.pingTicker != nil {
+		r.pingTicker.Stop()
+	}
+	r.pingTicker = time.NewTicker(15 * time.Second)
+	r.mu.Unlock()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-r.pingTicker.C:
+			r.sendPacket(RelayPacket{Type: "ping"})
+		}
+	}
 }
 
 var hmacKey = []byte("shared-secret-key")
