@@ -65,41 +65,31 @@ func ListenTCP(ipv4 string, portNumber string) (*ListenerTCP, error) {
 // Run listens for incoming TCP connection from the game client and forwards the
 // received data.
 func (p *ListenerTCP) Run(ctx context.Context, onReceive func(p []byte) (err error)) error {
-	defer func() {
-		p.logger.Info("Shutting down TCP listener")
-		if p.listener == nil {
-			return
-		}
-		if err := p.listener.Close(); err != nil {
-			p.logger.Error("Error closing listener", "error", err)
-		}
-	}()
-
-	// Goroutine to handle shutdown on context cancellation
 	go func() {
 		<-ctx.Done()
 		p.logger.Info("Listener shutting down due to context cancellation")
-		if p.listener != nil {
-			p.listener.Close()
-		}
+		p.Close()
 	}()
 
 	for {
 		conn, err := p.listener.Accept()
 		if err != nil {
-			select {
-			case <-ctx.Done():
-				return ctx.Err() // Exit gracefully on context cancellation
-			default:
-				p.logger.Error("Failed to accept TCP connection", "error", err)
-				continue
+			if errors.Is(err, net.ErrClosed) {
+				return nil
 			}
+
+			p.logger.Error("Failed to accept TCP connection", "error", err)
+			continue
 		}
 
 		p.logger.Debug("Accepted new connection", "remote-addr", conn.RemoteAddr())
 
 		// Store the latest active connection
 		p.mu.Lock()
+		if p.conn != nil {
+			p.logger.Info("Closing old connection")
+			p.conn.Close()
+		}
 		p.conn = conn
 		p.mu.Unlock()
 
@@ -115,10 +105,6 @@ func (p *ListenerTCP) Run(ctx context.Context, onReceive func(p []byte) (err err
 // from the game client.
 func (p *ListenerTCP) handleConnection(ctx context.Context, conn TCPConn, onReceive func(p []byte) (err error)) error {
 	defer func() {
-		p.mu.Lock()
-		p.conn = nil
-		p.mu.Unlock()
-
 		p.logger.Debug("Closing TCP connection", "remote-addr", conn.RemoteAddr())
 		if err := conn.Close(); err != nil {
 			p.logger.Warn("Error closing TCP connection", "error", err)
@@ -135,7 +121,8 @@ func (p *ListenerTCP) handleConnection(ctx context.Context, conn TCPConn, onRece
 		default:
 			clear(buf)
 
-			conn.SetReadDeadline(time.Now().Add(10 * time.Second))
+			_ = conn.SetReadDeadline(time.Now().Add(10 * time.Second))
+
 			n, err := conn.Read(buf)
 			if err != nil {
 				var ne net.Error
@@ -150,7 +137,7 @@ func (p *ListenerTCP) handleConnection(ctx context.Context, conn TCPConn, onRece
 				return fmt.Errorf("listener-tcp: failed to read data: %w", err)
 			}
 
-			p.logger.Debug("Received data", "size", n, "data", buf[:n])
+			p.logger.Debug("Received packet from the game client", "size", n, "data", buf[:n])
 
 			if err := onReceive(buf[:n]); err != nil {
 				p.logger.Warn("Failed to write data", "error", err)
@@ -189,12 +176,10 @@ func (p *ListenerTCP) Close() error {
 	// Close active TCP connection if present
 	if p.conn != nil {
 		errConn = p.conn.Close()
-		p.conn = nil
 	}
 
 	// Close the TCP listener
 	errListener = p.listener.Close()
-	p.listener = nil
 
 	if errConn != nil || errListener != nil {
 		return errors.Join(errConn, errListener)

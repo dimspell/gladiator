@@ -187,3 +187,51 @@ func TestListenerTCP_Close(t *testing.T) {
 		t.Error("expected connection to be closed")
 	}
 }
+
+func TestListenerTCP_ReceivesAndCallsCallback(t *testing.T) {
+	sendConn, handleConn := net.Pipe()
+	defer func() {
+		_ = sendConn.Close()
+		_ = handleConn.Close()
+	}()
+
+	// _ = handleConn.SetDeadline(time.Now().Add(time.Second))
+
+	mockLn := &mockListener{acceptConns: make(chan net.Conn, 1)}
+	mockLn.acceptConns <- handleConn
+
+	listener := &ListenerTCP{
+		listener: mockLn,
+		logger:   slog.Default(),
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	done := make(chan struct{})
+	go func() {
+		err := listener.Run(ctx, func(p []byte) error {
+			if string(p) != "ping" {
+				t.Errorf("expected 'ping', got: %s", string(p))
+			}
+			close(done)
+			return nil
+		})
+		if err != nil && !errors.Is(err, context.Canceled) {
+			t.Errorf("Run returned unexpected error: %v", err)
+		}
+	}()
+
+	time.Sleep(100 * time.Millisecond)
+	sendConn.Write([]byte("ping"))
+
+	select {
+	case <-done:
+		// success
+	case <-time.After(1 * time.Second):
+		t.Fatal("timeout waiting for onReceive to be called")
+	}
+
+	cancel()
+	time.Sleep(50 * time.Millisecond)
+}
