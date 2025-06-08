@@ -1,6 +1,6 @@
 package action
 
-const (
+var (
 	defaultConsoleAddr = "127.0.0.1:2137"
 	defaultBackendAddr = "127.0.0.1:6112"
 	defaultLobbyAddr   = "ws://127.0.0.1:2137/lobby"
