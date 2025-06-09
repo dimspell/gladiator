@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -16,6 +15,7 @@ import (
 	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/packet"
+	"github.com/dimspell/gladiator/internal/backend/redirect"
 	"github.com/dimspell/gladiator/internal/wire"
 	"github.com/quic-go/quic-go"
 )
@@ -167,47 +167,7 @@ func (r *PacketRouter) startPing(ctx context.Context) {
 }
 
 func (r *PacketRouter) startHostProbe(ctx context.Context, addr string, onDisconnect func()) error {
-	// Check if the connection to the game server can be established
-	conn, err := net.Dial("tcp", addr)
-	if err != nil {
-		return fmt.Errorf("could not connect to game server: %w", err)
-	}
-
-	var once sync.Once
-
-	// Check if the game server is still running
-	go func() {
-		time.Sleep(10 * time.Second)
-
-		buf := make([]byte, 1)
-		for {
-			select {
-			case <-ctx.Done():
-				slog.Error("CONTEXT CANCELLED")
-				continue
-				//return
-			default:
-				_ = conn.SetReadDeadline(time.Now().Add(5 * time.Second))
-
-				if _, err := conn.Read(buf); err != nil {
-					var ne net.Error
-					if errors.As(err, &ne) && ne.Timeout() {
-						continue
-					}
-
-					slog.Error("connection read error", logging.Error(err))
-
-					// Otherwise - reset connection with the relay server
-					if errors.Is(err, io.EOF) {
-						once.Do(onDisconnect)
-					}
-					return
-				}
-			}
-		}
-	}()
-
-	return nil
+	return redirect.StartProbeTCP(ctx, addr, onDisconnect)
 }
 
 func (r *PacketRouter) stop(host *FakeHost, peerID string, ipAddress string) {
