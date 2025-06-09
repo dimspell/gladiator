@@ -41,9 +41,9 @@ type Session struct {
 	Proxy proxy.ProxyClient
 }
 
-func NewSession(tcpConn net.Conn) *Session {
+func NewSession(backendConn net.Conn) *Session {
 	return &Session{
-		Conn:  tcpConn,
+		Conn:  backendConn,
 		ID:    uuid.New().String(),
 		State: &SessionState{},
 	}

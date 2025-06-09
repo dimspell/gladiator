@@ -2,7 +2,6 @@ package action
 
 import (
 	"fmt"
-	"github.com/dimspell/gladiator/internal/console"
 	"log/slog"
 	"net"
 
@@ -11,6 +10,7 @@ import (
 	"github.com/dimspell/gladiator/internal/backend/proxy/direct"
 	"github.com/dimspell/gladiator/internal/backend/proxy/p2p"
 	"github.com/dimspell/gladiator/internal/backend/proxy/relay"
+	"github.com/dimspell/gladiator/internal/console"
 	"github.com/dimspell/gladiator/internal/console/database"
 	"github.com/pion/webrtc/v4"
 	"github.com/urfave/cli/v3"
@@ -62,7 +62,7 @@ func selectProxy(c *cli.Command) (p backend.Proxy, err error) {
 		}, nil
 	case "relay-beta":
 		relayAddr := c.String("relay-addr")
-		return &relay.ProxyRelay{RelayAddr: relayAddr}, nil
+		return &relay.ProxyRelay{RelayServerAddr: relayAddr}, nil
 	default:
 		return nil, fmt.Errorf("unknown proxy: %q", c.String("proxy"))
 	}
