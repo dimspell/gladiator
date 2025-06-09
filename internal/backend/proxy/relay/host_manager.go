@@ -163,6 +163,7 @@ func (hm *HostManager) StartListenerHost(
 	ipAddress string,
 	realTCPPort, realUDPPort int,
 	onReceiveTCP, onReceiveUDP func([]byte) error,
+	livenessProbe func() error,
 ) (*FakeHost, error) {
 	if net.ParseIP(ipAddress) == nil {
 		return nil, fmt.Errorf("invalid IP address: %s", ipAddress)
@@ -178,12 +179,16 @@ func (hm *HostManager) StartListenerHost(
 	var err error
 	var tcpProxy, udpProxy redirect.Redirect
 
+	var wg sync.WaitGroup
+	wg.Add(1)
+
 	// TCP listener that mimics a peer in LAN
 	if realTCPPort > 0 {
 		tcpProxy, err = redirect.ListenTCP(ipAddress, strconv.Itoa(realTCPPort))
 		if err != nil {
 			return nil, fmt.Errorf("failed to listen on TCP: %w", err)
 		}
+		wg.Add(1)
 	}
 
 	// UDP listener
@@ -192,6 +197,7 @@ func (hm *HostManager) StartListenerHost(
 		if err != nil {
 			return nil, fmt.Errorf("failed to listen on UDP: %w", err)
 		}
+		wg.Add(1)
 	}
 
 	g, ctx := errgroup.WithContext(context.Background())
@@ -204,9 +210,6 @@ func (hm *HostManager) StartListenerHost(
 		ProxyTCP: tcpProxy,
 		ProxyUDP: udpProxy,
 	}
-
-	var wg sync.WaitGroup
-	wg.Add(3)
 
 	go func(host *FakeHost) {
 		g.Go(func() error {

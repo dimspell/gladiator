@@ -9,6 +9,7 @@ import (
 	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/proxy"
+	"github.com/dimspell/gladiator/internal/backend/redirect"
 )
 
 var _ proxy.ProxyClient = (*Relay)(nil)
@@ -31,7 +32,6 @@ type Relay struct {
 
 	session *bsession.Session
 	router  *PacketRouter
-	manager *HostManager
 	players map[string]net.IP
 }
 
@@ -42,21 +42,18 @@ type Config struct {
 func NewRelay(config *Config, session *bsession.Session) *Relay {
 	cfg := &Config{}
 
-	manager := NewManager()
-
 	router := &PacketRouter{
 		relayAddr: config.RelayAddr,
 		logger:    slog.With(slog.String("proxy", "relay"), slog.String("sessionId", session.ID)),
 		selfID:    remoteID(session.UserID),
 		session:   session,
-		manager:   manager,
+		manager:   NewManager(),
 	}
 
 	return &Relay{
 		cfg,
 		session,
 		router,
-		manager,
 		make(map[string]net.IP),
 	}
 }
@@ -87,12 +84,16 @@ func (r *Relay) HostRoom(ctx context.Context, params proxy.HostParams) error {
 		return fmt.Errorf("could not send set room ready: %w", err)
 	}
 
+	// A scheduled interval to keep connection to the relay server
+	// Note: In case of players playing alone
 	r.router.keepAliveHost(ctx)
 
-	if err := r.router.startHostProbe(ctx, net.JoinHostPort("127.0.0.1", "6114"), func() {
+	// Probe to check if the game server is still running
+	onDisconnect := func() {
 		slog.Warn("Game server went offline")
 		r.router.Reset()
-	}); err != nil {
+	}
+	if err := redirect.StartProbeTCP(ctx, net.JoinHostPort("127.0.0.1", "6114"), onDisconnect); err != nil {
 		return fmt.Errorf("failed start the game server probe: %w", err)
 	}
 
@@ -179,7 +180,8 @@ func (r *Relay) Join(ctx context.Context, params proxy.JoinParams) (net.IP, erro
 				})
 			}
 
-			host, err := r.router.manager.StartListenerHost(peerID, ipAddress, 6114, 6113, onTCPMessage, onUDPMessage)
+			// host, err := r.router.manager.StartListenerHost(peerID, ipAddress, 6114, 6113, onTCPMessage, onUDPMessage, todoLivenessProbe)
+			host, err := r.router.manager.StartListenerHost(peerID, ipAddress, 6114, 6113, onTCPMessage, onUDPMessage, nil)
 			if err != nil {
 				return nil, err
 			}
@@ -192,7 +194,7 @@ func (r *Relay) Join(ctx context.Context, params proxy.JoinParams) (net.IP, erro
 				return nil, fmt.Errorf("failed start the game server probe: %w", err)
 			}
 		} else {
-			if _, err := r.router.manager.StartListenerHost(peerID, ipAddress, 0, 6113, nil, onUDPMessage); err != nil {
+			if _, err := r.router.manager.StartListenerHost(peerID, ipAddress, 0, 6113, nil, onUDPMessage, nil); err != nil {
 				return nil, err
 			}
 		}
