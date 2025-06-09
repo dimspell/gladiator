@@ -16,34 +16,31 @@ var _ proxy.ProxyClient = (*Relay)(nil)
 
 type ProxyRelay struct {
 	// Proxies []*Relay
-	RelayAddr string
+
+	// RelayServerAddr is the address (IP:port) of the remote relay server to
+	// which the proxy will forward all client traffic.
+	RelayServerAddr string
 }
 
 func (p *ProxyRelay) Create(session *bsession.Session) proxy.ProxyClient {
-	px := NewRelay(&Config{RelayAddr: p.RelayAddr}, session)
+	px := NewRelay(p, session)
+
 	// TODO: Manage a list of opened proxies and help to close them
 	// FIXME: Not threadsafe, no closer
 	// p.Proxies = append(p.Proxies, px)
+
 	return px
 }
 
 type Relay struct {
-	config *Config
-
 	session *bsession.Session
 	router  *PacketRouter
 	players map[string]net.IP
 }
 
-type Config struct {
-	RelayAddr string
-}
-
-func NewRelay(config *Config, session *bsession.Session) *Relay {
-	cfg := &Config{}
-
+func NewRelay(config *ProxyRelay, session *bsession.Session) *Relay {
 	router := &PacketRouter{
-		relayAddr: config.RelayAddr,
+		relayAddr: config.RelayServerAddr,
 		logger:    slog.With(slog.String("proxy", "relay"), slog.String("sessionId", session.ID)),
 		selfID:    remoteID(session.UserID),
 		session:   session,
@@ -51,7 +48,6 @@ func NewRelay(config *Config, session *bsession.Session) *Relay {
 	}
 
 	return &Relay{
-		cfg,
 		session,
 		router,
 		make(map[string]net.IP),

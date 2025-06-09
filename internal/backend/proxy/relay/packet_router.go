@@ -28,7 +28,6 @@ type PacketRouter struct {
 	selfID    string
 	relayAddr string
 
-	isHost        bool
 	currentHostID string
 	relayConn     quic.Connection
 	stream        quic.Stream
