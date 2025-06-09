@@ -326,3 +326,35 @@ func TestListenerTCP_ReceivesAndCallsCallback(t *testing.T) {
 	cancel()
 	time.Sleep(50 * time.Millisecond)
 }
+
+func TestListenerTCP_Alive(t *testing.T) {
+	tests := []struct {
+		name     string
+		duration time.Duration
+		want     bool
+	}{
+		{
+			name:     "2 seconds before",
+			duration: -2 * time.Second,
+			want:     true,
+		},
+		{
+			name:     "11 seconds before",
+			duration: -11 * time.Second,
+			want:     false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			now := time.Now()
+
+			p := &ListenerTCP{
+				conn:     &mockConn{},
+				LastSeen: now.Add(tt.duration),
+			}
+			if got := p.Alive(now); got != tt.want {
+				t.Errorf("Alive() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
