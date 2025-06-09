@@ -46,7 +46,7 @@ func ListenTCP(ipv4 string, portNumber string) (*ListenerTCP, error) {
 	}
 
 	if portNumber == "" {
-		portNumber = defaultTcpPort
+		portNumber = defaultTCPPort
 	}
 
 	listener, err := net.Listen("tcp", net.JoinHostPort(ipv4, portNumber))
@@ -130,7 +130,7 @@ func (p *ListenerTCP) handleConnection(ctx context.Context, conn TCPConn, onRece
 					return fmt.Errorf("game client has closed the TCP connection: %w", err)
 				}
 				if errors.Is(err, net.ErrClosed) {
-					return fmt.Errorf("listener has closed the connection: %w", err)
+					return fmt.Errorf("tcp-listener has closed the connection: %w", err)
 				}
 				if errors.Is(err, io.ErrClosedPipe) {
 					return nil

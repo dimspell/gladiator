@@ -24,6 +24,11 @@ func (f *fastFakeUDPConn) Write(b []byte) (int, error) {
 	return len(b), nil
 }
 
+func (f *fastFakeUDPConn) WriteTo(b []byte, addr net.Addr) (int, error) {
+	f.WriteCount++
+	return len(b), nil
+}
+
 func (f *fastFakeUDPConn) Close() error                      { return nil }
 func (f *fastFakeUDPConn) SetReadDeadline(t time.Time) error { return nil }
 func (f *fastFakeUDPConn) LocalAddr() net.Addr               { return &net.UDPAddr{} }

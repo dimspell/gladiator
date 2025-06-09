@@ -17,6 +17,7 @@ var _ Redirect = (*DialerUDP)(nil)
 type UDPConn interface {
 	ReadFromUDP(b []byte) (n int, addr *net.UDPAddr, err error)
 	Write(b []byte) (n int, err error)
+	WriteTo(b []byte, addr net.Addr) (int, error)
 	Close() error
 	SetReadDeadline(t time.Time) error
 	LocalAddr() net.Addr

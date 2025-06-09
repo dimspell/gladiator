@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"net"
+	"sync"
 	"testing"
 	"time"
 )
@@ -13,6 +14,8 @@ import (
 
 // fakeUDPConn implements udp.UDPConn
 type fakeUDPConn struct {
+	mu sync.Mutex
+
 	ReadDeadline time.Time
 	ReadData     [][]byte
 	WriteData    [][]byte
@@ -20,38 +23,48 @@ type fakeUDPConn struct {
 	CloseCalled  bool
 }
 
-func (f *fakeUDPConn) ReadFromUDP(b []byte) (int, *net.UDPAddr, error) {
-	if f.ReadIndex >= len(f.ReadData) {
-		return 0, nil, errors.New("no more data")
+func (m *fakeUDPConn) ReadFromUDP(b []byte) (int, *net.UDPAddr, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.ReadIndex >= len(m.ReadData) {
+		time.Sleep(100 * time.Millisecond)            // simulate blocking read
+		return 0, nil, &net.DNSError{IsTimeout: true} // simulate timeout
 	}
-	copy(b, f.ReadData[f.ReadIndex])
-	n := len(f.ReadData[f.ReadIndex])
-	f.ReadIndex++
-	return n, &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 9999}, nil
+
+	copy(b, m.ReadData[m.ReadIndex])
+	n := len(m.ReadData[m.ReadIndex])
+	m.ReadIndex++
+	return n, &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 4321}, nil
 }
 
-func (f *fakeUDPConn) Write(b []byte) (int, error) {
-	data := make([]byte, len(b))
-	copy(data, b)
-	f.WriteData = append(f.WriteData, data)
+func (m *fakeUDPConn) Write(b []byte) (int, error) { return m.WriteTo(b, m.RemoteAddr()) }
+
+func (m *fakeUDPConn) WriteTo(b []byte, addr net.Addr) (int, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	d := make([]byte, len(b))
+	copy(d, b)
+	m.WriteData = append(m.WriteData, d)
 	return len(b), nil
 }
 
-func (f *fakeUDPConn) Close() error {
-	f.CloseCalled = true
+func (m *fakeUDPConn) Close() error {
+	m.CloseCalled = true
 	return nil
 }
 
-func (f *fakeUDPConn) SetReadDeadline(t time.Time) error {
-	f.ReadDeadline = t
+func (m *fakeUDPConn) SetReadDeadline(t time.Time) error {
+	m.ReadDeadline = t
 	return nil
 }
 
-func (f *fakeUDPConn) LocalAddr() net.Addr {
+func (m *fakeUDPConn) LocalAddr() net.Addr {
 	return &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 1234}
 }
 
-func (f *fakeUDPConn) RemoteAddr() net.Addr {
+func (m *fakeUDPConn) RemoteAddr() net.Addr {
 	return &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 4321}
 }
 

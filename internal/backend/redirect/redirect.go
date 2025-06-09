@@ -58,8 +58,8 @@ type Redirect interface {
 	io.Closer
 }
 
-const defaultUdpPort = "6113"
-const defaultTcpPort = "6114"
+const defaultUDPPort = "6113"
+const defaultTCPPort = "6114"
 
 type Addressing struct {
 	IP      net.IP
