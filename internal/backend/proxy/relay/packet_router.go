@@ -92,7 +92,7 @@ func (r *PacketRouter) handleJoinRoom(ctx context.Context, player wire.Player) e
 }
 
 func (r *PacketRouter) handleLeaveRoom(ctx context.Context, player wire.Player) error {
-	slog.Error("Not handled LEAVE_ROOM", "player", player.UserID)
+	slog.Error("LEAVE_ROOM - Delete only", "player", player.UserID)
 
 	peerID := remoteID(player.UserID)
 	if r.selfID == peerID {
@@ -138,6 +138,9 @@ func (r *PacketRouter) connect(ctx context.Context, roomID string) error {
 	}); err != nil {
 		return fmt.Errorf("send join packet failed: %w", err)
 	}
+
+	// Make sure the QUIC send the only packet, not joined with others.
+	time.Sleep(100 * time.Millisecond)
 
 	// Start receiver
 	go r.receiveLoop(ctx, stream)

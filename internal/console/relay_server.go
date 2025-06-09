@@ -56,8 +56,8 @@ func NewQUICRelay(addr string) (*RelayServer, error) {
 	}
 
 	listener, err := quic.ListenAddr(addr, tlsConf, &quic.Config{
-		MaxIdleTimeout:  300 * time.Second,
-		KeepAlivePeriod: 250 * time.Second,
+		MaxIdleTimeout:  60 * time.Second,
+		KeepAlivePeriod: 45 * time.Second,
 	})
 	if err != nil {
 		return nil, err
@@ -95,7 +95,7 @@ func (rs *RelayServer) handleConn(ctx context.Context, conn quic.Connection) {
 	}
 
 	// Initial handshake: receive signed join a packet
-	buf := make([]byte, 4096)
+	buf := make([]byte, 128)
 	n, err := stream.Read(buf)
 	if err != nil {
 		rs.logger.Warn("initial read error", logging.Error(err))
@@ -109,11 +109,13 @@ func (rs *RelayServer) handleConn(ctx context.Context, conn quic.Connection) {
 
 	var pkt RelayPacket
 	if err := json.Unmarshal(data, &pkt); err != nil {
-		rs.logger.Warn("first packet unmarshal error", logging.Error(err))
+		rs.logger.Warn("first packet unmarshal error", logging.Error(err), "data", string(data))
+		_ = stream.Close()
 		return
 	}
 	if pkt.Type != "join" {
 		rs.logger.Warn("invalid join packet", logging.Error(err))
+		_ = stream.Close()
 		return
 	}
 	metrics.PacketIn.Inc()
@@ -193,6 +195,8 @@ func (rs *RelayServer) joinRoom(roomID, peerID string, stream quic.Stream) {
 		role = "host"
 		rs.logger.Info("user will become a host", logging.RoomID(roomID), logging.PeerID(peerID))
 	}
+
+	log.Println("peers in room", room.Peers)
 
 	room.Peers[peerID] = &PeerConn{
 		ID:     peerID,
