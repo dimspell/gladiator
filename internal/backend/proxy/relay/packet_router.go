@@ -344,27 +344,32 @@ func (r *PacketRouter) dynamicJoin(ctx context.Context, roomID string, peerID st
 		r.logger.Warn("failed to assign IP for the peer ", logging.Error(err), logging.PeerID(peerID))
 		return
 	}
-	// ip := "127.0.0.1"
+	var (
+		tcpPort      int
+		onTCPMessage func(p []byte) error = nil
 
-	onTCPMessage := func(p []byte) error {
-		return r.sendPacket(RelayPacket{
-			Type:    "tcp",
-			RoomID:  roomID,
-			ToID:    peerID,
-			Payload: p,
-		})
-	}
-	onUDPMessage := func(p []byte) error {
-		return r.sendPacket(RelayPacket{
-			Type:    "udp",
-			RoomID:  roomID,
-			ToID:    peerID,
-			Payload: p,
-		})
+		onUDPMessage = func(p []byte) error {
+			return r.sendPacket(RelayPacket{
+				Type:    "udp",
+				RoomID:  roomID,
+				ToID:    peerID,
+				Payload: p,
+			})
+		}
+	)
+	if r.selfID == r.currentHostID {
+		tcpPort, onTCPMessage = 6114, func(p []byte) error {
+			return r.sendPacket(RelayPacket{
+				Type:    "tcp",
+				RoomID:  roomID,
+				ToID:    peerID,
+				Payload: p,
+			})
+		}
 	}
 
 	// TODO: It must be local addr
-	host, err := r.manager.StartDialHost(peerID, "127.0.0.1", 6114, 6113, onTCPMessage, onUDPMessage)
+	host, err := r.manager.StartDialHost(peerID, "127.0.0.1", tcpPort, 6113, onTCPMessage, onUDPMessage)
 	if err != nil {
 		r.logger.Warn("failed to start guest host", logging.Error(err), logging.PeerID(peerID))
 		// TODO: Unassign IP address
