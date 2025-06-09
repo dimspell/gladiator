@@ -14,20 +14,32 @@ import (
 // Ensure DialerUDP implements Redirect interface
 var _ Redirect = (*DialerUDP)(nil)
 
-type DialerUDP struct {
-	addr   *net.UDPAddr
-	conn   *net.UDPConn
-	logger *slog.Logger
+type UDPConn interface {
+	ReadFromUDP(b []byte) (n int, addr *net.UDPAddr, err error)
+	Write(b []byte) (n int, err error)
+	Close() error
+	SetReadDeadline(t time.Time) error
+	LocalAddr() net.Addr
+	RemoteAddr() net.Addr
 }
 
-// DialUDP establishes a UDP connection with the given IPv4 and port.
+// DialerUDP wraps the UDP connection used to communicate with a remote game
+// server.
+type DialerUDP struct {
+	conn       UDPConn
+	logger     *slog.Logger
+	lastActive time.Time
+}
+
+// DialUDP establishes the UDP connection with the given IPv4 and port.
+// It can be used to connect to the game server of a guest peers.
 func DialUDP(ipv4 string, portNumber string) (*DialerUDP, error) {
 	if net.ParseIP(ipv4) == nil {
 		return nil, fmt.Errorf("dial-udp: invalid IPv4 address format")
 	}
 
 	if portNumber == "" {
-		portNumber = defaultUdpPort
+		portNumber = defaultUDPPort
 	}
 
 	udpAddr, err := net.ResolveUDPAddr("udp", net.JoinHostPort(ipv4, portNumber))
@@ -35,41 +47,40 @@ func DialUDP(ipv4 string, portNumber string) (*DialerUDP, error) {
 		return nil, fmt.Errorf("dial-udp: could not resolve UDP address: %w", err)
 	}
 
-	udpConn, err := net.DialUDP("udp", nil, udpAddr)
+	rawConn, err := net.DialUDP("udp", nil, udpAddr)
 	if err != nil {
 		return nil, fmt.Errorf("dial-udp: could not dial over udp: %w", err)
 	}
 
-	logger := slog.With(
+	log := slog.With(
 		slog.String("redirect", "dial-udp"),
-		slog.String("local", udpConn.LocalAddr().String()),
-		slog.String("remote", udpConn.RemoteAddr().String()),
+		slog.String("local", rawConn.LocalAddr().String()),
+		slog.String("remote", rawConn.RemoteAddr().String()),
 	)
-	logger.Info("Dialed via UDP")
+	log.Info("Dialed via UDP")
 
 	return &DialerUDP{
-		addr:   udpAddr,
-		conn:   udpConn,
-		logger: logger,
+		conn:       rawConn,
+		logger:     log,
+		lastActive: time.Now(),
 	}, nil
 }
 
-// Run handles reading from UDP and forwards data received from the game client.
+// Run reads UDP packets and calls the provided onReceive callback for each
+// message received from the game client.
 func (p *DialerUDP) Run(ctx context.Context, onReceive func(p []byte) (err error)) error {
-	if p.conn == nil {
-		return fmt.Errorf("dial-udp: udp connection is nil")
-	}
-
 	defer func() {
 		p.logger.Info("Closing the UDP dialer")
 		p.Close()
 	}()
 
-	buf := make([]byte, 1024) // Reuse buffer for efficiency
+	buf := make([]byte, 1024)
+
 	for {
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("dial-udp: context canceled: %w", ctx.Err())
+			return fmt.Errorf("dial-udp: %w", ctx.Err())
+
 		default:
 			clear(buf)
 
@@ -78,13 +89,15 @@ func (p *DialerUDP) Run(ctx context.Context, onReceive func(p []byte) (err error
 			if err != nil {
 				var ne net.Error
 				if errors.As(err, &ne) && ne.Timeout() {
+					p.lastActive = time.Now()
 					continue
 				}
 				p.logger.Error("Error reading from UDP server", logging.Error(err))
 				return fmt.Errorf("dial-udp: failed to read UDP message: %w", err)
 			}
 
-			p.logger.Debug("Received UDP message", "size", n, "from", addr.String())
+			p.lastActive = time.Now()
+			p.logger.Debug("Received UDP message", slog.Int("size", n), slog.String("from", addr.String()))
 
 			if err := onReceive(buf[:n]); err != nil {
 				return fmt.Errorf("dial-udp: failed to handle data received from game client: %w", err)
