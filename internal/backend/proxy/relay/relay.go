@@ -14,6 +14,8 @@ import (
 
 var _ proxy.ProxyClient = (*Relay)(nil)
 
+// ProxyRelay represents the configuration for setting up a local UDP/TCP proxy
+// that forwards traffic to a remote relay server.
 type ProxyRelay struct {
 	// Proxies []*Relay
 
