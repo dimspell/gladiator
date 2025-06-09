@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/dimspell/gladiator/internal/app/logger/logging"
-	"golang.org/x/sync/errgroup"
 )
 
 // Ensure DialerUDP implements Redirect interface
@@ -63,38 +62,35 @@ func (p *DialerUDP) Run(ctx context.Context, onReceive func(p []byte) (err error
 
 	defer func() {
 		p.logger.Info("Closing the UDP dialer")
+		p.Close()
 	}()
 
-	g, ctx := errgroup.WithContext(ctx)
-	g.Go(func() error {
-		buf := make([]byte, 1024) // Reuse buffer for efficiency
-		for {
-			select {
-			case <-ctx.Done():
-				return fmt.Errorf("dial-udp: context canceled: %w", ctx.Err())
-			default:
-				clear(buf)
+	buf := make([]byte, 1024) // Reuse buffer for efficiency
+	for {
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("dial-udp: context canceled: %w", ctx.Err())
+		default:
+			clear(buf)
 
-				p.conn.SetReadDeadline(time.Now().Add(10 * time.Second))
-				n, addr, err := p.conn.ReadFromUDP(buf)
-				if err != nil {
-					var ne net.Error
-					if errors.As(err, &ne) && ne.Timeout() {
-						continue
-					}
-					p.logger.Error("Error reading from UDP server", logging.Error(err))
-					return fmt.Errorf("dial-udp: failed to read UDP message: %w", err)
+			p.conn.SetReadDeadline(time.Now().Add(10 * time.Second))
+			n, addr, err := p.conn.ReadFromUDP(buf)
+			if err != nil {
+				var ne net.Error
+				if errors.As(err, &ne) && ne.Timeout() {
+					continue
 				}
+				p.logger.Error("Error reading from UDP server", logging.Error(err))
+				return fmt.Errorf("dial-udp: failed to read UDP message: %w", err)
+			}
 
-				p.logger.Debug("Received UDP message", "size", n, "from", addr.String())
+			p.logger.Debug("Received UDP message", "size", n, "from", addr.String())
 
-				if err := onReceive(buf[:n]); err != nil {
-					return fmt.Errorf("dial-udp: failed to handle data received from game client: %w", err)
-				}
+			if err := onReceive(buf[:n]); err != nil {
+				return fmt.Errorf("dial-udp: failed to handle data received from game client: %w", err)
 			}
 		}
-	})
-	return g.Wait()
+	}
 }
 
 // Write sends a message over the UDP connection to the game client.
