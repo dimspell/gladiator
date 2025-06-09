@@ -10,21 +10,20 @@ import (
 	"time"
 
 	"github.com/dimspell/gladiator/internal/app/logger/logging"
-	"golang.org/x/sync/errgroup"
 )
 
 // Ensure DialerTCP implements Redirect interface
 var _ Redirect = (*DialerTCP)(nil)
 
 type DialerTCP struct {
-	conn   net.Conn
+	conn   TCPConn
 	logger *slog.Logger
 }
 
 // DialTCP establishes a TCP connection with the given IPv4 and port.
 func DialTCP(ipv4 string, portNumber string) (*DialerTCP, error) {
 	if portNumber == "" {
-		portNumber = "6114"
+		portNumber = defaultTCPPort
 	}
 	tcpConn, err := net.DialTimeout("tcp", net.JoinHostPort(ipv4, portNumber), 3*time.Second)
 	if err != nil {
@@ -54,41 +53,38 @@ func (p *DialerTCP) Run(ctx context.Context, onReceive func(p []byte) (err error
 		p.logger.Info("Closing the TCP dialer")
 	}()
 
-	g, ctx := errgroup.WithContext(ctx)
-	g.Go(func() error {
-		buf := make([]byte, 1024)
+	buf := make([]byte, 1024)
 
-		for {
-			select {
-			case <-ctx.Done():
-				return fmt.Errorf("tcp-dial: context canceled: %w", ctx.Err())
-			default:
-				clear(buf)
-				p.conn.SetReadDeadline(time.Now().Add(10 * time.Second))
-				n, err := p.conn.Read(buf)
-				if err != nil {
-					var ne net.Error
-					if errors.As(err, &ne) && ne.Timeout() {
-						continue
-					}
-					if err == io.EOF {
-						p.logger.Info("Connection closed by server")
-						return nil
-					}
-					p.logger.Error("Error reading from server", logging.Error(err))
-					return err
+	for {
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("tcp-dial: context canceled: %w", ctx.Err())
+
+		default:
+			clear(buf)
+
+			p.conn.SetReadDeadline(time.Now().Add(10 * time.Second))
+			n, err := p.conn.Read(buf)
+			if err != nil {
+				var ne net.Error
+				if errors.As(err, &ne) && ne.Timeout() {
+					continue
 				}
-
-				p.logger.Debug("Received TCP message", "size", n)
-
-				if err := onReceive(buf[:n]); err != nil {
-					return fmt.Errorf("tcp-dial: failed to handle data received from the game client to: %w", err)
+				if err == io.EOF {
+					p.logger.Info("Connection closed by server")
+					return nil
 				}
+				p.logger.Error("Error reading from server", logging.Error(err))
+				return err
+			}
+
+			p.logger.Debug("Received TCP message", "size", n)
+
+			if err := onReceive(buf[:n]); err != nil {
+				return fmt.Errorf("tcp-dial: failed to handle data received from the game client to: %w", err)
 			}
 		}
-	})
-
-	return g.Wait()
+	}
 }
 
 // Write sends a message over the TCP connection to the game client.
