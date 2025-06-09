@@ -181,7 +181,7 @@ func (r *Relay) Join(ctx context.Context, params proxy.JoinParams) (net.IP, erro
 			}
 
 			// host, err := r.router.manager.StartListenerHost(peerID, ipAddress, 6114, 6113, onTCPMessage, onUDPMessage, todoLivenessProbe)
-			host, err := r.router.manager.StartListenerHost(peerID, ipAddress, 6114, 6113, onTCPMessage, onUDPMessage, nil)
+			host, err := r.router.manager.StartListenerHost(ctx, peerID, ipAddress, 6114, 6113, onTCPMessage, onUDPMessage, nil)
 			if err != nil {
 				return nil, err
 			}
@@ -194,7 +194,7 @@ func (r *Relay) Join(ctx context.Context, params proxy.JoinParams) (net.IP, erro
 				return nil, fmt.Errorf("failed start the game server probe: %w", err)
 			}
 		} else {
-			if _, err := r.router.manager.StartListenerHost(peerID, ipAddress, 0, 6113, nil, onUDPMessage, nil); err != nil {
+			if _, err := r.router.manager.StartListenerHost(ctx, peerID, ipAddress, 0, 6113, nil, onUDPMessage, nil); err != nil {
 				return nil, err
 			}
 		}

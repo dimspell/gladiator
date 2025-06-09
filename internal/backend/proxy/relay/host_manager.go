@@ -159,6 +159,7 @@ func (hm *HostManager) StartDialHost(
 
 // StartListenerHost starts a fake host on a loopback IP
 func (hm *HostManager) StartListenerHost(
+	ctx context.Context,
 	peerID string,
 	ipAddress string,
 	realTCPPort, realUDPPort int,
@@ -200,7 +201,7 @@ func (hm *HostManager) StartListenerHost(
 		wg.Add(1)
 	}
 
-	g, ctx := errgroup.WithContext(context.Background())
+	g, ctx := errgroup.WithContext(ctx)
 	ctx, cancel := context.WithCancel(ctx)
 
 	host := &FakeHost{

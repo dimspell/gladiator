@@ -141,7 +141,7 @@ func (r *PacketRouter) connect(ctx context.Context, roomID string) error {
 	}
 
 	// Start receiver
-	go r.receiveLoop(stream)
+	go r.receiveLoop(ctx, stream)
 
 	return nil
 }
@@ -241,7 +241,7 @@ func (r *PacketRouter) sendPacket(pkt RelayPacket) error {
 	return nil
 }
 
-func (r *PacketRouter) receiveLoop(stream quic.Stream) {
+func (r *PacketRouter) receiveLoop(ctx context.Context, stream quic.Stream) {
 	buf := make([]byte, 4096)
 	for {
 		n, err := stream.Read(buf)
@@ -273,7 +273,7 @@ func (r *PacketRouter) receiveLoop(stream quic.Stream) {
 
 			switch pkt.Type {
 			case "join":
-				r.dynamicJoin(pkt.RoomID, pkt.FromID, pkt)
+				r.dynamicJoin(ctx, pkt.RoomID, pkt.FromID, pkt)
 
 			case "data":
 				r.readMessage(pkt.FromID, pkt)
@@ -291,7 +291,7 @@ func (r *PacketRouter) receiveLoop(stream quic.Stream) {
 				r.leaveRoom(pkt.FromID)
 
 			case "migrate":
-				r.hostMigration(pkt.RoomID, pkt)
+				r.hostMigration(ctx, pkt.RoomID, pkt)
 			}
 		}
 	}
@@ -338,7 +338,7 @@ func (r *PacketRouter) writeUDP(peerID string, pkt RelayPacket) {
 	}
 }
 
-func (r *PacketRouter) dynamicJoin(roomID string, peerID string, pkt RelayPacket) {
+func (r *PacketRouter) dynamicJoin(ctx context.Context, roomID string, peerID string, pkt RelayPacket) {
 	ip, err := r.manager.assignIP(peerID)
 	if err != nil {
 		r.logger.Warn("failed to assign IP for the peer ", logging.Error(err), logging.PeerID(peerID))
@@ -384,7 +384,7 @@ func (r *PacketRouter) leaveRoom(peerID string) {
 	r.manager.RemoveByRemoteID(peerID)
 }
 
-func (r *PacketRouter) hostMigration(roomID string, pkt RelayPacket) {
+func (r *PacketRouter) hostMigration(ctx context.Context, roomID string, pkt RelayPacket) {
 	newHostID := string(pkt.Payload)
 
 	if newHostID == r.selfID {
@@ -432,7 +432,7 @@ func (r *PacketRouter) hostMigration(roomID string, pkt RelayPacket) {
 	}
 
 	var err error
-	host, err = r.manager.StartListenerHost(newHostID, ipAddress, 6114, 6113, onTCPMessage, onUDPMessage)
+	host, err = r.manager.StartListenerHost(ctx, newHostID, ipAddress, 6114, 6113, onTCPMessage, onUDPMessage, nil)
 	if err != nil {
 		r.logger.Warn("failed to start host", logging.Error(err), logging.PeerID(newHostID))
 		return
