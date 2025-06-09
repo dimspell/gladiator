@@ -87,7 +87,8 @@ func (r *Relay) HostRoom(ctx context.Context, params proxy.HostParams) error {
 		return fmt.Errorf("could not send set room ready: %w", err)
 	}
 
-	go r.router.startPing(ctx)
+	r.router.keepAliveHost(ctx)
+
 	if err := r.router.startHostProbe(ctx, net.JoinHostPort("127.0.0.1", "6114"), func() {
 		slog.Warn("Game server went offline")
 		r.router.Reset()
@@ -159,6 +160,15 @@ func (r *Relay) Join(ctx context.Context, params proxy.JoinParams) (net.IP, erro
 	hostID := remoteID(params.HostUserID)
 
 	for peerID, ipAddress := range r.router.manager.peerIPs {
+		onUDPMessage := func(p []byte) error {
+			return r.router.sendPacket(RelayPacket{
+				Type:    "udp",
+				RoomID:  roomID,
+				ToID:    peerID,
+				Payload: p,
+			})
+		}
+
 		if peerID == hostID {
 			onTCPMessage := func(p []byte) error {
 				return r.router.sendPacket(RelayPacket{
@@ -168,42 +178,27 @@ func (r *Relay) Join(ctx context.Context, params proxy.JoinParams) (net.IP, erro
 					Payload: p,
 				})
 			}
-			onUDPMessage := func(p []byte) error {
-				return r.router.sendPacket(RelayPacket{
-					Type:    "udp",
-					RoomID:  roomID,
-					ToID:    peerID,
-					Payload: p,
-				})
-			}
 
-			host, err := r.router.manager.StartHost(peerID, ipAddress, 6114, 6113, onTCPMessage, onUDPMessage)
+			host, err := r.router.manager.StartListenerHost(peerID, ipAddress, 6114, 6113, onTCPMessage, onUDPMessage)
 			if err != nil {
 				return nil, err
 			}
-			if err := r.router.startHostProbe(ctx, net.JoinHostPort(ipAddress, "6114"), func() {
+
+			onDisconnect := func() {
 				slog.Warn("Host went offline", logging.PeerID(peerID), "lastSeen", host.LastSeen, "ip", ipAddress)
 				r.router.stop(host, peerID, ipAddress)
-			}); err != nil {
+			}
+			if err := r.router.startHostProbe(ctx, net.JoinHostPort(ipAddress, "6114"), onDisconnect); err != nil {
 				return nil, fmt.Errorf("failed start the game server probe: %w", err)
 			}
 		} else {
-			onUDPMessage := func(p []byte) error {
-				return r.router.sendPacket(RelayPacket{
-					Type:    "udp",
-					RoomID:  roomID,
-					ToID:    peerID,
-					Payload: p,
-				})
-			}
-
-			if _, err := r.router.manager.StartHost(peerID, ipAddress, 0, 6113, nil, onUDPMessage); err != nil {
+			if _, err := r.router.manager.StartListenerHost(peerID, ipAddress, 0, 6113, nil, onUDPMessage); err != nil {
 				return nil, err
 			}
 		}
 	}
 
-	//go r.router.manager.CleanupInactive()
+	// go r.router.manager.CleanupInactive()
 
 	return net.IPv4(127, 0, 0, 1), nil
 }

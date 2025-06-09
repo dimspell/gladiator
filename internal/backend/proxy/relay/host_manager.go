@@ -70,8 +70,8 @@ func (hm *HostManager) assignIP(remoteID string) (string, error) {
 	return "", fmt.Errorf("no available IPs")
 }
 
-// StartGuestHost adds new dynamic joiner
-func (hm *HostManager) StartGuestHost(
+// StartDialHost adds a new dynamic joiner that dials our game client address
+func (hm *HostManager) StartDialHost(
 	peerID string,
 	ipAddress string,
 	realTCPPort, realUDPPort int,
@@ -157,8 +157,8 @@ func (hm *HostManager) StartGuestHost(
 	return host, nil
 }
 
-// StartHost starts a fake host on a loopback IP
-func (hm *HostManager) StartHost(
+// StartListenerHost starts a fake host on a loopback IP
+func (hm *HostManager) StartListenerHost(
 	peerID string,
 	ipAddress string,
 	realTCPPort, realUDPPort int,

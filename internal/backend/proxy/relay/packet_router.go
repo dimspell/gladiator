@@ -146,7 +146,7 @@ func (r *PacketRouter) connect(ctx context.Context, roomID string) error {
 	return nil
 }
 
-func (r *PacketRouter) startPing(ctx context.Context) {
+func (r *PacketRouter) keepAliveHost(ctx context.Context) {
 	r.mu.Lock()
 	if r.pingTicker != nil {
 		r.pingTicker.Stop()
@@ -154,16 +154,24 @@ func (r *PacketRouter) startPing(ctx context.Context) {
 	r.pingTicker = time.NewTicker(15 * time.Second)
 	r.mu.Unlock()
 
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-r.pingTicker.C:
-			// Send a packet to the relay server to keep it announced, when
-			// playing alone
-			r.sendPacket(RelayPacket{Type: "ping"})
+	go func(ticker *time.Ticker) {
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case _, ok := <-ticker.C:
+				if !ok {
+					return
+				}
+
+				// Send a packet to the relay server to keep it announced, when
+				// playing alone
+				_ = r.sendPacket(RelayPacket{Type: "ping"})
+			}
 		}
-	}
+	}(r.pingTicker)
 }
 
 func (r *PacketRouter) startHostProbe(ctx context.Context, addr string, onDisconnect func()) error {
@@ -356,7 +364,7 @@ func (r *PacketRouter) dynamicJoin(roomID string, peerID string, pkt RelayPacket
 	}
 
 	// TODO: It must be local addr
-	host, err := r.manager.StartGuestHost(peerID, "127.0.0.1", 6114, 6113, onTCPMessage, onUDPMessage)
+	host, err := r.manager.StartDialHost(peerID, "127.0.0.1", 6114, 6113, onTCPMessage, onUDPMessage)
 	if err != nil {
 		r.logger.Warn("failed to start guest host", logging.Error(err), logging.PeerID(peerID))
 		// TODO: Unassign IP address
@@ -424,7 +432,7 @@ func (r *PacketRouter) hostMigration(roomID string, pkt RelayPacket) {
 	}
 
 	var err error
-	host, err = r.manager.StartHost(newHostID, ipAddress, 6114, 6113, onTCPMessage, onUDPMessage)
+	host, err = r.manager.StartListenerHost(newHostID, ipAddress, 6114, 6113, onTCPMessage, onUDPMessage)
 	if err != nil {
 		r.logger.Warn("failed to start host", logging.Error(err), logging.PeerID(newHostID))
 		return
