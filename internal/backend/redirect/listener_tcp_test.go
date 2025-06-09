@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"net"
+	"sync"
 	"testing"
 	"time"
 )
@@ -105,8 +106,8 @@ func TestListenerTCP_Run(t *testing.T) {
 		})
 
 		// Assert
-		if err != nil {
-			t.Fatalf("expected no error, got: %v", err)
+		if err == nil || !errors.Is(err, io.EOF) {
+			t.Fatalf("expected error io.EOF, got: %v", err)
 		}
 		if !mock.closed {
 			t.Error("expected connection to be closed")
@@ -293,7 +294,10 @@ func TestListenerTCP_ReceivesAndCallsCallback(t *testing.T) {
 		logger:   slog.Default(),
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
+
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	done := make(chan struct{})
@@ -308,6 +312,7 @@ func TestListenerTCP_ReceivesAndCallsCallback(t *testing.T) {
 		if err != nil && !errors.Is(err, context.Canceled) {
 			t.Errorf("Run returned unexpected error: %v", err)
 		}
+		wg.Done()
 	}()
 
 	time.Sleep(100 * time.Millisecond)
@@ -324,7 +329,7 @@ func TestListenerTCP_ReceivesAndCallsCallback(t *testing.T) {
 	}
 
 	cancel()
-	time.Sleep(50 * time.Millisecond)
+	wg.Wait()
 }
 
 func TestListenerTCP_Alive(t *testing.T) {
@@ -349,8 +354,8 @@ func TestListenerTCP_Alive(t *testing.T) {
 			now := time.Now()
 
 			p := &ListenerTCP{
-				conn:     &mockConn{},
-				LastSeen: now.Add(tt.duration),
+				conn:       &mockConn{},
+				lastActive: now.Add(tt.duration),
 			}
 			if got := p.Alive(now); got != tt.want {
 				t.Errorf("Alive() = %v, want %v", got, tt.want)
