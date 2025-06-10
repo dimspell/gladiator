@@ -60,8 +60,8 @@ sysctl -w net.core.wmem_max=7500000
 Note that these settings are not persisted across reboots.
 
 ```bash
-sudo ifconfig lo0 alias 127.0.1.2 netmask 0xff000000
-sudo ifconfig lo0 alias 127.0.1.3 netmask 0xff000000
-sudo ifconfig lo0 alias 127.0.1.4 netmask 0xff000000
+sudo ifconfig lo0 alias 127.0.0.2 netmask 0xff000000
+sudo ifconfig lo0 alias 127.0.0.3 netmask 0xff000000
+sudo ifconfig lo0 alias 127.0.0.4 netmask 0xff000000
 # ...
 ```
