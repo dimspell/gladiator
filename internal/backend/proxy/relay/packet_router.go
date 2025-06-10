@@ -232,7 +232,7 @@ func (r *PacketRouter) sendPacket(pkt RelayPacket) error {
 	}
 	// packet := sign(data)
 
-	r.logger.Debug("Sending packet", "fromID", pkt.FromID, "data", pkt.Payload, "datastr", string(pkt.Payload), "toId", pkt.ToID)
+	r.logger.Debug("Sending packet", "fromID", pkt.FromID, "type", pkt.Type, "data", pkt.Payload, "datastr", string(pkt.Payload), "toId", pkt.ToID)
 
 	data = append(data, '\n')
 
