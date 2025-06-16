@@ -102,7 +102,7 @@ func (p *ListenerUDP) Run(ctx context.Context, onReceive func(p []byte) (err err
 				return fmt.Errorf("listen-udp: write error: %w", err)
 			}
 
-			p.logger.Debug("Received UDP message", "size", n, "data", buf[:n])
+			// p.logger.Debug("Received UDP message", "size", n, "data", buf[:n])
 		}
 	}
 }
@@ -119,7 +119,7 @@ func (p *ListenerUDP) Write(msg []byte) (int, error) {
 		return n, fmt.Errorf("listen-udp: send failed: %w", err)
 	}
 
-	p.logger.Debug("Sent UDP message", "size", n, "data", msg)
+	// p.logger.Debug("Sent UDP message", "size", n, "data", msg)
 	return n, nil
 }
 

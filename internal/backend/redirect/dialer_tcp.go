@@ -78,7 +78,7 @@ func (p *DialerTCP) Run(ctx context.Context, onReceive func(p []byte) (err error
 				return err
 			}
 
-			p.logger.Debug("Received TCP message", "size", n)
+			// p.logger.Debug("Received TCP message", "size", n)
 
 			if err := onReceive(buf[:n]); err != nil {
 				return fmt.Errorf("tcp-dial: failed to handle data received from the game client to: %w", err)
@@ -94,7 +94,7 @@ func (p *DialerTCP) Write(msg []byte) (int, error) {
 		p.logger.Error("Failed to send message", logging.Error(err))
 		return n, err
 	}
-	p.logger.Debug("Message sent", "size", n, "msg", msg)
+	// p.logger.Debug("Message sent", "size", n, "msg", msg)
 	return n, nil
 }
 

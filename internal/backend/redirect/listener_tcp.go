@@ -140,7 +140,7 @@ func (p *ListenerTCP) handleConnection(ctx context.Context, conn TCPConn, onRece
 			}
 
 			p.lastActive = time.Now()
-			p.logger.Debug("Received packet from the game client", "size", n, "data", buf[:n])
+			// p.logger.Debug("Received packet from the game client", "size", n, "data", buf[:n])
 
 			if err := onReceive(buf[:n]); err != nil {
 				p.logger.Warn("Failed to write data", logging.Error(err))
@@ -165,7 +165,7 @@ func (p *ListenerTCP) Write(msg []byte) (int, error) {
 		return n, fmt.Errorf("listen-tcp: write failed: %w", err)
 	}
 
-	p.logger.Debug("Sent to the game client", "size", n, "data", msg[:n])
+	// p.logger.Debug("Sent to the game client", "size", n, "data", msg[:n])
 	return n, nil
 }
 

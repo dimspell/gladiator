@@ -86,7 +86,7 @@ func (p *DialerUDP) Run(ctx context.Context, onReceive func(p []byte) (err error
 			clear(buf)
 
 			p.conn.SetReadDeadline(time.Now().Add(10 * time.Second))
-			n, addr, err := p.conn.ReadFromUDP(buf)
+			n, _, err := p.conn.ReadFromUDP(buf)
 			if err != nil {
 				var ne net.Error
 				if errors.As(err, &ne) && ne.Timeout() {
@@ -98,7 +98,7 @@ func (p *DialerUDP) Run(ctx context.Context, onReceive func(p []byte) (err error
 			}
 
 			p.lastActive = time.Now()
-			p.logger.Debug("Received UDP message", slog.Int("size", n), slog.String("from", addr.String()))
+			// p.logger.Debug("Received UDP message", slog.Int("size", n)))
 
 			if err := onReceive(buf[:n]); err != nil {
 				return fmt.Errorf("dial-udp: failed to handle data received from game client: %w", err)
@@ -114,7 +114,7 @@ func (p *DialerUDP) Write(msg []byte) (int, error) {
 		p.logger.Error("Failed to send UDP message", logging.Error(err))
 		return n, fmt.Errorf("dial-udp: failed to write UDP message: %w", err)
 	}
-	p.logger.Debug("Message sent", "size", n, "msg", msg)
+	// p.logger.Debug("Message sent", "size", n, "msg", msg)
 	return n, nil
 }
 
