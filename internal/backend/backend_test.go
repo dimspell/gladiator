@@ -138,7 +138,7 @@ func helperNewBackend(tb testing.TB) (bd *Backend, px *direct.ProxyLAN, cs *cons
 	tb.Helper()
 
 	cs = &console.Console{
-		Multiplayer: console.NewMultiplayer(),
+		Multiplayer: console.NewMultiplayer(nil),
 	}
 	ts := httptest.NewServer(http.HandlerFunc(cs.HandleWebSocket))
 
