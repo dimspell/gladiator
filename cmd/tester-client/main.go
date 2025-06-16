@@ -8,8 +8,8 @@ import (
 	"time"
 )
 
-const peerTCP = "127.0.0.1:7000"
-const peerUDP = "127.0.0.1:7001"
+const peerTCP = "127.0.0.2:6114"
+const peerUDP = "127.0.0.2:6113"
 
 // gameServerIP defines IP address of the game server (DispelMulti.exe process)
 // const gameServerIP = "192.168.121.212"
