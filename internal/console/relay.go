@@ -10,8 +10,8 @@ type Relay struct {
 	cancel context.CancelFunc
 }
 
-func NewRelay(addr string) (*Relay, error) {
-	server, err := NewQUICRelay(addr)
+func NewRelay(addr string, multiplayer *Multiplayer) (*Relay, error) {
+	server, err := NewQUICRelay(addr, multiplayer)
 	if err != nil {
 		return nil, fmt.Errorf("relay failed to listen: %v", err)
 	}

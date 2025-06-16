@@ -41,7 +41,7 @@ func TestWebRTC(t *testing.T) {
 
 	// Create console instance and serve the HTTP
 	cs := &console.Console{
-		Multiplayer: console.NewMultiplayer(),
+		Multiplayer: console.NewMultiplayer(nil),
 		DB:          db,
 	}
 	ts := httptest.NewServer(cs.HttpRouter())

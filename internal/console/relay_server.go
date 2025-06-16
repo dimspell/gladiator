@@ -6,15 +6,17 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"log/slog"
+	"strconv"
 	"sync"
 	"time"
 
 	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"github.com/dimspell/gladiator/internal/metrics"
-	quic "github.com/quic-go/quic-go"
+	"github.com/quic-go/quic-go"
 )
 
 type RelayPacket struct {
@@ -26,13 +28,23 @@ type RelayPacket struct {
 }
 
 type PeerConn struct {
-	ID     string
+	// ID is a peer identifier.
+	ID string
+
+	// RoomID is a game room identifier.
 	RoomID string
-	Role   string // "host" or "guest"
+
+	// Stream holds a reference to the QUIC R/W streams of the relay server.
 	Stream quic.Stream
 
-	// ConnectedAt time.Time
+	// Conn holds a reference to the QUIC connection to the relay server.
+	Conn quic.Connection
+
+	// LastSeen is a timestamp, when the user has sent the packet for the last
+	// time.
 	LastSeen time.Time
+
+	Session *UserSession
 }
 
 type Room struct {
@@ -46,9 +58,19 @@ type RelayServer struct {
 	rooms         map[string]*Room  // keyed by roomID
 	peerToRoomIDs map[string]string // key: peerID, value: roomID
 	logger        *slog.Logger
+
+	Multiplayer *Multiplayer
+
+	Events chan RelayEvent
 }
 
-func NewQUICRelay(addr string) (*RelayServer, error) {
+type RelayEvent struct {
+	Type   string
+	PeerID string
+	RoomID string
+}
+
+func NewQUICRelay(addr string, multiplayer *Multiplayer) (*RelayServer, error) {
 	tlsConf := &tls.Config{
 		InsecureSkipVerify: true,
 		NextProtos:         []string{"game-relay"},
@@ -56,8 +78,8 @@ func NewQUICRelay(addr string) (*RelayServer, error) {
 	}
 
 	listener, err := quic.ListenAddr(addr, tlsConf, &quic.Config{
-		MaxIdleTimeout:  60 * time.Second,
-		KeepAlivePeriod: 45 * time.Second,
+		MaxIdleTimeout:  30 * time.Second,
+		KeepAlivePeriod: 15 * time.Second,
 	})
 	if err != nil {
 		return nil, err
@@ -68,6 +90,8 @@ func NewQUICRelay(addr string) (*RelayServer, error) {
 		rooms:         make(map[string]*Room),
 		peerToRoomIDs: make(map[string]string),
 		logger:        slog.With(slog.String("component", "relay")),
+		Multiplayer:   multiplayer,
+		Events:        make(chan RelayEvent),
 	}, nil
 }
 
@@ -90,53 +114,132 @@ func (rs *RelayServer) Start(ctx context.Context) error {
 func (rs *RelayServer) handleConn(ctx context.Context, conn quic.Connection) {
 	stream, err := conn.AcceptStream(ctx)
 	if err != nil {
-		rs.logger.Warn("Relay stream error", logging.Error(err))
+		rs.logger.Warn("Relay stream accept error", logging.Error(err))
+		_ = conn.CloseWithError(0x0, "done")
 		return
 	}
 
+	peerID, roomID, err := rs.handshake(stream)
+	if err != nil {
+		rs.logger.Warn("Relay handshake error", logging.Error(err))
+		rs.closeStream(conn, stream)
+		return
+	}
+
+	metrics.PacketIn.Inc()
+
+	peer := rs.joinRoom(roomID, peerID, conn, stream)
+
+	go rs.relayLoop(roomID, peerID, peer)
+}
+
+// closeStream closes the stream and connection abruptly
+func (rs *RelayServer) closeStream(conn quic.Connection, stream quic.Stream) {
+	// TODO: Name and handle various error codes
+	var errorCode quic.StreamErrorCode = 0xdead
+
+	stream.CancelWrite(errorCode)
+	stream.CancelRead(errorCode)
+	_ = conn.CloseWithError(0xdead, "done")
+
+	slog.Info("Closed relay connection", "addr", conn.RemoteAddr())
+}
+
+func (rs *RelayServer) handshake(stream quic.Stream) (string, string, error) {
 	// Initial handshake: receive signed join a packet
 	buf := make([]byte, 128)
 	n, err := stream.Read(buf)
 	if err != nil {
-		rs.logger.Warn("initial read error", logging.Error(err))
-		return
+		return "", "", fmt.Errorf("error reading stream: %w", err)
 	}
+
 	data, ok := verify(buf[:n])
 	if !ok {
-		rs.logger.Warn("signature failed from client", slog.String("remoteAddr", conn.RemoteAddr().String()))
-		return
+		return "", "", fmt.Errorf("signature failed from client")
 	}
 
 	var pkt RelayPacket
 	if err := json.Unmarshal(data, &pkt); err != nil {
-		rs.logger.Warn("first packet unmarshal error", logging.Error(err), "data", string(data))
-		_ = stream.Close()
-		return
+		return "", "", fmt.Errorf("error unmarshaling packet: %w", err)
 	}
 	if pkt.Type != "join" {
-		rs.logger.Warn("invalid join packet", logging.Error(err))
-		_ = stream.Close()
-		return
+		return "", "", fmt.Errorf("invalid join packet")
 	}
-	metrics.PacketIn.Inc()
 
-	rs.joinRoom(pkt.RoomID, pkt.FromID, stream)
+	userID, _ := strconv.ParseInt(pkt.FromID, 10, 64)
+	if _, ok := rs.Multiplayer.GetUserSession(userID); !ok {
+		return "", "", fmt.Errorf("failed to get user session")
+	}
 
-	go rs.relayLoop(pkt.FromID, stream)
+	// TODO: Authenticate & authorize
+
+	return pkt.FromID, pkt.RoomID, nil
 }
 
-func (rs *RelayServer) relayLoop(peerID string, stream quic.Stream) {
+func (rs *RelayServer) joinRoom(roomID, peerID string, conn quic.Connection, stream quic.Stream) *PeerConn {
+	rs.mu.Lock()
+	defer rs.mu.Unlock()
+
+	room, ok := rs.rooms[roomID]
+	if !ok {
+		room = &Room{ID: roomID, Peers: make(map[string]*PeerConn)}
+		rs.rooms[roomID] = room
+		rs.logger.Info("new room created", logging.RoomID(roomID), logging.PeerID(peerID))
+		metrics.ActiveRooms.Inc()
+	}
+
+	pc := &PeerConn{
+		ID:       peerID,
+		RoomID:   roomID,
+		Stream:   stream,
+		Conn:     conn,
+		LastSeen: time.Now(),
+	}
+	room.Peers[peerID] = pc
+	rs.peerToRoomIDs[peerID] = roomID
+	rs.logger.Info("joined room", logging.RoomID(roomID), logging.PeerID(peerID))
+
+	// Notify about the new dynamic joiner
+	for _, peer := range room.Peers {
+		if peer.ID == peerID {
+			continue
+		}
+
+		rs.sendSigned(peer.Stream, RelayPacket{
+			Type:    "join",
+			RoomID:  roomID,
+			FromID:  peerID,
+			ToID:    peer.ID,
+			Payload: nil,
+		})
+	}
+
+	rs.Events <- RelayEvent{
+		Type:   "join",
+		PeerID: peerID,
+		RoomID: roomID,
+	}
+	metrics.PeersInRoom.WithLabelValues(roomID).Set(float64(len(room.Peers)))
+
+	return pc
+}
+
+func (rs *RelayServer) relayLoop(roomID, peerID string, peer *PeerConn) {
 	metrics.ConnectedPeers.Inc()
 	defer metrics.ConnectedPeers.Dec()
 
 	buf := make([]byte, 4096)
 
 	for {
-		n, err := stream.Read(buf)
+		n, err := peer.Stream.Read(buf)
 		if err == io.EOF {
 			break
 		}
 		if err != nil {
+			var se *quic.StreamError
+			if ok := errors.As(err, &se); ok && se.ErrorCode == 0xdead {
+				break
+			}
 			rs.logger.Warn("stream error when reading", logging.Error(err), logging.PeerID(peerID))
 			break
 		}
@@ -147,7 +250,7 @@ func (rs *RelayServer) relayLoop(peerID string, stream quic.Stream) {
 			continue
 		}
 
-		rs.logger.Debug("[RELAY]", "data", data)
+		peer.LastSeen = time.Now()
 
 		d := json.NewDecoder(bytes.NewReader(data))
 		for {
@@ -162,145 +265,77 @@ func (rs *RelayServer) relayLoop(peerID string, stream quic.Stream) {
 			}
 			metrics.PacketIn.Inc()
 
+			// if pkt.Type != "ping" {
+			rs.logger.Debug("[RELAY]", "payload", pkt.Payload, "from", pkt.FromID, "to", pkt.ToID, "type", pkt.Type)
+			// }
+
 			switch pkt.Type {
-			case "data", "udp", "tcp":
+			case "udp", "tcp":
 				rs.sendTo(pkt.RoomID, pkt.ToID, pkt)
 
 			case "broadcast":
 				rs.broadcastFrom(pkt.RoomID, pkt.FromID, pkt)
 
 			case "leave":
-				rs.leaveRoom(pkt.FromID, pkt.RoomID)
+				if pkt.FromID != peerID && pkt.RoomID != roomID {
+					continue
+				}
+
+				slog.Info("leave room", logging.PeerID(peerID))
+				rs.leaveRoom(peerID, roomID)
+				return
 			}
 		}
 	}
 
-	rs.disconnected(peerID)
-}
-
-func (rs *RelayServer) joinRoom(roomID, peerID string, stream quic.Stream) {
-	rs.mu.Lock()
-	defer rs.mu.Unlock()
-
-	room, ok := rs.rooms[roomID]
-	if !ok {
-		room = &Room{ID: roomID, Peers: make(map[string]*PeerConn)}
-		rs.rooms[roomID] = room
-		rs.logger.Info("new room created", logging.RoomID(roomID), logging.PeerID(peerID))
-		metrics.ActiveRooms.Inc()
-	}
-
-	role := "guest"
-	if len(room.Peers) == 0 {
-		role = "host"
-		rs.logger.Info("user will become a host", logging.RoomID(roomID), logging.PeerID(peerID))
-	}
-
-	log.Println("peers in room", room.Peers)
-
-	room.Peers[peerID] = &PeerConn{
-		ID:     peerID,
-		RoomID: roomID,
-		Role:   role,
-		Stream: stream,
-	}
-	rs.peerToRoomIDs[peerID] = roomID
-	rs.logger.Info("joined room", logging.RoomID(roomID), logging.PeerID(peerID))
-
-	// Notify about the new dynamic joiner
-	for _, peer := range room.Peers {
-		if peer.ID == peerID {
-			continue
-		}
-
-		pkt := RelayPacket{
-			Type:    "join",
-			RoomID:  roomID,
-			FromID:  peerID,
-			ToID:    peer.ID,
-			Payload: nil,
-		}
-		rs.sendSigned(peer.Stream, pkt)
-	}
-
-	metrics.PeersInRoom.WithLabelValues(roomID).Set(float64(len(room.Peers)))
+	rs.logger.Info("disconnected from relay", logging.PeerID(peerID))
+	rs.leaveRoom(peerID, roomID)
 }
 
 func (rs *RelayServer) leaveRoom(peerID, roomID string) {
 	rs.mu.Lock()
 	defer rs.mu.Unlock()
 
+	if _, ok := rs.peerToRoomIDs[peerID]; !ok {
+		return
+	}
+	delete(rs.peerToRoomIDs, peerID)
+
 	room, ok := rs.rooms[roomID]
 	if !ok {
-		rs.logger.Warn("peer leaving the room which does not exist", logging.RoomID(roomID), logging.PeerID(peerID))
 		return
 	}
 
-	leaver, wasHost := room.Peers[peerID], false
-	if leaver != nil && leaver.Role == "host" {
-		wasHost = true
+	leaver, _ := room.Peers[peerID]
+	if leaver == nil {
+		return
 	}
-	defer leaver.Stream.Close()
 
+	rs.closeStream(leaver.Conn, leaver.Stream)
 	delete(room.Peers, peerID)
-	delete(rs.peerToRoomIDs, peerID)
+
+	rs.Events <- RelayEvent{
+		Type:   "leave",
+		PeerID: peerID,
+		RoomID: roomID,
+	}
 	rs.logger.Info("peer left room", logging.RoomID(roomID), logging.PeerID(peerID))
 
 	if len(room.Peers) == 0 {
 		delete(rs.rooms, roomID)
 		rs.logger.Info("room deleted (empty)", logging.RoomID(roomID))
+		rs.Events <- RelayEvent{
+			Type:   "delete",
+			PeerID: peerID,
+			RoomID: roomID,
+		}
+
 		metrics.ActiveRooms.Dec()
 		metrics.PeersInRoom.DeleteLabelValues(roomID)
 		return
 	}
 
 	metrics.PeersInRoom.WithLabelValues(roomID).Set(float64(len(room.Peers)))
-
-	if wasHost {
-		// Elect the new host
-		newHost := rs.electNewHost(room)
-		if newHost == nil {
-			panic("should not happen")
-		}
-
-		// Migrate host
-		newHost.Role = "host"
-		rs.logger.Info("peer promoted to host", slog.String("newHostID", newHost.ID), logging.RoomID(roomID))
-
-		// Notify about the new host
-		for _, peer := range room.Peers {
-			pkt := RelayPacket{
-				Type:    "migrate",
-				RoomID:  roomID,
-				FromID:  "system",
-				ToID:    peer.ID,
-				Payload: []byte(newHost.ID),
-			}
-			rs.sendSigned(peer.Stream, pkt)
-		}
-	}
-}
-
-func (rs *RelayServer) electNewHost(room *Room) *PeerConn {
-	// TODO: Find the oldest by connection time
-	for _, peer := range room.Peers {
-		return peer
-	}
-	return nil
-}
-
-func (rs *RelayServer) disconnected(peerID string) {
-	rs.logger.Info("disconnected from relay", logging.PeerID(peerID))
-
-	rs.mu.Lock()
-	roomID, ok := rs.peerToRoomIDs[peerID]
-	if !ok {
-		rs.mu.Unlock()
-		return
-	}
-	rs.mu.Unlock()
-
-	rs.leaveRoom(peerID, roomID)
 }
 
 func (rs *RelayServer) cleanupPeers() {
@@ -321,6 +356,7 @@ func (rs *RelayServer) cleanupPeers() {
 		rs.mu.Unlock()
 
 		for _, peer := range toLeave {
+			slog.Info("cleaning up users", logging.PeerID(peer.ID), logging.RoomID(peer.RoomID))
 			rs.leaveRoom(peer.ID, peer.RoomID)
 		}
 	}

@@ -3,10 +3,12 @@ package console
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"connectrpc.com/connect"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/gen/multi/v1/multiv1connect"
+	"github.com/dimspell/gladiator/internal/app/logger/logging"
 )
 
 var _ multiv1connect.GameServiceHandler = (*gameServiceServer)(nil)
@@ -70,25 +72,19 @@ func (s *gameServiceServer) GetGame(_ context.Context, req *connect.Request[mult
 func (s *gameServiceServer) CreateGame(_ context.Context, req *connect.Request[multiv1.CreateGameRequest]) (*connect.Response[multiv1.CreateGameResponse], error) {
 	gameId := req.Msg.GetGameName()
 
-	hostSession, found := s.Multiplayer.GetUserSession(req.Msg.HostUserId)
-	if !found {
-		return nil, connect.NewError(connect.CodeUnauthenticated, fmt.Errorf("user session %d not found", req.Msg.HostUserId))
+	room, hostSession, err := s.Multiplayer.CreateRoom(
+		req.Msg.HostUserId,
+		req.Msg.GameName,
+		req.Msg.Password,
+		req.Msg.MapId,
+	)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeAborted, fmt.Errorf("create-game failed"))
 	}
 
+	slog.Debug("Created new room", "gameId", gameId)
+
 	hostSession.IPAddress = req.Msg.HostIpAddress
-
-	room := s.Multiplayer.CreateRoom(GameRoom{
-		Ready:    false,
-		ID:       gameId,
-		Name:     req.Msg.GetGameName(),
-		Password: req.Msg.GetPassword(),
-		MapID:    req.Msg.MapId,
-
-		// TODO
-		HostPlayer: hostSession,
-		CreatedBy:  hostSession,
-		Players:    map[int64]*UserSession{hostSession.UserID: hostSession},
-	})
 
 	resp := connect.NewResponse(&multiv1.CreateGameResponse{
 		Game: &multiv1.Game{
@@ -111,8 +107,9 @@ func (s *gameServiceServer) JoinGame(_ context.Context, req *connect.Request[mul
 		req.Msg.IpAddress,
 	)
 	if err != nil {
+		slog.Error("failed to join room", "gameId", req.Msg.GameRoomId, logging.Error(err))
 		// TODO: Fixme
-		//return nil, connect.NewError(connect.CodeCanceled, err)
+		// return nil, connect.NewError(connect.CodeCanceled, err)
 	}
 
 	s.Multiplayer.AnnounceJoin(

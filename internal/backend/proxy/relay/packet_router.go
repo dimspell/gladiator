@@ -9,6 +9,7 @@ import (
 	"io"
 	"log/slog"
 	"net"
+	"strconv"
 	"sync"
 	"time"
 
@@ -28,6 +29,7 @@ type PacketRouter struct {
 	selfID    string
 	relayAddr string
 
+	roomID        string
 	currentHostID string
 	relayConn     quic.Connection
 	stream        quic.Stream
@@ -43,6 +45,7 @@ func (r *PacketRouter) Reset() {
 	}
 
 	if r.relayConn != nil {
+		_ = r.stream.Close()
 		_ = r.relayConn.CloseWithError(0, "done")
 	}
 
@@ -51,6 +54,8 @@ func (r *PacketRouter) Reset() {
 	}
 
 	r.manager = NewManager()
+	r.roomID = ""
+	r.currentHostID = ""
 }
 
 func (r *PacketRouter) Handle(ctx context.Context, payload []byte) error {
@@ -86,8 +91,6 @@ func decodeAndHandle[T any](
 
 // handleJoinRoom handles the event when new dynamic joiner has arrived (player who connected mid-game)
 func (r *PacketRouter) handleJoinRoom(ctx context.Context, player wire.Player) error {
-	slog.Error("Not handled JOIN_ROOM", "player", player.UserID)
-	// Handled in QUIC stream
 	return nil
 }
 
@@ -104,7 +107,71 @@ func (r *PacketRouter) handleLeaveRoom(ctx context.Context, player wire.Player) 
 }
 
 func (r *PacketRouter) handleHostMigration(ctx context.Context, player wire.Player) error {
-	// Handled in QUIC stream
+	slog.Error("Not handled HOST_MIGRATION", "player", player.UserID)
+
+	newHostID := strconv.Itoa(int(player.UserID))
+	roomID := r.roomID
+
+	if newHostID == r.selfID {
+		// I became a host!
+
+		payload := make([]byte, 8)
+		copy(payload[0:4], []byte{1, 0, 0, 0})
+		copy(payload[4:], net.IPv4(127, 0, 0, 1).To4())
+
+		if err := r.session.SendToGame(packet.HostMigration, payload); err != nil {
+			r.logger.Error("failed to send host migration packet", logging.Error(err))
+			return nil
+		}
+		return nil
+	}
+
+	// Someone else became a host
+	ipAddress, ok := r.manager.peerIPs[newHostID]
+	if !ok {
+		r.logger.Warn("ip address if peer not found, nothing to migrate", logging.PeerID(newHostID))
+		return nil
+	}
+	host, ok := r.manager.hosts[ipAddress]
+	if !ok {
+		r.logger.Warn("peer not found, nothing to migrate", logging.PeerID(newHostID))
+		return nil
+	}
+	r.manager.stopHost(host, ipAddress)
+
+	onTCPMessage := func(p []byte) error {
+		return r.sendPacket(RelayPacket{
+			Type:    "tcp",
+			RoomID:  roomID,
+			ToID:    newHostID,
+			Payload: p,
+		})
+	}
+	onUDPMessage := func(p []byte) error {
+		return r.sendPacket(RelayPacket{
+			Type:    "udp",
+			RoomID:  roomID,
+			ToID:    newHostID,
+			Payload: p,
+		})
+	}
+
+	var err error
+	host, err = r.manager.StartListenerHost(ctx, newHostID, ipAddress, 6114, 6113, onTCPMessage, onUDPMessage, nil)
+	if err != nil {
+		r.logger.Warn("failed to start host", logging.Error(err), logging.PeerID(newHostID))
+		return nil
+	}
+
+	payload := make([]byte, 8)
+	copy(payload[0:4], []byte{1, 0, 0, 0})
+	copy(payload[4:], ipAddress)
+
+	if err := r.session.SendToGame(packet.HostMigration, payload); err != nil {
+		r.logger.Error("failed to send host migration packet", logging.Error(err))
+		return nil
+	}
+
 	return nil
 }
 
@@ -117,8 +184,8 @@ func (r *PacketRouter) connect(ctx context.Context, roomID string) error {
 		NextProtos:         []string{"game-relay"},
 	}
 	conn, err := quic.DialAddr(ctx, r.relayAddr, tlsConf, &quic.Config{
-		MaxIdleTimeout:  45 * time.Second,
-		KeepAlivePeriod: 30 * time.Second,
+		MaxIdleTimeout:  30 * time.Second,
+		KeepAlivePeriod: 15 * time.Second,
 	})
 	if err != nil {
 		return fmt.Errorf("quic dial failed: %w", err)
@@ -157,7 +224,10 @@ func (r *PacketRouter) keepAliveHost(ctx context.Context) {
 	r.mu.Unlock()
 
 	go func(ticker *time.Ticker) {
-		defer ticker.Stop()
+		defer func() {
+			ticker.Stop()
+			r.logger.Debug("keep alive ping stopped")
+		}()
 
 		for {
 			select {
@@ -170,7 +240,11 @@ func (r *PacketRouter) keepAliveHost(ctx context.Context) {
 
 				// Send a packet to the relay server to keep it announced, when
 				// playing alone
-				_ = r.sendPacket(RelayPacket{Type: "ping"})
+				if err := r.sendPacket(RelayPacket{Type: "ping"}); err != nil {
+					r.logger.Error("failed to send ping packet", logging.Error(err))
+					r.Reset()
+					return
+				}
 			}
 		}
 	}(r.pingTicker)
@@ -232,7 +306,7 @@ func (r *PacketRouter) sendPacket(pkt RelayPacket) error {
 	}
 	// packet := sign(data)
 
-	r.logger.Debug("Sending packet", "fromID", pkt.FromID, "type", pkt.Type, "data", pkt.Payload, "datastr", string(pkt.Payload), "toId", pkt.ToID)
+	// r.logger.Debug("Sending packet", "fromID", pkt.FromID, "type", pkt.Type, "data", pkt.Payload, "datastr", string(pkt.Payload), "toId", pkt.ToID)
 
 	data = append(data, '\n')
 
@@ -260,7 +334,7 @@ func (r *PacketRouter) receiveLoop(ctx context.Context, stream quic.Stream) {
 			continue
 		}
 
-		r.logger.Debug("Received packet", "data", data, "datastr", string(data))
+		// r.logger.Debug("Received packet", "data", data, "datastr", string(data))
 
 		d := json.NewDecoder(bytes.NewReader(data))
 		for {
@@ -291,9 +365,6 @@ func (r *PacketRouter) receiveLoop(ctx context.Context, stream quic.Stream) {
 
 			case "leave":
 				r.leaveRoom(pkt.FromID)
-
-			case "migrate":
-				r.hostMigration(ctx, pkt.RoomID, pkt)
 			}
 		}
 	}
@@ -373,7 +444,7 @@ func (r *PacketRouter) dynamicJoin(ctx context.Context, roomID string, peerID st
 	// TODO: It must be local addr
 	host, err := r.manager.StartDialHost(peerID, "127.0.0.1", tcpPort, 6113, onTCPMessage, onUDPMessage)
 	if err != nil {
-		r.logger.Warn("failed to start guest host", logging.Error(err), logging.PeerID(peerID))
+		r.logger.Warn("failed to start dial host", logging.Error(err), logging.PeerID(peerID))
 		// TODO: Unassign IP address
 		return
 	}
@@ -389,68 +460,4 @@ func (r *PacketRouter) dynamicJoin(ctx context.Context, roomID string, peerID st
 
 func (r *PacketRouter) leaveRoom(peerID string) {
 	r.manager.RemoveByRemoteID(peerID)
-}
-
-func (r *PacketRouter) hostMigration(ctx context.Context, roomID string, pkt RelayPacket) {
-	newHostID := string(pkt.Payload)
-
-	if newHostID == r.selfID {
-		// I became a host!
-
-		payload := make([]byte, 8)
-		copy(payload[0:4], []byte{1, 0, 0, 0})
-		copy(payload[4:], net.IPv4(127, 0, 0, 1).To4())
-
-		if err := r.session.SendToGame(packet.HostMigration, payload); err != nil {
-			r.logger.Error("failed to send host migration packet", logging.Error(err))
-			return
-		}
-		return
-	}
-
-	// Someone else became a host
-	ipAddress, ok := r.manager.peerIPs[newHostID]
-	if !ok {
-		r.logger.Warn("ip address if peer not found, nothing to migrate", logging.PeerID(newHostID))
-		return
-	}
-	host, ok := r.manager.hosts[ipAddress]
-	if !ok {
-		r.logger.Warn("peer not found, nothing to migrate", logging.PeerID(newHostID))
-		return
-	}
-	r.manager.stopHost(host, ipAddress)
-
-	onTCPMessage := func(p []byte) error {
-		return r.sendPacket(RelayPacket{
-			Type:    "tcp",
-			RoomID:  roomID,
-			ToID:    newHostID,
-			Payload: p,
-		})
-	}
-	onUDPMessage := func(p []byte) error {
-		return r.sendPacket(RelayPacket{
-			Type:    "udp",
-			RoomID:  roomID,
-			ToID:    newHostID,
-			Payload: p,
-		})
-	}
-
-	var err error
-	host, err = r.manager.StartListenerHost(ctx, newHostID, ipAddress, 6114, 6113, onTCPMessage, onUDPMessage, nil)
-	if err != nil {
-		r.logger.Warn("failed to start host", logging.Error(err), logging.PeerID(newHostID))
-		return
-	}
-
-	payload := make([]byte, 8)
-	copy(payload[0:4], []byte{1, 0, 0, 0})
-	copy(payload[4:], ipAddress)
-
-	if err := r.session.SendToGame(packet.HostMigration, payload); err != nil {
-		r.logger.Error("failed to send host migration packet", logging.Error(err))
-		return
-	}
 }

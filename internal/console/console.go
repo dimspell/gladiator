@@ -50,13 +50,17 @@ func NewConsole(db *database.SQLite, addr string, opts ...Option) *Console {
 		}
 	}
 
+	multiplayer := NewMultiplayer()
+
 	var relay *Relay
 	var err error
 	if config.EnableRelayServer {
-		relay, err = NewRelay(config.RelayAddr)
+		relay, err = NewRelay(config.RelayAddr, multiplayer)
 		if err != nil {
 			panic("failed to initialize relay: " + err.Error())
 		}
+
+		multiplayer.Relay = relay
 	}
 
 	metrics.InitConsole()
@@ -65,7 +69,7 @@ func NewConsole(db *database.SQLite, addr string, opts ...Option) *Console {
 	return &Console{
 		Addr:        addr,
 		DB:          db,
-		Multiplayer: NewMultiplayer(),
+		Multiplayer: multiplayer,
 		Relay:       relay,
 		Config:      config,
 	}

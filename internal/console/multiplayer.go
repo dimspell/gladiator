@@ -15,10 +15,11 @@ import (
 	"github.com/dimspell/gladiator/internal/wire"
 )
 
+// Multiplayer is a control plane for the lobby, presence and the matchmaking.
 type Multiplayer struct {
 	done context.CancelFunc
 
-	// Presence in lobby
+	// Presence in a lobby
 	sessionMutex sync.RWMutex
 	sessions     map[int64]*UserSession
 
@@ -27,6 +28,8 @@ type Multiplayer struct {
 	// Game rooms
 	roomsMutex sync.RWMutex
 	Rooms      map[string]*GameRoom
+
+	Relay *Relay
 }
 
 func NewMultiplayer() *Multiplayer {
@@ -53,6 +56,7 @@ func (mp *Multiplayer) Reset() {
 func (mp *Multiplayer) Run(ctx context.Context) {
 	ctx, done := context.WithCancel(ctx)
 	mp.done = done
+	defer done()
 
 	for {
 		select {
@@ -60,11 +64,19 @@ func (mp *Multiplayer) Run(ctx context.Context) {
 			slog.Info("Received signal, closing the server")
 			mp.Reset()
 			return
+
 		case msg, ok := <-mp.Messages:
 			if !ok {
 				return
 			}
 			mp.HandleIncomingMessage(ctx, msg)
+
+		case ev, ok := <-mp.Relay.Server.Events:
+			if !ok {
+				return
+			}
+			// Note: It could be handled by NATS
+			mp.handleRelayEvent(ev)
 		}
 	}
 }
@@ -198,12 +210,41 @@ func (mp *Multiplayer) GetRoom(roomId string) (GameRoom, bool) {
 }
 
 // CreateRoom creates new game room.
-func (mp *Multiplayer) CreateRoom(room GameRoom) GameRoom {
+func (mp *Multiplayer) CreateRoom(
+	hostUserID int64,
+	gameID string,
+	password string,
+	mapID v1.GameMap,
+) (*GameRoom, *UserSession, error) {
 	mp.roomsMutex.Lock()
 	defer mp.roomsMutex.Unlock()
 
-	mp.Rooms[room.ID] = &room
-	return room
+	hostSession, found := mp.GetUserSession(hostUserID)
+	if !found {
+		return nil, nil, fmt.Errorf("user session not found %q", hostUserID)
+	}
+
+	if _, exist := mp.Rooms[gameID]; exist {
+		return nil, nil, fmt.Errorf("room already exists")
+	}
+
+	// TODO: Be more gentle with interfacing with the Relay Server
+	// if mp.Relay != nil {
+	// 	mp.Relay.Server.leaveRoom(fmt.Sprintf("%d", hostUserID), gameID)
+	// }
+
+	room := &GameRoom{
+		Ready:      false,
+		ID:         gameID,
+		Name:       gameID,
+		Password:   password,
+		MapID:      mapID,
+		HostPlayer: hostSession,
+		CreatedBy:  hostSession,
+		Players:    map[int64]*UserSession{hostSession.UserID: hostSession},
+	}
+	mp.Rooms[gameID] = room
+	return room, hostSession, nil
 }
 
 // DestroyRoom deletes an existing game room.
@@ -231,7 +272,7 @@ func (mp *Multiplayer) JoinRoom(roomId string, userId int64, ipAddr string) (Gam
 		return GameRoom{}, fmt.Errorf("room %s not found", roomId)
 	}
 
-	// Check if player was already added to game room
+	// Check if player was already added to the game room
 	if _, ok := room.Players[userId]; ok {
 		slog.Warn("User already joined a room", "room", roomId, "user", userId)
 		return GameRoom{}, fmt.Errorf("user session %d already joined", userId)
@@ -288,7 +329,7 @@ func (mp *Multiplayer) LeaveRoom(ctx context.Context, session *UserSession) {
 			},
 		}))
 
-		if playerWasHost {
+		if playerWasHost && room.HostPlayer != nil {
 			player.Send(ctx, wire.Compose(wire.HostMigration, wire.Message{
 				To:   strconv.Itoa(int(id)),
 				From: strconv.Itoa(int(room.HostPlayer.UserID)),
@@ -303,6 +344,8 @@ func (mp *Multiplayer) LeaveRoom(ctx context.Context, session *UserSession) {
 			}))
 		}
 	}
+
+	// mp.Relay.Server.switchHost(roomID, peerID)
 }
 
 // GetNextHost returns the next host of the game room.
@@ -456,6 +499,12 @@ func (mp *Multiplayer) SetPlayerDisconnected(session *UserSession) {
 	// Kick the user from the game room (if any)
 	mp.LeaveRoom(context.Background(), session)
 
+	// Notify the relay server the user has disconnected
+	if mp.Relay != nil {
+		slog.Info("Closing relay connection", "user", session.UserID)
+		mp.Relay.Server.leaveRoom(fmt.Sprintf("%d", session.UserID), session.GameID)
+	}
+
 	// Delete the session from the map
 	mp.DeleteUserSession(session.UserID)
 
@@ -525,4 +574,17 @@ func (mp *Multiplayer) listSessions() []wire.Player {
 		i++
 	}
 	return list
+}
+
+func (mp *Multiplayer) handleRelayEvent(event RelayEvent) {
+	switch event.Type {
+	case "join":
+		// mp.JoinRoom(event.RoomID, event.PeerID, "")
+	case "leave":
+		// mp.LeaveRoom(context.Background(), &UserSession{})
+	case "delete":
+		// mp.DestroyRoom(event.RoomID)
+	}
+
+	// slog.Debug("unhandled relay event", "type", event.Type)
 }
