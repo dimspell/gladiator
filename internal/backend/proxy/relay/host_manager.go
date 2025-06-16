@@ -296,7 +296,7 @@ func (hm *HostManager) stopHost(host *FakeHost, ipAddress string) {
 	delete(hm.ipToPeerID, ipAddress)
 	delete(hm.peerIPs, remoteID)
 
-	log.Printf("Fake host at %s cleaned up", ipAddress)
+	slog.Info("Fake host cleaned up", "ip", ipAddress)
 }
 
 // CleanupInactive does a cleanup of hosts that haven't been used in X seconds
@@ -308,7 +308,7 @@ func (hm *HostManager) CleanupInactive(timeout time.Duration) {
 	now := time.Now().Add(timeout)
 	for ipAddress, host := range hm.hosts {
 		if host.LastSeen.After(now) {
-			log.Printf("Removing inactive host %s", ipAddress)
+			slog.Info("Removing inactive host", "ip", ipAddress)
 			hm.stopHost(host, ipAddress)
 		}
 	}
