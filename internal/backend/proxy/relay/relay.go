@@ -63,12 +63,13 @@ func (r *Relay) GetHostIP(ip net.IP) net.IP {
 }
 
 func (r *Relay) CreateRoom(params proxy.CreateParams) (net.IP, error) {
+	ctx := context.Background()
+	roomID := params.GameID
+
 	r.router.Reset()
 	r.router.selfID = remoteID(r.session.UserID)
 	r.router.currentHostID = remoteID(r.session.UserID)
-
-	ctx := context.Background()
-	roomID := params.GameID
+	r.router.roomID = roomID
 
 	if err := r.router.connect(ctx, roomID); err != nil {
 		return nil, fmt.Errorf("failed connect to the relay server: %w", err)
@@ -101,6 +102,7 @@ func (r *Relay) HostRoom(ctx context.Context, params proxy.HostParams) error {
 func (r *Relay) SelectGame(data proxy.GameData) error {
 	r.router.Reset()
 	r.router.selfID = remoteID(r.session.UserID)
+	r.router.roomID = data.Game.GameId
 
 	host, err := data.FindHostUser()
 	if err != nil {
