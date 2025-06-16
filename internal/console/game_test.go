@@ -11,7 +11,7 @@ import (
 
 func TestGameServiceServer_CreateGame(t *testing.T) {
 	g := &gameServiceServer{
-		Multiplayer: NewMultiplayer(),
+		Multiplayer: NewMultiplayer(nil),
 	}
 	g.Multiplayer.AddUserSession(10, NewUserSession(10, nil))
 
@@ -58,7 +58,7 @@ func TestGameServiceServer_CreateGame(t *testing.T) {
 
 func TestGameServiceServer_ListGames(t *testing.T) {
 	g := &gameServiceServer{
-		Multiplayer: NewMultiplayer(),
+		Multiplayer: NewMultiplayer(nil),
 	}
 	g.Multiplayer.AddUserSession(10, NewUserSession(10, nil))
 
@@ -100,7 +100,7 @@ func TestGameServiceServer_ListGames(t *testing.T) {
 
 func TestGameServiceServer_GetGame(t *testing.T) {
 	g := &gameServiceServer{
-		Multiplayer: NewMultiplayer(),
+		Multiplayer: NewMultiplayer(nil),
 	}
 	g.Multiplayer.AddUserSession(10, NewUserSession(10, nil))
 
@@ -140,7 +140,7 @@ func TestGameServiceServer_GetGame(t *testing.T) {
 
 func TestGameServiceServer_JoinGame(t *testing.T) {
 	g := &gameServiceServer{
-		Multiplayer: NewMultiplayer(),
+		Multiplayer: NewMultiplayer(nil),
 	}
 	g.Multiplayer.AddUserSession(10, NewUserSession(10, nil))
 	g.Multiplayer.AddUserSession(5, NewUserSession(5, nil))
