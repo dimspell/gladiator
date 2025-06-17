@@ -53,7 +53,7 @@ func (r *PacketRouter) Reset() {
 		r.manager.stopHost(host, ipAddress)
 	}
 
-	r.manager = NewManager()
+	r.manager = NewManager(r.manager.ipPrefix)
 	r.roomID = ""
 	r.currentHostID = ""
 }

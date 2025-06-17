@@ -28,14 +28,17 @@ type HostManager struct {
 	// reverse map - fakeLAN IP => remoteID
 	ipToPeerID map[string]string
 	mu         sync.Mutex
+
+	ipPrefix net.IP
 }
 
-func NewManager() *HostManager {
+func NewManager(ipPrefix net.IP) *HostManager {
 	return &HostManager{
 		hosts:      make(map[string]*FakeHost),
 		peerHosts:  make(map[string]*FakeHost),
 		peerIPs:    make(map[string]string),
 		ipToPeerID: make(map[string]string),
+		ipPrefix:   ipPrefix,
 	}
 }
 
@@ -60,11 +63,16 @@ func (hm *HostManager) assignIP(remoteID string) (string, error) {
 
 	// Try from 127.0.0.2-127.0.0.254
 	for i := 2; i < 255; i++ {
-		ip := fmt.Sprintf("127.0.0.%d", i)
-		if _, ok := hm.ipToPeerID[ip]; !ok {
-			hm.peerIPs[remoteID] = ip
-			hm.ipToPeerID[ip] = remoteID
-			return ip, nil
+		var ip net.IP
+		copy(ip, hm.ipPrefix[:2])
+		ip[3] = byte(i)
+		ipAddr := ip.To4().String()
+		fmt.Println(ipAddr)
+
+		if _, ok := hm.ipToPeerID[ipAddr]; !ok {
+			hm.peerIPs[remoteID] = ipAddr
+			hm.ipToPeerID[ipAddr] = remoteID
+			return ipAddr, nil
 		}
 	}
 	return "", fmt.Errorf("no available IPs")

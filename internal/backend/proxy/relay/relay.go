@@ -22,6 +22,8 @@ type ProxyRelay struct {
 	// RelayServerAddr is the address (IP:port) of the remote relay server to
 	// which the proxy will forward all client traffic.
 	RelayServerAddr string
+
+	TODOIPPrefix string
 }
 
 func (p *ProxyRelay) Create(session *bsession.Session) proxy.ProxyClient {
@@ -41,12 +43,17 @@ type Relay struct {
 }
 
 func NewRelay(config *ProxyRelay, session *bsession.Session) *Relay {
+	ipPrefix := net.ParseIP(config.TODOIPPrefix)
+	if ipPrefix == nil {
+		ipPrefix = net.ParseIP("127.0.0.0")
+	}
+
 	router := &PacketRouter{
 		relayAddr: config.RelayServerAddr,
 		logger:    slog.With(slog.String("proxy", "relay"), slog.String("sessionId", session.ID)),
 		selfID:    remoteID(session.UserID),
 		session:   session,
-		manager:   NewManager(),
+		manager:   NewManager(ipPrefix),
 	}
 
 	return &Relay{
