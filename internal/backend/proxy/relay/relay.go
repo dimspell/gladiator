@@ -23,7 +23,7 @@ type ProxyRelay struct {
 	// which the proxy will forward all client traffic.
 	RelayServerAddr string
 
-	TODOIPPrefix string
+	IPPrefix net.IP
 }
 
 func (p *ProxyRelay) Create(session *bsession.Session) proxy.ProxyClient {
@@ -43,9 +43,9 @@ type Relay struct {
 }
 
 func NewRelay(config *ProxyRelay, session *bsession.Session) *Relay {
-	ipPrefix := net.ParseIP(config.TODOIPPrefix)
+	ipPrefix := config.IPPrefix
 	if ipPrefix == nil {
-		ipPrefix = net.ParseIP("127.0.0.0")
+		ipPrefix = net.IPv4(127, 0, 0, 0)
 	}
 
 	router := &PacketRouter{
@@ -53,7 +53,7 @@ func NewRelay(config *ProxyRelay, session *bsession.Session) *Relay {
 		logger:    slog.With(slog.String("proxy", "relay"), slog.String("sessionId", session.ID)),
 		selfID:    remoteID(session.UserID),
 		session:   session,
-		manager:   NewManager(ipPrefix),
+		manager:   NewManager(ipPrefix.To4()),
 	}
 
 	return &Relay{

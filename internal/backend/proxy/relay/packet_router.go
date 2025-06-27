@@ -53,7 +53,9 @@ func (r *PacketRouter) Reset() {
 		r.manager.stopHost(host, ipAddress)
 	}
 
-	r.manager = NewManager(r.manager.ipPrefix)
+	slog.Warn("Resetting PacketRouter", "ipPrefix", r.manager.ipPrefix)
+	ipPrefix := r.manager.ipPrefix
+	r.manager = NewManager(ipPrefix)
 	r.roomID = ""
 	r.currentHostID = ""
 }
