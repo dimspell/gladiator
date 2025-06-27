@@ -63,16 +63,8 @@ func (hm *HostManager) assignIP(remoteID string) (string, error) {
 
 	// Try from 127.0.0.2-127.0.0.254
 	for i := 2; i < 255; i++ {
-		//ip := make(net.IP, 4)
-		ip := net.IPv4(127, 0, 0, 1).To4()
-		//if !hm.ipPrefix.Equal(net.IPv4(0, 0, 0, 0)) {
-		//	slog.Error("PREFIX NOT SET")
-		//	copy(ip, hm.ipPrefix[:2])
-		//}
-		ip[3] = byte(i)
-		ipAddr := ip.To4().String()
-		fmt.Println(ipAddr)
-
+		ip := net.IPv4(127, 0, hm.ipPrefix[2], byte(i)).To4()
+		ipAddr := ip.String()
 		if _, ok := hm.ipToPeerID[ipAddr]; !ok {
 			hm.peerIPs[remoteID] = ipAddr
 			hm.ipToPeerID[ipAddr] = remoteID
@@ -301,6 +293,8 @@ func (hm *HostManager) stopHost(host *FakeHost, ipAddress string) {
 	if p := host.ProxyUDP; p != nil {
 		_ = p.Close()
 	}
+
+	fmt.Println(hm.ipToPeerID, hm.hosts)
 
 	// Remove from maps
 	remoteID, _ := hm.ipToPeerID[ipAddress]
