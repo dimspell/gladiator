@@ -63,8 +63,12 @@ func (hm *HostManager) assignIP(remoteID string) (string, error) {
 
 	// Try from 127.0.0.2-127.0.0.254
 	for i := 2; i < 255; i++ {
-		var ip net.IP
-		copy(ip, hm.ipPrefix[:2])
+		//ip := make(net.IP, 4)
+		ip := net.IPv4(127, 0, 0, 1).To4()
+		//if !hm.ipPrefix.Equal(net.IPv4(0, 0, 0, 0)) {
+		//	slog.Error("PREFIX NOT SET")
+		//	copy(ip, hm.ipPrefix[:2])
+		//}
 		ip[3] = byte(i)
 		ipAddr := ip.To4().String()
 		fmt.Println(ipAddr)
