@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"errors"
+	"flag"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"time"
@@ -20,19 +22,181 @@ import (
 	"github.com/dimspell/gladiator/internal/model"
 )
 
+var _ net.Conn = (*mockConn)(nil)
+
+type mockConn struct{}
+
+func (m mockConn) Read(b []byte) (n int, err error) {
+	// TODO implement me
+	panic("implement me")
+}
+
+func (m mockConn) Write(b []byte) (n int, err error) {
+	// TODO implement me
+	panic("implement me")
+}
+
+func (m mockConn) Close() error {
+	// TODO implement me
+	panic("implement me")
+}
+
+func (m mockConn) LocalAddr() net.Addr {
+	// TODO implement me
+	panic("implement me")
+}
+
+func (m mockConn) RemoteAddr() net.Addr {
+	// TODO implement me
+	panic("implement me")
+}
+
+func (m mockConn) SetDeadline(t time.Time) error {
+	// TODO implement me
+	panic("implement me")
+}
+
+func (m mockConn) SetReadDeadline(t time.Time) error {
+	// TODO implement me
+	panic("implement me")
+}
+
+func (m mockConn) SetWriteDeadline(t time.Time) error {
+	// TODO implement me
+	panic("implement me")
+}
+
+type Map struct {
+	SessionID   string
+	UserID      int64
+	CharacterID int
+	UserName    string
+	ClassType   model.ClassType
+	IPPrefix    net.IP
+
+	Game    *multiv1.Game
+	Players []*multiv1.Player
+}
+
+const roomID = "testroom"
+
+var mapping = map[string]Map{
+	"2": { // joins to host
+		IPPrefix:    net.IPv4(127, 0, 3, 1).To4(),
+		SessionID:   "sid-2",
+		UserID:      2,
+		CharacterID: 2,
+		UserName:    "mage",
+		ClassType:   model.ClassTypeArcher,
+
+		Game: &multiv1.Game{
+			GameId:        roomID,
+			Name:          roomID,
+			Password:      "",
+			MapId:         multiv1.GameMap_ScatteredShelter,
+			HostUserId:    1,
+			HostIpAddress: "",
+		},
+		Players: []*multiv1.Player{
+			{
+				UserId:      1,
+				Username:    "mage",
+				CharacterId: 1,
+				ClassType:   multiv1.ClassType_Mage,
+				IpAddress:   "",
+			},
+		},
+	},
+	"3": { // joins as third
+		SessionID:   "sid-3",
+		UserID:      3,
+		UserName:    "warrior",
+		CharacterID: 3,
+		ClassType:   model.ClassTypeWarrior,
+
+		Game: &multiv1.Game{
+			GameId:        roomID,
+			Name:          roomID,
+			Password:      "",
+			MapId:         multiv1.GameMap_ScatteredShelter,
+			HostUserId:    1,
+			HostIpAddress: "",
+		},
+		Players: []*multiv1.Player{
+			{
+				UserId:      1,
+				Username:    "mage",
+				CharacterId: 1,
+				ClassType:   multiv1.ClassType_Mage,
+				IpAddress:   "",
+			},
+			{
+				UserId:      2,
+				Username:    "archer",
+				CharacterId: 2,
+				ClassType:   multiv1.ClassType_Archer,
+				IpAddress:   "",
+			},
+		},
+	},
+	"4": { // joins to 2 and 3 after 2 became a host
+		SessionID:   "sid-4",
+		UserID:      4,
+		UserName:    "knight",
+		CharacterID: 4,
+		ClassType:   model.ClassTypeKnight,
+
+		Game: &multiv1.Game{
+			GameId:        roomID,
+			Name:          roomID,
+			Password:      "",
+			MapId:         multiv1.GameMap_ScatteredShelter,
+			HostUserId:    2,
+			HostIpAddress: "",
+		},
+		Players: []*multiv1.Player{
+			{
+				UserId:      2,
+				Username:    "archer",
+				CharacterId: 2,
+				ClassType:   multiv1.ClassType_Archer,
+				IpAddress:   "",
+			},
+			{
+				UserId:      3,
+				Username:    "warrior",
+				CharacterId: 3,
+				ClassType:   multiv1.ClassType_Warrior,
+				IpAddress:   "",
+			},
+		},
+	},
+}
+
 func main() {
 	logger.SetColoredLogger(os.Stderr, slog.LevelDebug, false)
 
+	var userID string
+	flag.StringVar(&userID, "user-id", "", "User ID")
+	flag.Parse()
+
+	user, ok := mapping[userID]
+	if !ok {
+		return
+	}
+
 	px := &relay.ProxyRelay{
 		RelayServerAddr: "localhost:9999",
+		IPPrefix:        user.IPPrefix,
 	}
 	session := bsession.NewSession(nil)
-	session.ID = "sid-2"
-	session.UserID = 2
-	session.Username = "mage"
-	session.CharacterID = 2
-	session.ClassType = model.ClassTypeArcher
+	session.ID = user.SessionID
+	session.UserID = user.UserID
+	session.Username = user.UserName
+	session.CharacterID = int64(user.CharacterID)
+	session.ClassType = user.ClassType
 	session.Proxy = px.Create(session)
+	session.Conn = &mockConn{}
 
 	ctx := context.TODO()
 
@@ -65,27 +229,11 @@ func main() {
 		}
 	}(ctx)
 
-	roomID := "testroom"
 	var err error
 
 	err = session.Proxy.SelectGame(proxy.GameData{
-		Game: &multiv1.Game{
-			GameId:        roomID,
-			Name:          roomID,
-			Password:      "",
-			MapId:         multiv1.GameMap_ScatteredShelter,
-			HostUserId:    1,
-			HostIpAddress: "",
-		},
-		Players: []*multiv1.Player{
-			{
-				UserId:      1,
-				Username:    "mage",
-				CharacterId: 1,
-				ClassType:   multiv1.ClassType_Mage,
-				IpAddress:   "",
-			},
-		},
+		Game:    user.Game,
+		Players: user.Players,
 	})
 	if err != nil {
 		slog.Error("SelectGame", logging.Error(err))

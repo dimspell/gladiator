@@ -5,8 +5,10 @@ mig_dir ?= console/database/migrations
 mig_name ?= create_users_table
 mig_version ?= VERSION
 
+join_id ?= 2
+
 build:
-	go build -v -o /dev/null ./
+	go build -race -v -o /dev/null ./
 
 serve:
 	 go run ./ serve --backend-addr=127.0.0.1:6112 --console-addr=127.0.0.1:2137
@@ -63,4 +65,4 @@ relay-host: clear
 	go run ./cmd/relay-host
 
 relay-join: clear
-	go run ./cmd/relay-join
+	go run ./cmd/relay-join -join=$(join_id)
