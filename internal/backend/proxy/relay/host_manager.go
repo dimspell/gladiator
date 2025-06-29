@@ -98,7 +98,7 @@ func (hm *HostManager) StartDialHost(
 
 	// TCP dialer to the local game server
 	if realTCPPort > 0 {
-		tcpProxy, err = redirect.DialTCP(ipAddress, strconv.Itoa(realTCPPort))
+		tcpProxy, err = redirect.DialTCP("127.0.0.1", strconv.Itoa(realTCPPort))
 		if err != nil {
 			return nil, fmt.Errorf("failed to dial TCP: %w", err)
 		}
@@ -106,7 +106,7 @@ func (hm *HostManager) StartDialHost(
 
 	// UDP dialer
 	if realUDPPort > 0 {
-		udpProxy, err = redirect.DialUDP(ipAddress, strconv.Itoa(realUDPPort))
+		udpProxy, err = redirect.DialUDP("127.0.0.1", strconv.Itoa(realUDPPort))
 		if err != nil {
 			return nil, fmt.Errorf("failed to dial UDP: %w", err)
 		}
@@ -129,6 +129,9 @@ func (hm *HostManager) StartDialHost(
 	go func(host *FakeHost) {
 		g.Go(func() error {
 			wg.Done()
+			if tcpProxy == nil {
+				return nil
+			}
 			return tcpProxy.Run(ctx, func(p []byte) (err error) {
 				slog.Debug("[TCP] GameClient => Remote", "data", p, logging.PeerID(peerID))
 
@@ -140,6 +143,10 @@ func (hm *HostManager) StartDialHost(
 		g.Go(func() error {
 			wg.Done()
 			return udpProxy.Run(ctx, func(p []byte) (err error) {
+				if udpProxy == nil {
+					return nil
+				}
+
 				slog.Debug("[UDP] GameClient => Remote", "data", p, logging.PeerID(peerID))
 
 				host.LastSeen = time.Now()
@@ -217,25 +224,29 @@ func (hm *HostManager) StartListenerHost(
 	}
 
 	go func(host *FakeHost) {
-		g.Go(func() error {
-			wg.Done()
-			return tcpProxy.Run(ctx, func(p []byte) (err error) {
-				slog.Debug("[TCP] GameClient => Remote", "data", p, logging.PeerID(peerID))
+		if tcpProxy != nil {
+			g.Go(func() error {
+				wg.Done()
+				return tcpProxy.Run(ctx, func(p []byte) (err error) {
+					slog.Debug("[TCP] GameClient => Remote", "data", p, logging.PeerID(peerID))
 
-				host.LastSeen = time.Now()
-				return onReceiveTCP(p)
+					host.LastSeen = time.Now()
+					return onReceiveTCP(p)
+				})
 			})
-		})
+		}
 
-		g.Go(func() error {
-			wg.Done()
-			return udpProxy.Run(ctx, func(p []byte) (err error) {
-				slog.Debug("[UDP] GameClient => Remote", "data", p, logging.PeerID(peerID))
+		if udpProxy != nil {
+			g.Go(func() error {
+				wg.Done()
+				return udpProxy.Run(ctx, func(p []byte) (err error) {
+					slog.Debug("[UDP] GameClient => Remote", "data", p, logging.PeerID(peerID))
 
-				host.LastSeen = time.Now()
-				return onReceiveUDP(p)
+					host.LastSeen = time.Now()
+					return onReceiveUDP(p)
+				})
 			})
-		})
+		}
 
 		wg.Done()
 		if err := g.Wait(); err != nil {
