@@ -30,9 +30,9 @@ func main() {
 	session := bsession.NewSession(nil)
 	session.ID = "sid-1"
 	session.UserID = 1
-	session.Username = "archer"
+	session.Username = "knight"
 	session.CharacterID = 1
-	session.ClassType = model.ClassTypeArcher
+	session.ClassType = model.ClassTypeKnight
 	session.Proxy = px.Create(session)
 
 	ctx := context.TODO()

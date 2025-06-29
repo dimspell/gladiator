@@ -102,9 +102,7 @@ func (p *ListenerTCP) Run(ctx context.Context, onReceive func(p []byte) (err err
 // from the game client.
 func (p *ListenerTCP) handleConnection(ctx context.Context, conn TCPConn, onReceive func(p []byte) (err error)) error {
 	defer func() {
-		if err := conn.Close(); err != nil {
-			p.logger.Warn("Error closing TCP connection", logging.Error(err))
-		}
+		_ = conn.Close()
 	}()
 
 	// Handle incoming data from the game client

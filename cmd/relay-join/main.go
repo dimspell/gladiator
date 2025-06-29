@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -20,6 +21,7 @@ import (
 	"github.com/dimspell/gladiator/internal/backend/proxy"
 	"github.com/dimspell/gladiator/internal/backend/proxy/relay"
 	"github.com/dimspell/gladiator/internal/model"
+	"github.com/go-chi/chi/v5"
 )
 
 var _ net.Conn = (*mockConn)(nil)
@@ -72,9 +74,6 @@ type Map struct {
 	UserName    string
 	ClassType   model.ClassType
 	IPPrefix    net.IP
-
-	Game    *multiv1.Game
-	Players []*multiv1.Player
 }
 
 const roomID = "testroom"
@@ -85,24 +84,24 @@ var mapping = map[string]Map{
 		SessionID:   "sid-2",
 		UserID:      2,
 		CharacterID: 2,
-		UserName:    "mage",
-		ClassType:   model.ClassTypeArcher,
+		UserName:    "warrior",
+		ClassType:   model.ClassTypeWarrior,
 	},
 	"3": { // joins as third
 		IPPrefix:    net.IPv4(127, 0, 3, 1).To4(),
 		SessionID:   "sid-3",
 		UserID:      3,
-		UserName:    "warrior",
+		UserName:    "archer",
 		CharacterID: 3,
-		ClassType:   model.ClassTypeWarrior,
+		ClassType:   model.ClassTypeArcher,
 	},
 	"4": { // joins to 2 and 3 after 2 became a host
 		IPPrefix:    net.IPv4(127, 0, 4, 1).To4(),
 		SessionID:   "sid-4",
 		UserID:      4,
-		UserName:    "knight",
+		UserName:    "mage",
 		CharacterID: 4,
-		ClassType:   model.ClassTypeKnight,
+		ClassType:   model.ClassTypeMage,
 	},
 }
 
@@ -123,13 +122,15 @@ func main() {
 		RelayServerAddr: "localhost:9999",
 		IPPrefix:        user.IPPrefix,
 	}
+
 	session := bsession.NewSession(nil)
 	session.ID = user.SessionID
 	session.UserID = user.UserID
 	session.Username = user.UserName
 	session.CharacterID = int64(user.CharacterID)
 	session.ClassType = user.ClassType
-	session.Proxy = px.Create(session)
+	proxyClient := px.Create(session).(*relay.Relay)
+	session.Proxy = proxyClient
 	session.Conn = &mockConn{}
 
 	ctx := context.TODO()
@@ -200,5 +201,29 @@ func main() {
 		return
 	}
 
-	select {}
+	r := chi.NewRouter()
+	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+		v := State{
+			User:  user,
+			Debug: proxyClient.Debug(),
+		}
+
+		doc, err := json.MarshalIndent(v, "", "  ")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(doc)
+	})
+
+	addr := fmt.Sprintf("localhost:999%d", user.UserID)
+	fmt.Println("Listening on", fmt.Sprintf("http://%s/", addr))
+	_ = http.ListenAndServe(addr, r)
+}
+
+type State struct {
+	User  Map `json:"user"`
+	Debug any `json:"debug"`
 }

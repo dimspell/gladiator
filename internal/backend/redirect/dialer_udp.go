@@ -71,8 +71,7 @@ func DialUDP(ipv4 string, portNumber string) (*DialerUDP, error) {
 // message received from the game client.
 func (p *DialerUDP) Run(ctx context.Context, onReceive func(p []byte) (err error)) error {
 	defer func() {
-		p.logger.Info("Closing the UDP dialer")
-		p.Close()
+		_ = p.Close()
 	}()
 
 	buf := make([]byte, 1024)
@@ -122,7 +121,7 @@ func (p *DialerUDP) Write(msg []byte) (int, error) {
 func (p *DialerUDP) Close() error {
 	err := p.conn.Close()
 	if err != nil {
-		p.logger.Error("Failed to close UDP connection", logging.Error(err))
+		p.logger.Debug("Failed to close UDP connection", logging.Error(err))
 	}
 	return err
 }

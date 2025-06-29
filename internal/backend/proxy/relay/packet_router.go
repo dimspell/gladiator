@@ -53,7 +53,6 @@ func (r *PacketRouter) Reset() {
 		r.manager.stopHost(host, ipAddress)
 	}
 
-	slog.Warn("Resetting PacketRouter", "ipPrefix", r.manager.ipPrefix)
 	ipPrefix := r.manager.ipPrefix
 	r.manager = NewManager(ipPrefix)
 	r.roomID = ""
@@ -97,8 +96,6 @@ func (r *PacketRouter) handleJoinRoom(ctx context.Context, player wire.Player) e
 }
 
 func (r *PacketRouter) handleLeaveRoom(ctx context.Context, player wire.Player) error {
-	slog.Error("LEAVE_ROOM - Delete only", "player", player.UserID)
-
 	peerID := remoteID(player.UserID)
 	if r.selfID == peerID {
 		return nil
@@ -110,6 +107,11 @@ func (r *PacketRouter) handleLeaveRoom(ctx context.Context, player wire.Player) 
 
 func (r *PacketRouter) handleHostMigration(ctx context.Context, player wire.Player) error {
 	newHostID := strconv.Itoa(int(player.UserID))
+
+	r.mu.Lock()
+	r.currentHostID = newHostID
+	r.mu.Unlock()
+
 	roomID := r.roomID
 
 	if newHostID == r.selfID {

@@ -42,6 +42,35 @@ type Relay struct {
 	players map[string]net.IP
 }
 
+func (r *Relay) Debug() any {
+	hosts := r.router.manager.hosts
+	peerHosts := r.router.manager.peerHosts
+	ipToPeerID := r.router.manager.ipToPeerID
+	peerIPs := r.router.manager.peerIPs
+	currentHostID := r.router.currentHostID
+	selfID := r.router.selfID
+
+	var state = struct {
+		Players       map[string]net.IP
+		Hosts         map[string]*FakeHost
+		PeerHosts     map[string]*FakeHost
+		IPToPeerID    map[string]string
+		PeerIPs       map[string]string
+		CurrentHostID string
+		SelfID        string
+	}{
+		Players:       r.players,
+		Hosts:         hosts,
+		PeerHosts:     peerHosts,
+		IPToPeerID:    ipToPeerID,
+		PeerIPs:       peerIPs,
+		CurrentHostID: currentHostID,
+		SelfID:        selfID,
+	}
+
+	return state
+}
+
 func NewRelay(config *ProxyRelay, session *bsession.Session) *Relay {
 	ipPrefix := config.IPPrefix
 	if ipPrefix == nil {

@@ -48,7 +48,7 @@ type FakeHost struct {
 
 	ProxyUDP redirect.Redirect
 	ProxyTCP redirect.Redirect
-	StopFunc context.CancelFunc
+	stopFunc context.CancelFunc
 }
 
 // Dynamic IP Allocator
@@ -118,7 +118,7 @@ func (hm *HostManager) StartDialHost(
 	host := &FakeHost{
 		IP:       ipAddress,
 		LastSeen: time.Now(),
-		StopFunc: cancel,
+		stopFunc: cancel,
 		ProxyTCP: tcpProxy,
 		ProxyUDP: udpProxy,
 	}
@@ -218,7 +218,7 @@ func (hm *HostManager) StartListenerHost(
 	host := &FakeHost{
 		IP:       ipAddress,
 		LastSeen: time.Now(),
-		StopFunc: cancel,
+		stopFunc: cancel,
 		ProxyTCP: tcpProxy,
 		ProxyUDP: udpProxy,
 	}
@@ -294,8 +294,7 @@ func (hm *HostManager) RemoveByRemoteID(remoteID string) {
 
 func (hm *HostManager) stopHost(host *FakeHost, ipAddress string) {
 	// Trigger a stop
-	// close(host.StopChan)
-	host.StopFunc()
+	host.stopFunc()
 
 	// Close the connections
 	if p := host.ProxyTCP; p != nil {
@@ -305,13 +304,12 @@ func (hm *HostManager) stopHost(host *FakeHost, ipAddress string) {
 		_ = p.Close()
 	}
 
-	fmt.Println(hm.ipToPeerID, hm.hosts)
-
 	// Remove from maps
 	remoteID, _ := hm.ipToPeerID[ipAddress]
 	delete(hm.hosts, ipAddress)
 	delete(hm.ipToPeerID, ipAddress)
 	delete(hm.peerIPs, remoteID)
+	delete(hm.peerHosts, remoteID)
 
 	slog.Info("Fake host cleaned up", "ip", ipAddress)
 }

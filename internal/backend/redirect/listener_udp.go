@@ -58,9 +58,7 @@ func (p *ListenerUDP) Run(ctx context.Context, onReceive func(p []byte) (err err
 	}()
 
 	defer func() {
-		if err := p.conn.Close(); err != nil {
-			p.logger.Error("Error closing UDP listener", logging.Error(err))
-		}
+		_ = p.conn.Close()
 	}()
 
 	// Goroutine to read incoming messages
@@ -127,9 +125,7 @@ func (p *ListenerUDP) Write(msg []byte) (int, error) {
 func (p *ListenerUDP) Close() error {
 	err := p.conn.Close()
 	if err != nil {
-		p.logger.Error("Failed to close UDP connection", logging.Error(err))
-		return fmt.Errorf("listen-udp: close error: %w", err)
+		p.logger.Debug("Failed to close UDP connection", logging.Error(err))
 	}
-	p.logger.Info("UDP listener closed")
-	return nil
+	return err
 }

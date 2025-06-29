@@ -50,7 +50,7 @@ func (p *DialerTCP) Run(ctx context.Context, onReceive func(p []byte) (err error
 	}
 
 	defer func() {
-		p.logger.Info("Closing the TCP dialer")
+		_ = p.Close()
 	}()
 
 	buf := make([]byte, 1024)
@@ -102,7 +102,7 @@ func (p *DialerTCP) Write(msg []byte) (int, error) {
 func (p *DialerTCP) Close() error {
 	err := p.conn.Close()
 	if err != nil {
-		p.logger.Error("Failed to close TCP connection", logging.Error(err))
+		p.logger.Debug("Failed to close TCP connection", logging.Error(err))
 	}
 	return err
 }
