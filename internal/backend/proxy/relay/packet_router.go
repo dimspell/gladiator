@@ -122,8 +122,48 @@ func (r *PacketRouter) handleHostMigration(ctx context.Context, player wire.Play
 			r.logger.Error("failed to send host migration packet", logging.Error(err))
 			return nil
 		}
+
+		// Shutdown the previous proxies and save {[peerID: IPv4]} parameters to
+		// reuse them.
+		rebindHosts := make(map[string]string)
+		for peerID, host := range r.manager.peerHosts {
+			rebindHosts[peerID] = host.IP
+			r.manager.stopHost(host, host.IP)
+		}
+
+		// Recreate the proxies to the new host
+		for peerID, ip := range rebindHosts {
+			onUDPMessage := func(p []byte) error {
+				return r.sendPacket(RelayPacket{
+					Type:    "udp",
+					RoomID:  roomID,
+					ToID:    peerID,
+					Payload: p,
+				})
+			}
+			onTCPMessage := func(p []byte) error {
+				return r.sendPacket(RelayPacket{
+					Type:    "tcp",
+					RoomID:  roomID,
+					ToID:    peerID,
+					Payload: p,
+				})
+			}
+			host, err := r.manager.StartDialHost(peerID, ip, 6114, 6113, onTCPMessage, onUDPMessage)
+			if err != nil {
+				r.logger.Warn("failed to start dial host", logging.Error(err), logging.PeerID(peerID))
+				return nil
+			}
+			r.logger.Info("dial host started", logging.PeerID(peerID), "ip", host.IP)
+		}
+
+		// TODO: Send notice about the completion
+
 		return nil
 	}
+
+	// TODO: Wait for completion and register
+	time.Sleep(3 * time.Second)
 
 	// Someone else became a host
 	ipAddress, ok := r.manager.peerIPs[newHostID]
