@@ -117,8 +117,7 @@ func (r *PacketRouter) handleHostMigration(ctx context.Context, player wire.Play
 	if newHostID == r.selfID {
 		// I became a host!
 
-		payload := packet.NewHostSwitch(true, net.IPv4(127, 0, 0, 1))
-
+		payload := packet.NewHostSwitch(false, net.IPv4(127, 0, 0, 1))
 		if err := r.session.SendToGame(packet.HostMigration, payload); err != nil {
 			r.logger.Error("failed to send host migration packet", logging.Error(err))
 			return nil

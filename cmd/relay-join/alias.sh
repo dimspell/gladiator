@@ -1,5 +1,8 @@
 #!/usr/bin/env zsh
 
+# Linux
+# ip addr add 127.0.0.2/8 dev lo
+
  sudo ifconfig lo0 alias 127.0.0.2 netmask 0xff000000
  sudo ifconfig lo0 alias 127.0.0.3 netmask 0xff000000
  sudo ifconfig lo0 alias 127.0.0.4 netmask 0xff000000
