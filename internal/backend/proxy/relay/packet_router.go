@@ -109,17 +109,13 @@ func (r *PacketRouter) handleLeaveRoom(ctx context.Context, player wire.Player) 
 }
 
 func (r *PacketRouter) handleHostMigration(ctx context.Context, player wire.Player) error {
-	slog.Error("Not handled HOST_MIGRATION", "player", player.UserID)
-
 	newHostID := strconv.Itoa(int(player.UserID))
 	roomID := r.roomID
 
 	if newHostID == r.selfID {
 		// I became a host!
 
-		payload := make([]byte, 8)
-		copy(payload[0:4], []byte{1, 0, 0, 0})
-		copy(payload[4:], net.IPv4(127, 0, 0, 1).To4())
+		payload := packet.NewHostSwitch(true, net.IPv4(127, 0, 0, 1))
 
 		if err := r.session.SendToGame(packet.HostMigration, payload); err != nil {
 			r.logger.Error("failed to send host migration packet", logging.Error(err))
@@ -165,10 +161,7 @@ func (r *PacketRouter) handleHostMigration(ctx context.Context, player wire.Play
 		return nil
 	}
 
-	payload := make([]byte, 8)
-	copy(payload[0:4], []byte{1, 0, 0, 0})
-	copy(payload[4:], net.ParseIP(ipAddress).To4())
-
+	payload := packet.NewHostSwitch(true, net.ParseIP(ipAddress))
 	if err := r.session.SendToGame(packet.HostMigration, payload); err != nil {
 		r.logger.Error("failed to send host migration packet", logging.Error(err))
 		return nil

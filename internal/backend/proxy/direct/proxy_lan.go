@@ -158,10 +158,7 @@ func (p *LAN) Handle(ctx context.Context, payload []byte) error {
 			return nil
 		}
 
-		response := make([]byte, 8)
-		copy(response[0:4], []byte{1, 0, 0, 0})
-		copy(response[4:], ip.To4())
-
+		response := packet.NewHostSwitch(true, ip)
 		if err := p.Session.SendToGame(packet.HostMigration, response); err != nil {
 			slog.Error("Failed to send host migration response", logging.Error(err))
 			return nil
