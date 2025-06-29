@@ -65,4 +65,4 @@ relay-host: clear
 	go run ./cmd/relay-host
 
 relay-join: clear
-	go run ./cmd/relay-join -join=$(join_id)
+	go run ./cmd/relay-join -player=$(join_id)

@@ -32,8 +32,7 @@ func (m mockConn) Read(b []byte) (n int, err error) {
 }
 
 func (m mockConn) Write(b []byte) (n int, err error) {
-	// TODO implement me
-	panic("implement me")
+	return fmt.Fprintln(os.Stderr, b)
 }
 
 func (m mockConn) Close() error {
@@ -82,102 +81,37 @@ const roomID = "testroom"
 
 var mapping = map[string]Map{
 	"2": { // joins to host
-		IPPrefix:    net.IPv4(127, 0, 3, 1).To4(),
+		IPPrefix:    net.IPv4(127, 0, 2, 1).To4(),
 		SessionID:   "sid-2",
 		UserID:      2,
 		CharacterID: 2,
 		UserName:    "mage",
 		ClassType:   model.ClassTypeArcher,
-
-		Game: &multiv1.Game{
-			GameId:        roomID,
-			Name:          roomID,
-			Password:      "",
-			MapId:         multiv1.GameMap_ScatteredShelter,
-			HostUserId:    1,
-			HostIpAddress: "",
-		},
-		Players: []*multiv1.Player{
-			{
-				UserId:      1,
-				Username:    "mage",
-				CharacterId: 1,
-				ClassType:   multiv1.ClassType_Mage,
-				IpAddress:   "",
-			},
-		},
 	},
 	"3": { // joins as third
+		IPPrefix:    net.IPv4(127, 0, 3, 1).To4(),
 		SessionID:   "sid-3",
 		UserID:      3,
 		UserName:    "warrior",
 		CharacterID: 3,
 		ClassType:   model.ClassTypeWarrior,
-
-		Game: &multiv1.Game{
-			GameId:        roomID,
-			Name:          roomID,
-			Password:      "",
-			MapId:         multiv1.GameMap_ScatteredShelter,
-			HostUserId:    1,
-			HostIpAddress: "",
-		},
-		Players: []*multiv1.Player{
-			{
-				UserId:      1,
-				Username:    "mage",
-				CharacterId: 1,
-				ClassType:   multiv1.ClassType_Mage,
-				IpAddress:   "",
-			},
-			{
-				UserId:      2,
-				Username:    "archer",
-				CharacterId: 2,
-				ClassType:   multiv1.ClassType_Archer,
-				IpAddress:   "",
-			},
-		},
 	},
 	"4": { // joins to 2 and 3 after 2 became a host
+		IPPrefix:    net.IPv4(127, 0, 4, 1).To4(),
 		SessionID:   "sid-4",
 		UserID:      4,
 		UserName:    "knight",
 		CharacterID: 4,
 		ClassType:   model.ClassTypeKnight,
-
-		Game: &multiv1.Game{
-			GameId:        roomID,
-			Name:          roomID,
-			Password:      "",
-			MapId:         multiv1.GameMap_ScatteredShelter,
-			HostUserId:    2,
-			HostIpAddress: "",
-		},
-		Players: []*multiv1.Player{
-			{
-				UserId:      2,
-				Username:    "archer",
-				CharacterId: 2,
-				ClassType:   multiv1.ClassType_Archer,
-				IpAddress:   "",
-			},
-			{
-				UserId:      3,
-				Username:    "warrior",
-				CharacterId: 3,
-				ClassType:   multiv1.ClassType_Warrior,
-				IpAddress:   "",
-			},
-		},
 	},
 }
 
 func main() {
-	logger.SetColoredLogger(os.Stderr, slog.LevelDebug, false)
+	// logger.SetColoredLogger(os.Stderr, slog.LevelDebug, false)
+	logger.SetColoredLogger(os.Stderr, slog.LevelInfo, false)
 
 	var userID string
-	flag.StringVar(&userID, "user-id", "", "User ID")
+	flag.StringVar(&userID, "player", "", "ID of player variant")
 	flag.Parse()
 
 	user, ok := mapping[userID]
@@ -229,31 +163,39 @@ func main() {
 		}
 	}(ctx)
 
-	var err error
+	consoleUri := fmt.Sprintf("%s://%s/grpc", "http", "localhost:2137")
+	gameClient := multiv1connect.NewGameServiceClient(&http.Client{Timeout: 10 * time.Second}, consoleUri)
 
-	err = session.Proxy.SelectGame(proxy.GameData{
-		Game:    user.Game,
-		Players: user.Players,
-	})
+	gameRes, err := gameClient.GetGame(ctx, connect.NewRequest(&multiv1.GetGameRequest{
+		GameRoomId: roomID,
+	}))
 	if err != nil {
+		slog.Error("GetGame", logging.Error(err))
+		return
+	}
+
+	if err := session.Proxy.SelectGame(proxy.GameData{
+		Game:    gameRes.Msg.Game,
+		Players: gameRes.Msg.Players,
+	}); err != nil {
 		slog.Error("SelectGame", logging.Error(err))
 		return
 	}
 
-	consoleUri := fmt.Sprintf("%s://%s/grpc", "http", "localhost:2137")
-	gameClient := multiv1connect.NewGameServiceClient(&http.Client{Timeout: 10 * time.Second}, consoleUri)
-	gameClient.JoinGame(ctx, connect.NewRequest(&multiv1.JoinGameRequest{
+	if _, err := gameClient.JoinGame(ctx, connect.NewRequest(&multiv1.JoinGameRequest{
 		UserId:     session.UserID,
 		GameRoomId: roomID,
 		IpAddress:  "127.0.0.1",
-	}))
+	})); err != nil {
+		slog.Error("JoinGame", logging.Error(err))
+		return
+	}
 
-	_, err = session.Proxy.Join(ctx, proxy.JoinParams{
+	if _, err := session.Proxy.Join(ctx, proxy.JoinParams{
 		HostUserID: 1,
 		GameID:     roomID,
 		HostUserIP: "127.0.0.2",
-	})
-	if err != nil {
+	}); err != nil {
 		slog.Error("Join", logging.Error(err))
 		return
 	}
