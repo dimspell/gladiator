@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -19,6 +20,7 @@ import (
 	"github.com/dimspell/gladiator/internal/backend/proxy"
 	"github.com/dimspell/gladiator/internal/backend/proxy/relay"
 	"github.com/dimspell/gladiator/internal/model"
+	"github.com/go-chi/chi/v5"
 )
 
 func main() {
@@ -33,7 +35,8 @@ func main() {
 	session.Username = "knight"
 	session.CharacterID = 1
 	session.ClassType = model.ClassTypeKnight
-	session.Proxy = px.Create(session)
+	proxyClient := px.Create(session).(*relay.Relay)
+	session.Proxy = proxyClient
 
 	ctx := context.TODO()
 
@@ -99,7 +102,23 @@ func main() {
 		return
 	}
 
-	select {}
+	r := chi.NewRouter()
+	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+		v := proxyClient.Debug()
+
+		doc, err := json.MarshalIndent(v, "", "  ")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(doc)
+	})
+
+	addr := fmt.Sprintf("localhost:9991")
+	fmt.Println("Listening on", fmt.Sprintf("http://%s/", addr))
+	_ = http.ListenAndServe(addr, r)
 }
 
 func startFakeBackendServer(ctx context.Context) {

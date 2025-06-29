@@ -92,7 +92,6 @@ func (p *DialerUDP) Run(ctx context.Context, onReceive func(p []byte) (err error
 					p.lastActive = time.Now()
 					continue
 				}
-				p.logger.Error("Error reading from UDP server", logging.Error(err))
 				return fmt.Errorf("dial-udp: failed to read UDP message: %w", err)
 			}
 

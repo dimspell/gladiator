@@ -74,7 +74,6 @@ func (p *DialerTCP) Run(ctx context.Context, onReceive func(p []byte) (err error
 					p.logger.Info("Connection closed by server")
 					return nil
 				}
-				p.logger.Error("Error reading from server", logging.Error(err))
 				return err
 			}
 

@@ -43,6 +43,7 @@ func NewManager(ipPrefix net.IP) *HostManager {
 }
 
 type FakeHost struct {
+	Type     string
 	IP       string
 	LastSeen time.Time
 
@@ -116,6 +117,7 @@ func (hm *HostManager) StartDialHost(
 	ctx, cancel := context.WithCancel(ctx)
 
 	host := &FakeHost{
+		Type:     "DIAL",
 		IP:       ipAddress,
 		LastSeen: time.Now(),
 		stopFunc: cancel,
@@ -216,6 +218,7 @@ func (hm *HostManager) StartListenerHost(
 	ctx, cancel := context.WithCancel(ctx)
 
 	host := &FakeHost{
+		Type:     "LISTEN",
 		IP:       ipAddress,
 		LastSeen: time.Now(),
 		stopFunc: cancel,

@@ -39,36 +39,6 @@ func (p *ProxyRelay) Create(session *bsession.Session) proxy.ProxyClient {
 type Relay struct {
 	session *bsession.Session
 	router  *PacketRouter
-	players map[string]net.IP
-}
-
-func (r *Relay) Debug() any {
-	hosts := r.router.manager.hosts
-	peerHosts := r.router.manager.peerHosts
-	ipToPeerID := r.router.manager.ipToPeerID
-	peerIPs := r.router.manager.peerIPs
-	currentHostID := r.router.currentHostID
-	selfID := r.router.selfID
-
-	var state = struct {
-		Players       map[string]net.IP
-		Hosts         map[string]*FakeHost
-		PeerHosts     map[string]*FakeHost
-		IPToPeerID    map[string]string
-		PeerIPs       map[string]string
-		CurrentHostID string
-		SelfID        string
-	}{
-		Players:       r.players,
-		Hosts:         hosts,
-		PeerHosts:     peerHosts,
-		IPToPeerID:    ipToPeerID,
-		PeerIPs:       peerIPs,
-		CurrentHostID: currentHostID,
-		SelfID:        selfID,
-	}
-
-	return state
 }
 
 func NewRelay(config *ProxyRelay, session *bsession.Session) *Relay {
@@ -88,7 +58,6 @@ func NewRelay(config *ProxyRelay, session *bsession.Session) *Relay {
 	return &Relay{
 		session,
 		router,
-		make(map[string]net.IP),
 	}
 }
 
@@ -246,10 +215,36 @@ func (r *Relay) ConnectToPlayer(ctx context.Context, params proxy.GetPlayerAddrP
 }
 
 func (r *Relay) Close() {
-	r.players = make(map[string]net.IP)
 	r.router.Reset()
 }
 
 func (r *Relay) Handle(ctx context.Context, payload []byte) error {
 	return r.router.Handle(ctx, payload)
+}
+
+func (r *Relay) Debug() any {
+	hosts := r.router.manager.hosts
+	peerHosts := r.router.manager.peerHosts
+	ipToPeerID := r.router.manager.ipToPeerID
+	peerIPs := r.router.manager.peerIPs
+	currentHostID := r.router.currentHostID
+	selfID := r.router.selfID
+
+	var state = struct {
+		Hosts         map[string]*FakeHost
+		PeerHosts     map[string]*FakeHost
+		IPToPeerID    map[string]string
+		PeerIPs       map[string]string
+		CurrentHostID string
+		SelfID        string
+	}{
+		Hosts:         hosts,
+		PeerHosts:     peerHosts,
+		IPToPeerID:    ipToPeerID,
+		PeerIPs:       peerIPs,
+		CurrentHostID: currentHostID,
+		SelfID:        selfID,
+	}
+
+	return state
 }
