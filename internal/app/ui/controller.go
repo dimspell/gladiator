@@ -2,12 +2,8 @@ package ui
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
-	"net/http"
-	"strings"
-	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/data/binding"
@@ -98,7 +94,7 @@ func (c *Controller) StartConsole(databaseType, databasePath, consoleAddr string
 		}
 	}()
 
-	c.Console = console.NewConsole(db, console.WithConsoleAddr(consoleAddr))
+	c.Console = console.NewConsole(db, console.WithConsoleAddr(consoleAddr, "http://"+consoleAddr))
 	c.Console.Config.RunMode = runMode
 
 	start, stop := c.Console.Handlers()
