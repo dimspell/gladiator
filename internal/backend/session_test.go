@@ -45,7 +45,7 @@ func TestBackend_UpdateCharacterInfo(t *testing.T) {
 
 	b, _, cs := helperNewBackend(t)
 	conn := &mockConn{}
-	session := &bsession.Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
+	session := &bsession.Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP", State: &bsession.SessionState{}}
 
 	// Authentication
 	if err := b.ConnectToLobby(ctx, &v1.User{UserId: session.UserID, Username: session.Username}, session); err != nil {

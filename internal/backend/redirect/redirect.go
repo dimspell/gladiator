@@ -2,11 +2,14 @@ package redirect
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"net"
 )
+
+var ErrClosed = errors.New("server closed")
 
 type Mode int
 
