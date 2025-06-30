@@ -3,7 +3,6 @@ package ui
 import (
 	"errors"
 	"fmt"
-	"log"
 	"net"
 	"os"
 	"path"
