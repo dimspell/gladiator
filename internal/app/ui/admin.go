@@ -1,10 +1,6 @@
 package ui
 
 import (
-	"context"
-	"errors"
-	"fmt"
-
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/data/binding"
@@ -50,35 +46,35 @@ func (c *Controller) AdminScreen(w fyne.Window, params *AdminScreenInputParams, 
 		return container.NewVBox(
 			widget.NewLabel("Actions"),
 			widget.NewButton("Delete all game rooms", func() {
-				if c.Console == nil {
-					dialog.ShowError(fmt.Errorf("The console is not running"), w)
-					return
-				}
-
-				loadingDialog := dialog.NewCustomWithoutButtons("Deleting all games", widget.NewProgressBarInfinite(), w)
-				loadingDialog.Show()
-
-				err := errors.Join(
-					func() error {
-						if err := c.Console.DB.Write.DeleteAllGameRoomPlayers(context.TODO()); err != nil {
-							return fmt.Errorf("could not delete all game room players: %w", err)
-						}
-						return nil
-					}(),
-					func() error {
-						if err := c.Console.DB.Write.DeleteAllGameRooms(context.TODO()); err != nil {
-							return fmt.Errorf("could not delete all game rooms: %w", err)
-						}
-						return nil
-					}(),
-				)
-
-				loadingDialog.Hide()
-				if err != nil {
-					dialog.ShowError(err, w)
-					return
-				}
-				dialog.ShowInformation("All deleted", "All game rooms have been deleted", w)
+				// if c.Console == nil {
+				// 	dialog.ShowError(fmt.Errorf("The console is not running"), w)
+				// 	return
+				// }
+				//
+				// loadingDialog := dialog.NewCustomWithoutButtons("Deleting all games", widget.NewProgressBarInfinite(), w)
+				// loadingDialog.Show()
+				//
+				// err := errors.Join(
+				// 	func() error {
+				// 		if err := c.Console.DB.Write.DeleteAllGameRoomPlayers(context.TODO()); err != nil {
+				// 			return fmt.Errorf("could not delete all game room players: %w", err)
+				// 		}
+				// 		return nil
+				// 	}(),
+				// 	func() error {
+				// 		if err := c.Console.DB.Write.DeleteAllGameRooms(context.TODO()); err != nil {
+				// 			return fmt.Errorf("could not delete all game rooms: %w", err)
+				// 		}
+				// 		return nil
+				// 	}(),
+				// )
+				//
+				// loadingDialog.Hide()
+				// if err != nil {
+				// 	dialog.ShowError(err, w)
+				// 	return
+				// }
+				dialog.ShowInformation("Not working", "Not working anymore", w)
 			}),
 		)
 	}

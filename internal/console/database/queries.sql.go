@@ -10,30 +10,6 @@ import (
 	"database/sql"
 )
 
-const addPlayerToRoom = `-- name: AddPlayerToRoom :exec
-INSERT INTO game_room_players (game_room_id, user_id, character_id, ip_address, added_at)
-VALUES (?, ?, ?, ?, ?)
-`
-
-type AddPlayerToRoomParams struct {
-	GameRoomID  int64
-	UserID      int64
-	CharacterID int64
-	IpAddress   string
-	AddedAt     int64
-}
-
-func (q *Queries) AddPlayerToRoom(ctx context.Context, arg AddPlayerToRoomParams) error {
-	_, err := q.exec(ctx, q.addPlayerToRoomStmt, addPlayerToRoom,
-		arg.GameRoomID,
-		arg.UserID,
-		arg.CharacterID,
-		arg.IpAddress,
-		arg.AddedAt,
-	)
-	return err
-}
-
 const createCharacter = `-- name: CreateCharacter :one
 INSERT INTO characters (strength,
                         agility,
@@ -194,43 +170,6 @@ func (q *Queries) CreateCharacter(ctx context.Context, arg CreateCharacterParams
 	return i, err
 }
 
-const createGameRoom = `-- name: CreateGameRoom :one
-INSERT INTO game_rooms (name, password, host_ip_address, map_id, created_by, host_user_id)
-VALUES (?, ?, ?, ?, ?, ?)
-RETURNING id, name, password, host_ip_address, map_id, created_by, host_user_id
-`
-
-type CreateGameRoomParams struct {
-	Name          string
-	Password      sql.NullString
-	HostIpAddress string
-	MapID         int64
-	CreatedBy     int64
-	HostUserID    int64
-}
-
-func (q *Queries) CreateGameRoom(ctx context.Context, arg CreateGameRoomParams) (GameRoom, error) {
-	row := q.queryRow(ctx, q.createGameRoomStmt, createGameRoom,
-		arg.Name,
-		arg.Password,
-		arg.HostIpAddress,
-		arg.MapID,
-		arg.CreatedBy,
-		arg.HostUserID,
-	)
-	var i GameRoom
-	err := row.Scan(
-		&i.ID,
-		&i.Name,
-		&i.Password,
-		&i.HostIpAddress,
-		&i.MapID,
-		&i.CreatedBy,
-		&i.HostUserID,
-	)
-	return i, err
-}
-
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (username, password)
 VALUES (?, ?)
@@ -249,28 +188,6 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 	return i, err
 }
 
-const deleteAllGameRoomPlayers = `-- name: DeleteAllGameRoomPlayers :exec
-DELETE
-FROM game_room_players
-WHERE TRUE
-`
-
-func (q *Queries) DeleteAllGameRoomPlayers(ctx context.Context) error {
-	_, err := q.exec(ctx, q.deleteAllGameRoomPlayersStmt, deleteAllGameRoomPlayers)
-	return err
-}
-
-const deleteAllGameRooms = `-- name: DeleteAllGameRooms :exec
-DELETE
-FROM game_rooms
-WHERE TRUE
-`
-
-func (q *Queries) DeleteAllGameRooms(ctx context.Context) error {
-	_, err := q.exec(ctx, q.deleteAllGameRoomsStmt, deleteAllGameRooms)
-	return err
-}
-
 const deleteCharacter = `-- name: DeleteCharacter :exec
 DELETE
 FROM characters
@@ -286,25 +203,6 @@ type DeleteCharacterParams struct {
 func (q *Queries) DeleteCharacter(ctx context.Context, arg DeleteCharacterParams) error {
 	_, err := q.exec(ctx, q.deleteCharacterStmt, deleteCharacter, arg.CharacterName, arg.UserID)
 	return err
-}
-
-const existPlayerInRoom = `-- name: ExistPlayerInRoom :one
-SELECT 1 as exist
-FROM game_room_players
-WHERE game_room_id = ?
-  AND character_id = ?
-`
-
-type ExistPlayerInRoomParams struct {
-	GameRoomID  int64
-	CharacterID int64
-}
-
-func (q *Queries) ExistPlayerInRoom(ctx context.Context, arg ExistPlayerInRoomParams) (int64, error) {
-	row := q.queryRow(ctx, q.existPlayerInRoomStmt, existPlayerInRoom, arg.GameRoomID, arg.CharacterID)
-	var exist int64
-	err := row.Scan(&exist)
-	return exist, err
 }
 
 const findCharacter = `-- name: FindCharacter :one
@@ -402,89 +300,6 @@ func (q *Queries) GetCurrentUser(ctx context.Context, arg GetCurrentUserParams) 
 	return i, err
 }
 
-const getGameRoom = `-- name: GetGameRoom :one
-SELECT id,
-       name,
-       password,
-       host_ip_address,
-       map_id,
-       created_by,
-       host_user_id
-FROM game_rooms
-WHERE game_rooms.name = ?
-LIMIT 1
-`
-
-func (q *Queries) GetGameRoom(ctx context.Context, name string) (GameRoom, error) {
-	row := q.queryRow(ctx, q.getGameRoomStmt, getGameRoom, name)
-	var i GameRoom
-	err := row.Scan(
-		&i.ID,
-		&i.Name,
-		&i.Password,
-		&i.HostIpAddress,
-		&i.MapID,
-		&i.CreatedBy,
-		&i.HostUserID,
-	)
-	return i, err
-}
-
-const getGameRoomPlayers = `-- name: GetGameRoomPlayers :many
-SELECT DISTINCT characters.user_id,
-                username,
-                character_name,
-                class_type,
-                ip_address,
-                game_rooms.host_ip_address == game_room_players.ip_address as is_host
-FROM game_rooms
-         JOIN game_room_players ON game_rooms.id = game_room_players.game_room_id
-         JOIN characters ON game_room_players.character_id = characters.id
-         JOIN users on users.id = characters.user_id
-WHERE game_rooms.id = ?
-ORDER BY game_rooms.host_ip_address == game_room_players.ip_address DESC,
-         game_room_players.added_at ASC
-`
-
-type GetGameRoomPlayersRow struct {
-	UserID        int64
-	Username      string
-	CharacterName string
-	ClassType     int64
-	IpAddress     string
-	IsHost        bool
-}
-
-func (q *Queries) GetGameRoomPlayers(ctx context.Context, id int64) ([]GetGameRoomPlayersRow, error) {
-	rows, err := q.query(ctx, q.getGameRoomPlayersStmt, getGameRoomPlayers, id)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []GetGameRoomPlayersRow
-	for rows.Next() {
-		var i GetGameRoomPlayersRow
-		if err := rows.Scan(
-			&i.UserID,
-			&i.Username,
-			&i.CharacterName,
-			&i.ClassType,
-			&i.IpAddress,
-			&i.IsHost,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const getUserByID = `-- name: GetUserByID :one
 SELECT id, username, password
 FROM users
@@ -567,42 +382,6 @@ func (q *Queries) ListCharacters(ctx context.Context, userID int64) ([]Character
 			&i.BonusPoints,
 			&i.Inventory,
 			&i.Spells,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listGameRooms = `-- name: ListGameRooms :many
-SELECT id, name, password, host_ip_address, map_id, created_by, host_user_id
-FROM game_rooms
-`
-
-func (q *Queries) ListGameRooms(ctx context.Context) ([]GameRoom, error) {
-	rows, err := q.query(ctx, q.listGameRoomsStmt, listGameRooms)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []GameRoom
-	for rows.Next() {
-		var i GameRoom
-		if err := rows.Scan(
-			&i.ID,
-			&i.Name,
-			&i.Password,
-			&i.HostIpAddress,
-			&i.MapID,
-			&i.CreatedBy,
-			&i.HostUserID,
 		); err != nil {
 			return nil, err
 		}
