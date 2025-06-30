@@ -1,0 +1,5 @@
+scrape_configs:
+  - job_name: 'gladiator'
+    metrics_path: '/_metrics'
+    static_configs:
+      - targets: ['localhost:2137']

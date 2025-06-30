@@ -22,7 +22,8 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.21"
+          go-version: "1.24"
+          cache: 'true'
 
       - name: Compile binary
         run: go build -v ./
@@ -43,7 +44,7 @@ jobs:
         id: setup-go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.21"
+          go-version: "1.24"
 
       - name: Get build data
         run: |
@@ -73,6 +74,7 @@ jobs:
             -ldflags="main.version=${BUILD_VERSION}" \
             -ldflags="main.commit=${BUILD_REVISION}" \
             -ldflags="main.date=${BUILD_TIME}" \
+            -env="GOTOOLCHAIN=go1.24.4" \
             -tags=gui
 
       - name: Extract packaged app

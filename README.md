@@ -17,6 +17,10 @@ This repository is a monorepo that contains multiple projects that helps to play
 
 ## Troubleshooting
 
+### Windows 
+
+#### Cannot start the backend server
+
 > "An attempt was made to access a socket in a way forbidden by its access permissions."
 
 Restart of the Host Network Service on Windows might fix this error. Open an elevated (with admin permissions) Command Prompt and run:
@@ -24,4 +28,40 @@ Restart of the Host Network Service on Windows might fix this error. Open an ele
 ```console
 net stop hns
 net start hns
+```
+
+### Linux  
+
+#### Cannot bind the 127.0.0.X for the relayed hosts
+
+```bash
+ip addr add 127.0.0.2/8 dev lo
+```
+
+#### QUIC error about the buffer being too small
+
+In the backend logs, you might notice the following fragment:
+
+> ... See https://github.com/quic-go/quic-go/wiki/UDP-Buffer-Sizes for details
+
+On Linux you need to extend the memory for the buffer. 
+Note that these settings are not persisted across reboots.
+
+```bash
+sysctl -w net.core.rmem_max=7500000
+sysctl -w net.core.wmem_max=7500000
+```
+
+
+### MacOS
+
+#### Cannot bind the 127.0.0.X for the relayed hosts
+
+Note that these settings are not persisted across reboots.
+
+```bash
+sudo ifconfig lo0 alias 127.0.0.2 netmask 0xff000000
+sudo ifconfig lo0 alias 127.0.0.3 netmask 0xff000000
+sudo ifconfig lo0 alias 127.0.0.4 netmask 0xff000000
+# ...
 ```

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
+	"github.com/dimspell/gladiator/internal/app/logger/logging"
 )
 
 const DefaultTimeout = 3 * time.Second
@@ -80,7 +81,7 @@ func (p *Probe) Check(operation func() error) {
 				return
 			case <-ticker.C:
 				if err := operation(); err != nil {
-					slog.Error("error", "err", err)
+					slog.Error("error", logging.Error(err))
 					p.Signal(StatusNotRunning)
 					return
 				}
@@ -108,7 +109,7 @@ func retryUntil(operation func() error, maxElapsedTime time.Duration) error {
 		func(err error, duration time.Duration) {
 			slog.Warn("Retrying operation",
 				"duration", duration.String(),
-				"error", err)
+				logging.Error(err))
 		},
 	)
 }

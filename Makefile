@@ -5,15 +5,17 @@ mig_dir ?= console/database/migrations
 mig_name ?= create_users_table
 mig_version ?= VERSION
 
+join_id ?= 2
+
 build:
-	go build -v -o /dev/null ./
+	go build -race -v -o /dev/null ./
 
 serve:
 	 go run ./ serve --backend-addr=127.0.0.1:6112 --console-addr=127.0.0.1:2137
 	#go run ./ serve --backend-addr=0.0.0.0:6112 --console-addr=0.0.0.0:2137
 	#(go build -v); (.\gladiator.exe serve --backend-addr=0.0.0.0:6112 --console-addr=0.0.0.0:2137)
 
-console:
+console: clear
 	go run ./ console --console-addr=127.0.0.1:2137
 	#go run ./ console --console-addr=0.0.0.0:2137
 	#(go build -v);; (.\gladiator.exe console --console-addr=0.0.0.0:2137)
@@ -46,3 +48,21 @@ grpc-test:
 
 gen-grpc:
 	buf generate proto
+
+p2p-join:
+	go run ./cmd/p2p-join -name="user2" -id=2
+
+p2p-join3:
+	go run ./cmd/p2p-join -name="user3" -id=3
+
+p2p-host:
+	go run ./cmd/p2p-host
+
+clear:
+	clear
+
+relay-host: clear
+	go run ./cmd/relay-host
+
+relay-join: clear
+	go run ./cmd/relay-join -player=$(join_id)

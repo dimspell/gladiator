@@ -4,5 +4,12 @@ Website = "https://github.com/dimspell/gladiator"
 #Icon = "Icon.png"
 Name = "Gladiator"
 ID = "com.github.dimspell.gladiator"
-Version = "0.2.0"
-Build = 2
+Version = "0.3.0"
+Build = 3
+
+[LinuxAndBSD]
+    GenericName = "Gladiator"
+    Categories = ["Games"]
+    # Comment = "View sites on the Internet"
+    Keywords = ["dispel", "gladiator"]
+    ExecParams = "gui"

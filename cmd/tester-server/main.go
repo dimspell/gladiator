@@ -3,109 +3,171 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"net"
 	"os"
+
+	"github.com/dimspell/gladiator/internal/app/logger"
+	"github.com/dimspell/gladiator/internal/app/logger/logging"
+	"golang.org/x/sync/errgroup"
 )
 
 const backendIP = "127.0.1.28"
 
-func main() {
-	ctx := context.TODO()
-
-	p := Proxy{}
-	go p.listenTCP(ctx, "127.0.1.28", "6114")
-	go p.listenUDP(ctx, "127.0.1.28", "6113")
-
-	fmt.Println("Waiting...")
-	<-ctx.Done()
+type Proxy struct {
+	TCPHost string
+	TCPPort string
+	UDPHost string
+	UDPPort string
 }
 
-type Proxy struct{}
+func main() {
+	logger.SetColoredLogger(os.Stderr, slog.LevelDebug, false)
 
-func (p *Proxy) listenUDP(ctx context.Context, connHost, connPort string) {
-	udpAddr, err := net.ResolveUDPAddr("udp", connHost+":"+connPort)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	proxy := Proxy{
+		TCPHost: "127.0.0.1",
+		TCPPort: "6114",
+		UDPHost: "127.0.0.1",
+		UDPPort: "6113",
+	}
+
+	// Start TCP listener
+	g, ctx := errgroup.WithContext(ctx)
+
+	g.Go(func() error {
+		return proxy.listenTCP(ctx)
+	})
+	g.Go(func() error {
+		return proxy.listenUDP(ctx)
+	})
+
+	if err := g.Wait(); err != nil {
+		cancel()
+		slog.Error(err.Error())
+		return
+	}
+}
+
+func (p *Proxy) listenUDP(ctx context.Context) error {
+	udpAddr, err := net.ResolveUDPAddr("udp", net.JoinHostPort(p.UDPHost, p.UDPPort))
 	if err != nil {
-		log.Fatal(err)
+		return fmt.Errorf("failed to resolve UDP address: %w", err)
 	}
 
 	udpConn, err := net.ListenUDP("udp", udpAddr)
 	if err != nil {
-		log.Fatal(err)
+		return fmt.Errorf("failed to start UDP listener: %w", err)
 	}
 	defer udpConn.Close()
 
-	fmt.Println("Listening UDP on", udpAddr.String())
+	slog.Info("Listening UDP", "addr", udpAddr.String())
 
+	buf := make([]byte, 1024)
 	for {
-		fmt.Println("udp - waiting for read")
-		if ctx.Err() != nil {
-			fmt.Println("context err")
-			return
-		}
-
-		buf := make([]byte, 1024)
-		n, addr, err := udpConn.ReadFrom(buf)
-		if err != nil {
-			break
-		}
-
-		fmt.Println(connPort, addr.String(), string(buf[:n]), buf[:n])
-
-		if buf[0] == 26 {
-			{
-				_, err = udpConn.WriteToUDP([]byte{27, 0, 2, 0}, udpAddr)
-				fmt.Println(err)
+		select {
+		case <-ctx.Done():
+			udpConn.Close()
+			return nil
+		default:
+			clear(buf)
+			n, addr, err := udpConn.ReadFrom(buf)
+			if err != nil {
+				return fmt.Errorf("UDP read error: %w", err)
 			}
-			fmt.Println("Responded with 27")
+
+			slog.Debug("UDP packet received", "data", buf[:n], "from", addr.String())
+
+			if buf[0] == 26 {
+				response := []byte{27, 0, 2, 0}
+				if _, err = udpConn.WriteTo(response, addr); err != nil {
+					slog.Error("Failed to send UDP response", logging.Error(err))
+				}
+				slog.Debug("Sent UDP response", "data", response)
+			}
 		}
 	}
+
+	// for {
+	// 	if ctx.Err() != nil {
+	// 		fmt.Println("context err")
+	// 		return
+	// 	}
+	//
+	// 	buf := make([]byte, 1024)
+	// 	n, addr, err := udpConn.ReadFrom(buf)
+	// 	if err != nil {
+	// 		break
+	// 	}
+	//
+	// 	fmt.Println("Accepted UDP connection", connPort, addr.String(), buf[:n])
+	//
+	// 	if buf[0] == 26 {
+	// 		{
+	// 			_, err = udpConn.WriteToUDP([]byte{27, 0, 2, 0}, udpAddr)
+	// 			fmt.Println(err)
+	// 		}
+	// 		fmt.Println("Responded with 27")
+	// 	}
+	// }
 }
 
-func (p *Proxy) listenTCP(ctx context.Context, connHost, connPort string) {
-	// Listen for incoming connections.
-	l, err := net.Listen("tcp", connHost+":"+connPort)
+func (p *Proxy) listenTCP(ctx context.Context) error {
+	l, err := net.Listen("tcp", net.JoinHostPort(p.TCPHost, p.TCPPort))
 	if err != nil {
-		fmt.Println("Error listening:", err.Error())
-		os.Exit(1)
+		return fmt.Errorf("failed to start TCP listener: %w", err)
 	}
+	defer l.Close()
 
-	processPackets := func(conn net.Conn) {
+	slog.Info("Listening TCP", "addr", l.Addr().String())
+
+	go func() {
+		<-ctx.Done()
+		l.Close()
+	}()
+
+	handleConnection := func(conn net.Conn) {
 		defer conn.Close()
 
 		for {
-			fmt.Println("waiting for read")
-
-			buf := make([]byte, 1024)
-			n, err := conn.Read(buf)
-			if err != nil {
-				fmt.Printf("error reading (%s): %s\n", connPort, err)
+			select {
+			case <-ctx.Done():
 				return
-			}
-			fmt.Println(connPort, string(buf[:n]), n, buf[:n])
+			default:
+				buf := make([]byte, 1024)
+				n, err := conn.Read(buf)
+				if err != nil {
+					slog.Error("TCP: error reading", logging.Error(err))
+					return
+				}
 
-			conn.Write([]byte{35, 35, 116, 101, 115, 116, 0})
-			// conn.Write(buf[:n])
+				slog.Debug("TCP packet received", "data", buf[:n], "string", string(buf[:n]))
+
+				if _, err := conn.Write([]byte{35, 35, 116, 101, 115, 116, 0}); err != nil {
+					slog.Error("Failed to send TCP response", logging.Error(err))
+				}
+			}
 		}
 	}
-
+ 
 	// Close the listener when the application closes.
 	defer l.Close()
-	fmt.Println("Listening TCP on", l.Addr().String())
 	for {
-		if ctx.Err() != nil {
-			return
-		}
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+			// Listen for an incoming connection.
+			conn, err := l.Accept()
+			if err != nil {
+				slog.Error("Error accepting TCP connection", logging.Error(err))
+				return err
+			}
+			slog.Info("Accepted new TCP connection", "addr", conn.RemoteAddr().String())
 
-		// Listen for an incoming connection.
-		conn, err := l.Accept()
-		if err != nil {
-			fmt.Println("Error accepting: ", err.Error())
-			continue
+			go handleConnection(conn)
 		}
-		fmt.Println("Accepted connection on port", connPort)
-
-		go processPackets(conn)
 	}
-	fmt.Println("DONE")
 }

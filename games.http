@@ -1,0 +1,7 @@
+### POST List opened games
+POST http://localhost:2137/grpc/multi.v1.GameService/ListGames
+Content-Type: application/json
+
+{}
+
+###
