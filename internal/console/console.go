@@ -24,6 +24,11 @@ import (
 	"golang.org/x/net/http2/h2c"
 )
 
+func init() {
+	metrics.InitConsole()
+	metrics.InitRelay()
+}
+
 type Console struct {
 	Config      *Config
 	DB          *database.SQLite
@@ -51,9 +56,6 @@ func NewConsole(db *database.SQLite, opts ...Option) *Console {
 
 		multiplayer.Relay = relay
 	}
-
-	metrics.InitConsole()
-	metrics.InitLanRelay()
 
 	return &Console{
 		DB:          db,

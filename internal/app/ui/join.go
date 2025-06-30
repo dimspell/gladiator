@@ -77,7 +77,7 @@ func (c *Controller) JoinScreen(w fyne.Window) fyne.CanvasObject {
 							return
 						}
 
-						changePage(w, "Joined", c.PlayScreen(w, metadata))
+						changePage(w, "Joined", c.PlayScreen(w, consoleAddr, metadata))
 					}),
 				),
 			),

@@ -123,7 +123,15 @@ func (c *Controller) HostScreen(w fyne.Window, params *HostScreenInputParams) fy
 			}
 		}
 
-		if err := c.StartConsole(databaseType, databasePath, net.JoinHostPort(bindIP.Text, bindPort.Text), model.RunModeLAN); err != nil {
+		consoleAddr := net.JoinHostPort(bindIP.Text, bindPort.Text)
+		if err := c.StartConsole(databaseType, databasePath, consoleAddr, model.RunModeLAN); err != nil {
+			loadingDialog.Hide()
+			dialog.ShowError(err, w)
+			return
+		}
+
+		metadata, err := c.ConsoleHandshake(consoleAddr)
+		if err != nil {
 			loadingDialog.Hide()
 			dialog.ShowError(err, w)
 			return
@@ -133,8 +141,8 @@ func (c *Controller) HostScreen(w fyne.Window, params *HostScreenInputParams) fy
 		changePage(w, "Admin", c.AdminScreen(w, &AdminScreenInputParams{
 			DatabasePath: databasePath,
 			DatabaseType: databaseType,
-			BindAddress:  net.JoinHostPort(bindIP.Text, bindPort.Text),
-		}))
+			BindAddress:  consoleAddr,
+		}, metadata))
 	}
 
 	btn := widget.NewButtonWithIcon("Start Console", theme.NavigateNextIcon(), onHost)

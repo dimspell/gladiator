@@ -13,11 +13,7 @@ import (
 	"github.com/dimspell/gladiator/internal/model"
 )
 
-func (c *Controller) PlayScreen(w fyne.Window, metadata *model.WellKnown) fyne.CanvasObject {
-	myIpAddress, _ := metadata.Caller.IPString("")
-
-	fmt.Println(metadata)
-
+func (c *Controller) PlayScreen(w fyne.Window, consoleAddr string, metadata *model.WellKnown) fyne.CanvasObject {
 	return container.NewBorder(
 		container.NewPadded(
 			headerContainer("Join & Play Multiplayer", func() {
@@ -27,17 +23,19 @@ func (c *Controller) PlayScreen(w fyne.Window, metadata *model.WellKnown) fyne.C
 		nil,
 		nil,
 		nil,
-		c.playView(w, "TODO", myIpAddress),
+		c.playView(w, consoleAddr, metadata),
 	)
 }
 
-func (c *Controller) playView(w fyne.Window, consoleAddr, myIpAddress string) fyne.CanvasObject {
+func (c *Controller) playView(w fyne.Window, consoleAddr string, metadata *model.WellKnown) fyne.CanvasObject {
 	ips, _ := listAllIPs()
 	fmt.Println("ips:", ips)
 
 	myIPEntry := widget.NewSelectEntry(ips)
 	myIPEntry.Validator = ipValidator
 	myIPEntry.PlaceHolder = "Example: 192.168.100.1"
+
+	myIpAddress, _ := metadata.Caller.IPString("")
 	if myIpAddress == "" {
 		if len(ips) > 0 {
 			myIpAddress = ips[0]

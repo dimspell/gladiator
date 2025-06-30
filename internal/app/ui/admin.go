@@ -12,6 +12,7 @@ import (
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	"github.com/dimspell/gladiator/internal/model"
 )
 
 type AdminScreenInputParams struct {
@@ -20,7 +21,7 @@ type AdminScreenInputParams struct {
 	BindAddress  string
 }
 
-func (c *Controller) AdminScreen(w fyne.Window, params *AdminScreenInputParams) fyne.CanvasObject {
+func (c *Controller) AdminScreen(w fyne.Window, params *AdminScreenInputParams, metadata *model.WellKnown) fyne.CanvasObject {
 	wrapConsoleRunning := func(children func() fyne.CanvasObject) fyne.CanvasObject {
 		if !c.ConsoleRunning() {
 			return container.NewCenter(
@@ -185,7 +186,7 @@ func (c *Controller) AdminScreen(w fyne.Window, params *AdminScreenInputParams) 
 			nil,
 			container.NewAppTabs(
 				container.NewTabItemWithIcon("Host", theme.HomeIcon(), consoleScreen()),
-				container.NewTabItemWithIcon("Play", theme.MediaPlayIcon(), c.playView(w, params.BindAddress, "")),
+				container.NewTabItemWithIcon("Play", theme.MediaPlayIcon(), c.playView(w, params.BindAddress, metadata)),
 			),
 		),
 	)
