@@ -78,13 +78,13 @@ func NewApp(version, commit, buildDate string) {
 
 	// Setup function
 	var closers []logger.CleanupFunc
-	app.Before = func(_ context.Context, c *cli.Command) error {
+	app.Before = func(ctx context.Context, c *cli.Command) (context.Context, error) {
 		closer, err := logger.InitDefaultLogger(c)
 		if err != nil {
-			return err
+			return ctx, err
 		}
 		closers = append(closers, closer)
-		return nil
+		return ctx, nil
 	}
 
 	// Cleanup function

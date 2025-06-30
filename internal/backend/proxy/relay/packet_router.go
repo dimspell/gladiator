@@ -31,8 +31,8 @@ type PacketRouter struct {
 
 	roomID        string
 	currentHostID string
-	relayConn     quic.Connection
-	stream        quic.Stream
+	relayConn     *quic.Conn
+	stream        *quic.Stream
 	pingTicker    *time.Ticker
 }
 
@@ -353,7 +353,7 @@ func (r *PacketRouter) sendPacket(pkt RelayPacket) error {
 	return nil
 }
 
-func (r *PacketRouter) receiveLoop(ctx context.Context, stream quic.Stream) {
+func (r *PacketRouter) receiveLoop(ctx context.Context, stream *quic.Stream) {
 	buf := make([]byte, 4096)
 	for {
 		n, err := stream.Read(buf)

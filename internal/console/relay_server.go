@@ -35,10 +35,10 @@ type PeerConn struct {
 	RoomID string
 
 	// Stream holds a reference to the QUIC R/W streams of the relay server.
-	Stream quic.Stream
+	Stream *quic.Stream
 
 	// Conn holds a reference to the QUIC connection to the relay server.
-	Conn quic.Connection
+	Conn *quic.Conn
 
 	// LastSeen is a timestamp, when the user has sent the packet for the last
 	// time.
@@ -111,7 +111,7 @@ func (rs *RelayServer) Start(ctx context.Context) error {
 	}
 }
 
-func (rs *RelayServer) handleConn(ctx context.Context, conn quic.Connection) {
+func (rs *RelayServer) handleConn(ctx context.Context, conn *quic.Conn) {
 	stream, err := conn.AcceptStream(ctx)
 	if err != nil {
 		rs.logger.Warn("Relay stream accept error", logging.Error(err))
@@ -134,7 +134,7 @@ func (rs *RelayServer) handleConn(ctx context.Context, conn quic.Connection) {
 }
 
 // closeStream closes the stream and connection abruptly
-func (rs *RelayServer) closeStream(conn quic.Connection, stream quic.Stream) {
+func (rs *RelayServer) closeStream(conn *quic.Conn, stream *quic.Stream) {
 	// TODO: Name and handle various error codes
 	var errorCode quic.StreamErrorCode = 0xdead
 
@@ -145,7 +145,7 @@ func (rs *RelayServer) closeStream(conn quic.Connection, stream quic.Stream) {
 	slog.Info("Closed relay connection", "addr", conn.RemoteAddr())
 }
 
-func (rs *RelayServer) handshake(stream quic.Stream) (string, string, error) {
+func (rs *RelayServer) handshake(stream *quic.Stream) (string, string, error) {
 	// Initial handshake: receive signed join a packet
 	buf := make([]byte, 128)
 	n, err := stream.Read(buf)
@@ -176,7 +176,7 @@ func (rs *RelayServer) handshake(stream quic.Stream) (string, string, error) {
 	return pkt.FromID, pkt.RoomID, nil
 }
 
-func (rs *RelayServer) joinRoom(roomID, peerID string, conn quic.Connection, stream quic.Stream) *PeerConn {
+func (rs *RelayServer) joinRoom(roomID, peerID string, conn *quic.Conn, stream *quic.Stream) *PeerConn {
 	rs.mu.Lock()
 	defer rs.mu.Unlock()
 
@@ -398,7 +398,7 @@ func (rs *RelayServer) broadcastFrom(roomID, fromID string, pkt RelayPacket) {
 	}
 }
 
-func (rs *RelayServer) sendSigned(stream quic.Stream, pkt RelayPacket) {
+func (rs *RelayServer) sendSigned(stream *quic.Stream, pkt RelayPacket) {
 	data, err := json.Marshal(pkt)
 	if err != nil {
 		slog.Error("json marshal failed", logging.Error(err))

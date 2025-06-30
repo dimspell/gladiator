@@ -44,7 +44,6 @@ func TestE2E_LAN(t *testing.T) {
 	}
 	ts := httptest.NewServer(cs.HttpRouter())
 	defer ts.Close()
-
 	// go cs.Multiplayer.Run(ctx)
 
 	// Remove the HTTP schema prefix
