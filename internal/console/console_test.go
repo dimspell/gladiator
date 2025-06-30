@@ -19,7 +19,7 @@ func TestConsole_Handlers(t *testing.T) {
 			t.Error(err)
 			return
 		}
-		c := NewConsole(db, "")
+		c := NewConsole(db)
 		ts := httptest.NewServer(c.HttpRouter())
 		defer ts.Close()
 

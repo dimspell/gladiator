@@ -11,8 +11,8 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-func (c *Controller) JoinDefineScreen(w fyne.Window) fyne.CanvasObject {
-	headerText := "Join a server - connect to custom auth server"
+func (c *Controller) JoinScreen(w fyne.Window) fyne.CanvasObject {
+	headerText := "Join a server"
 
 	bindIP := widget.NewEntry()
 	bindIP.Validator = ipValidator
@@ -42,7 +42,7 @@ func (c *Controller) JoinDefineScreen(w fyne.Window) fyne.CanvasObject {
 
 	return container.NewBorder(
 		container.NewPadded(headerContainer(headerText, func() {
-			changePage(w, "JoinOptions", c.JoinOptionsScreen(w))
+			changePage(w, "Start", c.StartScreen(w, startOptionJoin))
 		})),
 		nil,
 		nil,
@@ -71,14 +71,13 @@ func (c *Controller) JoinDefineScreen(w fyne.Window) fyne.CanvasObject {
 						// loadingDialog.Show()
 						// defer loadingDialog.Hide()
 
-						wk, err := c.ConsoleHandshake(consoleAddr)
+						metadata, err := c.ConsoleHandshake(consoleAddr)
 						if err != nil {
 							dialog.ShowError(err, w)
 							return
 						}
-						myIpAddress, _ := wk.Caller.IPString("")
 
-						changePage(w, "Joined", c.PlayScreen(w, consoleAddr, myIpAddress))
+						changePage(w, "Joined", c.PlayScreen(w, consoleAddr, metadata))
 					}),
 				),
 			),

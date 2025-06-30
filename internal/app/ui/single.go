@@ -3,7 +3,6 @@ package ui
 import (
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"path"
 	"time"
@@ -15,6 +14,8 @@ import (
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	"github.com/dimspell/gladiator/internal/backend/proxy/direct"
+	"github.com/dimspell/gladiator/internal/model"
 )
 
 type SinglePlayerScreenParameters struct {
@@ -35,8 +36,6 @@ func (c *Controller) SinglePlayerScreen(w fyne.Window, initial *SinglePlayerScre
 	pathContainer := container.NewBorder(nil, nil, nil, pathSelection, pathEntry)
 
 	comboGroup := widget.NewSelect(Values(databaseTypeText), func(value string) {
-		log.Println("Select set to", value)
-
 		if value == databaseTypeText[HostDatabaseTypeMemory] {
 			pathLabel.Hide()
 			pathContainer.Hide()
@@ -68,7 +67,7 @@ func (c *Controller) SinglePlayerScreen(w fyne.Window, initial *SinglePlayerScre
 			dialog.ShowError(fmt.Errorf("unknown database type: %q", databaseType), w)
 			return
 		}
-		if err := c.StartConsole(databaseType, databasePath, consoleAddr); err != nil {
+		if err := c.StartConsole(databaseType, databasePath, consoleAddr, model.RunModeSinglePlayer); err != nil {
 			dialog.ShowError(err, w)
 			return
 		}
@@ -84,7 +83,7 @@ func (c *Controller) SinglePlayerScreen(w fyne.Window, initial *SinglePlayerScre
 	backendRunningCheck := widget.NewLabelWithData(backendRunningLabel)
 	backendRunningCheck.Alignment = fyne.TextAlignCenter
 	backendStart := widget.NewButtonWithIcon("Start backend", theme.MediaPlayIcon(), func() {
-		if err := c.StartBackend(consoleAddr, "127.0.0.1"); err != nil {
+		if err := c.StartBackend(consoleAddr, &direct.ProxyLAN{"127.0.0.1"}); err != nil {
 			dialog.ShowError(err, w)
 			return
 		}

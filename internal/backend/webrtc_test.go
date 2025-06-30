@@ -50,7 +50,7 @@ func TestWebRTC(t *testing.T) {
 	defer ts.Close()
 
 	// Remove the HTTP schema prefix
-	cs.Addr = ts.URL[len("http://"):]
+	cs.Config.ConsoleBindAddr = ts.URL[len("http://"):]
 
 	go func() {
 		<-time.After(3 * time.Second)
@@ -64,8 +64,8 @@ func TestWebRTC(t *testing.T) {
 	}()
 
 	// Mock the hosting user's proxy - player1
-	bd1 := NewBackend("", cs.Addr, proxyCreator)
-	bd1.SignalServerURL = "ws://" + cs.Addr + "/lobby"
+	bd1 := NewBackend("", cs.Config.ConsoleBindAddr, proxyCreator)
+	bd1.SignalServerURL = "ws://" + cs.Config.ConsoleBindAddr + "/lobby"
 
 	conn1 := &mockConn{}
 	session1 := bd1.AddSession(conn1)
@@ -116,8 +116,8 @@ func TestWebRTC(t *testing.T) {
 	}
 
 	// Create a joining user, a guest - player2
-	bd2 := NewBackend("", cs.Addr, proxyCreator)
-	bd2.SignalServerURL = "ws://" + cs.Addr + "/lobby"
+	bd2 := NewBackend("", cs.Config.ConsoleBindAddr, proxyCreator)
+	bd2.SignalServerURL = "ws://" + cs.Config.ConsoleBindAddr + "/lobby"
 
 	conn2 := &mockConn{}
 	session2 := bd2.AddSession(conn2)

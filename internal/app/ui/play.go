@@ -10,27 +10,34 @@ import (
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	"github.com/dimspell/gladiator/internal/backend"
+	"github.com/dimspell/gladiator/internal/backend/proxy/direct"
+	"github.com/dimspell/gladiator/internal/backend/proxy/relay"
+	"github.com/dimspell/gladiator/internal/model"
 )
 
-func (c *Controller) PlayScreen(w fyne.Window, consoleAddr string, myIpAddress string) fyne.CanvasObject {
+func (c *Controller) PlayScreen(w fyne.Window, consoleAddr string, metadata *model.WellKnown) fyne.CanvasObject {
 	return container.NewBorder(
 		container.NewPadded(
 			headerContainer("Join & Play Multiplayer", func() {
-				changePage(w, "JoinOptions", c.JoinOptionsScreen(w))
+				changePage(w, "Join", c.JoinScreen(w))
 			}),
 		),
 		nil,
 		nil,
 		nil,
-		c.playView(w, consoleAddr, myIpAddress),
+		c.playView(w, consoleAddr, metadata),
 	)
 }
 
-func (c *Controller) playView(w fyne.Window, consoleAddr, myIpAddress string) fyne.CanvasObject {
+func (c *Controller) playView(w fyne.Window, consoleAddr string, metadata *model.WellKnown) fyne.CanvasObject {
 	ips, _ := listAllIPs()
+
 	myIPEntry := widget.NewSelectEntry(ips)
 	myIPEntry.Validator = ipValidator
 	myIPEntry.PlaceHolder = "Example: 192.168.100.1"
+
+	myIpAddress, _ := metadata.CallerAddr.IPString("")
 	if myIpAddress == "" {
 		if len(ips) > 0 {
 			myIpAddress = ips[0]
@@ -45,6 +52,8 @@ func (c *Controller) playView(w fyne.Window, consoleAddr, myIpAddress string) fy
 			myIPEntry,
 			widget.NewLabelWithStyle("Auth Server (Console) Address:", fyne.TextAlignTrailing, fyne.TextStyle{Bold: false}),
 			widget.NewLabel(consoleAddr),
+			widget.NewLabelWithStyle("Configuration Run Mode:", fyne.TextAlignTrailing, fyne.TextStyle{Bold: false}),
+			widget.NewLabel(metadata.RunMode.String()),
 		))
 	settingsAccordion.Open = true
 
@@ -60,7 +69,15 @@ func (c *Controller) playView(w fyne.Window, consoleAddr, myIpAddress string) fy
 		loadingDialog := dialog.NewCustomWithoutButtons("Starting backend...", widget.NewProgressBarInfinite(), w)
 		loadingDialog.Show()
 
-		if err := c.StartBackend(consoleAddr, myIPEntry.Text); err != nil {
+		var proxyCreator backend.Proxy
+		switch metadata.RunMode {
+		case model.RunModeRelay:
+			proxyCreator = &relay.ProxyRelay{RelayServerAddr: metadata.RelayServerAddr}
+		default:
+			proxyCreator = &direct.ProxyLAN{MyIPAddress: myIPEntry.Text}
+		}
+
+		if err := c.StartBackend(consoleAddr, proxyCreator); err != nil {
 			loadingDialog.Hide()
 			return
 		}

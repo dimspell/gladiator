@@ -2,12 +2,12 @@ version: "2"
 sql:
   - engine: "sqlite"
     queries:
-      - "console/database/queries.sql"
-    schema: "console/database/schema.sql"
+      - "internal/console/database/queries.sql"
+    schema: "internal/console/database/schema.sql"
     gen:
       go:
         package: "database"
-        out: "console/database"
+        out: "internal/console/database"
         emit_prepared_queries: true
         emit_params_struct_pointers: false
         emit_empty_slices: false

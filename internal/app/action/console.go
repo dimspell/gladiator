@@ -17,7 +17,20 @@ func ConsoleCommand() *cli.Command {
 			&cli.StringFlag{
 				Name:  "console-addr",
 				Value: defaultConsoleAddr,
-				Usage: "Port for the console server",
+				Usage: "Bind address for the console server",
+			},
+			&cli.StringFlag{
+				Name:  "console-public-addr",
+				Value: defaultConsoleAddr,
+				Usage: "Public address to the console server",
+			},
+			&cli.StringFlag{
+				Name:  "relay-addr",
+				Usage: "Bind address for the relay server",
+			},
+			&cli.StringFlag{
+				Name:  "relay-public-addr",
+				Usage: "Public address to the relay server",
 			},
 			&cli.StringFlag{
 				Name:  "database-type",
@@ -33,8 +46,6 @@ func ConsoleCommand() *cli.Command {
 	}
 
 	cmd.Action = func(ctx context.Context, c *cli.Command) error {
-		consoleAddr := cmd.String("console-addr")
-
 		db, err := selectDatabaseType(c)
 		if err != nil {
 			return err
@@ -49,7 +60,7 @@ func ConsoleCommand() *cli.Command {
 		if err != nil {
 			return err
 		}
-		con := console.NewConsole(db, consoleAddr, co...)
+		con := console.NewConsole(db, co...)
 
 		start, stop := con.Handlers()
 		return con.Graceful(ctx, start, stop)

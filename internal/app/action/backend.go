@@ -31,7 +31,7 @@ func BackendCommand() *cli.Command {
 			&cli.StringFlag{
 				Name:  "proxy",
 				Value: defaultProxyType,
-				Usage: fmt.Sprintf("Proxy type to use. Possible values are: %q, %q, %q", "lan", "webrtc-beta", "relay-beta"),
+				Usage: fmt.Sprintf("Proxy type to use. Possible values are: %q, %q, %q", proxyTypeLAN, proxyTypeWebRTC, proxyTypeRelay),
 			},
 			&cli.StringFlag{
 				Name:  "lan-my-ip-addr",
@@ -73,7 +73,14 @@ func BackendCommand() *cli.Command {
 			return err
 		}
 
-		bd := backend.NewBackend(backendAddr, consoleAddr, px)
+		// TODO: Use for metadata to autoconfigure the backend options
+		metadata, err := backend.GetMetadata(ctx, consoleAddr)
+		if err != nil {
+			return err
+		}
+		fmt.Println(metadata)
+
+		bd := backend.NewBackend(backendAddr, "http://"+consoleAddr, px)
 		bd.SignalServerURL = c.String("lobby-addr")
 
 		if err := bd.Start(); err != nil {

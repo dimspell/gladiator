@@ -24,41 +24,20 @@ func New(db DBTX) *Queries {
 func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	q := Queries{db: db}
 	var err error
-	if q.addPlayerToRoomStmt, err = db.PrepareContext(ctx, addPlayerToRoom); err != nil {
-		return nil, fmt.Errorf("error preparing query AddPlayerToRoom: %w", err)
-	}
 	if q.createCharacterStmt, err = db.PrepareContext(ctx, createCharacter); err != nil {
 		return nil, fmt.Errorf("error preparing query CreateCharacter: %w", err)
-	}
-	if q.createGameRoomStmt, err = db.PrepareContext(ctx, createGameRoom); err != nil {
-		return nil, fmt.Errorf("error preparing query CreateGameRoom: %w", err)
 	}
 	if q.createUserStmt, err = db.PrepareContext(ctx, createUser); err != nil {
 		return nil, fmt.Errorf("error preparing query CreateUser: %w", err)
 	}
-	if q.deleteAllGameRoomPlayersStmt, err = db.PrepareContext(ctx, deleteAllGameRoomPlayers); err != nil {
-		return nil, fmt.Errorf("error preparing query DeleteAllGameRoomPlayers: %w", err)
-	}
-	if q.deleteAllGameRoomsStmt, err = db.PrepareContext(ctx, deleteAllGameRooms); err != nil {
-		return nil, fmt.Errorf("error preparing query DeleteAllGameRooms: %w", err)
-	}
 	if q.deleteCharacterStmt, err = db.PrepareContext(ctx, deleteCharacter); err != nil {
 		return nil, fmt.Errorf("error preparing query DeleteCharacter: %w", err)
-	}
-	if q.existPlayerInRoomStmt, err = db.PrepareContext(ctx, existPlayerInRoom); err != nil {
-		return nil, fmt.Errorf("error preparing query ExistPlayerInRoom: %w", err)
 	}
 	if q.findCharacterStmt, err = db.PrepareContext(ctx, findCharacter); err != nil {
 		return nil, fmt.Errorf("error preparing query FindCharacter: %w", err)
 	}
 	if q.getCurrentUserStmt, err = db.PrepareContext(ctx, getCurrentUser); err != nil {
 		return nil, fmt.Errorf("error preparing query GetCurrentUser: %w", err)
-	}
-	if q.getGameRoomStmt, err = db.PrepareContext(ctx, getGameRoom); err != nil {
-		return nil, fmt.Errorf("error preparing query GetGameRoom: %w", err)
-	}
-	if q.getGameRoomPlayersStmt, err = db.PrepareContext(ctx, getGameRoomPlayers); err != nil {
-		return nil, fmt.Errorf("error preparing query GetGameRoomPlayers: %w", err)
 	}
 	if q.getUserByIDStmt, err = db.PrepareContext(ctx, getUserByID); err != nil {
 		return nil, fmt.Errorf("error preparing query GetUserByID: %w", err)
@@ -68,9 +47,6 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	}
 	if q.listCharactersStmt, err = db.PrepareContext(ctx, listCharacters); err != nil {
 		return nil, fmt.Errorf("error preparing query ListCharacters: %w", err)
-	}
-	if q.listGameRoomsStmt, err = db.PrepareContext(ctx, listGameRooms); err != nil {
-		return nil, fmt.Errorf("error preparing query ListGameRooms: %w", err)
 	}
 	if q.selectRankingStmt, err = db.PrepareContext(ctx, selectRanking); err != nil {
 		return nil, fmt.Errorf("error preparing query SelectRanking: %w", err)
@@ -89,19 +65,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 
 func (q *Queries) Close() error {
 	var err error
-	if q.addPlayerToRoomStmt != nil {
-		if cerr := q.addPlayerToRoomStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing addPlayerToRoomStmt: %w", cerr)
-		}
-	}
 	if q.createCharacterStmt != nil {
 		if cerr := q.createCharacterStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing createCharacterStmt: %w", cerr)
-		}
-	}
-	if q.createGameRoomStmt != nil {
-		if cerr := q.createGameRoomStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing createGameRoomStmt: %w", cerr)
 		}
 	}
 	if q.createUserStmt != nil {
@@ -109,24 +75,9 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing createUserStmt: %w", cerr)
 		}
 	}
-	if q.deleteAllGameRoomPlayersStmt != nil {
-		if cerr := q.deleteAllGameRoomPlayersStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing deleteAllGameRoomPlayersStmt: %w", cerr)
-		}
-	}
-	if q.deleteAllGameRoomsStmt != nil {
-		if cerr := q.deleteAllGameRoomsStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing deleteAllGameRoomsStmt: %w", cerr)
-		}
-	}
 	if q.deleteCharacterStmt != nil {
 		if cerr := q.deleteCharacterStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing deleteCharacterStmt: %w", cerr)
-		}
-	}
-	if q.existPlayerInRoomStmt != nil {
-		if cerr := q.existPlayerInRoomStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing existPlayerInRoomStmt: %w", cerr)
 		}
 	}
 	if q.findCharacterStmt != nil {
@@ -137,16 +88,6 @@ func (q *Queries) Close() error {
 	if q.getCurrentUserStmt != nil {
 		if cerr := q.getCurrentUserStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing getCurrentUserStmt: %w", cerr)
-		}
-	}
-	if q.getGameRoomStmt != nil {
-		if cerr := q.getGameRoomStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing getGameRoomStmt: %w", cerr)
-		}
-	}
-	if q.getGameRoomPlayersStmt != nil {
-		if cerr := q.getGameRoomPlayersStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing getGameRoomPlayersStmt: %w", cerr)
 		}
 	}
 	if q.getUserByIDStmt != nil {
@@ -162,11 +103,6 @@ func (q *Queries) Close() error {
 	if q.listCharactersStmt != nil {
 		if cerr := q.listCharactersStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing listCharactersStmt: %w", cerr)
-		}
-	}
-	if q.listGameRoomsStmt != nil {
-		if cerr := q.listGameRoomsStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing listGameRoomsStmt: %w", cerr)
 		}
 	}
 	if q.selectRankingStmt != nil {
@@ -226,24 +162,16 @@ func (q *Queries) queryRow(ctx context.Context, stmt *sql.Stmt, query string, ar
 }
 
 type Queries struct {
-	db DBTX
-	tx *sql.Tx
-	addPlayerToRoomStmt          *sql.Stmt
+	db                           DBTX
+	tx                           *sql.Tx
 	createCharacterStmt          *sql.Stmt
-	createGameRoomStmt           *sql.Stmt
 	createUserStmt               *sql.Stmt
-	deleteAllGameRoomPlayersStmt *sql.Stmt
-	deleteAllGameRoomsStmt       *sql.Stmt
 	deleteCharacterStmt          *sql.Stmt
-	existPlayerInRoomStmt        *sql.Stmt
 	findCharacterStmt            *sql.Stmt
 	getCurrentUserStmt           *sql.Stmt
-	getGameRoomStmt              *sql.Stmt
-	getGameRoomPlayersStmt       *sql.Stmt
 	getUserByIDStmt              *sql.Stmt
 	getUserByNameStmt            *sql.Stmt
 	listCharactersStmt           *sql.Stmt
-	listGameRoomsStmt            *sql.Stmt
 	selectRankingStmt            *sql.Stmt
 	updateCharacterInventoryStmt *sql.Stmt
 	updateCharacterSpellsStmt    *sql.Stmt
@@ -254,22 +182,14 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 	return &Queries{
 		db:                           tx,
 		tx:                           tx,
-		addPlayerToRoomStmt:          q.addPlayerToRoomStmt,
 		createCharacterStmt:          q.createCharacterStmt,
-		createGameRoomStmt:           q.createGameRoomStmt,
 		createUserStmt:               q.createUserStmt,
-		deleteAllGameRoomPlayersStmt: q.deleteAllGameRoomPlayersStmt,
-		deleteAllGameRoomsStmt:       q.deleteAllGameRoomsStmt,
 		deleteCharacterStmt:          q.deleteCharacterStmt,
-		existPlayerInRoomStmt:        q.existPlayerInRoomStmt,
 		findCharacterStmt:            q.findCharacterStmt,
 		getCurrentUserStmt:           q.getCurrentUserStmt,
-		getGameRoomStmt:              q.getGameRoomStmt,
-		getGameRoomPlayersStmt:       q.getGameRoomPlayersStmt,
 		getUserByIDStmt:              q.getUserByIDStmt,
 		getUserByNameStmt:            q.getUserByNameStmt,
 		listCharactersStmt:           q.listCharactersStmt,
-		listGameRoomsStmt:            q.listGameRoomsStmt,
 		selectRankingStmt:            q.selectRankingStmt,
 		updateCharacterInventoryStmt: q.updateCharacterInventoryStmt,
 		updateCharacterSpellsStmt:    q.updateCharacterSpellsStmt,

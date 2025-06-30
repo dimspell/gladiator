@@ -1,10 +1,6 @@
 package ui
 
 import (
-	"context"
-	"errors"
-	"fmt"
-
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/data/binding"
@@ -12,6 +8,7 @@ import (
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	"github.com/dimspell/gladiator/internal/model"
 )
 
 type AdminScreenInputParams struct {
@@ -20,7 +17,7 @@ type AdminScreenInputParams struct {
 	BindAddress  string
 }
 
-func (c *Controller) AdminScreen(w fyne.Window, params *AdminScreenInputParams) fyne.CanvasObject {
+func (c *Controller) AdminScreen(w fyne.Window, params *AdminScreenInputParams, metadata *model.WellKnown) fyne.CanvasObject {
 	wrapConsoleRunning := func(children func() fyne.CanvasObject) fyne.CanvasObject {
 		if !c.ConsoleRunning() {
 			return container.NewCenter(
@@ -33,7 +30,7 @@ func (c *Controller) AdminScreen(w fyne.Window, params *AdminScreenInputParams) 
 	configurationView := func() fyne.CanvasObject {
 		formContainer := container.New(layout.NewFormLayout())
 		paramsMap := map[string]string{
-			"Run Mode":      c.Console.RunMode.String(),
+			"Run Mode":      c.Console.Config.RunMode.String(),
 			"Bind Address":  params.BindAddress,
 			"Database Type": params.DatabaseType,
 			"Database Path": params.DatabasePath,
@@ -49,35 +46,35 @@ func (c *Controller) AdminScreen(w fyne.Window, params *AdminScreenInputParams) 
 		return container.NewVBox(
 			widget.NewLabel("Actions"),
 			widget.NewButton("Delete all game rooms", func() {
-				if c.Console == nil {
-					dialog.ShowError(fmt.Errorf("The console is not running"), w)
-					return
-				}
-
-				loadingDialog := dialog.NewCustomWithoutButtons("Deleting all games", widget.NewProgressBarInfinite(), w)
-				loadingDialog.Show()
-
-				err := errors.Join(
-					func() error {
-						if err := c.Console.DB.Write.DeleteAllGameRoomPlayers(context.TODO()); err != nil {
-							return fmt.Errorf("could not delete all game room players: %w", err)
-						}
-						return nil
-					}(),
-					func() error {
-						if err := c.Console.DB.Write.DeleteAllGameRooms(context.TODO()); err != nil {
-							return fmt.Errorf("could not delete all game rooms: %w", err)
-						}
-						return nil
-					}(),
-				)
-
-				loadingDialog.Hide()
-				if err != nil {
-					dialog.ShowError(err, w)
-					return
-				}
-				dialog.ShowInformation("All deleted", "All game rooms have been deleted", w)
+				// if c.Console == nil {
+				// 	dialog.ShowError(fmt.Errorf("The console is not running"), w)
+				// 	return
+				// }
+				//
+				// loadingDialog := dialog.NewCustomWithoutButtons("Deleting all games", widget.NewProgressBarInfinite(), w)
+				// loadingDialog.Show()
+				//
+				// err := errors.Join(
+				// 	func() error {
+				// 		if err := c.Console.DB.Write.DeleteAllGameRoomPlayers(context.TODO()); err != nil {
+				// 			return fmt.Errorf("could not delete all game room players: %w", err)
+				// 		}
+				// 		return nil
+				// 	}(),
+				// 	func() error {
+				// 		if err := c.Console.DB.Write.DeleteAllGameRooms(context.TODO()); err != nil {
+				// 			return fmt.Errorf("could not delete all game rooms: %w", err)
+				// 		}
+				// 		return nil
+				// 	}(),
+				// )
+				//
+				// loadingDialog.Hide()
+				// if err != nil {
+				// 	dialog.ShowError(err, w)
+				// 	return
+				// }
+				dialog.ShowInformation("Not working", "Not working anymore", w)
 			}),
 		)
 	}
@@ -185,7 +182,7 @@ func (c *Controller) AdminScreen(w fyne.Window, params *AdminScreenInputParams) 
 			nil,
 			container.NewAppTabs(
 				container.NewTabItemWithIcon("Host", theme.HomeIcon(), consoleScreen()),
-				container.NewTabItemWithIcon("Play", theme.MediaPlayIcon(), c.playView(w, params.BindAddress, "")),
+				container.NewTabItemWithIcon("Play", theme.MediaPlayIcon(), c.playView(w, params.BindAddress, metadata)),
 			),
 		),
 	)

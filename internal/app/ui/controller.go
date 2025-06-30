@@ -2,18 +2,13 @@ package ui
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
-	"net/http"
-	"strings"
-	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/data/binding"
 	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"github.com/dimspell/gladiator/internal/backend"
-	"github.com/dimspell/gladiator/internal/backend/proxy/direct"
 	"github.com/dimspell/gladiator/internal/console"
 	"github.com/dimspell/gladiator/internal/console/database"
 	"github.com/dimspell/gladiator/internal/model"
@@ -47,7 +42,7 @@ func NewController(fyneApp fyne.App, version string) *Controller {
 	}
 }
 
-func (c *Controller) StartConsole(databaseType, databasePath, consoleAddr string) error {
+func (c *Controller) StartConsole(databaseType, databasePath, consoleAddr string, runMode model.RunMode) error {
 	if c.Console != nil {
 		slog.Warn("Console is already running")
 		return nil
@@ -99,7 +94,8 @@ func (c *Controller) StartConsole(databaseType, databasePath, consoleAddr string
 		}
 	}()
 
-	c.Console = console.NewConsole(db, consoleAddr)
+	c.Console = console.NewConsole(db, console.WithConsoleAddr(consoleAddr, "http://"+consoleAddr))
+	c.Console.Config.RunMode = runMode
 
 	start, stop := c.Console.Handlers()
 	c.consoleStop = func(ctx context.Context) error {
@@ -138,31 +134,12 @@ func (c *Controller) StopConsole() error {
 	return nil
 }
 
+// Deprecated: Call backend.GetMetadata
 func (c *Controller) ConsoleHandshake(consoleAddr string) (*model.WellKnown, error) {
-	client := &http.Client{Timeout: 3 * time.Second}
-
-	if !strings.Contains(consoleAddr, "://") {
-		consoleAddr = "http://" + consoleAddr
-	}
-	res, err := client.Get(fmt.Sprintf("%s/.well-known/console.json", consoleAddr))
-	if err != nil {
-		return nil, err
-	}
-	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("incorrect http-status code: %d", res.StatusCode)
-	}
-
-	// TODO: Read configuration parameters
-	var resp model.WellKnown
-	if err := json.NewDecoder(res.Body).Decode(&resp); err != nil {
-		return nil, err
-	}
-
-	slog.Info("Console handshake", "info", resp)
-	return &resp, nil
+	return backend.GetMetadata(context.Background(), consoleAddr)
 }
 
-func (c *Controller) StartBackend(consoleAddr, myIPAddress string) error {
+func (c *Controller) StartBackend(consoleAddr string, proxy backend.Proxy) error {
 	if c.Backend != nil {
 		slog.Warn("Backend is already running")
 		return nil
@@ -185,7 +162,7 @@ func (c *Controller) StartBackend(consoleAddr, myIPAddress string) error {
 		}
 	}()
 
-	c.Backend = backend.NewBackend("127.0.0.1:6112", consoleAddr, &direct.ProxyLAN{myIPAddress})
+	c.Backend = backend.NewBackend("127.0.0.1:6112", "http://"+consoleAddr, proxy)
 	if err := c.Backend.Start(); err != nil {
 		cancel()
 		return err

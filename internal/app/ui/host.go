@@ -3,7 +3,6 @@ package ui
 import (
 	"errors"
 	"fmt"
-	"log"
 	"net"
 	"os"
 	"path"
@@ -14,6 +13,7 @@ import (
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	"github.com/dimspell/gladiator/internal/model"
 )
 
 type HostDatabaseTypeLabel string
@@ -49,8 +49,6 @@ func (c *Controller) HostScreen(w fyne.Window, params *HostScreenInputParams) fy
 	pathContainer := container.NewBorder(nil, nil, nil, pathSelection, pathEntry)
 
 	comboGroup := widget.NewSelect(Values(databaseTypeText), func(value string) {
-		log.Println("Select set to", value)
-
 		if value == databaseTypeText[HostDatabaseTypeMemory] {
 			pathLabel.Hide()
 			pathContainer.Hide()
@@ -122,7 +120,15 @@ func (c *Controller) HostScreen(w fyne.Window, params *HostScreenInputParams) fy
 			}
 		}
 
-		if err := c.StartConsole(databaseType, databasePath, net.JoinHostPort(bindIP.Text, bindPort.Text)); err != nil {
+		consoleAddr := net.JoinHostPort(bindIP.Text, bindPort.Text)
+		if err := c.StartConsole(databaseType, databasePath, consoleAddr, model.RunModeLAN); err != nil {
+			loadingDialog.Hide()
+			dialog.ShowError(err, w)
+			return
+		}
+
+		metadata, err := c.ConsoleHandshake(consoleAddr)
+		if err != nil {
 			loadingDialog.Hide()
 			dialog.ShowError(err, w)
 			return
@@ -132,8 +138,8 @@ func (c *Controller) HostScreen(w fyne.Window, params *HostScreenInputParams) fy
 		changePage(w, "Admin", c.AdminScreen(w, &AdminScreenInputParams{
 			DatabasePath: databasePath,
 			DatabaseType: databaseType,
-			BindAddress:  net.JoinHostPort(bindIP.Text, bindPort.Text),
-		}))
+			BindAddress:  consoleAddr,
+		}, metadata))
 	}
 
 	btn := widget.NewButtonWithIcon("Start Console", theme.NavigateNextIcon(), onHost)

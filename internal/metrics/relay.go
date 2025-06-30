@@ -38,6 +38,6 @@ var (
 	)
 )
 
-func InitLanRelay() {
+func InitRelay() {
 	prometheus.MustRegister(PacketIn, PacketOut, ActiveRooms, ConnectedPeers, PeersInRoom)
 }

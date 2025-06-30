@@ -2,7 +2,6 @@ package ui
 
 import (
 	"fmt"
-	"log"
 	"log/slog"
 
 	"fyne.io/fyne/v2"
@@ -58,9 +57,8 @@ func (c *Controller) StartScreen(w fyne.Window, selectedOption startOption) fyne
 				widget.NewLabel(""),
 				container.NewCenter(
 					widget.NewButtonWithIcon("Next", theme.NavigateNextIcon(), func() {
-						log.Println(radioGroup.Selected)
 						if radioGroup.Selected == radioOptions[startOptionJoin] {
-							changePage(w, "JoinOptions", c.JoinOptionsScreen(w))
+							changePage(w, "Join", c.JoinScreen(w))
 							return
 						}
 						if radioGroup.Selected == radioOptions[startOptionHost] {
