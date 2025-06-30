@@ -10,7 +10,6 @@ import (
 	"log/slog"
 	"runtime"
 
-	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/sqlite"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
@@ -134,7 +133,7 @@ func Migrate(conn *sql.DB) error {
 
 	{
 		version, dirty, err := m.Version()
-		slog.Info("Migration status", "version", version, "dirty", dirty, logging.Error(err))
+		slog.Info("Migration status", "version", version, "dirty", dirty, "error", err)
 	}
 	if err := m.Up(); err != nil {
 		if errors.Is(err, migrate.ErrNoChange) {
