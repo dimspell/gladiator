@@ -6,13 +6,14 @@ import (
 )
 
 type WellKnown struct {
-	Version  string  `json:"version"`
-	Protocol string  `json:"protocol"`
-	Addr     string  `json:"addr"`
-	RunMode  RunMode `json:"runMode"`
+	Version string  `json:"version"`
+	RunMode RunMode `json:"runMode"`
 
-	CallerAddr      WellKnownCaller `json:"calleraddr,omitempty"`
-	RelayServerAddr string          `json:"relayServerAddr,omitempty"`
+	// TODO: Rename the field to ConsoleServerAddr
+	Addr            string `json:"consoleServerAddr"`
+	RelayServerAddr string `json:"relayServerAddr,omitempty"`
+
+	CallerAddr WellKnownCaller `json:"callerAddr,omitempty"`
 }
 
 type WellKnownCaller string

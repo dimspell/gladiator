@@ -138,28 +138,9 @@ func (c *Controller) StopConsole() error {
 	return nil
 }
 
+// Deprecated: Call backend.GetMetadata
 func (c *Controller) ConsoleHandshake(consoleAddr string) (*model.WellKnown, error) {
-	client := &http.Client{Timeout: 3 * time.Second}
-
-	if !strings.Contains(consoleAddr, "://") {
-		consoleAddr = "http://" + consoleAddr
-	}
-	res, err := client.Get(fmt.Sprintf("%s/.well-known/console.json", consoleAddr))
-	if err != nil {
-		return nil, err
-	}
-	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("incorrect http-status code: %d", res.StatusCode)
-	}
-
-	// TODO: Read configuration parameters
-	var resp model.WellKnown
-	if err := json.NewDecoder(res.Body).Decode(&resp); err != nil {
-		return nil, err
-	}
-
-	slog.Info("Console handshake", "info", resp)
-	return &resp, nil
+	return backend.GetMetadata(context.Background(), consoleAddr)
 }
 
 func (c *Controller) StartBackend(consoleAddr string, proxy backend.Proxy) error {
@@ -185,7 +166,7 @@ func (c *Controller) StartBackend(consoleAddr string, proxy backend.Proxy) error
 		}
 	}()
 
-	c.Backend = backend.NewBackend("127.0.0.1:6112", consoleAddr, proxy)
+	c.Backend = backend.NewBackend("127.0.0.1:6112", "http://"+consoleAddr, proxy)
 	if err := c.Backend.Start(); err != nil {
 		cancel()
 		return err

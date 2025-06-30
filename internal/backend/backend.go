@@ -2,12 +2,14 @@ package backend
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -15,6 +17,7 @@ import (
 	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/packet"
+	"github.com/dimspell/gladiator/internal/model"
 )
 
 type Backend struct {
@@ -33,8 +36,8 @@ type Backend struct {
 	rankingClient   multiv1connect.RankingServiceClient
 }
 
-func NewBackend(backendAddr, consoleAddr string, createProxy Proxy) *Backend {
-	characterClient, gameClient, userClient, rankingClient := createServiceClients(consoleAddr)
+func NewBackend(backendAddr, consolePublicAddr string, createProxy Proxy) *Backend {
+	characterClient, gameClient, userClient, rankingClient := createServiceClients(consolePublicAddr)
 
 	return &Backend{
 		Addr:        backendAddr,
@@ -66,8 +69,7 @@ func createServiceClients(consoleAddr string) (
 		},
 	}
 
-	// TODO: Name the schema as parameter
-	consoleUri := fmt.Sprintf("%s://%s/grpc", "http", consoleAddr)
+	consoleUri := fmt.Sprintf("%s/grpc", consoleAddr)
 
 	characterClient := multiv1connect.NewCharacterServiceClient(httpClient, consoleUri)
 	gameClient := multiv1connect.NewGameServiceClient(httpClient, consoleUri)
@@ -185,4 +187,32 @@ func (b *Backend) handleClient(conn net.Conn) error {
 			return err
 		}
 	}
+}
+
+// type ConfigOption func(backend *Backend) error
+// []ConfigOption,
+
+func GetMetadata(ctx context.Context, consoleAddr string) (*model.WellKnown, error) {
+	httpClient := &http.Client{Timeout: 3 * time.Second}
+
+	if !strings.Contains(consoleAddr, "://") {
+		consoleAddr = "http://" + consoleAddr
+	}
+	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("%s/.well-known/console.json", consoleAddr), nil)
+	if err != nil {
+		return nil, err
+	}
+	res, err := httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("incorrect http-status code: %d", res.StatusCode)
+	}
+
+	var resp model.WellKnown
+	if err := json.NewDecoder(res.Body).Decode(&resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
 }

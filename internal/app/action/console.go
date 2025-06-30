@@ -17,7 +17,20 @@ func ConsoleCommand() *cli.Command {
 			&cli.StringFlag{
 				Name:  "console-addr",
 				Value: defaultConsoleAddr,
-				Usage: "Port for the console server",
+				Usage: "Bind address for the console server",
+			},
+			&cli.StringFlag{
+				Name:  "console-public-addr",
+				Value: defaultConsoleAddr,
+				Usage: "Public address to the console server",
+			},
+			&cli.StringFlag{
+				Name:  "relay-addr",
+				Usage: "Bind address for the relay server",
+			},
+			&cli.StringFlag{
+				Name:  "relay-public-addr",
+				Usage: "Public address to the relay server",
 			},
 			&cli.StringFlag{
 				Name:  "database-type",

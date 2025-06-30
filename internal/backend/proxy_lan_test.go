@@ -49,11 +49,11 @@ func TestE2E_LAN(t *testing.T) {
 	// go cs.Multiplayer.Run(ctx)
 
 	// Remove the HTTP schema prefix
-	cs.Config.ConsoleAddr = ts.URL[len("http://"):]
+	cs.Config.ConsoleBindAddr = ts.URL[len("http://"):]
 
 	proxy1 := &direct.ProxyLAN{"198.51.100.1"}
-	bd1 := NewBackend("", cs.Config.ConsoleAddr, proxy1)
-	bd1.SignalServerURL = "ws://" + cs.Config.ConsoleAddr + "/lobby"
+	bd1 := NewBackend("", cs.Config.ConsoleBindAddr, proxy1)
+	bd1.SignalServerURL = "ws://" + cs.Config.ConsoleBindAddr + "/lobby"
 
 	conn1 := &mockConn{}
 	session1 := bd1.AddSession(conn1)
@@ -122,8 +122,8 @@ func TestE2E_LAN(t *testing.T) {
 	conn2 := &mockConn{}
 
 	proxy2 := &direct.ProxyLAN{"198.51.100.2"}
-	bd2 := NewBackend("", cs.Config.ConsoleAddr, proxy2)
-	bd2.SignalServerURL = "ws://" + cs.Config.ConsoleAddr + "/lobby"
+	bd2 := NewBackend("", cs.Config.ConsoleBindAddr, proxy2)
+	bd2.SignalServerURL = "ws://" + cs.Config.ConsoleBindAddr + "/lobby"
 
 	session2 := bd2.AddSession(conn2)
 

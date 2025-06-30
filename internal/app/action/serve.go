@@ -28,6 +28,11 @@ func ServeCommand() *cli.Command {
 				Usage: "Port for the console server",
 			},
 			&cli.StringFlag{
+				Name:  "console-public-addr",
+				Value: defaultConsoleAddr,
+				Usage: "Public address to the console server",
+			},
+			&cli.StringFlag{
 				Name:  "backend-addr",
 				Value: defaultBackendAddr,
 				Usage: "Port for the backend server",
@@ -35,7 +40,7 @@ func ServeCommand() *cli.Command {
 			&cli.StringFlag{
 				Name:  "proxy",
 				Value: defaultProxyType,
-				Usage: fmt.Sprintf("Proxy type to use. Possible values are: %q, %q, %q", "lan", "webrtc-beta", "relay-beta"),
+				Usage: fmt.Sprintf("Proxy type to use. Possible values are: %q, %q, %q", proxyTypeLAN, proxyTypeWebRTC, proxyTypeRelay),
 			},
 			&cli.StringFlag{
 				Name:  "lan-my-ip-addr",
@@ -46,6 +51,10 @@ func ServeCommand() *cli.Command {
 				Name:  "relay-addr",
 				Value: defaultRelayAddr,
 				Usage: "Address of the relay server (only in relay proxy)",
+			},
+			&cli.StringFlag{
+				Name:  "relay-public-addr",
+				Usage: "Public address to the relay server",
 			},
 			&cli.StringFlag{
 				Name:  "lobby-addr",
@@ -97,7 +106,7 @@ func ServeCommand() *cli.Command {
 			return err
 		}
 
-		bd := backend.NewBackend(backendAddr, consoleAddr, px)
+		bd := backend.NewBackend(backendAddr, "http//"+consoleAddr, px)
 		bd.SignalServerURL = c.String("lobby-addr")
 
 		co, err := selectConsoleOptions(c)
@@ -122,7 +131,7 @@ func ServeCommand() *cli.Command {
 
 		if err := group.Wait(); err != nil {
 			bd.Shutdown()
-			return errors.Join(err, stopConsole(context.TODO()))
+			return errors.Join(err, stopConsole(ctx))
 		}
 		return nil
 	}

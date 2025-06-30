@@ -52,6 +52,8 @@ func (c *Controller) playView(w fyne.Window, consoleAddr string, metadata *model
 			myIPEntry,
 			widget.NewLabelWithStyle("Auth Server (Console) Address:", fyne.TextAlignTrailing, fyne.TextStyle{Bold: false}),
 			widget.NewLabel(consoleAddr),
+			widget.NewLabelWithStyle("Configuration Run Mode:", fyne.TextAlignTrailing, fyne.TextStyle{Bold: false}),
+			widget.NewLabel(metadata.RunMode.String()),
 		))
 	settingsAccordion.Open = true
 

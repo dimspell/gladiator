@@ -39,15 +39,21 @@ func selectDatabaseType(c *cli.Command) (db *database.SQLite, err error) {
 	return db, nil
 }
 
+const (
+	proxyTypeLAN    = "lan"
+	proxyTypeWebRTC = "webrtc-beta"
+	proxyTypeRelay  = "relay-beta"
+)
+
 func selectProxy(c *cli.Command) (p backend.Proxy, err error) {
 	switch c.String("proxy") {
-	case "lan":
+	case proxyTypeLAN:
 		myIPAddr := c.String("lan-my-ip-addr")
 		if ip := net.ParseIP(myIPAddr); ip == nil {
 			return nil, fmt.Errorf("invalid lan-my-ip-addr: %q", myIPAddr)
 		}
 		return &direct.ProxyLAN{myIPAddr}, nil
-	case "webrtc-beta":
+	case proxyTypeWebRTC:
 		return &p2p.ProxyP2P{
 			ICEServers: []webrtc.ICEServer{
 				{
@@ -60,7 +66,7 @@ func selectProxy(c *cli.Command) (p backend.Proxy, err error) {
 				},
 			},
 		}, nil
-	case "relay-beta":
+	case proxyTypeRelay:
 		relayAddr := c.String("relay-addr")
 		return &relay.ProxyRelay{RelayServerAddr: relayAddr}, nil
 	default:
@@ -71,14 +77,21 @@ func selectProxy(c *cli.Command) (p backend.Proxy, err error) {
 func selectConsoleOptions(c *cli.Command) ([]console.Option, error) {
 	var options []console.Option
 
-	consoleAddr := c.String("console-addr")
-	options = append(options, console.WithConsoleAddr(consoleAddr))
+	consoleBindAddr := c.String("console-addr")
+	consolePublicAddr := fallbackString(c.String("console-public-addr"), fmt.Sprintf("http://%s", consoleBindAddr))
+	options = append(options, console.WithConsoleAddr(consoleBindAddr, consolePublicAddr))
 
-	consoleHost, _, err := net.SplitHostPort(consoleAddr)
-	if err != nil {
-		return nil, err
+	if relayBindAddr := c.String("relay-addr"); relayBindAddr != "" {
+		relayPublicAddr := fallbackString(c.String("relay-public-addr"), relayBindAddr)
+		options = append(options, console.WithRelayAddr(relayBindAddr, relayPublicAddr))
 	}
-	options = append(options, console.WithRelayAddr(net.JoinHostPort(consoleHost, "9999")))
-
+	
 	return options, nil
+}
+
+func fallbackString(value string, fallback string) string {
+	if value == "" {
+		return fallback
+	}
+	return value
 }
