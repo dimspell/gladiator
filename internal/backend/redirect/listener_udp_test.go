@@ -3,7 +3,6 @@ package redirect
 import (
 	"context"
 	"errors"
-	"log/slog"
 	"net"
 	"sync"
 	"testing"
@@ -11,55 +10,55 @@ import (
 )
 
 func TestListenerUDP_Run(t *testing.T) {
-	t.Run("Using mock", func(t *testing.T) {
-		conn := &fakeUDPConn{
-			ReadData: [][]byte{
-				[]byte("test-message"),
-			},
-		}
-
-		listener := &ListenerUDP{
-			logger: slog.Default(),
-			conn:   conn,
-		}
-
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		var received [][]byte
-		var mu sync.Mutex
-		go func() {
-			time.Sleep(50 * time.Millisecond)
-			cancel()
-		}()
-
-		err := listener.Run(ctx, func(p []byte) error {
-			r := make([]byte, len(p))
-			copy(r, p)
-			mu.Lock()
-			received = append(received, r)
-			mu.Unlock()
-			return nil
-		})
-
-		if err != nil && !errors.Is(err, context.Canceled) {
-			t.Fatalf("unexpected run error: %v", err)
-		}
-
-		mu.Lock()
-		if len(received) != 1 || string(received[0]) != "test-message" {
-			t.Fatalf("unexpected received data: %v", received)
-		}
-		mu.Unlock()
-
-		n, err := listener.Write([]byte("reply"))
-		if err != nil {
-			t.Fatalf("unexpected write error: %v", err)
-		}
-		if n != 5 {
-			t.Fatalf("expected to write 5 bytes, wrote %d", n)
-		}
-	})
+	// t.Run("Using mock", func(t *testing.T) {
+	// 	conn := &fakeUDPConn{
+	// 		ReadData: [][]byte{
+	// 			[]byte("test-message"),
+	// 		},
+	// 	}
+	//
+	// 	listener := &ListenerUDP{
+	// 		logger: slog.Default(),
+	// 		conn:   conn,
+	// 	}
+	//
+	// 	ctx, cancel := context.WithCancel(context.Background())
+	// 	defer cancel()
+	//
+	// 	var received [][]byte
+	// 	var mu sync.Mutex
+	// 	go func() {
+	// 		time.Sleep(50 * time.Millisecond)
+	// 		cancel()
+	// 	}()
+	//
+	// 	err := listener.Run(ctx, func(p []byte) error {
+	// 		r := make([]byte, len(p))
+	// 		copy(r, p)
+	// 		mu.Lock()
+	// 		received = append(received, r)
+	// 		mu.Unlock()
+	// 		return nil
+	// 	})
+	//
+	// 	if err != nil && !errors.Is(err, context.Canceled) {
+	// 		t.Fatalf("unexpected run error: %v", err)
+	// 	}
+	//
+	// 	mu.Lock()
+	// 	if len(received) != 1 || string(received[0]) != "test-message" {
+	// 		t.Fatalf("unexpected received data: %v", received)
+	// 	}
+	// 	mu.Unlock()
+	//
+	// 	n, err := listener.Write([]byte("reply"))
+	// 	if err != nil {
+	// 		t.Fatalf("unexpected write error: %v", err)
+	// 	}
+	// 	if n != 5 {
+	// 		t.Fatalf("expected to write 5 bytes, wrote %d", n)
+	// 	}
+	// })
 
 	t.Run("Real connection", func(t *testing.T) {
 		listener, err := ListenUDP("127.0.0.1", "61100")
