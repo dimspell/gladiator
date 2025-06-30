@@ -37,7 +37,7 @@ func (c *Controller) playView(w fyne.Window, consoleAddr string, metadata *model
 	myIPEntry.Validator = ipValidator
 	myIPEntry.PlaceHolder = "Example: 192.168.100.1"
 
-	myIpAddress, _ := metadata.Caller.IPString("")
+	myIpAddress, _ := metadata.CallerAddr.IPString("")
 	if myIpAddress == "" {
 		if len(ips) > 0 {
 			myIpAddress = ips[0]
@@ -69,7 +69,7 @@ func (c *Controller) playView(w fyne.Window, consoleAddr string, metadata *model
 
 		var proxyCreator backend.Proxy
 		switch metadata.RunMode {
-		case model.RunModeRelay.String():
+		case model.RunModeRelay:
 			proxyCreator = &relay.ProxyRelay{RelayServerAddr: metadata.RelayServerAddr}
 		default:
 			proxyCreator = &direct.ProxyLAN{MyIPAddress: myIPEntry.Text}

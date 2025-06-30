@@ -268,13 +268,11 @@ func (c *Console) WellKnownInfo() http.HandlerFunc {
 		slog.Info("Serving well-known info", "caller_ip", r.RemoteAddr, "caller_agent", r.UserAgent())
 
 		wk := model.WellKnown{
-			Version:  "dev",
-			Protocol: "http",
-			Addr:     c.Config.ConsoleAddr,
-			RunMode:  c.Config.RunMode.String(),
-			Caller: model.WellKnownCaller{
-				Addr: r.RemoteAddr,
-			},
+			Version:    "dev",
+			Protocol:   "http",
+			Addr:       c.Config.ConsoleAddr,
+			RunMode:    c.Config.RunMode,
+			CallerAddr: model.WellKnownCaller(r.RemoteAddr),
 		}
 
 		if c.Config.RunMode == model.RunModeRelay {
