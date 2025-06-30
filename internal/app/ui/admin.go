@@ -33,7 +33,7 @@ func (c *Controller) AdminScreen(w fyne.Window, params *AdminScreenInputParams) 
 	configurationView := func() fyne.CanvasObject {
 		formContainer := container.New(layout.NewFormLayout())
 		paramsMap := map[string]string{
-			"Run Mode":      c.Console.RunMode.String(),
+			"Run Mode":      c.Console.Config.RunMode.String(),
 			"Bind Address":  params.BindAddress,
 			"Database Type": params.DatabaseType,
 			"Database Path": params.DatabasePath,

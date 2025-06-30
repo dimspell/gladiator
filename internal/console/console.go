@@ -25,24 +25,13 @@ import (
 )
 
 type Console struct {
-	Addr    string        // TODO: Move to option
-	RunMode model.RunMode // TODO: Move to option
-	Config  *Config
-
+	Config      *Config
 	DB          *database.SQLite
 	Multiplayer *Multiplayer
 	Relay       *Relay
 }
 
-func DefaultConfig() *Config {
-	return &Config{
-		CORSAllowedOrigins: []string{"*"},
-		EnableRelayServer:  true,
-		RelayAddr:          ":9999",
-	}
-}
-
-func NewConsole(db *database.SQLite, addr string, opts ...Option) *Console {
+func NewConsole(db *database.SQLite, opts ...Option) *Console {
 	config := DefaultConfig()
 	for _, fn := range opts {
 		if err := fn(config); err != nil {
@@ -54,7 +43,7 @@ func NewConsole(db *database.SQLite, addr string, opts ...Option) *Console {
 
 	var relay *Relay
 	var err error
-	if config.EnableRelayServer {
+	if config.RunMode == model.RunModeRelay {
 		relay, err = NewRelay(config.RelayAddr, multiplayer)
 		if err != nil {
 			panic("failed to initialize relay: " + err.Error())
@@ -67,7 +56,6 @@ func NewConsole(db *database.SQLite, addr string, opts ...Option) *Console {
 	metrics.InitLanRelay()
 
 	return &Console{
-		Addr:        addr,
 		DB:          db,
 		Multiplayer: multiplayer,
 		Relay:       relay,
@@ -78,9 +66,19 @@ func NewConsole(db *database.SQLite, addr string, opts ...Option) *Console {
 type Option func(*Config) error
 
 type Config struct {
+	ConsoleAddr        string
 	CORSAllowedOrigins []string
-	EnableRelayServer  bool
 	RelayAddr          string
+	RunMode            model.RunMode
+}
+
+func DefaultConfig() *Config {
+	return &Config{
+		ConsoleAddr:        "localhost:2137",
+		CORSAllowedOrigins: []string{"*"},
+		RunMode:            model.RunModeLAN,
+		RelayAddr:          ":9999",
+	}
 }
 
 // TODO: For production replace it with []string{"https://dispel-multi.net"}
@@ -91,9 +89,9 @@ func WithCORSAllowedOrigins(allowedOrigins []string) Option {
 	}
 }
 
-func WithRelayServerEnabled(enableRelayServer bool) Option {
+func WithConsoleAddr(consoleAddr string) Option {
 	return func(c *Config) error {
-		c.EnableRelayServer = enableRelayServer
+		c.ConsoleAddr = consoleAddr
 		return nil
 	}
 }
@@ -101,6 +99,7 @@ func WithRelayServerEnabled(enableRelayServer bool) Option {
 func WithRelayAddr(relayAddr string) Option {
 	return func(c *Config) error {
 		c.RelayAddr = relayAddr
+		c.RunMode = model.RunModeRelay
 		return nil
 	}
 }
@@ -193,7 +192,7 @@ func (c *Console) HttpRouter() http.Handler {
 
 func (c *Console) Handlers() (start GracefulFunc, shutdown GracefulFunc) {
 	httpServer := &http.Server{
-		Addr:         c.Addr,
+		Addr:         c.Config.ConsoleAddr,
 		Handler:      h2c.NewHandler(c.HttpRouter(), &http2.Server{}),
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,
@@ -201,7 +200,7 @@ func (c *Console) Handlers() (start GracefulFunc, shutdown GracefulFunc) {
 	}
 
 	start = func(ctx context.Context) error {
-		slog.Info("Configured console server", "addr", c.Addr)
+		slog.Info("Configured console server", "addr", c.Config.ConsoleAddr)
 
 		go c.Multiplayer.Run(ctx)
 		go c.Relay.Start(ctx)
@@ -263,17 +262,14 @@ func (c *Console) Graceful(ctx context.Context, start GracefulFunc, shutdown Gra
 }
 
 func (c *Console) WellKnownInfo() http.HandlerFunc {
-	if c.RunMode == "" {
-		c.RunMode = model.RunModeLAN
-	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		slog.Info("Serving well-known info", "caller_ip", r.RemoteAddr, "caller_agent", r.UserAgent())
 
 		renderJSON(w, r, model.WellKnown{
 			Version:  "dev",
 			Protocol: "http",
-			Addr:     c.Addr,
-			RunMode:  c.RunMode.String(),
+			Addr:     c.Config.ConsoleAddr,
+			RunMode:  c.Config.RunMode.String(),
 			Caller: model.WellKnownCaller{
 				Addr: r.RemoteAddr,
 			},

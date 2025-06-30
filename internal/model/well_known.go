@@ -42,9 +42,9 @@ func (w *WellKnownCaller) IPString(fallBackIP string) (string, error) {
 type RunMode string
 
 const (
-	RunModeSingle RunMode = "SINGLE_PLAYER"
-	RunModeLAN    RunMode = "LAN"
-	RunModeHosted RunMode = "HOSTED"
+	RunModeSinglePlayer RunMode = "SINGLE_PLAYER.v1"
+	RunModeLAN          RunMode = "LAN.v1"
+	RunModeRelay        RunMode = "RELAY.v1"
 )
 
 func (m RunMode) String() string { return string(m) }

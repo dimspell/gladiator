@@ -15,6 +15,7 @@ import (
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	"github.com/dimspell/gladiator/internal/model"
 )
 
 type SinglePlayerScreenParameters struct {
@@ -68,7 +69,7 @@ func (c *Controller) SinglePlayerScreen(w fyne.Window, initial *SinglePlayerScre
 			dialog.ShowError(fmt.Errorf("unknown database type: %q", databaseType), w)
 			return
 		}
-		if err := c.StartConsole(databaseType, databasePath, consoleAddr); err != nil {
+		if err := c.StartConsole(databaseType, databasePath, consoleAddr, model.RunModeSinglePlayer); err != nil {
 			dialog.ShowError(err, w)
 			return
 		}

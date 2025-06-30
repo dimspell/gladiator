@@ -12,7 +12,7 @@ func (c *Controller) SignInScreen(w fyne.Window) fyne.CanvasObject {
 	return container.NewBorder(
 		container.NewPadded(
 			headerContainer("Sign-up", func() {
-				changePage(w, "JoinOptions", c.JoinOptionsScreen(w))
+				changePage(w, "Join", c.JoinScreen(w))
 			}),
 		),
 		nil,

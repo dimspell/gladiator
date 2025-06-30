@@ -10,24 +10,31 @@ import (
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	"github.com/dimspell/gladiator/internal/model"
 )
 
-func (c *Controller) PlayScreen(w fyne.Window, consoleAddr string, myIpAddress string) fyne.CanvasObject {
+func (c *Controller) PlayScreen(w fyne.Window, metadata *model.WellKnown) fyne.CanvasObject {
+	myIpAddress, _ := metadata.Caller.IPString("")
+
+	fmt.Println(metadata)
+
 	return container.NewBorder(
 		container.NewPadded(
 			headerContainer("Join & Play Multiplayer", func() {
-				changePage(w, "JoinOptions", c.JoinOptionsScreen(w))
+				changePage(w, "Join", c.JoinScreen(w))
 			}),
 		),
 		nil,
 		nil,
 		nil,
-		c.playView(w, consoleAddr, myIpAddress),
+		c.playView(w, "TODO", myIpAddress),
 	)
 }
 
 func (c *Controller) playView(w fyne.Window, consoleAddr, myIpAddress string) fyne.CanvasObject {
 	ips, _ := listAllIPs()
+	fmt.Println("ips:", ips)
+
 	myIPEntry := widget.NewSelectEntry(ips)
 	myIPEntry.Validator = ipValidator
 	myIPEntry.PlaceHolder = "Example: 192.168.100.1"

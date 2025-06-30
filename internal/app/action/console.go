@@ -33,8 +33,6 @@ func ConsoleCommand() *cli.Command {
 	}
 
 	cmd.Action = func(ctx context.Context, c *cli.Command) error {
-		consoleAddr := cmd.String("console-addr")
-
 		db, err := selectDatabaseType(c)
 		if err != nil {
 			return err
@@ -49,7 +47,7 @@ func ConsoleCommand() *cli.Command {
 		if err != nil {
 			return err
 		}
-		con := console.NewConsole(db, consoleAddr, co...)
+		con := console.NewConsole(db, co...)
 
 		start, stop := con.Handlers()
 		return con.Graceful(ctx, start, stop)

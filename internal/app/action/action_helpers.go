@@ -71,7 +71,10 @@ func selectProxy(c *cli.Command) (p backend.Proxy, err error) {
 func selectConsoleOptions(c *cli.Command) ([]console.Option, error) {
 	var options []console.Option
 
-	consoleHost, _, err := net.SplitHostPort(c.String("console-addr"))
+	consoleAddr := c.String("console-addr")
+	options = append(options, console.WithConsoleAddr(consoleAddr))
+
+	consoleHost, _, err := net.SplitHostPort(consoleAddr)
 	if err != nil {
 		return nil, err
 	}

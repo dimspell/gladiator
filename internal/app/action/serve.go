@@ -104,7 +104,7 @@ func ServeCommand() *cli.Command {
 		if err != nil {
 			return err
 		}
-		con := console.NewConsole(db, consoleAddr, co...)
+		con := console.NewConsole(db, co...)
 
 		startConsole, stopConsole := con.Handlers()
 

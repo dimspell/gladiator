@@ -47,7 +47,7 @@ func NewController(fyneApp fyne.App, version string) *Controller {
 	}
 }
 
-func (c *Controller) StartConsole(databaseType, databasePath, consoleAddr string) error {
+func (c *Controller) StartConsole(databaseType, databasePath, consoleAddr string, runMode model.RunMode) error {
 	if c.Console != nil {
 		slog.Warn("Console is already running")
 		return nil
@@ -99,7 +99,8 @@ func (c *Controller) StartConsole(databaseType, databasePath, consoleAddr string
 		}
 	}()
 
-	c.Console = console.NewConsole(db, consoleAddr)
+	c.Console = console.NewConsole(db, console.WithConsoleAddr(consoleAddr))
+	c.Console.Config.RunMode = runMode
 
 	start, stop := c.Console.Handlers()
 	c.consoleStop = func(ctx context.Context) error {

@@ -14,6 +14,7 @@ import (
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	"github.com/dimspell/gladiator/internal/model"
 )
 
 type HostDatabaseTypeLabel string
@@ -122,7 +123,7 @@ func (c *Controller) HostScreen(w fyne.Window, params *HostScreenInputParams) fy
 			}
 		}
 
-		if err := c.StartConsole(databaseType, databasePath, net.JoinHostPort(bindIP.Text, bindPort.Text)); err != nil {
+		if err := c.StartConsole(databaseType, databasePath, net.JoinHostPort(bindIP.Text, bindPort.Text), model.RunModeLAN); err != nil {
 			loadingDialog.Hide()
 			dialog.ShowError(err, w)
 			return
