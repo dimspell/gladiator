@@ -68,14 +68,14 @@ jobs:
 
       - name: Package for Windows
         run: |
-          GOTOOLCHAIN=go1.24.4 \
-            go run -v github.com/fyne-io/fyne-cross@latest windows \
-              -arch=amd64 \
-              -debug \
-              -ldflags="main.version=${BUILD_VERSION}" \
-              -ldflags="main.commit=${BUILD_REVISION}" \
-              -ldflags="main.date=${BUILD_TIME}" \
-              -tags=gui
+          go run -v github.com/fyne-io/fyne-cross@latest windows \
+            -arch=amd64 \
+            -debug \
+            -ldflags="main.version=${BUILD_VERSION}" \
+            -ldflags="main.commit=${BUILD_REVISION}" \
+            -ldflags="main.date=${BUILD_TIME}" \
+            -env="GOTOOLCHAIN=go1.24.4" \
+            -tags=gui
 
       - name: Extract packaged app
         run: |
