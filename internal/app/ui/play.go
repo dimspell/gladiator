@@ -10,6 +10,9 @@ import (
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	"github.com/dimspell/gladiator/internal/backend"
+	"github.com/dimspell/gladiator/internal/backend/proxy/direct"
+	"github.com/dimspell/gladiator/internal/backend/proxy/relay"
 	"github.com/dimspell/gladiator/internal/model"
 )
 
@@ -29,7 +32,6 @@ func (c *Controller) PlayScreen(w fyne.Window, consoleAddr string, metadata *mod
 
 func (c *Controller) playView(w fyne.Window, consoleAddr string, metadata *model.WellKnown) fyne.CanvasObject {
 	ips, _ := listAllIPs()
-	fmt.Println("ips:", ips)
 
 	myIPEntry := widget.NewSelectEntry(ips)
 	myIPEntry.Validator = ipValidator
@@ -65,7 +67,15 @@ func (c *Controller) playView(w fyne.Window, consoleAddr string, metadata *model
 		loadingDialog := dialog.NewCustomWithoutButtons("Starting backend...", widget.NewProgressBarInfinite(), w)
 		loadingDialog.Show()
 
-		if err := c.StartBackend(consoleAddr, myIPEntry.Text); err != nil {
+		var proxyCreator backend.Proxy
+		switch metadata.RunMode {
+		case model.RunModeRelay.String():
+			proxyCreator = &relay.ProxyRelay{RelayServerAddr: metadata.RelayServerAddr}
+		default:
+			proxyCreator = &direct.ProxyLAN{MyIPAddress: myIPEntry.Text}
+		}
+
+		if err := c.StartBackend(consoleAddr, proxyCreator); err != nil {
 			loadingDialog.Hide()
 			return
 		}

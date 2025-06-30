@@ -15,6 +15,7 @@ import (
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	"github.com/dimspell/gladiator/internal/backend/proxy/direct"
 	"github.com/dimspell/gladiator/internal/model"
 )
 
@@ -85,7 +86,7 @@ func (c *Controller) SinglePlayerScreen(w fyne.Window, initial *SinglePlayerScre
 	backendRunningCheck := widget.NewLabelWithData(backendRunningLabel)
 	backendRunningCheck.Alignment = fyne.TextAlignCenter
 	backendStart := widget.NewButtonWithIcon("Start backend", theme.MediaPlayIcon(), func() {
-		if err := c.StartBackend(consoleAddr, "127.0.0.1"); err != nil {
+		if err := c.StartBackend(consoleAddr, &direct.ProxyLAN{"127.0.0.1"}); err != nil {
 			dialog.ShowError(err, w)
 			return
 		}

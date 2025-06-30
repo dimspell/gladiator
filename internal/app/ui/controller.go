@@ -13,7 +13,6 @@ import (
 	"fyne.io/fyne/v2/data/binding"
 	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"github.com/dimspell/gladiator/internal/backend"
-	"github.com/dimspell/gladiator/internal/backend/proxy/direct"
 	"github.com/dimspell/gladiator/internal/console"
 	"github.com/dimspell/gladiator/internal/console/database"
 	"github.com/dimspell/gladiator/internal/model"
@@ -163,7 +162,7 @@ func (c *Controller) ConsoleHandshake(consoleAddr string) (*model.WellKnown, err
 	return &resp, nil
 }
 
-func (c *Controller) StartBackend(consoleAddr, myIPAddress string) error {
+func (c *Controller) StartBackend(consoleAddr string, proxy backend.Proxy) error {
 	if c.Backend != nil {
 		slog.Warn("Backend is already running")
 		return nil
@@ -186,7 +185,7 @@ func (c *Controller) StartBackend(consoleAddr, myIPAddress string) error {
 		}
 	}()
 
-	c.Backend = backend.NewBackend("127.0.0.1:6112", consoleAddr, &direct.ProxyLAN{myIPAddress})
+	c.Backend = backend.NewBackend("127.0.0.1:6112", consoleAddr, proxy)
 	if err := c.Backend.Start(); err != nil {
 		cancel()
 		return err

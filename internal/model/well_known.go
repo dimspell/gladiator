@@ -11,7 +11,8 @@ type WellKnown struct {
 	Addr     string `json:"addr"`
 	RunMode  string `json:"runMode"`
 
-	Caller WellKnownCaller `json:"caller,omitempty"`
+	Caller          WellKnownCaller `json:"caller,omitempty"`
+	RelayServerAddr string          `json:"relayServerAddr,omitempty"`
 }
 
 type WellKnownCaller struct {

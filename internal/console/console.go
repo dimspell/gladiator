@@ -267,7 +267,7 @@ func (c *Console) WellKnownInfo() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		slog.Info("Serving well-known info", "caller_ip", r.RemoteAddr, "caller_agent", r.UserAgent())
 
-		renderJSON(w, r, model.WellKnown{
+		wk := model.WellKnown{
 			Version:  "dev",
 			Protocol: "http",
 			Addr:     c.Config.ConsoleAddr,
@@ -275,6 +275,12 @@ func (c *Console) WellKnownInfo() http.HandlerFunc {
 			Caller: model.WellKnownCaller{
 				Addr: r.RemoteAddr,
 			},
-		})
+		}
+
+		if c.Config.RunMode == model.RunModeRelay {
+			wk.RelayServerAddr = c.Config.RelayAddr
+		}
+
+		renderJSON(w, r, wk)
 	}
 }
