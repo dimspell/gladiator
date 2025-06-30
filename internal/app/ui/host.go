@@ -50,8 +50,6 @@ func (c *Controller) HostScreen(w fyne.Window, params *HostScreenInputParams) fy
 	pathContainer := container.NewBorder(nil, nil, nil, pathSelection, pathEntry)
 
 	comboGroup := widget.NewSelect(Values(databaseTypeText), func(value string) {
-		log.Println("Select set to", value)
-
 		if value == databaseTypeText[HostDatabaseTypeMemory] {
 			pathLabel.Hide()
 			pathContainer.Hide()

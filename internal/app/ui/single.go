@@ -3,7 +3,6 @@ package ui
 import (
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"path"
 	"time"
@@ -37,8 +36,6 @@ func (c *Controller) SinglePlayerScreen(w fyne.Window, initial *SinglePlayerScre
 	pathContainer := container.NewBorder(nil, nil, nil, pathSelection, pathEntry)
 
 	comboGroup := widget.NewSelect(Values(databaseTypeText), func(value string) {
-		log.Println("Select set to", value)
-
 		if value == databaseTypeText[HostDatabaseTypeMemory] {
 			pathLabel.Hide()
 			pathContainer.Hide()
