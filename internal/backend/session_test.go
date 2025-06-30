@@ -11,6 +11,7 @@ import (
 	v1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/internal/app/logger"
 	"github.com/dimspell/gladiator/internal/backend/bsession"
+	"github.com/dimspell/gladiator/internal/backend/proxy/direct"
 	"github.com/dimspell/gladiator/internal/model"
 	"github.com/stretchr/testify/assert"
 )
@@ -55,6 +56,7 @@ func TestBackend_UpdateCharacterInfo(t *testing.T) {
 	// Character selection
 	session.CharacterID = 4
 	session.ClassType = model.ClassTypeMage
+	session.Proxy = &direct.LAN{}
 
 	// First call, after approved character selection
 	if err := session.JoinLobby(ctx); err != nil {

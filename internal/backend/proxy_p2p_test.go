@@ -48,7 +48,7 @@ func TestE2E_P2P(t *testing.T) {
 	defer cancel()
 
 	cs := &console.Console{
-		Multiplayer: console.NewMultiplayer(nil),
+		Multiplayer: console.NewMultiplayer(),
 		Config:      console.DefaultConfig(),
 		DB:          db,
 	}

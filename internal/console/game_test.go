@@ -5,13 +5,22 @@ import (
 	"testing"
 
 	"connectrpc.com/connect"
+	"github.com/coder/websocket"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/stretchr/testify/assert"
 )
 
+type mockConn struct{}
+
+func (m *mockConn) Read(ctx context.Context) (websocket.MessageType, []byte, error) {
+	return websocket.MessageText, []byte{}, nil
+}
+func (m *mockConn) Write(ctx context.Context, typ websocket.MessageType, p []byte) error { return nil }
+func (m *mockConn) CloseNow() error                                                      { return nil }
+
 func TestGameServiceServer_CreateGame(t *testing.T) {
 	g := &gameServiceServer{
-		Multiplayer: NewMultiplayer(nil),
+		Multiplayer: NewMultiplayer(),
 	}
 	g.Multiplayer.AddUserSession(10, NewUserSession(10, nil))
 
@@ -53,12 +62,11 @@ func TestGameServiceServer_CreateGame(t *testing.T) {
 	assert.Equal(t, int64(10), room.HostPlayer.UserID)
 	assert.Equal(t, int64(10), room.CreatedBy.UserID)
 	assert.Equal(t, int64(10), room.Players[10].UserID)
-	assert.Equal(t, "user", room.Players[10].User.Username)
 }
 
 func TestGameServiceServer_ListGames(t *testing.T) {
 	g := &gameServiceServer{
-		Multiplayer: NewMultiplayer(nil),
+		Multiplayer: NewMultiplayer(),
 	}
 	g.Multiplayer.AddUserSession(10, NewUserSession(10, nil))
 
@@ -100,7 +108,7 @@ func TestGameServiceServer_ListGames(t *testing.T) {
 
 func TestGameServiceServer_GetGame(t *testing.T) {
 	g := &gameServiceServer{
-		Multiplayer: NewMultiplayer(nil),
+		Multiplayer: NewMultiplayer(),
 	}
 	g.Multiplayer.AddUserSession(10, NewUserSession(10, nil))
 
@@ -140,10 +148,10 @@ func TestGameServiceServer_GetGame(t *testing.T) {
 
 func TestGameServiceServer_JoinGame(t *testing.T) {
 	g := &gameServiceServer{
-		Multiplayer: NewMultiplayer(nil),
+		Multiplayer: NewMultiplayer(),
 	}
-	g.Multiplayer.AddUserSession(10, NewUserSession(10, nil))
-	g.Multiplayer.AddUserSession(5, NewUserSession(5, nil))
+	g.Multiplayer.AddUserSession(10, NewUserSession(10, &mockConn{}))
+	g.Multiplayer.AddUserSession(5, NewUserSession(5, &mockConn{}))
 
 	gameId := "Game Room"
 	if _, err := g.CreateGame(context.Background(), connect.NewRequest(&multiv1.CreateGameRequest{

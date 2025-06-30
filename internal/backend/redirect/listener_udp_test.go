@@ -27,6 +27,7 @@ func TestListenerUDP_Run(t *testing.T) {
 		defer cancel()
 
 		var received [][]byte
+		var mu sync.Mutex
 		go func() {
 			time.Sleep(50 * time.Millisecond)
 			cancel()
@@ -35,7 +36,9 @@ func TestListenerUDP_Run(t *testing.T) {
 		err := listener.Run(ctx, func(p []byte) error {
 			r := make([]byte, len(p))
 			copy(r, p)
+			mu.Lock()
 			received = append(received, r)
+			mu.Unlock()
 			return nil
 		})
 
@@ -43,9 +46,11 @@ func TestListenerUDP_Run(t *testing.T) {
 			t.Fatalf("unexpected run error: %v", err)
 		}
 
+		mu.Lock()
 		if len(received) != 1 || string(received[0]) != "test-message" {
 			t.Fatalf("unexpected received data: %v", received)
 		}
+		mu.Unlock()
 
 		n, err := listener.Write([]byte("reply"))
 		if err != nil {
