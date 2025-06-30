@@ -12,6 +12,7 @@ import (
 	"github.com/dimspell/gladiator/internal/backend/proxy/relay"
 	"github.com/dimspell/gladiator/internal/console"
 	"github.com/dimspell/gladiator/internal/console/database"
+	"github.com/dimspell/gladiator/internal/model"
 	"github.com/pion/webrtc/v4"
 	"github.com/urfave/cli/v3"
 )
@@ -39,10 +40,10 @@ func selectDatabaseType(c *cli.Command) (db *database.SQLite, err error) {
 	return db, nil
 }
 
-const (
-	proxyTypeLAN    = "lan"
-	proxyTypeWebRTC = "webrtc-beta"
-	proxyTypeRelay  = "relay-beta"
+var (
+	proxyTypeLAN    = model.RunModeLAN.String()
+	proxyTypeWebRTC = model.RunModeWebRTC.String()
+	proxyTypeRelay  = model.RunModeRelay.String()
 )
 
 func selectProxy(c *cli.Command) (p backend.Proxy, err error) {
@@ -85,7 +86,7 @@ func selectConsoleOptions(c *cli.Command) ([]console.Option, error) {
 		relayPublicAddr := fallbackString(c.String("relay-public-addr"), relayBindAddr)
 		options = append(options, console.WithRelayAddr(relayBindAddr, relayPublicAddr))
 	}
-	
+
 	return options, nil
 }
 
