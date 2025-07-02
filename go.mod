@@ -10,8 +10,6 @@ require (
 	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/coder/websocket v1.8.13
 	github.com/fxamacker/cbor/v2 v2.8.0
-	github.com/fynelabs/fyneselfupdate v0.1.1
-	github.com/fynelabs/selfupdate v0.2.0
 	github.com/go-chi/chi/v5 v5.2.2
 	github.com/golang-migrate/migrate/v4 v4.18.3
 	github.com/google/uuid v1.6.0
