@@ -1,10 +1,10 @@
 FROM golang:1.24-alpine AS builder
 
 WORKDIR /app
-COPY hello-app/ .
-RUN go build -o hello-app .
+COPY ./ .
+RUN go build -o gladiator .
 
 FROM gcr.io/distroless/static
-COPY --from=builder /app/hello-app /hello-app
+COPY --from=builder /app/gladiator /gladiator
 EXPOSE 8080
-ENTRYPOINT ["/hello-app"]
+ENTRYPOINT ["/gladiator"]
