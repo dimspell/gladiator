@@ -27,7 +27,6 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push image
-        working-directory: cmd
         run: |
           docker build -t $IMAGE_NAME .
           docker push $IMAGE_NAME
