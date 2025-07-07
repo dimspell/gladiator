@@ -57,12 +57,28 @@ func NewApp(version, commit, buildDate string) {
 			Value:   "debug",
 			Usage:   "Log level (debug, info, warn, error)",
 			Sources: cli.NewValueSourceChain(cli.EnvVar("LOG_LEVEL")),
+			Validator: func(s string) error {
+				switch s {
+				case "debug", "info", "warn", "error":
+					return nil
+				default:
+					return fmt.Errorf("unknown log level: %s", s)
+				}
+			},
 		},
 		&cli.StringFlag{
 			Name:    "log-format",
 			Value:   "text",
 			Usage:   "Log format (text, json)",
 			Sources: cli.NewValueSourceChain(cli.EnvVar("LOG_FORMAT")),
+			Validator: func(s string) error {
+				switch s {
+				case "json", "text":
+					return nil
+				default:
+					return fmt.Errorf("unknown log format: %s", s)
+				}
+			},
 		},
 		&cli.StringFlag{
 			Name:    "log-file",
