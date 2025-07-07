@@ -14,17 +14,20 @@ func TurnCommand() *cli.Command {
 		Description: "Start TURN server",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
-				Name:  "turn-public-ip",
-				Value: defaultTurnPublicIP,
+				Name:    "turn-public-ip",
+				Value:   defaultTurnPublicIP,
+				Sources: cli.NewValueSourceChain(cli.EnvVar("TURN_PUBLIC_IP")),
 			},
 			&cli.IntFlag{
-				Name:  "turn-port",
-				Value: 3478,
+				Name:    "turn-port",
+				Value:   3478,
+				Sources: cli.NewValueSourceChain(cli.EnvVar("TURN_PORT")),
 			},
 			&cli.StringFlag{
-				Name:  "turn-realm",
-				Value: "dispel-multi",
-				Usage: "Realm to use for TURN server",
+				Name:    "turn-realm",
+				Value:   "dispel-multi",
+				Usage:   "Realm to use for TURN server",
+				Sources: cli.NewValueSourceChain(cli.EnvVar("TURN_REALM")),
 			},
 		},
 	}

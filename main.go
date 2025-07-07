@@ -52,27 +52,27 @@ func NewApp(version, commit, buildDate string) {
 
 	// Root flags
 	app.Flags = append(app.Flags,
+		&cli.StringFlag{
+			Name:    "log-level",
+			Value:   "debug",
+			Usage:   "Log level (debug, info, warn, error)",
+			Sources: cli.NewValueSourceChain(cli.EnvVar("LOG_LEVEL")),
+		},
+		&cli.StringFlag{
+			Name:    "log-format",
+			Value:   "text",
+			Usage:   "Log format (text, json)",
+			Sources: cli.NewValueSourceChain(cli.EnvVar("LOG_FORMAT")),
+		},
+		&cli.StringFlag{
+			Name:    "log-file",
+			Usage:   "Log file path",
+			Sources: cli.NewValueSourceChain(cli.EnvVar("LOG_FILE")),
+		},
 		&cli.BoolFlag{
-			Name:  "debug",
-			Usage: "Enable debug mode",
-		},
-		&cli.StringFlag{
-			Name:  "log-level",
-			Value: "debug",
-			Usage: "Log level (debug, info, warn, error)",
-		},
-		&cli.StringFlag{
-			Name:  "log-format",
-			Value: "text",
-			Usage: "Log format (text, json)",
-		},
-		&cli.StringFlag{
-			Name:  "log-file",
-			Usage: "Log file path",
-		},
-		&cli.BoolFlag{
-			Name:  "no-color",
-			Usage: "Disable colors in log output",
+			Name:    "no-color",
+			Usage:   "Disable colors in log output",
+			Sources: cli.NewValueSourceChain(cli.EnvVar("NO_COLOR")),
 		},
 	)
 
