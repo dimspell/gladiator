@@ -156,6 +156,7 @@ jobs:
             --build-arg GIT_COMMIT=$BUILD_REVISION \
             --tag "${IMAGE_NAME}:latest" \
             --tag "${IMAGE_NAME}:${BUILD_VERSION}" .
-          docker push "${IMAGE_NAME}:latest" "${IMAGE_NAME}:${BUILD_VERSION}"
+          docker push "${IMAGE_NAME}:latest"
+          docker push "${IMAGE_NAME}:${BUILD_VERSION}"
         env:
           IMAGE_NAME: "ghcr.io/${{ github.repository_owner }}/gladiator"
