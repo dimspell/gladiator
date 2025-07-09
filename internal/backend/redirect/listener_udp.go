@@ -18,7 +18,7 @@ var _ Redirect = (*ListenerUDP)(nil)
 
 type ListenerUDP struct {
 	sync.Mutex
-	Closing chan bool
+	closingCh chan bool
 
 	logger *slog.Logger
 
@@ -71,7 +71,7 @@ func (p *ListenerUDP) Run(ctx context.Context, onReceive func(p []byte) (err err
 			clear(buf)
 
 			_ = p.conn.SetReadDeadline(time.Now().Add(5 * time.Second))
-			
+
 			n, remoteAddr, err := p.conn.ReadFromUDP(buf)
 			if err != nil {
 				var ne net.Error
@@ -134,10 +134,10 @@ func (s *ListenerUDP) closing() <-chan bool {
 
 // getClosing gets the closing channel in a non-thread-safe manner.
 func (s *ListenerUDP) getClosing() chan bool {
-	if s.Closing == nil {
-		s.Closing = make(chan bool)
+	if s.closingCh == nil {
+		s.closingCh = make(chan bool)
 	}
-	return s.Closing
+	return s.closingCh
 }
 
 // close closes the channel
