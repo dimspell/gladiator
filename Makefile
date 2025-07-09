@@ -15,6 +15,9 @@ serve:
 	#go run ./ serve --backend-addr=0.0.0.0:6112 --console-addr=0.0.0.0:2137
 	#(go build -v); (.\gladiator.exe serve --backend-addr=0.0.0.0:6112 --console-addr=0.0.0.0:2137)
 
+test:
+	go test -v --race ./...
+
 console: clear
 	go run ./ console --console-addr=127.0.0.1:2137
 	#go run ./ console --console-addr=0.0.0.0:2137
