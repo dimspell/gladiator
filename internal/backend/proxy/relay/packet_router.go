@@ -144,7 +144,7 @@ func (r *PacketRouter) handleHostMigration(ctx context.Context, player wire.Play
 					Payload: p,
 				})
 			}
-			host, err := r.manager.StartDialHost(peerID, ip, 6114, 6113, onTCPMessage, onUDPMessage)
+			host, err := r.manager.StartGuest(peerID, ip, 6114, 6113, onTCPMessage, onUDPMessage)
 			if err != nil {
 				r.logger.Warn("failed to start dial host", logging.Error(err), logging.PeerID(peerID))
 				return nil
@@ -191,12 +191,12 @@ func (r *PacketRouter) handleHostMigration(ctx context.Context, player wire.Play
 	}
 
 	var err error
-	host, err = r.manager.StartListenerHost(ctx, newHostID, ipAddress, 6114, 6113, onTCPMessage, onUDPMessage, nil)
+	host, err = r.manager.StartHost(ctx, newHostID, ipAddress, 6114, 6113, onTCPMessage, onUDPMessage, nil)
 	if err != nil {
 		r.logger.Warn("failed to start host", logging.Error(err), logging.PeerID(newHostID))
 		return nil
 	}
-	
+
 	payload := packet.NewHostSwitch(true, net.ParseIP(ipAddress))
 	if err := r.session.SendToGame(packet.HostMigration, payload); err != nil {
 		r.logger.Error("failed to send host migration packet", logging.Error(err))
@@ -473,7 +473,7 @@ func (r *PacketRouter) dynamicJoin(ctx context.Context, roomID string, peerID st
 	}
 
 	// TODO: It must be local addr
-	host, err := r.manager.StartDialHost(peerID, ip, tcpPort, 6113, onTCPMessage, onUDPMessage)
+	host, err := r.manager.StartGuest(peerID, ip, tcpPort, 6113, onTCPMessage, onUDPMessage)
 	if err != nil {
 		r.logger.Warn("failed to start dial host", logging.Error(err), logging.PeerID(peerID))
 		// TODO: Unassign IP address

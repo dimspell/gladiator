@@ -85,8 +85,8 @@ type FakeHost struct {
 	stopFunc context.CancelFunc
 }
 
-// StartDialHost adds a new dynamic joiner that dials our game client address
-func (hm *HostManager) StartDialHost(
+// StartGuest adds a new dynamic joiner that dials our game client address
+func (hm *HostManager) StartGuest(
 	peerID string,
 	ipAddress string,
 	realTCPPort, realUDPPort int,
@@ -180,8 +180,8 @@ func (hm *HostManager) StartDialHost(
 	return host, nil
 }
 
-// StartListenerHost starts a fake host on a loopback IP
-func (hm *HostManager) StartListenerHost(
+// StartHost starts a fake host listening on a loopback IP
+func (hm *HostManager) StartHost(
 	ctx context.Context,
 	peerID string,
 	ipAddress string,
