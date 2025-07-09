@@ -79,6 +79,7 @@ func (s *gameServiceServer) CreateGame(_ context.Context, req *connect.Request[m
 		req.Msg.MapId,
 	)
 	if err != nil {
+		slog.With(slog.String("game", req.Msg.GameName), logging.Error(err)).Warn("Create room failed")
 		return nil, connect.NewError(connect.CodeAborted, fmt.Errorf("create-game failed"))
 	}
 
