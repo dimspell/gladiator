@@ -68,22 +68,24 @@ func NewConsole(db *database.SQLite, opts ...Option) *Console {
 type Option func(*Config) error
 
 type Config struct {
+	RunMode            model.RunMode
 	ConsoleBindAddr    string
 	ConsolePublicAddr  string
-	RunMode            model.RunMode
-	CORSAllowedOrigins []string
 	RelayBindAddr      string
 	RelayPublicAddr    string
+	CORSAllowedOrigins []string
+	Version            string
 }
 
 func DefaultConfig() *Config {
 	return &Config{
+		RunMode:            model.RunModeLAN,
 		ConsoleBindAddr:    "localhost:2137",
 		ConsolePublicAddr:  "http://localhost:2137",
-		CORSAllowedOrigins: []string{"*"},
-		RunMode:            model.RunModeLAN,
 		RelayBindAddr:      ":9999",
 		RelayPublicAddr:    "localhost:9999",
+		CORSAllowedOrigins: []string{"*"},
+		Version:            "dev",
 	}
 }
 
@@ -108,6 +110,13 @@ func WithRelayAddr(bindAddr, publicAddr string) Option {
 		c.RelayBindAddr = bindAddr
 		c.RelayPublicAddr = publicAddr
 		c.RunMode = model.RunModeRelay
+		return nil
+	}
+}
+
+func WithVersion(version string) Option {
+	return func(c *Config) error {
+		c.Version = version
 		return nil
 	}
 }

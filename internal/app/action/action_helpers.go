@@ -75,8 +75,10 @@ func selectProxy(c *cli.Command) (p backend.Proxy, err error) {
 	}
 }
 
-func selectConsoleOptions(c *cli.Command) ([]console.Option, error) {
+func selectConsoleOptions(c *cli.Command, version string) ([]console.Option, error) {
 	var options []console.Option
+
+	options = append(options, console.WithVersion(version))
 
 	consoleBindAddr := c.String("console-addr")
 	consolePublicAddr := fallbackString(c.String("console-public-addr"), fmt.Sprintf("http://%s", consoleBindAddr))

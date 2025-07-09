@@ -9,7 +9,7 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
-func ConsoleCommand() *cli.Command {
+func ConsoleCommand(version string) *cli.Command {
 	cmd := &cli.Command{
 		Name:        "console",
 		Description: "Start console server",
@@ -62,7 +62,7 @@ func ConsoleCommand() *cli.Command {
 			}
 		}()
 
-		co, err := selectConsoleOptions(c)
+		co, err := selectConsoleOptions(c, version)
 		if err != nil {
 			return err
 		}

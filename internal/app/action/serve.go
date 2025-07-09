@@ -17,7 +17,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-func ServeCommand() *cli.Command {
+func ServeCommand(version string) *cli.Command {
 	cmd := &cli.Command{
 		Name:        "serve",
 		Description: "Start the backend and console server",
@@ -119,7 +119,7 @@ func ServeCommand() *cli.Command {
 		bd := backend.NewBackend(backendAddr, "http//"+consoleAddr, px)
 		bd.SignalServerURL = c.String("lobby-addr")
 
-		co, err := selectConsoleOptions(c)
+		co, err := selectConsoleOptions(c, version)
 		if err != nil {
 			return err
 		}
