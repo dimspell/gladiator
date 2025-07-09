@@ -99,3 +99,11 @@ func SetJSONLogger(w io.Writer, logLevel slog.Level) {
 		}),
 	))
 }
+
+func NewDiscardLogger() *slog.Logger {
+	return slog.New(slog.NewTextHandler(nil, &slog.HandlerOptions{Level: slog.LevelError}))
+}
+
+func SetDiscardLogger() {
+	slog.SetDefault(NewDiscardLogger())
+}

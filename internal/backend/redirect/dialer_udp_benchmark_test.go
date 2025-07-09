@@ -2,10 +2,11 @@ package redirect
 
 import (
 	"context"
-	"log/slog"
 	"net"
 	"testing"
 	"time"
+
+	"github.com/dimspell/gladiator/internal/app/logger"
 )
 
 // fastFakeUDPConn simulates a UDP connection with minimal overhead.
@@ -37,10 +38,7 @@ func (f *fastFakeUDPConn) RemoteAddr() net.Addr              { return &net.UDPAd
 // Benchmark writing messages to the UDP connection.
 func BenchmarkDialerUDP_Write(b *testing.B) {
 	conn := &fastFakeUDPConn{}
-	d := &DialerUDP{
-		conn:   conn,
-		logger: slog.New(slog.NewTextHandler(nil, &slog.HandlerOptions{Level: slog.LevelError})),
-	}
+	d := &DialerUDP{conn: conn, logger: logger.NewDiscardLogger()}
 
 	msg := []byte("benchmark-payload")
 
@@ -57,10 +55,7 @@ func BenchmarkDialerUDP_Run(b *testing.B) {
 	conn := &fastFakeUDPConn{
 		ReadBuf: []byte("benchmark-read-payload"),
 	}
-	d := &DialerUDP{
-		conn:   conn,
-		logger: slog.New(slog.NewTextHandler(nil, &slog.HandlerOptions{Level: slog.LevelError})),
-	}
+	d := &DialerUDP{conn: conn, logger: logger.NewDiscardLogger()}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

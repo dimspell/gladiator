@@ -5,12 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
+	"github.com/dimspell/gladiator/internal/app/logger"
 	"github.com/dimspell/gladiator/internal/console/database"
 	"github.com/dimspell/gladiator/internal/model"
 	"github.com/dimspell/gladiator/internal/wire"
@@ -18,7 +18,7 @@ import (
 )
 
 func init() {
-	slog.SetDefault(slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{Level: slog.LevelError})))
+	logger.SetDiscardLogger()
 }
 
 func helperGetJSON(ctx context.Context, link string) ([]byte, error) {
