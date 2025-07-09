@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -282,17 +283,31 @@ func (c *Console) WellKnownInfo() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		slog.Info("Serving well-known info", "caller_ip", r.RemoteAddr, "caller_agent", r.UserAgent())
 
+		callerIP := getCallerIP(r.RemoteAddr)
+
 		wk := model.WellKnown{
-			Version:    "dev",
-			Addr:       c.Config.ConsoleBindAddr,
-			RunMode:    c.Config.RunMode,
-			CallerAddr: model.WellKnownCaller(r.RemoteAddr),
+			Version:  c.Config.Version,
+			Addr:     c.Config.ConsolePublicAddr,
+			RunMode:  c.Config.RunMode,
+			CallerIP: callerIP,
 		}
 
 		if c.Config.RunMode == model.RunModeRelay {
-			wk.RelayServerAddr = c.Config.RelayBindAddr
+			wk.RelayServerAddr = c.Config.RelayPublicAddr
 		}
 
 		renderJSON(w, r, wk)
 	}
+}
+
+func getCallerIP(remoteAddr string) string {
+	host, _, err := net.SplitHostPort(remoteAddr)
+	if err != nil {
+		return ""
+	}
+	ip := net.ParseIP(host).To4()
+	if ip == nil {
+		return ""
+	}
+	return ip.String()
 }
