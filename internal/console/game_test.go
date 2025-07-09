@@ -2,6 +2,7 @@ package console
 
 import (
 	"context"
+	"sort"
 	"testing"
 
 	"connectrpc.com/connect"
@@ -147,8 +148,6 @@ func TestGameServiceServer_GetGame(t *testing.T) {
 }
 
 func TestGameServiceServer_JoinGame(t *testing.T) {
-	t.Skip("Fix me please")
-
 	g := &gameServiceServer{
 		Multiplayer: NewMultiplayer(),
 	}
@@ -179,11 +178,16 @@ func TestGameServiceServer_JoinGame(t *testing.T) {
 	}
 
 	players := resp.Msg.GetPlayers()
+
+	// Sort in ascending order
+	sort.Slice(players, func(i, j int) bool {
+		return players[i].UserId < players[j].UserId
+	})
 	assert.Equal(t, 2, len(players))
 
-	assert.Equal(t, int64(10), players[0].UserId)
-	assert.Equal(t, "192.168.100.1", players[0].IpAddress)
+	assert.Equal(t, int64(5), players[0].UserId)
+	assert.Equal(t, "192.168.100.201", players[0].IpAddress)
 
-	assert.Equal(t, int64(5), players[1].UserId)
-	assert.Equal(t, "192.168.100.201", players[1].IpAddress)
+	assert.Equal(t, int64(10), players[1].UserId)
+	assert.Equal(t, "192.168.100.1", players[1].IpAddress)
 }
