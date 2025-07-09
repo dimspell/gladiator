@@ -11,7 +11,7 @@ build:
 	go build -race -v -o /dev/null ./
 
 serve:
-	 go run ./ serve --backend-addr=127.0.0.1:6112 --console-addr=127.0.0.1:2137
+	 go run -v ./ serve --backend-addr=127.0.0.1:6112 --console-addr=127.0.0.1:2137
 	#go run ./ serve --backend-addr=0.0.0.0:6112 --console-addr=0.0.0.0:2137
 	#(go build -v); (.\gladiator.exe serve --backend-addr=0.0.0.0:6112 --console-addr=0.0.0.0:2137)
 
@@ -19,12 +19,12 @@ test:
 	go test -v --race ./...
 
 console: clear
-	go run ./ console --console-addr=127.0.0.1:2137
+	go run -v ./ console --console-addr=127.0.0.1:2137
 	#go run ./ console --console-addr=0.0.0.0:2137
 	#(go build -v);; (.\gladiator.exe console --console-addr=0.0.0.0:2137)
 
 backend:
-	go run ./ backend --backend-addr=127.0.0.1:6112 --console-addr=192.168.121.212:2137
+	go run -v ./ backend --backend-addr=127.0.0.1:6112 --console-addr=192.168.121.212:2137
 
 tools-install:
 	go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
