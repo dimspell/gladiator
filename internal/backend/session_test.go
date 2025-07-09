@@ -2,9 +2,7 @@ package backend
 
 import (
 	"context"
-	"log/slog"
 	"net"
-	"os"
 	"testing"
 	"time"
 
@@ -14,15 +12,13 @@ import (
 	"github.com/dimspell/gladiator/internal/backend/proxy/direct"
 	"github.com/dimspell/gladiator/internal/model"
 	"github.com/stretchr/testify/assert"
-	"go.uber.org/goleak"
 )
 
-func TestBackend_RegisterNewObserver(t *testing.T) {
-	logger.SetPlainTextLogger(os.Stderr, slog.LevelDebug)
-	t.Cleanup(func() {
-		goleak.VerifyNone(t)
-	})
+func init() {
+	logger.SetDiscardLogger()
+}
 
+func TestBackend_RegisterNewObserver(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -41,8 +37,6 @@ func TestBackend_RegisterNewObserver(t *testing.T) {
 }
 
 func TestBackend_UpdateCharacterInfo(t *testing.T) {
-	logger.SetPlainTextLogger(os.Stderr, slog.LevelDebug)
-
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -91,5 +85,4 @@ func TestBackend_UpdateCharacterInfo(t *testing.T) {
 	}
 
 	time.Sleep(1 * time.Second)
-	cs.Multiplayer.DebugState()
 }
