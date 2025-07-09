@@ -103,7 +103,7 @@ func SetJSONLogger(w io.Writer, logLevel slog.Level) {
 }
 
 func NewDiscardLogger() *slog.Logger {
-	return slog.New(slog.NewTextHandler(nil, &slog.HandlerOptions{Level: slog.LevelError}))
+	return slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{Level: slog.LevelError}))
 }
 
 func SetDiscardLogger() {
