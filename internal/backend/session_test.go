@@ -14,11 +14,14 @@ import (
 	"github.com/dimspell/gladiator/internal/backend/proxy/direct"
 	"github.com/dimspell/gladiator/internal/model"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
 )
 
 func TestBackend_RegisterNewObserver(t *testing.T) {
 	logger.SetPlainTextLogger(os.Stderr, slog.LevelDebug)
-	// defer goleak.VerifyNone(t)
+	t.Cleanup(func() {
+		goleak.VerifyNone(t)
+	})
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
