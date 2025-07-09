@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"net"
 	"net/http"
 	"os"
 	"time"
@@ -119,68 +118,4 @@ func main() {
 	addr := fmt.Sprintf("localhost:9991")
 	fmt.Println("Listening on", fmt.Sprintf("http://%s/", addr))
 	_ = http.ListenAndServe(addr, r)
-}
-
-func startFakeBackendServer(ctx context.Context) {
-	tcpAddr, err := net.ResolveTCPAddr("tcp", "localhost:6114")
-	if err != nil {
-		slog.Error("fake backend server failed", logging.Error(err))
-		os.Exit(1)
-		return
-	}
-
-	ln, err := net.Listen("tcp", tcpAddr.String())
-	if err != nil {
-		return
-	}
-
-	srcAddr, err := net.ResolveUDPAddr("udp", "localhost:6113")
-	if err != nil {
-		return
-	}
-	srcConn, err := net.ListenUDP("udp", srcAddr)
-	if err != nil {
-		return
-	}
-
-	go func() {
-		for {
-			c, err := ln.Accept()
-			if err != nil {
-				return
-			}
-
-			go func() {
-				defer c.Close()
-
-				for {
-					buf := make([]byte, 1024)
-
-					n, err := c.Read(buf)
-					if err != nil {
-						return
-					}
-
-					msg := buf[:n]
-					slog.Debug("[GameServer] Received TCP", "message", msg)
-
-					// TODO: Write back
-				}
-			}()
-		}
-	}()
-
-	go func() {
-		buf := make([]byte, 1024)
-
-		for {
-			n, _, err := srcConn.ReadFromUDP(buf)
-			if err != nil {
-				return
-			}
-
-			msg := buf[:n]
-			slog.Debug("[GameServer] Received UDP", "message", msg)
-		}
-	}()
 }
