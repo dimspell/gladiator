@@ -69,11 +69,11 @@ func NewApp(version, commit, buildDate string) {
 		&cli.StringFlag{
 			Name:    "log-format",
 			Value:   "text",
-			Usage:   "Log format (text, json)",
+			Usage:   "Log format (text, json, discard)",
 			Sources: cli.NewValueSourceChain(cli.EnvVar("LOG_FORMAT")),
 			Validator: func(s string) error {
 				switch s {
-				case "json", "text":
+				case "json", "text", "discard":
 					return nil
 				default:
 					return fmt.Errorf("unknown log format: %s", s)

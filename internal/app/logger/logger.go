@@ -15,7 +15,7 @@ import (
 )
 
 var (
-	PacketLogger = slog.New(slog.NewTextHandler(io.Discard, nil))
+	PacketLogger = NewDiscardLogger()
 )
 
 // logLevels maps log level names to slog.Level values.
@@ -34,7 +34,7 @@ type CleanupFunc func() error
 
 // InitDefaultLogger initializes the default logger.
 func InitDefaultLogger(app *cli.Command) (CleanupFunc, error) {
-	deferred := io.NopCloser(nil).Close
+	deferred := func() error { return nil }
 
 	logLevel, ok := logLevels[strings.ToLower(app.String("log-level"))]
 	if !ok {
@@ -57,6 +57,8 @@ func InitDefaultLogger(app *cli.Command) (CleanupFunc, error) {
 	switch strings.ToLower(app.String("log-format")) {
 	case "text":
 		SetColoredLogger(w, logLevel, app.Bool("no-color"))
+	case "discard":
+		SetDiscardLogger()
 	default:
 		SetJSONLogger(w, logLevel)
 	}
