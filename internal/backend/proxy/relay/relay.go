@@ -52,7 +52,7 @@ func NewRelay(config *ProxyRelay, session *bsession.Session) *Relay {
 		logger:    slog.With(slog.String("proxy", "relay"), slog.String("sessionId", session.ID)),
 		selfID:    remoteID(session.UserID),
 		session:   session,
-		manager:   NewManager(ipPrefix.To4()),
+		manager:   redirect.NewManager(ipPrefix.To4()),
 	}
 
 	return &Relay{
@@ -121,7 +121,7 @@ func (r *Relay) SelectGame(data proxy.GameData) error {
 			continue
 		}
 
-		ip, err := r.router.manager.assignIP(peerID)
+		ip, err := r.router.manager.AssignIP(peerID)
 		if err != nil {
 			return err
 		}
@@ -138,7 +138,7 @@ func (r *Relay) GetPlayerAddr(params proxy.GetPlayerAddrParams) (net.IP, error) 
 		return net.IPv4(127, 0, 0, 1), nil
 	}
 
-	ip, ok := r.router.manager.peerIPs[peerID]
+	ip, ok := r.router.manager.PeerIPs[peerID]
 	if !ok {
 		return nil, fmt.Errorf("not found the IP for a peer with ID %s", peerID)
 	}
@@ -165,7 +165,7 @@ func (r *Relay) Join(ctx context.Context, params proxy.JoinParams) (net.IP, erro
 
 	hostID := remoteID(params.HostUserID)
 
-	for peerID, ipAddress := range r.router.manager.peerIPs {
+	for peerID, ipAddress := range r.router.manager.PeerIPs {
 		onUDPMessage := func(p []byte) error {
 			return r.router.sendPacket(RelayPacket{
 				Type:    "udp",
@@ -223,16 +223,16 @@ func (r *Relay) Handle(ctx context.Context, payload []byte) error {
 }
 
 func (r *Relay) Debug() any {
-	hosts := r.router.manager.hosts
-	peerHosts := r.router.manager.peerHosts
-	ipToPeerID := r.router.manager.ipToPeerID
-	peerIPs := r.router.manager.peerIPs
+	hosts := r.router.manager.Hosts
+	peerHosts := r.router.manager.PeerHosts
+	ipToPeerID := r.router.manager.IPToPeerID
+	peerIPs := r.router.manager.PeerIPs
 	currentHostID := r.router.currentHostID
 	selfID := r.router.selfID
 
 	var state = struct {
-		Hosts         map[string]*FakeHost
-		PeerHosts     map[string]*FakeHost
+		Hosts         map[string]*redirect.FakeHost
+		PeerHosts     map[string]*redirect.FakeHost
 		IPToPeerID    map[string]string
 		PeerIPs       map[string]string
 		CurrentHostID string

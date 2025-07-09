@@ -1,4 +1,4 @@
-package relay
+package redirect
 
 import (
 	"context"
@@ -12,34 +12,67 @@ import (
 	"time"
 
 	"github.com/dimspell/gladiator/internal/app/logger/logging"
-	"github.com/dimspell/gladiator/internal/backend/redirect"
 	"golang.org/x/sync/errgroup"
 )
 
 type HostManager struct {
+	mu       sync.Mutex
+	IpPrefix net.IP
+
 	// key: ip
-	hosts map[string]*FakeHost
+	Hosts map[string]*FakeHost
 	// key: remoteID
-	peerHosts map[string]*FakeHost
+	PeerHosts map[string]*FakeHost
 
 	// key: remoteID, value: localIP
-	peerIPs map[string]string
+	PeerIPs map[string]string
 
 	// reverse map - fakeLAN IP => remoteID
-	ipToPeerID map[string]string
-	mu         sync.Mutex
-
-	ipPrefix net.IP
+	IPToPeerID map[string]string
 }
 
 func NewManager(ipPrefix net.IP) *HostManager {
 	return &HostManager{
-		hosts:      make(map[string]*FakeHost),
-		peerHosts:  make(map[string]*FakeHost),
-		peerIPs:    make(map[string]string),
-		ipToPeerID: make(map[string]string),
-		ipPrefix:   ipPrefix,
+		IpPrefix:   ipPrefix,
+		Hosts:      make(map[string]*FakeHost),
+		PeerHosts:  make(map[string]*FakeHost),
+		PeerIPs:    make(map[string]string),
+		IPToPeerID: make(map[string]string),
 	}
+}
+
+func (hm *HostManager) StopAll() {
+	for ipAddress, host := range hm.Hosts {
+		hm.StopHost(host, ipAddress)
+	}
+
+	hm.Hosts = make(map[string]*FakeHost)
+	hm.PeerHosts = make(map[string]*FakeHost)
+	hm.PeerIPs = make(map[string]string)
+	hm.IPToPeerID = make(map[string]string)
+}
+
+// Dynamic IP Allocator
+func (hm *HostManager) AssignIP(remoteID string) (string, error) {
+	hm.mu.Lock()
+	defer hm.mu.Unlock()
+
+	// Already assigned?
+	if ip, ok := hm.PeerIPs[remoteID]; ok {
+		return ip, nil
+	}
+
+	// Try from 127.0.0.2-127.0.0.254
+	for i := 2; i < 255; i++ {
+		ip := net.IPv4(127, 0, hm.IpPrefix[2], byte(i)).To4()
+		ipAddr := ip.String()
+		if _, ok := hm.IPToPeerID[ipAddr]; !ok {
+			hm.PeerIPs[remoteID] = ipAddr
+			hm.IPToPeerID[ipAddr] = remoteID
+			return ipAddr, nil
+		}
+	}
+	return "", fmt.Errorf("no available IPs")
 }
 
 type FakeHost struct {
@@ -47,32 +80,9 @@ type FakeHost struct {
 	IP       string
 	LastSeen time.Time
 
-	ProxyUDP redirect.Redirect
-	ProxyTCP redirect.Redirect
+	ProxyUDP Redirect
+	ProxyTCP Redirect
 	stopFunc context.CancelFunc
-}
-
-// Dynamic IP Allocator
-func (hm *HostManager) assignIP(remoteID string) (string, error) {
-	hm.mu.Lock()
-	defer hm.mu.Unlock()
-
-	// Already assigned?
-	if ip, ok := hm.peerIPs[remoteID]; ok {
-		return ip, nil
-	}
-
-	// Try from 127.0.0.2-127.0.0.254
-	for i := 2; i < 255; i++ {
-		ip := net.IPv4(127, 0, hm.ipPrefix[2], byte(i)).To4()
-		ipAddr := ip.String()
-		if _, ok := hm.ipToPeerID[ipAddr]; !ok {
-			hm.peerIPs[remoteID] = ipAddr
-			hm.ipToPeerID[ipAddr] = remoteID
-			return ipAddr, nil
-		}
-	}
-	return "", fmt.Errorf("no available IPs")
 }
 
 // StartDialHost adds a new dynamic joiner that dials our game client address
@@ -89,17 +99,17 @@ func (hm *HostManager) StartDialHost(
 	hm.mu.Lock()
 	defer hm.mu.Unlock()
 
-	if _, exists := hm.hosts[ipAddress]; exists {
+	if _, exists := hm.Hosts[ipAddress]; exists {
 		log.Printf("Already started guest IP %s\n", ipAddress)
 		return nil, fmt.Errorf("host %s already running", ipAddress)
 	}
 
 	var err error
-	var tcpProxy, udpProxy redirect.Redirect
+	var tcpProxy, udpProxy Redirect
 
 	// TCP dialer to the local game server
 	if realTCPPort > 0 {
-		tcpProxy, err = redirect.DialTCP("127.0.0.1", strconv.Itoa(realTCPPort))
+		tcpProxy, err = DialTCP("127.0.0.1", strconv.Itoa(realTCPPort))
 		if err != nil {
 			return nil, fmt.Errorf("failed to dial TCP: %w", err)
 		}
@@ -107,7 +117,7 @@ func (hm *HostManager) StartDialHost(
 
 	// UDP dialer
 	if realUDPPort > 0 {
-		udpProxy, err = redirect.DialUDP("127.0.0.1", strconv.Itoa(realUDPPort))
+		udpProxy, err = DialUDP("127.0.0.1", strconv.Itoa(realUDPPort))
 		if err != nil {
 			return nil, fmt.Errorf("failed to dial UDP: %w", err)
 		}
@@ -163,8 +173,8 @@ func (hm *HostManager) StartDialHost(
 		}
 	}(host)
 
-	hm.hosts[ipAddress] = host
-	hm.peerHosts[peerID] = host
+	hm.Hosts[ipAddress] = host
+	hm.PeerHosts[peerID] = host
 
 	wg.Wait()
 	return host, nil
@@ -186,19 +196,19 @@ func (hm *HostManager) StartListenerHost(
 	hm.mu.Lock()
 	defer hm.mu.Unlock()
 
-	if _, exists := hm.hosts[ipAddress]; exists {
+	if _, exists := hm.Hosts[ipAddress]; exists {
 		return nil, fmt.Errorf("host %s already running", ipAddress)
 	}
 
 	var err error
-	var tcpProxy, udpProxy redirect.Redirect
+	var tcpProxy, udpProxy Redirect
 
 	var wg sync.WaitGroup
 	wg.Add(1)
 
 	// TCP listener that mimics a peer in LAN
 	if realTCPPort > 0 {
-		tcpProxy, err = redirect.ListenTCP(ipAddress, strconv.Itoa(realTCPPort))
+		tcpProxy, err = ListenTCP(ipAddress, strconv.Itoa(realTCPPort))
 		if err != nil {
 			return nil, fmt.Errorf("failed to listen on TCP: %w", err)
 		}
@@ -207,7 +217,7 @@ func (hm *HostManager) StartListenerHost(
 
 	// UDP listener
 	if realUDPPort > 0 {
-		udpProxy, err = redirect.ListenUDP(ipAddress, strconv.Itoa(realUDPPort))
+		udpProxy, err = ListenUDP(ipAddress, strconv.Itoa(realUDPPort))
 		if err != nil {
 			return nil, fmt.Errorf("failed to listen on UDP: %w", err)
 		}
@@ -258,20 +268,30 @@ func (hm *HostManager) StartListenerHost(
 		}
 	}(host)
 
-	hm.hosts[ipAddress] = host
-	hm.peerHosts[peerID] = host
+	hm.Hosts[ipAddress] = host
+	hm.PeerHosts[peerID] = host
 
 	wg.Wait()
 	return host, nil
+}
+
+func (hm *HostManager) SetHost(ip, peerID string, host *FakeHost) {
+	hm.mu.Lock()
+	defer hm.mu.Unlock()
+
+	hm.PeerIPs[peerID] = ip
+	hm.IPToPeerID[ip] = peerID
+	hm.Hosts[ip] = host
+	hm.PeerHosts[peerID] = host
 }
 
 func (hm *HostManager) RemoveByIP(ipAddrOrPrefix string) {
 	hm.mu.Lock()
 	defer hm.mu.Unlock()
 
-	for ipAddress, host := range hm.hosts {
+	for ipAddress, host := range hm.Hosts {
 		if strings.HasPrefix(ipAddress, ipAddrOrPrefix) {
-			hm.stopHost(host, ipAddress)
+			hm.StopHost(host, ipAddress)
 		}
 	}
 }
@@ -282,20 +302,20 @@ func (hm *HostManager) RemoveByRemoteID(remoteID string) {
 	hm.mu.Lock()
 	defer hm.mu.Unlock()
 
-	ip, exists := hm.peerIPs[remoteID]
+	ip, exists := hm.PeerIPs[remoteID]
 	if !exists {
 		return
 	}
 
-	host, exists := hm.hosts[ip]
+	host, exists := hm.Hosts[ip]
 	if !exists {
 		return
 	}
 
-	hm.stopHost(host, ip)
+	hm.StopHost(host, ip)
 }
 
-func (hm *HostManager) stopHost(host *FakeHost, ipAddress string) {
+func (hm *HostManager) StopHost(host *FakeHost, ipAddress string) {
 	// Trigger a stop
 	host.stopFunc()
 
@@ -308,26 +328,24 @@ func (hm *HostManager) stopHost(host *FakeHost, ipAddress string) {
 	}
 
 	// Remove from maps
-	remoteID, _ := hm.ipToPeerID[ipAddress]
-	delete(hm.hosts, ipAddress)
-	delete(hm.ipToPeerID, ipAddress)
-	delete(hm.peerIPs, remoteID)
-	delete(hm.peerHosts, remoteID)
+	remoteID, _ := hm.IPToPeerID[ipAddress]
+	delete(hm.Hosts, ipAddress)
+	delete(hm.IPToPeerID, ipAddress)
+	delete(hm.PeerIPs, remoteID)
+	delete(hm.PeerHosts, remoteID)
 
 	slog.Info("Fake host cleaned up", "ip", ipAddress)
 }
 
-// CleanupInactive does a cleanup of hosts that haven't been used in X seconds
-// TODO: Unused
 func (hm *HostManager) CleanupInactive(timeout time.Duration) {
 	hm.mu.Lock()
 	defer hm.mu.Unlock()
 
 	now := time.Now().Add(timeout)
-	for ipAddress, host := range hm.hosts {
+	for ipAddress, host := range hm.Hosts {
 		if host.LastSeen.After(now) {
 			slog.Info("Removing inactive host", "ip", ipAddress)
-			hm.stopHost(host, ipAddress)
+			hm.StopHost(host, ipAddress)
 		}
 	}
 }

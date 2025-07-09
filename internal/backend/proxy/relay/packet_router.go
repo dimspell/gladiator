@@ -24,7 +24,7 @@ import (
 type PacketRouter struct {
 	mu        sync.Mutex
 	logger    *slog.Logger
-	manager   *HostManager
+	manager   *redirect.HostManager
 	session   *bsession.Session
 	selfID    string
 	relayAddr string
@@ -49,12 +49,7 @@ func (r *PacketRouter) Reset() {
 		_ = r.relayConn.CloseWithError(0, "done")
 	}
 
-	for ipAddress, host := range r.manager.hosts {
-		r.manager.stopHost(host, ipAddress)
-	}
-
-	ipPrefix := r.manager.ipPrefix
-	r.manager = NewManager(ipPrefix)
+	r.manager.StopAll()
 	r.roomID = ""
 	r.currentHostID = ""
 }
@@ -126,9 +121,9 @@ func (r *PacketRouter) handleHostMigration(ctx context.Context, player wire.Play
 		// Shutdown the previous proxies and save {[peerID: IPv4]} parameters to
 		// reuse them.
 		rebindHosts := make(map[string]string)
-		for peerID, host := range r.manager.peerHosts {
+		for peerID, host := range r.manager.PeerHosts {
 			rebindHosts[peerID] = host.IP
-			r.manager.stopHost(host, host.IP)
+			r.manager.StopHost(host, host.IP)
 		}
 
 		// Recreate the proxies to the new host
@@ -166,17 +161,17 @@ func (r *PacketRouter) handleHostMigration(ctx context.Context, player wire.Play
 	time.Sleep(3 * time.Second)
 
 	// Someone else became a host
-	ipAddress, ok := r.manager.peerIPs[newHostID]
+	ipAddress, ok := r.manager.PeerIPs[newHostID]
 	if !ok {
 		r.logger.Warn("ip address if peer not found, nothing to migrate", logging.PeerID(newHostID))
 		return nil
 	}
-	host, ok := r.manager.hosts[ipAddress]
+	host, ok := r.manager.Hosts[ipAddress]
 	if !ok {
 		r.logger.Warn("peer not found, nothing to migrate", logging.PeerID(newHostID))
 		return nil
 	}
-	r.manager.stopHost(host, ipAddress)
+	r.manager.StopHost(host, ipAddress)
 
 	onTCPMessage := func(p []byte) error {
 		return r.sendPacket(RelayPacket{
@@ -201,7 +196,7 @@ func (r *PacketRouter) handleHostMigration(ctx context.Context, player wire.Play
 		r.logger.Warn("failed to start host", logging.Error(err), logging.PeerID(newHostID))
 		return nil
 	}
-
+	
 	payload := packet.NewHostSwitch(true, net.ParseIP(ipAddress))
 	if err := r.session.SendToGame(packet.HostMigration, payload); err != nil {
 		r.logger.Error("failed to send host migration packet", logging.Error(err))
@@ -290,12 +285,12 @@ func (r *PacketRouter) startHostProbe(ctx context.Context, addr string, onDiscon
 	return redirect.StartProbeTCP(ctx, addr, onDisconnect)
 }
 
-func (r *PacketRouter) stop(host *FakeHost, peerID string, ipAddress string) {
+func (r *PacketRouter) stop(host *redirect.FakeHost, peerID string, ipAddress string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	slog.Info("Stopping host", logging.PeerID(peerID), "ip", ipAddress, "lastSeen", host.LastSeen)
-	r.manager.stopHost(host, ipAddress)
+	r.manager.StopHost(host, ipAddress)
 }
 
 var hmacKey = []byte("shared-secret-key")
@@ -419,7 +414,7 @@ func (r *PacketRouter) writeTCP(peerID string, pkt RelayPacket) {
 	// r.manager.mu.Lock()
 	// defer r.manager.mu.Unlock()
 
-	host, ok := r.manager.peerHosts[peerID]
+	host, ok := r.manager.PeerHosts[peerID]
 	if !ok {
 		r.logger.Warn("peer not found, nothing to write", logging.PeerID(peerID))
 		return
@@ -436,7 +431,7 @@ func (r *PacketRouter) writeUDP(peerID string, pkt RelayPacket) {
 	// r.manager.mu.Lock()
 	// defer r.manager.mu.Unlock()
 
-	host, ok := r.manager.peerHosts[peerID]
+	host, ok := r.manager.PeerHosts[peerID]
 	if !ok {
 		r.logger.Warn("peer not found, nothing to write", logging.PeerID(peerID))
 		return
@@ -448,7 +443,7 @@ func (r *PacketRouter) writeUDP(peerID string, pkt RelayPacket) {
 }
 
 func (r *PacketRouter) dynamicJoin(ctx context.Context, roomID string, peerID string, pkt RelayPacket) {
-	ip, err := r.manager.assignIP(peerID)
+	ip, err := r.manager.AssignIP(peerID)
 	if err != nil {
 		r.logger.Warn("failed to assign IP for the peer ", logging.Error(err), logging.PeerID(peerID))
 		return
@@ -484,12 +479,7 @@ func (r *PacketRouter) dynamicJoin(ctx context.Context, roomID string, peerID st
 		// TODO: Unassign IP address
 		return
 	}
-	r.manager.mu.Lock()
-	r.manager.peerIPs[peerID] = ip
-	r.manager.ipToPeerID[ip] = peerID
-	r.manager.hosts[ip] = host
-	r.manager.peerHosts[peerID] = host
-	r.manager.mu.Unlock()
+	r.manager.SetHost(ip, peerID, host)
 
 	// TODO: There is no probe for checking if it exist?
 }
