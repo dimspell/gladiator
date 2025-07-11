@@ -165,7 +165,7 @@ func (c *Console) HttpRouter() http.Handler {
 	{ // Set up gRPC routes for the backend
 		api := chi.NewRouter()
 		api.Use(middleware.Timeout(5 * time.Second))
-		// api.Use(slogchi.New(slog.Default()))
+		api.Use(slogchi.New(slog.Default()))
 		api.Use(cors.New(cors.Options{
 			AllowedOrigins:   c.Config.CORSAllowedOrigins,
 			AllowCredentials: false,
@@ -230,13 +230,15 @@ func (c *Console) Handlers() (start GracefulFunc, shutdown GracefulFunc) {
 		slog.Info("Started shutting down the console server")
 
 		c.Multiplayer.Stop()
-		c.Relay.Stop(ctx)
+		if err := c.Relay.Stop(ctx); err != nil {
+			slog.Warn("Failed to shut down relay", "error", logging.Error(err))
+		}
 
 		if err := httpServer.Shutdown(ctx); err != nil {
 			slog.Error("Failed shutting down the console server", logging.Error(err))
 			return err
 		}
-		slog.Info("Shut down the console server")
+		slog.Info("Successfully shut down the console server")
 		return nil
 	}
 
