@@ -37,11 +37,12 @@ func (c *Controller) playView(w fyne.Window, consoleAddr string, metadata *model
 	myIPEntry.Validator = ipValidator
 	myIPEntry.PlaceHolder = "Example: 192.168.100.1"
 
-	myIpAddress := metadata.CallerIP
+	var myIpAddress string
+	if len(ips) > 0 {
+		myIpAddress = ips[0]
+	}
 	if myIpAddress == "" {
-		if len(ips) > 0 {
-			myIpAddress = ips[0]
-		}
+		myIpAddress = metadata.CallerIP
 	}
 	myIPEntry.SetText(myIpAddress)
 
