@@ -85,6 +85,7 @@ func (s *gameServiceServer) CreateGame(_ context.Context, req *connect.Request[m
 
 	slog.Debug("Created new room", "gameId", gameId)
 
+	hostSession.GameID = room.ID
 	hostSession.IPAddress = req.Msg.HostIpAddress
 
 	resp := connect.NewResponse(&multiv1.CreateGameResponse{

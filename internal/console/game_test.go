@@ -20,49 +20,78 @@ func (m *mockConn) Write(ctx context.Context, typ websocket.MessageType, p []byt
 func (m *mockConn) CloseNow() error                                                      { return nil }
 
 func TestGameServiceServer_CreateGame(t *testing.T) {
-	g := &gameServiceServer{
-		Multiplayer: NewMultiplayer(),
-	}
-	g.Multiplayer.AddUserSession(10, NewUserSession(10, nil))
+	t.Run("ok", func(t *testing.T) {
+		g := &gameServiceServer{
+			Multiplayer: NewMultiplayer(),
+		}
+		g.Multiplayer.AddUserSession(10, NewUserSession(10, nil))
 
-	gameId := "Game Room"
+		gameId := "Game Room"
 
-	resp, err := g.CreateGame(context.Background(), connect.NewRequest(&multiv1.CreateGameRequest{
-		GameName: gameId,
-		Password: "secret",
-		MapId:    multiv1.GameMap_FrozenLabyrinth,
+		resp, err := g.CreateGame(context.Background(), connect.NewRequest(&multiv1.CreateGameRequest{
+			GameName: gameId,
+			Password: "secret",
+			MapId:    multiv1.GameMap_FrozenLabyrinth,
 
-		HostIpAddress: "192.168.100.1",
-		HostUserId:    10,
-	}))
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	if resp.Msg.Game.GameId != gameId {
-		t.Errorf("Name of the game room is wrong, expected %s, got %s", gameId, resp.Msg.Game.GameId)
-		return
-	}
+			HostIpAddress: "192.168.100.1",
+			HostUserId:    10,
+		}))
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		if resp.Msg.Game.GameId != gameId {
+			t.Errorf("Name of the game room is wrong, expected %s, got %s", gameId, resp.Msg.Game.GameId)
+			return
+		}
+		if len(g.Multiplayer.Rooms) != 1 {
+			t.Errorf("Rooms length is wrong, expected 1, got %d", len(g.Multiplayer.Rooms))
+			return
+		}
+		room, ok := g.Multiplayer.Rooms[gameId]
+		if !ok {
+			t.Errorf("Game room not found, expected %s, got %s", gameId, resp.Msg.Game.GameId)
+			return
+		}
 
-	if len(g.Multiplayer.Rooms) != 1 {
-		t.Errorf("Rooms length is wrong, expected 1, got %d", len(g.Multiplayer.Rooms))
-		return
-	}
-	room, ok := g.Multiplayer.Rooms[gameId]
-	if !ok {
-		t.Errorf("Game room not found, expected %s, got %s", gameId, resp.Msg.Game.GameId)
-		return
-	}
+		assert.Equal(t, false, room.Ready)
+		assert.Equal(t, gameId, room.ID)
+		assert.Equal(t, gameId, room.Name)
+		assert.Equal(t, "secret", room.Password)
+		assert.Equal(t, multiv1.GameMap_FrozenLabyrinth, room.MapID)
 
-	assert.Equal(t, false, room.Ready)
-	assert.Equal(t, gameId, room.ID)
-	assert.Equal(t, gameId, room.Name)
-	assert.Equal(t, "secret", room.Password)
-	assert.Equal(t, multiv1.GameMap_FrozenLabyrinth, room.MapID)
+		assert.Equal(t, int64(10), room.HostPlayer.UserID)
+		assert.Equal(t, int64(10), room.CreatedBy.UserID)
+		assert.Equal(t, int64(10), room.Players[10].UserID)
+	})
 
-	assert.Equal(t, int64(10), room.HostPlayer.UserID)
-	assert.Equal(t, int64(10), room.CreatedBy.UserID)
-	assert.Equal(t, int64(10), room.Players[10].UserID)
+	t.Run("create and leave", func(t *testing.T) {
+		roomID := "testing"
+		g := &gameServiceServer{
+			Multiplayer: NewMultiplayer(),
+		}
+		sess := NewUserSession(10, nil)
+
+		g.Multiplayer.AddUserSession(10, sess)
+
+		resp, err := g.CreateGame(context.Background(), connect.NewRequest(&multiv1.CreateGameRequest{
+			GameName: roomID,
+			MapId:    multiv1.GameMap_FrozenLabyrinth,
+
+			HostIpAddress: "192.168.100.1",
+			HostUserId:    10,
+		}))
+		if err != nil || resp.Msg.Game.GameId != roomID || len(g.Multiplayer.Rooms) != 1 {
+			t.Error("room not created")
+			return
+		}
+		g.Multiplayer.LeaveRoom(t.Context(), sess)
+
+		if roomsLen := len(g.Multiplayer.Rooms); roomsLen != 0 {
+			t.Errorf("Rooms length is wrong, expected 0, got %d", roomsLen)
+			return
+		}
+	})
 }
 
 func TestGameServiceServer_ListGames(t *testing.T) {
