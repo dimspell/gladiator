@@ -76,42 +76,81 @@ func TestConsole_Handlers(t *testing.T) {
 	})
 
 	t.Run("GET /.well-known/console.json", func(t *testing.T) {
-		// Arrange
-		options := []Option{
-			WithVersion("2.13.7"),
-			WithConsoleAddr("127.0.0.1:2137", "https://console.example.com"),
-			WithRelayAddr("0.0.0.0:9999", "relay.example.com:9123"),
-		}
+		t.Run("Relay", func(t *testing.T) {
+			// Arrange
+			options := []Option{
+				WithVersion("v2.13.7-dev1"),
+				WithConsoleAddr("127.0.0.1:2137", "https://console.example.com"),
+				WithRelayAddr("0.0.0.0:9999", "relay.example.com:9123"),
+			}
 
-		c := NewConsole(nil, options...)
-		ts := httptest.NewServer(c.HttpRouter())
-		defer ts.Close()
+			c := NewConsole(nil, options...)
+			ts := httptest.NewServer(c.HttpRouter())
+			defer ts.Close()
 
-		ctx, cancel := context.WithTimeout(t.Context(), time.Second)
-		defer cancel()
+			ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+			defer cancel()
 
-		// Act
-		http.DefaultClient.Timeout = time.Second
-		body, err := helperGetJSON(ctx, ts.URL+"/.well-known/console.json")
-		if err != nil {
-			t.Error(err)
-			return
-		}
-		var wellKnown model.WellKnown
-		if err := json.Unmarshal(body, &wellKnown); err != nil {
-			t.Error(err)
-			return
-		}
+			// Act
+			http.DefaultClient.Timeout = time.Second
+			body, err := helperGetJSON(ctx, ts.URL+"/.well-known/console.json")
+			if err != nil {
+				t.Error(err)
+				return
+			}
+			var wellKnown model.WellKnown
+			if err := json.Unmarshal(body, &wellKnown); err != nil {
+				t.Error(err)
+				return
+			}
 
-		// Assert
-		assert.Equal(t, c.Config.ConsoleBindAddr, "127.0.0.1:2137")
-		assert.Equal(t, c.Config.RelayBindAddr, "0.0.0.0:9999")
+			// Assert
+			assert.Equal(t, c.Config.ConsoleBindAddr, "127.0.0.1:2137")
+			assert.Equal(t, c.Config.RelayBindAddr, "0.0.0.0:9999")
 
-		assert.Equal(t, wellKnown.Version, "2.13.7")
-		assert.Equal(t, wellKnown.Addr, "https://console.example.com")
-		assert.Equal(t, wellKnown.RunMode, model.RunModeRelay)
-		assert.Equal(t, wellKnown.RelayServerAddr, "relay.example.com:9123")
-		assert.Equal(t, wellKnown.CallerIP, "127.0.0.1")
+			assert.Equal(t, wellKnown.Version, "v2.13.7-dev1")
+			assert.Equal(t, wellKnown.Addr, "https://console.example.com")
+			assert.Equal(t, wellKnown.RunMode, model.RunModeRelay)
+			assert.Equal(t, wellKnown.RelayServerAddr, "relay.example.com:9123")
+			assert.Equal(t, wellKnown.CallerIP, "")
+		})
+
+		t.Run("LAN", func(t *testing.T) {
+			// Arrange
+			options := []Option{
+				WithVersion("v2.13.7-dev1"),
+				WithConsoleAddr("127.0.0.1:2137", "https://console.example.com"),
+			}
+
+			c := NewConsole(nil, options...)
+			ts := httptest.NewServer(c.HttpRouter())
+			defer ts.Close()
+
+			ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+			defer cancel()
+
+			// Act
+			http.DefaultClient.Timeout = time.Second
+			body, err := helperGetJSON(ctx, ts.URL+"/.well-known/console.json")
+			if err != nil {
+				t.Error(err)
+				return
+			}
+			var wellKnown model.WellKnown
+			if err := json.Unmarshal(body, &wellKnown); err != nil {
+				t.Error(err)
+				return
+			}
+
+			// Assert
+			assert.Equal(t, c.Config.ConsoleBindAddr, "127.0.0.1:2137")
+
+			assert.Equal(t, wellKnown.Version, "v2.13.7-dev1")
+			assert.Equal(t, wellKnown.Addr, "https://console.example.com")
+			assert.Equal(t, wellKnown.RunMode, model.RunModeLAN)
+			assert.Equal(t, wellKnown.RelayServerAddr, "")
+			assert.Equal(t, wellKnown.CallerIP, "127.0.0.1")
+		})
 	})
 
 	t.Run("Connect to websocket", func(t *testing.T) {
