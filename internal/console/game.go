@@ -110,23 +110,10 @@ func (s *gameServiceServer) JoinGame(_ context.Context, req *connect.Request[mul
 	)
 	if err != nil {
 		slog.Error("failed to join room", "gameId", req.Msg.GameRoomId, logging.Error(err))
-		// TODO: Fixme
-		// return nil, connect.NewError(connect.CodeCanceled, err)
+		return nil, connect.NewError(connect.CodeAborted, err)
 	}
 
-	s.Multiplayer.AnnounceJoin(
-		room,
-		req.Msg.UserId,
-	)
-
-	// for _, session := range s.Multiplayer.sessions {
-	// 	wire.Compose(wire.JoinRoom, wire.Message{
-	// 		Type:    wire.JoinRoom,
-	// 		From:    newPlayer.ID(),
-	// 		To:      "0",
-	// 		Content: newPlayer,
-	// 	})
-	// }
+	s.Multiplayer.AnnounceJoin(room, req.Msg.UserId)
 
 	players := make([]*multiv1.Player, 0, len(room.Players))
 	for _, player := range room.Players {
@@ -139,7 +126,6 @@ func (s *gameServiceServer) JoinGame(_ context.Context, req *connect.Request[mul
 		})
 	}
 
-	// FIXME: Likely empty response
 	resp := connect.NewResponse(&multiv1.JoinGameResponse{Players: players})
 	return resp, nil
 }
