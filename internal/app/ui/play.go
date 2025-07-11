@@ -20,7 +20,7 @@ func (c *Controller) PlayScreen(w fyne.Window, consoleAddr string, metadata *mod
 	return container.NewBorder(
 		container.NewPadded(
 			headerContainer("Join & Play Multiplayer", func() {
-				changePage(w, "Join", c.JoinScreen(w))
+				changePage(w, "Join", c.JoinScreen(w, consoleAddr))
 			}),
 		),
 		nil,

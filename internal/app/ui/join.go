@@ -15,12 +15,12 @@ import (
 	"github.com/dimspell/gladiator/internal/backend"
 )
 
-func (c *Controller) JoinScreen(w fyne.Window) fyne.CanvasObject {
+func (c *Controller) JoinScreen(w fyne.Window, addr string) fyne.CanvasObject {
 	headerText := "Join a server"
 
 	consoleAddr := widget.NewEntry()
 	consoleAddr.PlaceHolder = "Example: https://multi.example.com"
-	consoleAddr.SetText("http://127.0.0.1:2137")
+	consoleAddr.SetText(addr)
 	consoleAddr.Validator = func(s string) error {
 		u, err := url.Parse(s)
 		if err != nil {

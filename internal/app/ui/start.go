@@ -58,7 +58,7 @@ func (c *Controller) StartScreen(w fyne.Window, selectedOption startOption) fyne
 				container.NewCenter(
 					widget.NewButtonWithIcon("Next", theme.NavigateNextIcon(), func() {
 						if radioGroup.Selected == radioOptions[startOptionJoin] {
-							changePage(w, "Join", c.JoinScreen(w))
+							changePage(w, "Join", c.JoinScreen(w, "http://127.0.0.1:2137"))
 							return
 						}
 						if radioGroup.Selected == radioOptions[startOptionHost] {
