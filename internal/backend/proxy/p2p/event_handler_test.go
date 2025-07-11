@@ -14,6 +14,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func init() {
+	logger.SetDiscardLogger()
+}
+
 type mockSession struct {
 	ID int64
 

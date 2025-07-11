@@ -123,8 +123,6 @@ func TestConsole_Handlers(t *testing.T) {
 		defer cancel()
 
 		uri := fmt.Sprintf("ws://%s/lobby", ts.URL[7:])
-		t.Logf("connecting to %s", uri)
-
 		_, err := wire.Connect(ctx, uri, wire.User{
 			UserID:   1,
 			Username: "tester",

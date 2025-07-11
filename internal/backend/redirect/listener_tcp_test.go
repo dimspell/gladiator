@@ -10,6 +10,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/dimspell/gladiator/internal/app/logger"
 )
 
 // ---- MOCK IMPLEMENTATIONS ----
@@ -87,6 +89,10 @@ func (timeoutErr) Temporary() bool { return true }
 func (timeoutErr) Unwrap() error { return nil }
 
 // ---- UNIT TESTS ----
+
+func init() {
+	logger.SetDiscardLogger()
+}
 
 func TestListenerTCP_Run(t *testing.T) {
 	t.Run("Got EOF", func(t *testing.T) {
