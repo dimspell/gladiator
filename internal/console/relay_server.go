@@ -10,6 +10,7 @@ import (
 	"io"
 	"log"
 	"log/slog"
+	"net"
 	"strconv"
 	"sync"
 	"time"
@@ -19,9 +20,22 @@ import (
 	"github.com/quic-go/quic-go"
 )
 
+type RelayStream interface {
+	io.Reader
+	io.Writer
+	CancelRead(code quic.StreamErrorCode)
+	CancelWrite(code quic.StreamErrorCode)
+}
+
+type RelayConn interface {
+	AcceptStream(context.Context) (*quic.Stream, error)
+	CloseWithError(code quic.ApplicationErrorCode, msg string) error
+	RemoteAddr() net.Addr
+}
+
 type RelayPacket struct {
-	Type    string `json:"type"` // "join", "leave", "data", "broadcast", "migrate", "tcp", "udp"
-	RoomID  string `json:"room"` // new!
+	Type    string `json:"type"` // "join", "leave", ...
+	RoomID  string `json:"room"`
 	FromID  string `json:"from"`
 	ToID    string `json:"to,omitempty"`
 	Payload []byte `json:"payload"`
@@ -35,10 +49,10 @@ type PeerConn struct {
 	RoomID string
 
 	// Stream holds a reference to the QUIC R/W streams of the relay server.
-	Stream *quic.Stream
+	Stream RelayStream
 
 	// Conn holds a reference to the QUIC connection to the relay server.
-	Conn *quic.Conn
+	Conn RelayConn
 
 	// LastSeen is a timestamp, when the user has sent the packet for the last
 	// time.
@@ -111,7 +125,7 @@ func (rs *RelayServer) Start(ctx context.Context) error {
 	}
 }
 
-func (rs *RelayServer) handleConn(ctx context.Context, conn *quic.Conn) {
+func (rs *RelayServer) handleConn(ctx context.Context, conn RelayConn) {
 	stream, err := conn.AcceptStream(ctx)
 	if err != nil {
 		rs.logger.Warn("Relay stream accept error", logging.Error(err))
@@ -134,7 +148,7 @@ func (rs *RelayServer) handleConn(ctx context.Context, conn *quic.Conn) {
 }
 
 // closeStream closes the stream and connection abruptly
-func (rs *RelayServer) closeStream(conn *quic.Conn, stream *quic.Stream) {
+func (rs *RelayServer) closeStream(conn RelayConn, stream RelayStream) {
 	// TODO: Name and handle various error codes
 	var errorCode quic.StreamErrorCode = 0xdead
 
@@ -145,7 +159,7 @@ func (rs *RelayServer) closeStream(conn *quic.Conn, stream *quic.Stream) {
 	slog.Info("Closed relay connection", "addr", conn.RemoteAddr())
 }
 
-func (rs *RelayServer) handshake(stream *quic.Stream) (string, string, error) {
+func (rs *RelayServer) handshake(stream RelayStream) (string, string, error) {
 	// Initial handshake: receive signed join a packet
 	buf := make([]byte, 128)
 	n, err := stream.Read(buf)
@@ -176,7 +190,7 @@ func (rs *RelayServer) handshake(stream *quic.Stream) (string, string, error) {
 	return pkt.FromID, pkt.RoomID, nil
 }
 
-func (rs *RelayServer) joinRoom(roomID, peerID string, conn *quic.Conn, stream *quic.Stream) *PeerConn {
+func (rs *RelayServer) joinRoom(roomID, peerID string, conn RelayConn, stream RelayStream) *PeerConn {
 	rs.mu.Lock()
 	defer rs.mu.Unlock()
 
@@ -398,7 +412,7 @@ func (rs *RelayServer) broadcastFrom(roomID, fromID string, pkt RelayPacket) {
 	}
 }
 
-func (rs *RelayServer) sendSigned(stream *quic.Stream, pkt RelayPacket) {
+func (rs *RelayServer) sendSigned(stream RelayStream, pkt RelayPacket) {
 	data, err := json.Marshal(pkt)
 	if err != nil {
 		slog.Error("json marshal failed", logging.Error(err))
@@ -409,6 +423,5 @@ func (rs *RelayServer) sendSigned(stream *quic.Stream, pkt RelayPacket) {
 		slog.Error("could not write the msg", logging.Error(err))
 		return
 	}
-
 	metrics.PacketOut.Inc()
 }
