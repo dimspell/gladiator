@@ -281,19 +281,17 @@ func (c *Console) Graceful(ctx context.Context, start GracefulFunc, shutdown Gra
 
 func (c *Console) WellKnownInfo() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		slog.Info("Serving well-known info", "caller_ip", r.RemoteAddr, "caller_agent", r.UserAgent())
-
-		callerIP := getCallerIP(r.RemoteAddr)
-
 		wk := model.WellKnown{
-			Version:  c.Config.Version,
-			Addr:     c.Config.ConsolePublicAddr,
-			RunMode:  c.Config.RunMode,
-			CallerIP: callerIP,
+			Version: c.Config.Version,
+			Addr:    c.Config.ConsolePublicAddr,
+			RunMode: c.Config.RunMode,
 		}
 
-		if c.Config.RunMode == model.RunModeRelay {
+		switch c.Config.RunMode {
+		case model.RunModeRelay:
 			wk.RelayServerAddr = c.Config.RelayPublicAddr
+		case model.RunModeLAN:
+			wk.CallerIP = getCallerIP(r.RemoteAddr)
 		}
 
 		renderJSON(w, r, wk)
