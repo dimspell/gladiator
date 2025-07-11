@@ -1,12 +1,18 @@
 package ui
 
 import (
+	"context"
+	"fmt"
+	"net/url"
+	"time"
+
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	"github.com/dimspell/gladiator/internal/backend"
 )
 
 func (c *Controller) JoinScreen(w fyne.Window) fyne.CanvasObject {
@@ -15,6 +21,17 @@ func (c *Controller) JoinScreen(w fyne.Window) fyne.CanvasObject {
 	consoleAddr := widget.NewEntry()
 	consoleAddr.PlaceHolder = "Example: https://multi.example.com"
 	consoleAddr.SetText("http://127.0.0.1:2137")
+	consoleAddr.Validator = func(s string) error {
+		u, err := url.Parse(s)
+		if err != nil {
+			return err
+		}
+		isSchemeValid := u.Scheme == "https" || u.Scheme == "http"
+		if !isSchemeValid {
+			return fmt.Errorf("invalid URL scheme: %s", s)
+		}
+		return nil
+	}
 
 	formGrid := container.New(
 		layout.NewFormLayout(),
@@ -48,7 +65,10 @@ func (c *Controller) JoinScreen(w fyne.Window) fyne.CanvasObject {
 						loadingDialog := dialog.NewCustomWithoutButtons("Connecting to auth server...", widget.NewProgressBarInfinite(), w)
 						loadingDialog.Show()
 
-						metadata, err := c.ConsoleHandshake(consoleAddr.Text)
+						ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+						defer cancel()
+
+						metadata, err := backend.GetMetadata(ctx, consoleAddr.Text)
 						if err != nil {
 							loadingDialog.Hide()
 							dialog.ShowError(err, w)
