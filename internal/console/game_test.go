@@ -244,7 +244,7 @@ func TestGameServiceServer_JoinGame(t *testing.T) {
 			t.Error(err)
 			return
 		}
-		g.Multiplayer.SetRoomReady(t.Context(), wire.Message{
+		g.Multiplayer.SetRoomReady(wire.Message{
 			Type:    wire.SetRoomReady,
 			Content: roomID,
 		})

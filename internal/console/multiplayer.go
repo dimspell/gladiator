@@ -95,7 +95,7 @@ func (mp *Multiplayer) HandleIncomingMessage(ctx context.Context, msg wire.Messa
 	case wire.RTCOffer, wire.RTCAnswer, wire.RTCICECandidate:
 		mp.ForwardRTCMessage(ctx, msg)
 	case wire.SetRoomReady:
-		mp.SetRoomReady(ctx, msg)
+		mp.SetRoomReady(msg)
 	default:
 		// Do nothing but log the event type
 		slog.Error("Unhandled event type", "type", msg.Type.String())
@@ -396,7 +396,7 @@ func (mp *Multiplayer) AnnounceJoin(room GameRoom, userId int64) {
 }
 
 // SetRoomReady notifies the LobbyRoom that it can start accepting players.
-func (mp *Multiplayer) SetRoomReady(ctx context.Context, msg wire.Message) {
+func (mp *Multiplayer) SetRoomReady(msg wire.Message) {
 	mp.roomsMutex.Lock()
 	defer mp.roomsMutex.Unlock()
 
