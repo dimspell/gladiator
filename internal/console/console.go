@@ -20,7 +20,6 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/cors"
-	slogchi "github.com/samber/slog-chi"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 )
@@ -148,7 +147,7 @@ func (c *Console) HttpRouter() http.Handler {
 
 	{ // Set up routes used by the launcher
 		wellKnown := chi.NewRouter()
-		wellKnown.Use(slogchi.New(slog.Default()))
+		// wellKnown.Use(slogchi.New(slog.Default()))
 		wellKnown.Use(cors.New(cors.Options{
 			AllowedOrigins:   c.Config.CORSAllowedOrigins,
 			AllowCredentials: false,
@@ -165,7 +164,7 @@ func (c *Console) HttpRouter() http.Handler {
 	{ // Set up gRPC routes for the backend
 		api := chi.NewRouter()
 		api.Use(middleware.Timeout(5 * time.Second))
-		api.Use(slogchi.New(slog.Default()))
+		// api.Use(slogchi.New(slog.Default()))
 		api.Use(cors.New(cors.Options{
 			AllowedOrigins:   c.Config.CORSAllowedOrigins,
 			AllowCredentials: false,
@@ -222,6 +221,17 @@ func (c *Console) Handlers() (start GracefulFunc, shutdown GracefulFunc) {
 
 		go c.Multiplayer.Run(ctx)
 		go c.Relay.Start(ctx)
+
+		// TODO: Move it elsewhere
+		if c.Relay != nil && c.Relay.Server != nil {
+			go func() {
+				for {
+					for event := range c.Relay.Server.Events {
+						c.Multiplayer.handleRelayEvent(event)
+					}
+				}
+			}()
+		}
 
 		return httpServer.ListenAndServe()
 	}

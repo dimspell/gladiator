@@ -70,13 +70,6 @@ func (mp *Multiplayer) Run(ctx context.Context) {
 				return
 			}
 			mp.HandleIncomingMessage(ctx, msg)
-
-			// case ev, ok := <-mp.Relay.Server.Events:
-			// 	if !ok {
-			// 		return
-			// 	}
-			// 	// Note: It could be handled by NATS
-			// 	mp.handleRelayEvent(ev)
 		}
 	}
 }

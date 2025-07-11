@@ -38,5 +38,7 @@ func (r *Relay) Stop(ctx context.Context) error {
 		r.cancel()
 	}
 
+	close(r.Server.Events)
+
 	return nil
 }
