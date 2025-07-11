@@ -9,7 +9,6 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
-	"strings"
 	"sync"
 	"time"
 
@@ -91,7 +90,7 @@ func (b *Backend) Start() error {
 	}
 	b.listener = listener
 
-	slog.Info("Backend listening", "addr", b.listener.Addr())
+	slog.Info("Backend listening", "addr", b.listener.Addr(), "mode", b.CreateProxy.Mode())
 	return nil
 }
 
@@ -194,10 +193,7 @@ func (b *Backend) handleClient(conn net.Conn) error {
 
 func GetMetadata(ctx context.Context, consoleAddr string) (*model.WellKnown, error) {
 	httpClient := &http.Client{Timeout: 3 * time.Second}
-
-	if !strings.Contains(consoleAddr, "://") {
-		consoleAddr = "http://" + consoleAddr
-	}
+	
 	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("%s/.well-known/console.json", consoleAddr), nil)
 	if err != nil {
 		return nil, err

@@ -10,6 +10,7 @@ import (
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/packet"
 	"github.com/dimspell/gladiator/internal/backend/proxy"
+	"github.com/dimspell/gladiator/internal/model"
 	"github.com/dimspell/gladiator/internal/wire"
 )
 
@@ -18,6 +19,8 @@ var _ proxy.ProxyClient = (*LAN)(nil)
 type ProxyLAN struct {
 	MyIPAddress string
 }
+
+func (p *ProxyLAN) Mode() model.RunMode { return model.RunModeLAN }
 
 func (p *ProxyLAN) Create(session *bsession.Session) proxy.ProxyClient {
 	ipAddress := p.MyIPAddress

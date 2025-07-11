@@ -1,11 +1,13 @@
 package ui
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
 	"os"
 	"path"
+	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
@@ -13,6 +15,7 @@ import (
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	"github.com/dimspell/gladiator/internal/backend"
 	"github.com/dimspell/gladiator/internal/model"
 )
 
@@ -127,7 +130,10 @@ func (c *Controller) HostScreen(w fyne.Window, params *HostScreenInputParams) fy
 			return
 		}
 
-		metadata, err := c.ConsoleHandshake(consoleAddr)
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+
+		metadata, err := backend.GetMetadata(ctx, "http://"+consoleAddr)
 		if err != nil {
 			loadingDialog.Hide()
 			dialog.ShowError(err, w)

@@ -11,6 +11,7 @@ import (
 	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/proxy"
+	"github.com/dimspell/gladiator/internal/model"
 )
 
 func (b *Backend) AddSession(tcpConn net.Conn) *bsession.Session {
@@ -79,4 +80,5 @@ func (b *Backend) RegisterNewObserver(ctx context.Context, session *bsession.Ses
 type Proxy interface {
 	// Create creates a proxy for the session
 	Create(session *bsession.Session) proxy.ProxyClient
+	Mode() model.RunMode
 }

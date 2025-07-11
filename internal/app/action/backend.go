@@ -4,12 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"os"
-	"time"
 
 	"github.com/dimspell/gladiator/internal/app/logger"
 	"github.com/dimspell/gladiator/internal/backend"
-	"github.com/lmittmann/tint"
 	"github.com/urfave/cli/v3"
 )
 
@@ -59,35 +56,29 @@ func BackendCommand() *cli.Command {
 	cmd.Action = func(ctx context.Context, c *cli.Command) error {
 		consoleAddr := c.String("console-addr")
 		backendAddr := c.String("backend-addr")
+		lobbyAddr := c.String("lobby-addr")
 
 		// logger.PacketLogger = slog.New(packetlogger.New(os.Stderr, &packetlogger.Options{
 		//	Level: slog.LevelDebug,
 		// }))
-		logger.PacketLogger = slog.New(
-			tint.NewHandler(
-				os.Stderr,
-				&tint.Options{
-					Level:      slog.LevelDebug,
-					TimeFormat: time.TimeOnly,
-					AddSource:  true,
-				},
-			),
-		)
+		logger.PacketLogger = slog.Default()
 
 		px, err := selectProxy(c)
 		if err != nil {
 			return err
 		}
 
-		// TODO: Use for metadata to autoconfigure the backend options
 		metadata, err := backend.GetMetadata(ctx, consoleAddr)
 		if err != nil {
 			return err
 		}
-		fmt.Println(metadata)
 
-		bd := backend.NewBackend(backendAddr, "http://"+consoleAddr, px)
-		bd.SignalServerURL = c.String("lobby-addr")
+		if px.Mode() != metadata.RunMode {
+			return fmt.Errorf("incorrect run-mode - was %q; expected %q", px.Mode(), metadata.RunMode)
+		}
+
+		bd := backend.NewBackend(backendAddr, consoleAddr, px)
+		bd.SignalServerURL = lobbyAddr
 
 		if err := bd.Start(); err != nil {
 			return err

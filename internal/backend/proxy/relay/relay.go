@@ -10,6 +10,7 @@ import (
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/proxy"
 	"github.com/dimspell/gladiator/internal/backend/redirect"
+	"github.com/dimspell/gladiator/internal/model"
 )
 
 var _ proxy.ProxyClient = (*Relay)(nil)
@@ -25,6 +26,8 @@ type ProxyRelay struct {
 
 	IPPrefix net.IP
 }
+
+func (p *ProxyRelay) Mode() model.RunMode { return model.RunModeRelay }
 
 func (p *ProxyRelay) Create(session *bsession.Session) proxy.ProxyClient {
 	px := NewRelay(p, session)

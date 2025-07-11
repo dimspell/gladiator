@@ -5,14 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"os"
-	"time"
 
 	"github.com/dimspell/gladiator/internal/app/logger"
 	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"github.com/dimspell/gladiator/internal/backend"
 	"github.com/dimspell/gladiator/internal/console"
-	"github.com/lmittmann/tint"
 	"github.com/urfave/cli/v3"
 	"golang.org/x/sync/errgroup"
 )
@@ -86,6 +83,7 @@ func ServeCommand(version string) *cli.Command {
 	cmd.Action = func(ctx context.Context, c *cli.Command) error {
 		consoleAddr := c.String("console-addr")
 		backendAddr := c.String("backend-addr")
+		lobbyAddr := c.String("lobby-addr")
 
 		db, err := selectDatabaseType(c)
 		if err != nil {
@@ -100,24 +98,15 @@ func ServeCommand(version string) *cli.Command {
 		// logger.PacketLogger = slog.New(packetlogger.New(os.Stderr, &packetlogger.Options{
 		//	Level: slog.LevelDebug,
 		// }))
-		logger.PacketLogger = slog.New(
-			tint.NewHandler(
-				os.Stderr,
-				&tint.Options{
-					Level:      slog.LevelDebug,
-					TimeFormat: time.TimeOnly,
-					AddSource:  true,
-				},
-			),
-		)
+		logger.PacketLogger = slog.Default()
 
 		px, err := selectProxy(c)
 		if err != nil {
 			return err
 		}
 
-		bd := backend.NewBackend(backendAddr, "http//"+consoleAddr, px)
-		bd.SignalServerURL = c.String("lobby-addr")
+		bd := backend.NewBackend(backendAddr, consoleAddr, px)
+		bd.SignalServerURL = lobbyAddr
 
 		co, err := selectConsoleOptions(c, version)
 		if err != nil {

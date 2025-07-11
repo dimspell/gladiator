@@ -10,6 +10,7 @@ import (
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/proxy"
 	"github.com/dimspell/gladiator/internal/backend/redirect"
+	"github.com/dimspell/gladiator/internal/model"
 	"github.com/pion/webrtc/v4"
 )
 
@@ -18,6 +19,8 @@ var _ proxy.ProxyClient = (*PeerToPeer)(nil)
 type ProxyP2P struct {
 	ICEServers []webrtc.ICEServer
 }
+
+func (p *ProxyP2P) Mode() model.RunMode { return model.RunModeWebRTC }
 
 func (p *ProxyP2P) Create(session *bsession.Session) proxy.ProxyClient {
 	return NewPeerToPeer(session, p.ICEServers...)

@@ -134,11 +134,6 @@ func (c *Controller) StopConsole() error {
 	return nil
 }
 
-// Deprecated: Call backend.GetMetadata
-func (c *Controller) ConsoleHandshake(consoleAddr string) (*model.WellKnown, error) {
-	return backend.GetMetadata(context.Background(), consoleAddr)
-}
-
 func (c *Controller) StartBackend(consoleAddr string, proxy backend.Proxy) error {
 	if c.Backend != nil {
 		slog.Warn("Backend is already running")

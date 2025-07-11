@@ -27,9 +27,9 @@ func (c *Controller) signUpForm(consoleUri string, onCancel func(), onCreate fun
 	password.SetPlaceHolder("Password")
 
 	if !strings.Contains(consoleUri, "//") {
-		consoleUri = fmt.Sprintf("%s://%s/grpc", "http", consoleUri)
+		consoleUri = fmt.Sprintf("%s://%s", "http", consoleUri)
 	}
-	client := multiv1connect.NewUserServiceClient(&http.Client{Timeout: 5 * time.Second}, consoleUri)
+	client := multiv1connect.NewUserServiceClient(&http.Client{Timeout: 5 * time.Second}, consoleUri+"/grpc")
 
 	form := &widget.Form{
 		Items: []*widget.FormItem{
@@ -49,7 +49,10 @@ func (c *Controller) signUpForm(consoleUri string, onCancel func(), onCreate fun
 				return
 			}
 
-			user, err := client.CreateUser(context.TODO(), connect.NewRequest(&v1.CreateUserRequest{
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancel()
+
+			user, err := client.CreateUser(ctx, connect.NewRequest(&v1.CreateUserRequest{
 				Username: name.Text,
 				Password: pwd.String(),
 			}))
