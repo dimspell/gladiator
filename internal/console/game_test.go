@@ -8,6 +8,7 @@ import (
 	"connectrpc.com/connect"
 	"github.com/coder/websocket"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
+	"github.com/dimspell/gladiator/internal/wire"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -177,46 +178,104 @@ func TestGameServiceServer_GetGame(t *testing.T) {
 }
 
 func TestGameServiceServer_JoinGame(t *testing.T) {
-	g := &gameServiceServer{
-		Multiplayer: NewMultiplayer(),
-	}
-	g.Multiplayer.AddUserSession(10, NewUserSession(10, &mockConn{}))
-	g.Multiplayer.AddUserSession(5, NewUserSession(5, &mockConn{}))
+	t.Run("ok", func(t *testing.T) {
+		roomID := "testing"
+		g := &gameServiceServer{
+			Multiplayer: NewMultiplayer(),
+		}
+		g.Multiplayer.AddUserSession(10, NewUserSession(10, &mockConn{}))
+		g.Multiplayer.AddUserSession(5, NewUserSession(5, &mockConn{}))
 
-	gameId := "Game Room"
-	if _, err := g.CreateGame(context.Background(), connect.NewRequest(&multiv1.CreateGameRequest{
-		GameName: gameId,
-		Password: "secret",
-		MapId:    multiv1.GameMap_FrozenLabyrinth,
+		if _, err := g.CreateGame(context.Background(), connect.NewRequest(&multiv1.CreateGameRequest{
+			GameName: roomID,
+			Password: "secret",
+			MapId:    multiv1.GameMap_FrozenLabyrinth,
 
-		HostIpAddress: "192.168.100.1",
-		HostUserId:    10,
-	})); err != nil {
-		t.Error(err)
-		return
-	}
+			HostIpAddress: "192.168.100.1",
+			HostUserId:    10,
+		})); err != nil {
+			t.Error(err)
+			return
+		}
 
-	resp, err := g.JoinGame(context.Background(), connect.NewRequest(&multiv1.JoinGameRequest{
-		UserId:     5,
-		GameRoomId: gameId,
-		IpAddress:  "192.168.100.201",
-	}))
-	if err != nil {
-		t.Error(err)
-		return
-	}
+		resp, err := g.JoinGame(context.Background(), connect.NewRequest(&multiv1.JoinGameRequest{
+			UserId:     5,
+			GameRoomId: roomID,
+			IpAddress:  "192.168.100.201",
+		}))
+		if err != nil {
+			t.Error(err)
+			return
+		}
 
-	players := resp.Msg.GetPlayers()
+		players := resp.Msg.GetPlayers()
 
-	// Sort in ascending order
-	sort.Slice(players, func(i, j int) bool {
-		return players[i].UserId < players[j].UserId
+		// Sort in ascending order
+		sort.Slice(players, func(i, j int) bool {
+			return players[i].UserId < players[j].UserId
+		})
+		assert.Equal(t, 2, len(players))
+
+		assert.Equal(t, int64(5), players[0].UserId)
+		assert.Equal(t, "192.168.100.201", players[0].IpAddress)
+
+		assert.Equal(t, int64(10), players[1].UserId)
+		assert.Equal(t, "192.168.100.1", players[1].IpAddress)
 	})
-	assert.Equal(t, 2, len(players))
 
-	assert.Equal(t, int64(5), players[0].UserId)
-	assert.Equal(t, "192.168.100.201", players[0].IpAddress)
+	t.Run("rejoin", func(t *testing.T) {
+		roomID := "testing"
+		g := &gameServiceServer{
+			Multiplayer: NewMultiplayer(),
+		}
 
-	assert.Equal(t, int64(10), players[1].UserId)
-	assert.Equal(t, "192.168.100.1", players[1].IpAddress)
+		guestSession := NewUserSession(5, &mockConn{})
+		g.Multiplayer.AddUserSession(10, NewUserSession(10, &mockConn{}))
+		g.Multiplayer.AddUserSession(5, guestSession)
+
+		if _, err := g.CreateGame(t.Context(), connect.NewRequest(&multiv1.CreateGameRequest{
+			GameName: roomID,
+			Password: "secret",
+			MapId:    multiv1.GameMap_FrozenLabyrinth,
+
+			HostIpAddress: "192.168.100.1",
+			HostUserId:    10,
+		})); err != nil {
+			t.Error(err)
+			return
+		}
+		g.Multiplayer.SetRoomReady(t.Context(), wire.Message{
+			Type:    wire.SetRoomReady,
+			Content: roomID,
+		})
+
+		resp1, err := g.JoinGame(t.Context(), connect.NewRequest(&multiv1.JoinGameRequest{
+			UserId:     5,
+			GameRoomId: roomID,
+			IpAddress:  "192.168.100.201",
+		}))
+		if err != nil {
+			t.Error(err)
+			return
+		}
+
+		assert.Equal(t, 2, len(resp1.Msg.GetPlayers()))
+		assert.Equal(t, 2, len(g.Multiplayer.Rooms[roomID].Players))
+
+		g.Multiplayer.LeaveRoom(t.Context(), guestSession)
+		assert.Equal(t, 1, len(g.Multiplayer.Rooms[roomID].Players))
+
+		resp2, err := g.JoinGame(t.Context(), connect.NewRequest(&multiv1.JoinGameRequest{
+			UserId:     5,
+			GameRoomId: roomID,
+			IpAddress:  "192.168.100.201",
+		}))
+		if err != nil {
+			t.Error(err)
+			return
+		}
+
+		assert.Equal(t, 2, len(resp2.Msg.GetPlayers()))
+		assert.Equal(t, 2, len(g.Multiplayer.Rooms[roomID].Players))
+	})
 }
