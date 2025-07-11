@@ -72,11 +72,12 @@ func (s *gameServiceServer) GetGame(_ context.Context, req *connect.Request[mult
 func (s *gameServiceServer) CreateGame(_ context.Context, req *connect.Request[multiv1.CreateGameRequest]) (*connect.Response[multiv1.CreateGameResponse], error) {
 	gameId := req.Msg.GetGameName()
 
-	room, hostSession, err := s.Multiplayer.CreateRoom(
+	room, err := s.Multiplayer.CreateRoom(
 		req.Msg.HostUserId,
 		req.Msg.GameName,
 		req.Msg.Password,
 		req.Msg.MapId,
+		req.Msg.HostIpAddress,
 	)
 	if err != nil {
 		slog.With(slog.String("game", req.Msg.GameName), logging.Error(err)).Warn("Create room failed")
@@ -84,9 +85,6 @@ func (s *gameServiceServer) CreateGame(_ context.Context, req *connect.Request[m
 	}
 
 	slog.Debug("Created new room", "gameId", gameId)
-
-	hostSession.GameID = room.ID
-	hostSession.IPAddress = req.Msg.HostIpAddress
 
 	resp := connect.NewResponse(&multiv1.CreateGameResponse{
 		Game: &multiv1.Game{

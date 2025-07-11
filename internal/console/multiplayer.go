@@ -210,28 +210,26 @@ func (mp *Multiplayer) GetRoom(roomId string) (GameRoom, bool) {
 }
 
 // CreateRoom creates new game room.
-func (mp *Multiplayer) CreateRoom(
-	hostUserID int64,
-	gameID string,
-	password string,
-	mapID v1.GameMap,
-) (*GameRoom, *UserSession, error) {
+func (mp *Multiplayer) CreateRoom(hostUserID int64, gameID string, password string, mapID v1.GameMap, hostIpAddress string) (*GameRoom, error) {
 	mp.roomsMutex.Lock()
 	defer mp.roomsMutex.Unlock()
 
 	hostSession, found := mp.GetUserSession(hostUserID)
 	if !found {
-		return nil, nil, fmt.Errorf("user session not found %q", hostUserID)
+		return nil, fmt.Errorf("user session not found %q", hostUserID)
 	}
 
 	if _, exist := mp.Rooms[gameID]; exist {
-		return nil, nil, fmt.Errorf("room already exists")
+		return nil, fmt.Errorf("room already exists")
 	}
 
 	// TODO: Be more gentle with interfacing with the Relay Server
 	// if mp.Relay != nil {
 	// 	mp.Relay.Server.leaveRoom(fmt.Sprintf("%d", hostUserID), gameID)
 	// }
+
+	hostSession.GameID = gameID
+	hostSession.IPAddress = hostIpAddress
 
 	room := &GameRoom{
 		Ready:      false,
@@ -244,7 +242,7 @@ func (mp *Multiplayer) CreateRoom(
 		Players:    map[int64]*UserSession{hostSession.UserID: hostSession},
 	}
 	mp.Rooms[gameID] = room
-	return room, hostSession, nil
+	return room, nil
 }
 
 // DestroyRoom deletes an existing game room.
