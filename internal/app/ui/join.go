@@ -1,8 +1,6 @@
 package ui
 
 import (
-	"net"
-
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
@@ -14,23 +12,13 @@ import (
 func (c *Controller) JoinScreen(w fyne.Window) fyne.CanvasObject {
 	headerText := "Join a server"
 
-	bindIP := widget.NewEntry()
-	bindIP.Validator = ipValidator
-	bindIP.PlaceHolder = "Example: 0.0.0.0"
-	bindIP.SetText("127.0.0.1")
-
-	bindPort := widget.NewEntry()
-	bindPort.Validator = portValidator
-	bindPort.PlaceHolder = "Example: 2137"
-	bindPort.SetText("2137")
-
-	bindGroup := container.NewGridWithColumns(2, bindIP, bindPort)
-
-	bindLabel := widget.NewLabelWithStyle("Server Address (IP, Port)", fyne.TextAlignTrailing, fyne.TextStyle{Bold: true})
+	consoleAddr := widget.NewEntry()
+	consoleAddr.PlaceHolder = "Example: https://multi.example.com"
+	consoleAddr.SetText("http://127.0.0.1:2137")
 
 	formGrid := container.New(
 		layout.NewFormLayout(),
-		bindLabel, bindGroup,
+		widget.NewLabelWithStyle("Server Address", fyne.TextAlignTrailing, fyne.TextStyle{Bold: true}), consoleAddr,
 	)
 
 	label := widget.NewRichTextFromMarkdown("**Specify the address**\n\nSpecify the address of the authentication server you wish to connect to. To troubleshoot, you could ask your friend to give you all the IP addresses that can be found after running the _ipconfig_ command on his/her machine.")
@@ -57,27 +45,18 @@ func (c *Controller) JoinScreen(w fyne.Window) fyne.CanvasObject {
 				widget.NewLabel(""),
 				container.NewCenter(
 					widget.NewButtonWithIcon("Connect", theme.NavigateNextIcon(), func() {
-						if err := bindIP.Validate(); err != nil {
-							dialog.NewError(err, w)
-							return
-						}
-						if err := bindPort.Validate(); err != nil {
-							dialog.NewError(err, w)
-							return
-						}
-						consoleAddr := net.JoinHostPort(bindIP.Text, bindPort.Text)
+						loadingDialog := dialog.NewCustomWithoutButtons("Connecting to auth server...", widget.NewProgressBarInfinite(), w)
+						loadingDialog.Show()
 
-						// loadingDialog := dialog.NewCustomWithoutButtons("Connecting to auth server...", widget.NewProgressBarInfinite(), w)
-						// loadingDialog.Show()
-						// defer loadingDialog.Hide()
-
-						metadata, err := c.ConsoleHandshake(consoleAddr)
+						metadata, err := c.ConsoleHandshake(consoleAddr.Text)
 						if err != nil {
+							loadingDialog.Hide()
 							dialog.ShowError(err, w)
 							return
 						}
+						loadingDialog.Hide()
 
-						changePage(w, "Joined", c.PlayScreen(w, consoleAddr, metadata))
+						changePage(w, "Joined", c.PlayScreen(w, consoleAddr.Text, metadata))
 					}),
 				),
 			),
