@@ -157,11 +157,12 @@ func (c *Controller) StartBackend(consoleAddr string, proxy backend.Proxy) error
 		}
 	}()
 
-	c.Backend = backend.NewBackend("127.0.0.1:6112", "http://"+consoleAddr, proxy)
+	c.Backend = backend.NewBackend("127.0.0.1:6112", consoleAddr, proxy)
 	if err := c.Backend.Start(); err != nil {
 		cancel()
 		return err
 	}
+	c.Backend.SignalServerURL = fmt.Sprintf("%s/lobby", consoleAddr)
 
 	// Healthcheck
 	c.backendProbe.Signal(probe.StatusRunning)

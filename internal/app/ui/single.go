@@ -83,7 +83,7 @@ func (c *Controller) SinglePlayerScreen(w fyne.Window, initial *SinglePlayerScre
 	backendRunningCheck := widget.NewLabelWithData(backendRunningLabel)
 	backendRunningCheck.Alignment = fyne.TextAlignCenter
 	backendStart := widget.NewButtonWithIcon("Start backend", theme.MediaPlayIcon(), func() {
-		if err := c.StartBackend(consoleAddr, &direct.ProxyLAN{"127.0.0.1"}); err != nil {
+		if err := c.StartBackend("http://"+consoleAddr, &direct.ProxyLAN{"127.0.0.1"}); err != nil {
 			dialog.ShowError(err, w)
 			return
 		}
@@ -95,7 +95,7 @@ func (c *Controller) SinglePlayerScreen(w fyne.Window, initial *SinglePlayerScre
 	createUser := widget.NewButtonWithIcon("Create New User", theme.AccountIcon(), func() {
 		centered := container.NewCenter()
 		d := dialog.NewCustomWithoutButtons("Create New User", centered, w)
-		centered.Add(c.signUpForm(consoleAddr, d.Hide, func(username string) {
+		centered.Add(c.signUpForm("http://"+consoleAddr, d.Hide, func(username string) {
 			d.Hide()
 
 			c.app.SendNotification(
