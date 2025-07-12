@@ -218,11 +218,11 @@ func renderRegistryPatchContainer(w fyne.Window) fyne.CanvasObject {
 		registryValueBinding.Set(fmt.Sprintf("Value: %q", registryValue))
 	}
 
-	registryValue, _ := registrypatch.ReadRegistryKey()
+	registryValue, _ := registrypatch.ReadServer()
 	changeRegistryValue(registryValue)
 
 	checkButton := widget.NewButton("Check registry", func() {
-		s, err := registrypatch.ReadRegistryKey()
+		s, err := registrypatch.ReadServer()
 		if err != nil {
 			dialog.ShowError(err, w)
 			return
@@ -232,7 +232,7 @@ func renderRegistryPatchContainer(w fyne.Window) fyne.CanvasObject {
 	})
 
 	patchButton := widget.NewButton("Patch registry", func() {
-		before, _ := registrypatch.ReadRegistryKey()
+		before, _ := registrypatch.ReadServer()
 
 		if !registrypatch.PatchRegistry() {
 			dialog.ShowError(fmt.Errorf("cannot change registry key"), w)
@@ -241,7 +241,7 @@ func renderRegistryPatchContainer(w fyne.Window) fyne.CanvasObject {
 
 		time.Sleep(1 * time.Second)
 
-		after, err := registrypatch.ReadRegistryKey()
+		after, err := registrypatch.ReadServer()
 		if err != nil {
 			dialog.ShowError(err, w)
 			return

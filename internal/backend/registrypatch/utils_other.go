@@ -2,7 +2,7 @@
 
 package registrypatch
 
-func ReadRegistryKey() (string, error) {
+func ReadServer() (string, error) {
 	return "", nil
 }
 
