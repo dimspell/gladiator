@@ -46,15 +46,24 @@ func (c *Controller) playView(w fyne.Window, consoleAddr string, metadata *model
 	}
 	myIPEntry.SetText(myIpAddress)
 
+	settingsWidgets := []fyne.CanvasObject{}
+	if metadata.RunMode == model.RunModeLAN {
+		settingsWidgets = append(settingsWidgets,
+			widget.NewLabelWithStyle("My in-game IP Address:", fyne.TextAlignTrailing, fyne.TextStyle{Bold: false}),
+			myIPEntry,
+		)
+	}
+	settingsWidgets = append(settingsWidgets,
+		widget.NewLabelWithStyle("Auth Server (Console) Address:", fyne.TextAlignTrailing, fyne.TextStyle{Bold: false}),
+		widget.NewLabel(consoleAddr),
+		widget.NewLabelWithStyle("Configuration Run Mode:", fyne.TextAlignTrailing, fyne.TextStyle{Bold: false}),
+		widget.NewLabel(metadata.RunMode.String()),
+	)
+
 	settingsAccordion := widget.NewAccordionItem("Settings",
 		container.New(
 			layout.NewFormLayout(),
-			widget.NewLabelWithStyle("My in-game IP Address:", fyne.TextAlignTrailing, fyne.TextStyle{Bold: false}),
-			myIPEntry,
-			widget.NewLabelWithStyle("Auth Server (Console) Address:", fyne.TextAlignTrailing, fyne.TextStyle{Bold: false}),
-			widget.NewLabel(consoleAddr),
-			widget.NewLabelWithStyle("Configuration Run Mode:", fyne.TextAlignTrailing, fyne.TextStyle{Bold: false}),
-			widget.NewLabel(metadata.RunMode.String()),
+			settingsWidgets...,
 		))
 	settingsAccordion.Open = true
 
