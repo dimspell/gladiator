@@ -14,7 +14,6 @@ import (
 	"fyne.io/fyne/v2/widget"
 	v1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/gen/multi/v1/multiv1connect"
-	"github.com/dimspell/gladiator/internal/console/auth"
 )
 
 func (c *Controller) signUpForm(consoleUri string, onCancel func(), onCreate func(user string), w fyne.Window) *widget.Form {
@@ -42,19 +41,12 @@ func (c *Controller) signUpForm(consoleUri string, onCancel func(), onCreate fun
 			loadingDialog := dialog.NewCustomWithoutButtons("Submitting the form...", widget.NewProgressBarInfinite(), w)
 			loadingDialog.Show()
 
-			pwd, err := auth.NewPassword(password.Text)
-			if err != nil {
-				loadingDialog.Hide()
-				dialog.ShowError(err, w)
-				return
-			}
-
 			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 			defer cancel()
 
 			user, err := client.CreateUser(ctx, connect.NewRequest(&v1.CreateUserRequest{
 				Username: name.Text,
-				Password: pwd.String(),
+				Password: password.Text,
 			}))
 			if err != nil {
 				loadingDialog.Hide()
