@@ -1,6 +1,6 @@
 //go:build windows
 
-package ui
+package registrypatch
 
 import (
 	"fmt"
@@ -11,31 +11,37 @@ import (
 )
 
 const (
-	registryPath = `SOFTWARE\WOW6432Node\AbalonStudio\Dispel\Multi`
-	registryKey  = "Server"
+	registryPath       = `SOFTWARE\WOW6432Node\AbalonStudio\Dispel\Multi`
+	registryKeyServer  = "Server"
+	registryKeyVersion = "Version"
 )
 
-func readRegistryKey() (string, error) {
+func ReadServer() (string, error) {
 	key, err := registry.OpenKey(registry.LOCAL_MACHINE, registryPath, registry.QUERY_VALUE)
 	if err != nil {
 		return "", fmt.Errorf("could not find the registry key (is the game installed?): %w", err)
 	}
 	defer key.Close()
 
-	s, _, err := key.GetStringValue(registryKey)
+	s, _, err := key.GetStringValue(registryKeyServer)
 	if err != nil {
-		return "", fmt.Errorf("could not read from the %q registry key: %w", registryKey, err)
+		return "", fmt.Errorf("could not read from the %q registry key: %w", registryKeyServer, err)
 	}
 	return s, nil
 }
 
-func patchRegistryKey() (likelyChanged bool) {
+func PatchRegistry() bool {
+	changed := patchRegistryKey(registryKeyServer, "localhost")
+	_ = patchRegistryKey(registryKeyVersion, "1.30")
+	return changed
+}
+
+func patchRegistryKey(registryKey, newValue string) (likelyChanged bool) {
 	cmd := "reg.exe"
-	newValue := "localhost"
 	args := strings.Join([]string{
 		"ADD",
 		fmt.Sprintf(`HKEY_LOCAL_MACHINE\%s`, registryPath),
-		"/v", "Server",
+		"/v", registryKey,
 		"/t", "REG_SZ",
 		"/f",
 		"/d", newValue,

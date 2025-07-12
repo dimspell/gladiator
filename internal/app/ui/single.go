@@ -15,6 +15,7 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/dimspell/gladiator/internal/backend/proxy/direct"
+	"github.com/dimspell/gladiator/internal/backend/registrypatch"
 	"github.com/dimspell/gladiator/internal/model"
 )
 
@@ -217,11 +218,11 @@ func renderRegistryPatchContainer(w fyne.Window) fyne.CanvasObject {
 		registryValueBinding.Set(fmt.Sprintf("Value: %q", registryValue))
 	}
 
-	registryValue, _ := readRegistryKey()
+	registryValue, _ := registrypatch.ReadRegistryKey()
 	changeRegistryValue(registryValue)
 
 	checkButton := widget.NewButton("Check registry", func() {
-		s, err := readRegistryKey()
+		s, err := registrypatch.ReadRegistryKey()
 		if err != nil {
 			dialog.ShowError(err, w)
 			return
@@ -231,20 +232,16 @@ func renderRegistryPatchContainer(w fyne.Window) fyne.CanvasObject {
 	})
 
 	patchButton := widget.NewButton("Patch registry", func() {
-		before, err := readRegistryKey()
-		if err != nil {
-			dialog.ShowError(err, w)
-			return
-		}
+		before, _ := registrypatch.ReadRegistryKey()
 
-		if !patchRegistryKey() {
+		if !registrypatch.PatchRegistry() {
 			dialog.ShowError(fmt.Errorf("cannot change registry key"), w)
 			return
 		}
 
 		time.Sleep(1 * time.Second)
 
-		after, err := readRegistryKey()
+		after, err := registrypatch.ReadRegistryKey()
 		if err != nil {
 			dialog.ShowError(err, w)
 			return
