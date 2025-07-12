@@ -21,6 +21,11 @@ func TestUserServiceHandler(t *testing.T) {
 			return
 		}
 
+		service.CreateUser(t.Context(), connect.NewRequest(&multiv1.CreateUserRequest{
+			Username: "ardmin",
+			Password: "password",
+		}))
+
 		res2, err := service.AuthenticateUser(t.Context(), connect.NewRequest(&multiv1.AuthenticateUserRequest{
 			Username: "testuser",
 			Password: "password",
@@ -30,9 +35,15 @@ func TestUserServiceHandler(t *testing.T) {
 			return
 		}
 
+		res3, err := service.GetUser(t.Context(), connect.NewRequest(&multiv1.GetUserRequest{
+			UserId: 1,
+		}))
+
 		assert.Equal(t, int64(1), res.Msg.User.UserId)
 		assert.Equal(t, "testuser", res.Msg.User.Username)
 		assert.Equal(t, int64(1), res2.Msg.User.UserId)
 		assert.Equal(t, "testuser", res2.Msg.User.Username)
+		assert.Equal(t, int64(1), res3.Msg.User.UserId)
+		assert.Equal(t, "testuser", res3.Msg.User.Username)
 	})
 }
