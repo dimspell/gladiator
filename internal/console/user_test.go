@@ -21,11 +21,6 @@ func TestUserServiceHandler(t *testing.T) {
 			return
 		}
 
-		service.CreateUser(t.Context(), connect.NewRequest(&multiv1.CreateUserRequest{
-			Username: "ardmin",
-			Password: "password",
-		}))
-
 		res2, err := service.AuthenticateUser(t.Context(), connect.NewRequest(&multiv1.AuthenticateUserRequest{
 			Username: "testuser",
 			Password: "password",
@@ -45,5 +40,34 @@ func TestUserServiceHandler(t *testing.T) {
 		assert.Equal(t, "testuser", res2.Msg.User.Username)
 		assert.Equal(t, int64(1), res3.Msg.User.UserId)
 		assert.Equal(t, "testuser", res3.Msg.User.Username)
+	})
+
+	t.Run("authentication fails", func(t *testing.T) {
+		service := &userServiceServer{DB: setupDatabase(t)}
+
+		var err error
+		_, err = service.CreateUser(t.Context(), connect.NewRequest(&multiv1.CreateUserRequest{
+			Username: "testuser",
+			Password: "password",
+		}))
+		if err != nil {
+			t.Fatalf("create user failed: %v", err)
+			return
+		}
+
+		{
+			_, err = service.AuthenticateUser(t.Context(), connect.NewRequest(&multiv1.AuthenticateUserRequest{
+				Username: "otheruser",
+				Password: "password",
+			}))
+			assert.Error(t, err, "not existing user")
+		}
+		{
+			_, err = service.AuthenticateUser(t.Context(), connect.NewRequest(&multiv1.AuthenticateUserRequest{
+				Username: "testuser",
+				Password: "wrongpassword",
+			}))
+			assert.Error(t, err, "wrong password")
+		}
 	})
 }
