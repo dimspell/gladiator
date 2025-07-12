@@ -17,7 +17,12 @@ func (b *Backend) HandleCreateNewAccount(ctx context.Context, session *bsession.
 	data, err := req.Parse()
 	if err != nil {
 		slog.Warn("Invalid packet", logging.Error(err))
-		return nil
+		return session.SendToGame(packet.CreateNewAccount, []byte{0, 0, 0, 0})
+	}
+
+	if len(data.Username)+len(data.Password) > 20 {
+		slog.Warn("Username and password too long", "length", len(data.Username)+len(data.Password), "expected", "<=20")
+		return session.SendToGame(packet.CreateNewAccount, []byte{0, 0, 0, 0})
 	}
 
 	respUser, err := b.userClient.CreateUser(ctx, connect.NewRequest(&multiv1.CreateUserRequest{
@@ -25,7 +30,7 @@ func (b *Backend) HandleCreateNewAccount(ctx context.Context, session *bsession.
 		Password: data.Password,
 	}))
 	if err != nil {
-		slog.Warn("packet-42: could not save new user into database", logging.Error(err))
+		slog.Warn("packet-42: could not save a new user into database", logging.Error(err))
 		return session.SendToGame(packet.CreateNewAccount, []byte{0, 0, 0, 0})
 	}
 
@@ -40,7 +45,6 @@ type CreateNewAccountRequestData struct {
 	CDKey    uint32
 	Username string
 	Password string
-	Unknown  []byte
 }
 
 func (r CreateNewAccountRequest) Parse() (data CreateNewAccountRequestData, err error) {
@@ -58,7 +62,6 @@ func (r CreateNewAccountRequest) Parse() (data CreateNewAccountRequestData, err 
 	if err != nil {
 		return data, fmt.Errorf("packet-42: malformed username: %w", err)
 	}
-	data.Unknown, _ = rd.ReadRestBytes()
 
 	return data, rd.Close()
 }
