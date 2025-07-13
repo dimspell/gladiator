@@ -17,14 +17,14 @@ func BackendCommand() *cli.Command {
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:    "console-addr",
-				Value:   defaultConsoleAddr,
-				Usage:   "Port for the console server",
+				Value:   defaultPublicConsoleAddr,
+				Usage:   "Address to the console server (with http:// or https://)",
 				Sources: cli.NewValueSourceChain(cli.EnvVar("CONSOLE_ADDR")),
 			},
 			&cli.StringFlag{
 				Name:    "backend-addr",
 				Value:   defaultBackendAddr,
-				Usage:   "Port for the backend server",
+				Usage:   "Bind address for the backend server",
 				Sources: cli.NewValueSourceChain(cli.EnvVar("BACKEND_ADDR")),
 			},
 			&cli.StringFlag{

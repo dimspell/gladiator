@@ -21,20 +21,21 @@ func ServeCommand(version string) *cli.Command {
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:    "console-addr",
+				Aliases: []string{"console-bind"},
 				Value:   defaultConsoleAddr,
-				Usage:   "Port for the console server",
-				Sources: cli.NewValueSourceChain(cli.EnvVar("CONSOLE_ADDR")),
+				Usage:   "Bind address for the console server",
+				Sources: cli.NewValueSourceChain(cli.EnvVar("CONSOLE_ADDR"), cli.EnvVar("CONSOLE_BIND")),
 			},
 			&cli.StringFlag{
 				Name:    "console-public-addr",
-				Value:   defaultConsoleAddr,
-				Usage:   "Public address to the console server",
+				Value:   defaultPublicConsoleAddr,
+				Usage:   "Public address to the console server (with http:// or https://)",
 				Sources: cli.NewValueSourceChain(cli.EnvVar("CONSOLE_PUBLIC_ADDR")),
 			},
 			&cli.StringFlag{
 				Name:    "backend-addr",
 				Value:   defaultBackendAddr,
-				Usage:   "Port for the backend server",
+				Usage:   "Bind address for the backend server",
 				Sources: cli.NewValueSourceChain(cli.EnvVar("BACKEND_ADDR")),
 			},
 			&cli.StringFlag{
@@ -51,9 +52,10 @@ func ServeCommand(version string) *cli.Command {
 			},
 			&cli.StringFlag{
 				Name:    "relay-addr",
+				Aliases: []string{"relay-bind"},
 				Value:   defaultRelayAddr,
-				Usage:   "Address of the relay server (only in relay proxy)",
-				Sources: cli.NewValueSourceChain(cli.EnvVar("RELAY_ADDR")),
+				Usage:   "Bind address for the relay server",
+				Sources: cli.NewValueSourceChain(cli.EnvVar("RELAY_ADDR"), cli.EnvVar("RELAY_BIND")),
 			},
 			&cli.StringFlag{
 				Name:    "relay-public-addr",
@@ -81,7 +83,7 @@ func ServeCommand(version string) *cli.Command {
 	}
 
 	cmd.Action = func(ctx context.Context, c *cli.Command) error {
-		consoleAddr := c.String("console-addr")
+		consolePublicAddr := c.String("console-public-addr")
 		backendAddr := c.String("backend-addr")
 		lobbyAddr := c.String("lobby-addr")
 
@@ -105,7 +107,7 @@ func ServeCommand(version string) *cli.Command {
 			return err
 		}
 
-		bd := backend.NewBackend(backendAddr, consoleAddr, px)
+		bd := backend.NewBackend(backendAddr, consolePublicAddr, px)
 		bd.SignalServerURL = lobbyAddr
 
 		co, err := selectConsoleOptions(c, version)

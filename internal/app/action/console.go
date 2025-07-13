@@ -16,9 +16,10 @@ func ConsoleCommand(version string) *cli.Command {
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:    "console-addr",
+				Aliases: []string{"console-bind"},
 				Value:   defaultConsoleAddr,
 				Usage:   "Bind address for the console server",
-				Sources: cli.NewValueSourceChain(cli.EnvVar("CONSOLE_ADDR")),
+				Sources: cli.NewValueSourceChain(cli.EnvVar("CONSOLE_ADDR"), cli.EnvVar("CONSOLE_BIND")),
 			},
 			&cli.StringFlag{
 				Name:    "console-public-addr",
@@ -28,8 +29,9 @@ func ConsoleCommand(version string) *cli.Command {
 			},
 			&cli.StringFlag{
 				Name:    "relay-addr",
+				Aliases: []string{"relay-bind"},
 				Usage:   "Bind address for the relay server",
-				Sources: cli.NewValueSourceChain(cli.EnvVar("RELAY_ADDR")),
+				Sources: cli.NewValueSourceChain(cli.EnvVar("RELAY_ADDR"), cli.EnvVar("RELAY_BIND")),
 			},
 			&cli.StringFlag{
 				Name:    "relay-public-addr",

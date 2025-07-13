@@ -1,9 +1,10 @@
 package action
 
+import "fmt"
+
 var (
 	// Backend
 	defaultBackendAddr = "127.0.0.1:6112"
-	defaultLobbyAddr   = "ws://127.0.0.1:2137/lobby"
 
 	// Proxy config
 	defaultProxyType = "lan"
@@ -17,7 +18,9 @@ var (
 
 var (
 	// Console
-	defaultConsoleAddr = "127.0.0.1:2137"
+	defaultConsoleAddr       = "127.0.0.1:2137"
+	defaultPublicConsoleAddr = fmt.Sprintf("http://%s", defaultConsoleAddr)
+	defaultLobbyAddr         = fmt.Sprintf("ws://%s/lobby", defaultConsoleAddr)
 
 	// SQLite config
 	defaultDatabasePath = "dispel-multi.sqlite"
