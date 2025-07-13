@@ -57,17 +57,17 @@ func TestSplit(t *testing.T) {
 		}
 
 		packets := Split(createAccountPacket)
-		assert.Equal(t, 22, len(packets))
+		assert.Equal(t, 1, len(packets))
+		assert.Equal(t, 22, len(packets[0]))
 	})
 
 	t.Run("wrong packet length - oversize", func(t *testing.T) {
-		createAccountPacket := []byte{
-			255, 1,
-			200, 200,
-			116, 101, 115, 116, 0, // password "test" = 5 (13)
-		}
+		packets := Split([]byte{
+			255, 1, // header
+			200, 200, // incorrect packet length
+			116, 101, 115, 116, 0, // some gibberish after
+		})
 
-		packets := Split(createAccountPacket)
 		assert.Equal(t, 0, len(packets))
 	})
 }
