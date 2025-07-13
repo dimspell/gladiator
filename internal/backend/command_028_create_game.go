@@ -2,8 +2,8 @@ package backend
 
 import (
 	"context"
-	"encoding/binary"
 	"fmt"
+	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"log/slog"
 
 	"connectrpc.com/connect"
@@ -25,13 +25,12 @@ func (b *Backend) HandleCreateGame(ctx context.Context, session *bsession.Sessio
 		return err
 	}
 
-	response := make([]byte, 4)
-
 	switch data.State {
 	case uint32(model.GameStateNone):
 		hostIPAddress, err := session.Proxy.CreateRoom(proxy.CreateParams{GameID: data.RoomName})
 		if err != nil {
-			return fmt.Errorf("packet-28: incorrect host address %w", err)
+			slog.Info("Failed to obtain host address when creating a game", logging.Error(err))
+			return session.SendToGame(packet.CreateGame, []byte{2, 0, 0, 0})
 		}
 
 		respGame, err := b.gameClient.CreateGame(ctx, connect.NewRequest(&multiv1.CreateGameRequest{
@@ -42,28 +41,30 @@ func (b *Backend) HandleCreateGame(ctx context.Context, session *bsession.Sessio
 			HostIpAddress: hostIPAddress.String(),
 		}))
 		if err != nil {
-			return err
+			slog.Info("Failed to create a game", logging.Error(err))
+			return session.SendToGame(packet.CreateGame, []byte{2, 0, 0, 0})
 		}
-		slog.Info("packet-28: created game room", "id", respGame.Msg.Game.GameId, "name", respGame.Msg.Game.Name)
 
-		binary.LittleEndian.PutUint32(response[0:4], uint32(model.GameStateCreating))
-		break
+		slog.Info("packet-28: created game room", "id", respGame.Msg.Game.GameId, "name", respGame.Msg.Game.Name)
+		return session.SendToGame(packet.CreateGame, []byte{model.GameStateCreating, 0, 0, 0})
+
 	case uint32(model.GameStateCreating):
 		respGame, err := b.gameClient.GetGame(ctx, connect.NewRequest(&multiv1.GetGameRequest{
 			GameRoomId: data.RoomName,
 		}))
 		if err != nil {
-			return err
+			slog.Info("Failed to get a game room", logging.Error(err))
+			return nil // Note: It is not possible to cancel the game creation now.
 		}
 
 		if err := session.Proxy.HostRoom(ctx, proxy.HostParams{GameID: respGame.Msg.GetGame().Name}); err != nil {
-			return err
+			slog.Info("Failed to host a game room", logging.Error(err))
+			return nil // Note: It is not possible to cancel the game creation now.
 		}
-		binary.LittleEndian.PutUint32(response[0:4], uint32(model.GameStateStarted))
-		break
+		return session.SendToGame(packet.CreateGame, []byte{model.GameStateStarted, 0, 0, 0})
 	}
 
-	return session.SendToGame(packet.CreateGame, response)
+	return fmt.Errorf("packet-28: incorrect game state %d", data.State)
 }
 
 type CreateGameRequest []byte
