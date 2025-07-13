@@ -20,8 +20,12 @@ func (b *Backend) HandleCreateNewAccount(ctx context.Context, session *bsession.
 		return session.SendToGame(packet.CreateNewAccount, []byte{0, 0, 0, 0})
 	}
 
-	if len(data.Username)+len(data.Password) > 20 {
-		slog.Warn("Username and password too long", "length", len(data.Username)+len(data.Password), "expected", "<=20")
+	if len(data.Username) == 0 || len(data.Username) > 8 {
+		slog.Warn("Incorrect username - must be less than 9 characters", "length", len(data.Username))
+		return session.SendToGame(packet.CreateNewAccount, []byte{0, 0, 0, 0})
+	}
+	if len(data.Password) == 0 || len(data.Password) > 8 {
+		slog.Warn("Incorrect password - must be less than 9 characters", "length", len(data.Password))
 		return session.SendToGame(packet.CreateNewAccount, []byte{0, 0, 0, 0})
 	}
 
