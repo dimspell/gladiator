@@ -3,8 +3,6 @@ package action
 import (
 	"context"
 	"fmt"
-	"log/slog"
-
 	"github.com/dimspell/gladiator/internal/app/logger"
 	"github.com/dimspell/gladiator/internal/backend"
 	"github.com/urfave/cli/v3"
@@ -61,7 +59,7 @@ func BackendCommand() *cli.Command {
 		// logger.PacketLogger = slog.New(packetlogger.New(os.Stderr, &packetlogger.Options{
 		//	Level: slog.LevelDebug,
 		// }))
-		logger.PacketLogger = slog.Default()
+		logger.PacketLogger = logger.NewDiscardLogger()
 
 		px, err := selectProxy(c)
 		if err != nil {
