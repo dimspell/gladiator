@@ -76,9 +76,8 @@ func (hm *HostManager) AssignIP(remoteID string) (string, error) {
 }
 
 type FakeHost struct {
-	Type     string
-	IP       string
-	LastSeen time.Time
+	Type string
+	IP   string
 
 	ProxyUDP Redirect
 	ProxyTCP Redirect
@@ -87,6 +86,7 @@ type FakeHost struct {
 
 // StartGuest adds a new dynamic joiner that dials our game client address
 func (hm *HostManager) StartGuest(
+	ctx context.Context,
 	peerID string,
 	ipAddress string,
 	realTCPPort, realUDPPort int,
@@ -107,15 +107,12 @@ func (hm *HostManager) StartGuest(
 	var err error
 	var tcpProxy, udpProxy Redirect
 
-	// TCP dialer to the local game server
 	if realTCPPort > 0 {
 		tcpProxy, err = DialTCP("127.0.0.1", strconv.Itoa(realTCPPort))
 		if err != nil {
 			return nil, fmt.Errorf("failed to dial TCP: %w", err)
 		}
 	}
-
-	// UDP dialer
 	if realUDPPort > 0 {
 		udpProxy, err = DialUDP("127.0.0.1", strconv.Itoa(realUDPPort))
 		if err != nil {
@@ -123,55 +120,44 @@ func (hm *HostManager) StartGuest(
 		}
 	}
 
-	g, ctx := errgroup.WithContext(context.Background())
+	g, ctx := errgroup.WithContext(ctx)
 	ctx, cancel := context.WithCancel(ctx)
 
 	host := &FakeHost{
 		Type:     "DIAL",
 		IP:       ipAddress,
-		LastSeen: time.Now(),
 		stopFunc: cancel,
 		ProxyTCP: tcpProxy,
 		ProxyUDP: udpProxy,
 	}
 
-	var wg sync.WaitGroup
-	wg.Add(3)
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
 
-	go func(host *FakeHost) {
-		g.Go(func() error {
-			wg.Done()
-			if tcpProxy == nil {
-				return nil
-			}
-			return tcpProxy.Run(ctx, func(p []byte) (err error) {
-				slog.Debug("[TCP] GameClient => Remote", "data", p, logging.PeerID(peerID))
-
-				host.LastSeen = time.Now()
-				return onReceiveTCP(p)
+	go func(host *FakeHost, wg *sync.WaitGroup) {
+		if tcpProxy == nil {
+			g.Go(func() error {
+				return tcpProxy.Run(ctx, func(p []byte) (err error) {
+					slog.Debug("[TCP] GameClient => Remote", "data", p, logging.PeerID(peerID))
+					return onReceiveTCP(p)
+				})
 			})
-		})
-
-		g.Go(func() error {
-			wg.Done()
-			return udpProxy.Run(ctx, func(p []byte) (err error) {
-				if udpProxy == nil {
-					return nil
-				}
-
-				slog.Debug("[UDP] GameClient => Remote", "data", p, logging.PeerID(peerID))
-
-				host.LastSeen = time.Now()
-				return onReceiveUDP(p)
+		}
+		if udpProxy != nil {
+			g.Go(func() error {
+				return udpProxy.Run(ctx, func(p []byte) (err error) {
+					slog.Debug("[UDP] GameClient => Remote", "data", p, logging.PeerID(peerID))
+					return onReceiveUDP(p)
+				})
 			})
-		})
+		}
 
 		wg.Done()
 		if err := g.Wait(); err != nil {
 			slog.Warn("UDP/TCP fake host failed", logging.Error(err))
 			return
 		}
-	}(host)
+	}(host, wg)
 
 	hm.Hosts[ipAddress] = host
 	hm.PeerHosts[peerID] = host
@@ -203,25 +189,17 @@ func (hm *HostManager) StartHost(
 	var err error
 	var tcpProxy, udpProxy Redirect
 
-	var wg sync.WaitGroup
-	wg.Add(1)
-
-	// TCP listener that mimics a peer in LAN
 	if realTCPPort > 0 {
 		tcpProxy, err = ListenTCP(ipAddress, strconv.Itoa(realTCPPort))
 		if err != nil {
 			return nil, fmt.Errorf("failed to listen on TCP: %w", err)
 		}
-		wg.Add(1)
 	}
-
-	// UDP listener
 	if realUDPPort > 0 {
 		udpProxy, err = ListenUDP(ipAddress, strconv.Itoa(realUDPPort))
 		if err != nil {
 			return nil, fmt.Errorf("failed to listen on UDP: %w", err)
 		}
-		wg.Add(1)
 	}
 
 	g, ctx := errgroup.WithContext(ctx)
@@ -230,32 +208,27 @@ func (hm *HostManager) StartHost(
 	host := &FakeHost{
 		Type:     "LISTEN",
 		IP:       ipAddress,
-		LastSeen: time.Now(),
 		stopFunc: cancel,
 		ProxyTCP: tcpProxy,
 		ProxyUDP: udpProxy,
 	}
 
+	var wg sync.WaitGroup
+	wg.Add(1)
+
 	go func(host *FakeHost) {
 		if tcpProxy != nil {
 			g.Go(func() error {
-				wg.Done()
 				return tcpProxy.Run(ctx, func(p []byte) (err error) {
 					slog.Debug("[TCP] GameClient => Remote", "data", p, logging.PeerID(peerID))
-
-					host.LastSeen = time.Now()
 					return onReceiveTCP(p)
 				})
 			})
 		}
-
 		if udpProxy != nil {
 			g.Go(func() error {
-				wg.Done()
 				return udpProxy.Run(ctx, func(p []byte) (err error) {
 					slog.Debug("[UDP] GameClient => Remote", "data", p, logging.PeerID(peerID))
-
-					host.LastSeen = time.Now()
 					return onReceiveUDP(p)
 				})
 			})
@@ -341,11 +314,11 @@ func (hm *HostManager) CleanupInactive(timeout time.Duration) {
 	hm.mu.Lock()
 	defer hm.mu.Unlock()
 
-	now := time.Now().Add(timeout)
-	for ipAddress, host := range hm.Hosts {
-		if host.LastSeen.After(now) {
-			slog.Info("Removing inactive host", "ip", ipAddress)
-			hm.StopHost(host, ipAddress)
-		}
-	}
+	// now := time.Now().Add(timeout)
+	// for ipAddress, host := range hm.Hosts {
+	// 	if host.LastSeen.After(now) {
+	// 		slog.Info("Removing inactive host", "ip", ipAddress)
+	// 		hm.StopHost(host, ipAddress)
+	// 	}
+	// }
 }
