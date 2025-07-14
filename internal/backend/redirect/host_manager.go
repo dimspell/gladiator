@@ -196,7 +196,7 @@ func (hm *HostManager) CreateFakeHost(
 	wg.Add(1)
 
 	go func(host *FakeHost, wg *sync.WaitGroup) {
-		if tcpProxy == nil {
+		if tcpProxy != nil {
 			g.Go(func() error {
 				err := tcpProxy.Run(ctx, func(p []byte) (err error) {
 					slog.Debug("[TCP] GameClient => Remote", "data", p, logging.PeerID(peerID))
