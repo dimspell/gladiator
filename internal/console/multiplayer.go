@@ -565,7 +565,15 @@ func (mp *Multiplayer) handleRelayEvent(event RelayEvent) {
 	case "join":
 		// mp.JoinRoom(event.RoomID, event.PeerID, "")
 	case "leave":
-		// mp.LeaveRoom(context.Background(), &UserSession{})
+		userID, err := strconv.ParseInt(event.PeerID, 10, 64)
+		if err != nil {
+			return
+		}
+		sess, found := mp.GetUserSession(userID)
+		if !found {
+			return
+		}
+		mp.LeaveRoom(context.Background(), sess)
 	case "delete":
 		// mp.DestroyRoom(event.RoomID)
 	}
