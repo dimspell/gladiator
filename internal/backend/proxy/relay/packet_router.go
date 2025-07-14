@@ -144,7 +144,7 @@ func (r *PacketRouter) handleHostMigration(ctx context.Context, player wire.Play
 					Payload: p,
 				})
 			}
-			host, err := r.manager.StartGuest(peerID, ip, 6114, 6113, onTCPMessage, onUDPMessage)
+			host, err := r.manager.StartGuest(ctx, peerID, ip, 6114, 6113, onTCPMessage, onUDPMessage)
 			if err != nil {
 				r.logger.Warn("failed to start dial host", logging.Error(err), logging.PeerID(peerID))
 				return nil
@@ -281,15 +281,11 @@ func (r *PacketRouter) keepAliveHost(ctx context.Context) {
 	}(r.pingTicker)
 }
 
-func (r *PacketRouter) startHostProbe(ctx context.Context, addr string, onDisconnect func()) error {
-	return redirect.StartProbeTCP(ctx, addr, onDisconnect)
-}
-
 func (r *PacketRouter) stop(host *redirect.FakeHost, peerID string, ipAddress string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	slog.Info("Stopping host", logging.PeerID(peerID), "ip", ipAddress, "lastSeen", host.LastSeen)
+	slog.Info("Stopping host", logging.PeerID(peerID), "ip", ipAddress)
 	r.manager.StopHost(host, ipAddress)
 }
 
@@ -473,7 +469,7 @@ func (r *PacketRouter) dynamicJoin(ctx context.Context, roomID string, peerID st
 	}
 
 	// TODO: It must be local addr
-	host, err := r.manager.StartGuest(peerID, ip, tcpPort, 6113, onTCPMessage, onUDPMessage)
+	host, err := r.manager.StartGuest(ctx, peerID, ip, tcpPort, 6113, onTCPMessage, onUDPMessage)
 	if err != nil {
 		r.logger.Warn("failed to start dial host", logging.Error(err), logging.PeerID(peerID))
 		// TODO: Unassign IP address
