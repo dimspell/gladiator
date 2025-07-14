@@ -50,6 +50,7 @@ func (p *DialerTCP) Run(ctx context.Context, onReceive func(p []byte) (err error
 	}
 
 	defer func() {
+		p.logger.Debug("Deferred p.Close TCP connection")
 		_ = p.Close()
 	}()
 
@@ -63,8 +64,10 @@ func (p *DialerTCP) Run(ctx context.Context, onReceive func(p []byte) (err error
 		default:
 			clear(buf)
 
-			p.conn.SetReadDeadline(time.Now().Add(10 * time.Second))
+			p.conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 			n, err := p.conn.Read(buf)
+			p.logger.Info("TCP READ")
+
 			if err != nil {
 				var ne net.Error
 				if errors.As(err, &ne) && ne.Timeout() {
@@ -99,6 +102,8 @@ func (p *DialerTCP) Write(msg []byte) (int, error) {
 
 // Close terminates the TCP connection.
 func (p *DialerTCP) Close() error {
+	p.logger.Debug("Closing TCP connection")
+
 	err := p.conn.Close()
 	if err != nil {
 		p.logger.Debug("Failed to close TCP connection", logging.Error(err))
