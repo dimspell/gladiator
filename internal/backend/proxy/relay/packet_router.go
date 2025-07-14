@@ -422,7 +422,7 @@ func (r *PacketRouter) writeTCP(peerID string, pkt RelayPacket) {
 }
 
 func (r *PacketRouter) writeUDP(peerID string, pkt RelayPacket) {
-	slog.Debug("[UDP] Remote => GameClient", "data", pkt.Payload, logging.PeerID(peerID))
+	//slog.Debug("[UDP] Remote => GameClient", "data", pkt.Payload, logging.PeerID(peerID))
 
 	// r.manager.mu.Lock()
 	// defer r.manager.mu.Unlock()
