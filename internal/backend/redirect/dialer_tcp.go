@@ -66,8 +66,6 @@ func (p *DialerTCP) Run(ctx context.Context, onReceive func(p []byte) (err error
 
 			p.conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 			n, err := p.conn.Read(buf)
-			p.logger.Info("TCP READ")
-
 			if err != nil {
 				var ne net.Error
 				if errors.As(err, &ne) && ne.Timeout() {
@@ -80,7 +78,7 @@ func (p *DialerTCP) Run(ctx context.Context, onReceive func(p []byte) (err error
 				return err
 			}
 
-			// p.logger.Debug("Received TCP message", "size", n)
+			p.logger.Debug("Received TCP message", "size", n)
 
 			if err := onReceive(buf[:n]); err != nil {
 				return fmt.Errorf("tcp-dial: failed to handle data received from the game client to: %w", err)
