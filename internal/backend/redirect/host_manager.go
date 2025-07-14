@@ -202,7 +202,7 @@ func (hm *HostManager) CreateFakeHost(
 					slog.Debug("[TCP] GameClient => Remote", "data", p, logging.PeerID(peerID))
 					return tcpParams.OnReceive(p)
 				})
-				slog.Debug("Closed TCP proxy")
+				slog.Debug("Closed TCP proxy", "error", err)
 				return err
 			})
 		}
@@ -212,7 +212,7 @@ func (hm *HostManager) CreateFakeHost(
 					slog.Debug("[UDP] GameClient => Remote", "data", p, logging.PeerID(peerID))
 					return udpParams.OnReceive(p)
 				})
-				slog.Debug("Closed UDP proxy")
+				slog.Debug("Closed UDP proxy", "error", err)
 				return err
 			})
 		}
@@ -221,6 +221,7 @@ func (hm *HostManager) CreateFakeHost(
 		if err := g.Wait(); err != nil {
 			slog.Warn("UDP/TCP fake host failed", logging.Error(err))
 			cancel()
+			host.Dead = true
 			return
 		}
 	}(host, wg)
