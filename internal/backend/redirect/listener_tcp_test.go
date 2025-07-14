@@ -23,10 +23,12 @@ type mockConn struct {
 	writeErr    error
 	closed      bool
 	setDeadline bool
-	remoteAddr  net.Addr
 }
 
 func (m *mockConn) Read(b []byte) (int, error) {
+	if m.closed {
+		return 0, io.EOF
+	}
 	if m.readErr != nil {
 		return 0, m.readErr
 	}
@@ -49,10 +51,6 @@ func (m *mockConn) Close() error {
 func (m *mockConn) SetReadDeadline(t time.Time) error {
 	m.setDeadline = true
 	return nil
-}
-
-func (m *mockConn) RemoteAddr() net.Addr {
-	return m.remoteAddr
 }
 
 // mockListener implements net.Listener for testing Run
@@ -98,46 +96,19 @@ func TestListenerTCP_Run(t *testing.T) {
 	t.Run("Got EOF", func(t *testing.T) {
 		// Arrange
 		mock := &mockConn{
-			readErr:    io.EOF,
-			remoteAddr: &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 3333},
+			readErr: io.EOF,
 		}
 		listener := &ListenerTCP{logger: slog.Default()}
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
 
 		// Act
-		err := listener.handleConnection(ctx, mock, func(p []byte) error {
+		err := listener.handleConnection(mock, func(p []byte) error {
 			t.Fatal("should not be called")
 			return nil
 		})
 
 		// Assert
 		if err == nil || !errors.Is(err, io.EOF) {
-			t.Fatalf("expected error io.EOF, got: %v", err)
-		}
-		if !mock.closed {
-			t.Error("expected connection to be closed")
-		}
-	})
-
-	t.Run("Context cancelled on handle connections", func(t *testing.T) {
-		// Arrange
-		mock := &mockConn{
-			readData:   []byte("test"),
-			remoteAddr: &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 4444},
-		}
-		listener := &ListenerTCP{logger: slog.Default()}
-		ctx, cancel := context.WithCancel(context.Background())
-		cancel()
-
-		// Act
-		err := listener.handleConnection(ctx, mock, func(p []byte) error {
-			return nil
-		})
-
-		// Assert
-		if !errors.Is(err, context.Canceled) {
-			t.Errorf("expected context.Canceled, got: %v", err)
+			t.Errorf("expected error io.EOF, got: %v", err)
 		}
 	})
 
@@ -170,20 +141,16 @@ func TestListenerTCP_Run(t *testing.T) {
 	t.Run("Continue on deadline exceeded", func(t *testing.T) {
 		// Arrange
 		mock := &mockConn{
-			readErr:    timeoutErr{},
-			readData:   []byte("ignored"), // won't be used
-			remoteAddr: &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 6666},
+			readErr:  &timeoutErr{},
+			readData: []byte("ignored"), // won't be used
 		}
 		listener := &ListenerTCP{logger: slog.Default()}
-
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
 
 		// Act
 		done := make(chan struct{})
 		go func() {
 			// only allow a short loop
-			_ = listener.handleConnection(ctx, mock, func(p []byte) error {
+			_ = listener.handleConnection(mock, func(p []byte) error {
 				t.Fatal("should not be called on timeout")
 				return nil
 			})
@@ -191,7 +158,7 @@ func TestListenerTCP_Run(t *testing.T) {
 		}()
 
 		time.Sleep(50 * time.Millisecond)
-		cancel()
+		_ = mock.Close()
 
 		// Assert
 		select {
@@ -203,17 +170,13 @@ func TestListenerTCP_Run(t *testing.T) {
 
 	t.Run("Receive error", func(t *testing.T) {
 		mock := &mockConn{
-			readData:   []byte("trigger"),
-			remoteAddr: &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 7777},
+			readData: []byte("trigger"),
 		}
 		listener := &ListenerTCP{logger: slog.Default()}
 
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
 		expectedErr := errors.New("callback failure")
 
-		err := listener.handleConnection(ctx, mock, func(p []byte) error {
+		err := listener.handleConnection(mock, func(p []byte) error {
 			return expectedErr
 		})
 
@@ -239,9 +202,7 @@ func TestListenerTCP_Write(t *testing.T) {
 
 	t.Run("Success", func(t *testing.T) {
 		// Arrange
-		mock := &mockConn{
-			remoteAddr: &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 12345},
-		}
+		mock := &mockConn{}
 
 		l := &ListenerTCP{
 			conn:   mock,
@@ -266,9 +227,7 @@ func TestListenerTCP_Write(t *testing.T) {
 }
 
 func TestListenerTCP_Close(t *testing.T) {
-	mock := &mockConn{
-		remoteAddr: &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 5555},
-	}
+	mock := &mockConn{}
 	ln := &ListenerTCP{
 		conn:     mock,
 		listener: &mockListener{acceptConns: make(chan net.Conn)},
@@ -315,13 +274,19 @@ func TestListenerTCP_ReceivesAndCallsCallback(t *testing.T) {
 			close(done)
 			return nil
 		})
-		if err != nil && !errors.Is(err, context.Canceled) {
+		if err != nil && !errors.Is(err, io.ErrClosedPipe) {
 			t.Errorf("Run returned unexpected error: %v", err)
 		}
 		wg.Done()
 	}()
 
 	time.Sleep(100 * time.Millisecond)
+	if _, err := sendConn.Write([]byte("##testuser")); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+		return
+	}
+
+	time.Sleep(5 * time.Millisecond)
 	if _, err := sendConn.Write([]byte("ping")); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 		return
@@ -363,7 +328,7 @@ func TestListenerTCP_Alive(t *testing.T) {
 				conn:       &mockConn{},
 				lastActive: now.Add(tt.duration),
 			}
-			if got := p.Alive(now); got != tt.want {
+			if got := p.Alive(now, 5*time.Second); got != tt.want {
 				t.Errorf("Alive() = %v, want %v", got, tt.want)
 			}
 		})
