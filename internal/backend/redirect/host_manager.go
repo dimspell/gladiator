@@ -91,6 +91,7 @@ func (hm *HostManager) StartGuest(
 	ipAddress string,
 	tcpPort, udpPort int,
 	onReceiveTCP, onReceiveUDP func([]byte) error,
+	onHostDisconnect func(host *FakeHost),
 ) (*FakeHost, error) {
 	return hm.CreateFakeHost(
 		ctx,
@@ -109,6 +110,7 @@ func (hm *HostManager) StartGuest(
 			Create:    func(ipv4, port string) (Redirect, error) { return DialUDP(ipv4, port) },
 			OnReceive: onReceiveUDP,
 		},
+		onHostDisconnect,
 	)
 }
 
@@ -118,6 +120,7 @@ func (hm *HostManager) StartHost(
 	peerID, ipAddress string,
 	tcpPort, udpPort int,
 	onReceiveTCP, onReceiveUDP func([]byte) error,
+	onHostDisconnect func(host *FakeHost),
 ) (*FakeHost, error) {
 	return hm.CreateFakeHost(
 		ctx,
@@ -136,6 +139,7 @@ func (hm *HostManager) StartHost(
 			Create:    func(ipv4, port string) (Redirect, error) { return ListenUDP(ipv4, port) },
 			OnReceive: onReceiveUDP,
 		},
+		onHostDisconnect,
 	)
 }
 
@@ -153,6 +157,7 @@ func (hm *HostManager) CreateFakeHost(
 	ipAddress string,
 	tcpParams *ProxyParams,
 	udpParams *ProxyParams,
+	onHostDisconnect func(host *FakeHost),
 ) (*FakeHost, error) {
 	if net.ParseIP(ipAddress).To4() == nil {
 		return nil, fmt.Errorf("invalid IP address: %s", ipAddress)
@@ -221,6 +226,9 @@ func (hm *HostManager) CreateFakeHost(
 		if err := g.Wait(); err != nil {
 			slog.Warn("UDP/TCP fake host failed", logging.Error(err))
 			cancel()
+			if onHostDisconnect != nil {
+				onHostDisconnect(host)
+			}
 			return
 		}
 	}(host, wg)
