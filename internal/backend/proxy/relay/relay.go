@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"net"
 
-	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/proxy"
 	"github.com/dimspell/gladiator/internal/backend/redirect"
@@ -189,18 +188,18 @@ func (r *Relay) Join(ctx context.Context, params proxy.JoinParams) (net.IP, erro
 				})
 			}
 
-			host, err := r.router.manager.StartHost(ctx, peerID, ipAddress, 6114, 6113, onTCPMessage, onUDPMessage)
+			_, err := r.router.manager.StartHost(ctx, peerID, ipAddress, 6114, 6113, onTCPMessage, onUDPMessage)
 			if err != nil {
 				return nil, err
 			}
 
-			onHostDisconnected := func() {
-				slog.Warn("Host went offline", logging.PeerID(peerID), "ip", ipAddress)
-				r.router.stop(host, peerID, ipAddress)
-			}
-			if err := probe.StartProbeTCP(ctx, net.JoinHostPort(ipAddress, "6114"), onHostDisconnected); err != nil {
-				return nil, fmt.Errorf("failed start the game server probe: %w", err)
-			}
+			//onHostDisconnected := func() {
+			//	slog.Warn("Host went offline", logging.PeerID(peerID), "ip", ipAddress)
+			//	r.router.stop(host, peerID, ipAddress)
+			//}
+			//if err := probe.StartProbeTCP(ctx, net.JoinHostPort(ipAddress, "6114"), onHostDisconnected); err != nil {
+			//	return nil, fmt.Errorf("failed start the game server probe: %w", err)
+			//}
 		} else {
 			if _, err := r.router.manager.StartHost(ctx, peerID, ipAddress, 0, 6113, nil, onUDPMessage); err != nil {
 				return nil, err
