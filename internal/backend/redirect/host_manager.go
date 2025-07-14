@@ -226,9 +226,7 @@ func (hm *HostManager) CreateFakeHost(
 		if err := g.Wait(); err != nil {
 			slog.Warn("UDP/TCP fake host failed", logging.Error(err))
 			cancel()
-			if onHostDisconnect != nil {
-				onHostDisconnect(host)
-			}
+			hm.StopHost(host, ipAddress)
 			return
 		}
 	}(host, wg)
