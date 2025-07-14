@@ -89,10 +89,72 @@ func (hm *HostManager) StartGuest(
 	ctx context.Context,
 	peerID string,
 	ipAddress string,
-	realTCPPort, realUDPPort int,
+	tcpPort, udpPort int,
 	onReceiveTCP, onReceiveUDP func([]byte) error,
 ) (*FakeHost, error) {
-	if net.ParseIP(ipAddress) == nil {
+	return hm.CreateFakeHost(
+		ctx,
+		"DIAL",
+		peerID,
+		ipAddress,
+		&ProxyParams{
+			IPAddress: "127.0.0.1",
+			Port:      tcpPort,
+			Create:    func(ipv4, port string) (Redirect, error) { return DialTCP(ipv4, port) },
+			OnReceive: onReceiveTCP,
+		},
+		&ProxyParams{
+			IPAddress: "127.0.0.1",
+			Port:      udpPort,
+			Create:    func(ipv4, port string) (Redirect, error) { return DialUDP(ipv4, port) },
+			OnReceive: onReceiveUDP,
+		},
+	)
+}
+
+// StartHost starts a fake host listening on a loopback IP
+func (hm *HostManager) StartHost(
+	ctx context.Context,
+	peerID, ipAddress string,
+	tcpPort, udpPort int,
+	onReceiveTCP, onReceiveUDP func([]byte) error,
+) (*FakeHost, error) {
+	return hm.CreateFakeHost(
+		ctx,
+		"LISTEN",
+		peerID,
+		ipAddress,
+		&ProxyParams{
+			IPAddress: ipAddress,
+			Port:      tcpPort,
+			Create:    func(ipv4, port string) (Redirect, error) { return ListenTCP(ipv4, port) },
+			OnReceive: onReceiveTCP,
+		},
+		&ProxyParams{
+			IPAddress: ipAddress,
+			Port:      udpPort,
+			Create:    func(ipv4, port string) (Redirect, error) { return ListenUDP(ipv4, port) },
+			OnReceive: onReceiveUDP,
+		},
+	)
+}
+
+type ProxyParams struct {
+	IPAddress string
+	Port      int
+	Create    func(ipv4, port string) (Redirect, error)
+	OnReceive func([]byte) error
+}
+
+func (hm *HostManager) CreateFakeHost(
+	ctx context.Context,
+	fakeHostType string,
+	peerID string,
+	ipAddress string,
+	tcpParams *ProxyParams,
+	udpParams *ProxyParams,
+) (*FakeHost, error) {
+	if net.ParseIP(ipAddress).To4() == nil {
 		return nil, fmt.Errorf("invalid IP address: %s", ipAddress)
 	}
 
@@ -100,31 +162,30 @@ func (hm *HostManager) StartGuest(
 	defer hm.mu.Unlock()
 
 	if _, exists := hm.Hosts[ipAddress]; exists {
-		log.Printf("Already started guest IP %s\n", ipAddress)
 		return nil, fmt.Errorf("host %s already running", ipAddress)
 	}
 
 	var err error
 	var tcpProxy, udpProxy Redirect
 
-	if realTCPPort > 0 {
-		tcpProxy, err = DialTCP("127.0.0.1", strconv.Itoa(realTCPPort))
+	if tcpParams != nil && tcpParams.Port > 0 {
+		tcpProxy, err = tcpParams.Create(tcpParams.IPAddress, strconv.Itoa(tcpParams.Port))
 		if err != nil {
-			return nil, fmt.Errorf("failed to dial TCP: %w", err)
+			return nil, err
 		}
 	}
-	if realUDPPort > 0 {
-		udpProxy, err = DialUDP("127.0.0.1", strconv.Itoa(realUDPPort))
+	if udpParams != nil && udpParams.Port > 0 {
+		udpProxy, err = udpParams.Create(udpParams.IPAddress, strconv.Itoa(udpParams.Port))
 		if err != nil {
-			return nil, fmt.Errorf("failed to dial UDP: %w", err)
+			return nil, err
 		}
 	}
 
-	g, ctx := errgroup.WithContext(ctx)
 	ctx, cancel := context.WithCancel(ctx)
+	g, ctx := errgroup.WithContext(ctx)
 
 	host := &FakeHost{
-		Type:     "DIAL",
+		Type:     fakeHostType,
 		IP:       ipAddress,
 		stopFunc: cancel,
 		ProxyTCP: tcpProxy,
@@ -139,7 +200,7 @@ func (hm *HostManager) StartGuest(
 			g.Go(func() error {
 				return tcpProxy.Run(ctx, func(p []byte) (err error) {
 					slog.Debug("[TCP] GameClient => Remote", "data", p, logging.PeerID(peerID))
-					return onReceiveTCP(p)
+					return tcpParams.OnReceive(p)
 				})
 			})
 		}
@@ -147,7 +208,7 @@ func (hm *HostManager) StartGuest(
 			g.Go(func() error {
 				return udpProxy.Run(ctx, func(p []byte) (err error) {
 					slog.Debug("[UDP] GameClient => Remote", "data", p, logging.PeerID(peerID))
-					return onReceiveUDP(p)
+					return udpParams.OnReceive(p)
 				})
 			})
 		}
@@ -155,89 +216,10 @@ func (hm *HostManager) StartGuest(
 		wg.Done()
 		if err := g.Wait(); err != nil {
 			slog.Warn("UDP/TCP fake host failed", logging.Error(err))
+			cancel()
 			return
 		}
 	}(host, wg)
-
-	hm.Hosts[ipAddress] = host
-	hm.PeerHosts[peerID] = host
-
-	wg.Wait()
-	return host, nil
-}
-
-// StartHost starts a fake host listening on a loopback IP
-func (hm *HostManager) StartHost(
-	ctx context.Context,
-	peerID, ipAddress string,
-	realTCPPort, realUDPPort int,
-	onReceiveTCP, onReceiveUDP func([]byte) error,
-) (*FakeHost, error) {
-	if net.ParseIP(ipAddress) == nil {
-		return nil, fmt.Errorf("invalid IP address: %s", ipAddress)
-	}
-
-	hm.mu.Lock()
-	defer hm.mu.Unlock()
-
-	if _, exists := hm.Hosts[ipAddress]; exists {
-		return nil, fmt.Errorf("host %s already running", ipAddress)
-	}
-
-	var err error
-	var tcpProxy, udpProxy Redirect
-
-	if realTCPPort > 0 {
-		tcpProxy, err = ListenTCP(ipAddress, strconv.Itoa(realTCPPort))
-		if err != nil {
-			return nil, fmt.Errorf("failed to listen on TCP: %w", err)
-		}
-	}
-	if realUDPPort > 0 {
-		udpProxy, err = ListenUDP(ipAddress, strconv.Itoa(realUDPPort))
-		if err != nil {
-			return nil, fmt.Errorf("failed to listen on UDP: %w", err)
-		}
-	}
-
-	g, ctx := errgroup.WithContext(ctx)
-	ctx, cancel := context.WithCancel(ctx)
-
-	host := &FakeHost{
-		Type:     "LISTEN",
-		IP:       ipAddress,
-		stopFunc: cancel,
-		ProxyTCP: tcpProxy,
-		ProxyUDP: udpProxy,
-	}
-
-	var wg sync.WaitGroup
-	wg.Add(1)
-
-	go func(host *FakeHost) {
-		if tcpProxy != nil {
-			g.Go(func() error {
-				return tcpProxy.Run(ctx, func(p []byte) (err error) {
-					slog.Debug("[TCP] GameClient => Remote", "data", p, logging.PeerID(peerID))
-					return onReceiveTCP(p)
-				})
-			})
-		}
-		if udpProxy != nil {
-			g.Go(func() error {
-				return udpProxy.Run(ctx, func(p []byte) (err error) {
-					slog.Debug("[UDP] GameClient => Remote", "data", p, logging.PeerID(peerID))
-					return onReceiveUDP(p)
-				})
-			})
-		}
-
-		wg.Done()
-		if err := g.Wait(); err != nil {
-			slog.Warn("UDP/TCP fake host failed", logging.Error(err))
-			return
-		}
-	}(host)
 
 	hm.Hosts[ipAddress] = host
 	hm.PeerHosts[peerID] = host
