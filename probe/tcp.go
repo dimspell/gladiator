@@ -42,7 +42,7 @@ func StartProbeTCP(ctx context.Context, addr string, onDisconnect func()) error 
 			_ = conn.Close()
 		}()
 
-		time.Sleep(10 * time.Second)
+		time.Sleep(3 * time.Second)
 
 		buf := make([]byte, 1)
 		for {
