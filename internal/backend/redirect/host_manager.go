@@ -198,18 +198,22 @@ func (hm *HostManager) CreateFakeHost(
 	go func(host *FakeHost, wg *sync.WaitGroup) {
 		if tcpProxy == nil {
 			g.Go(func() error {
-				return tcpProxy.Run(ctx, func(p []byte) (err error) {
+				err := tcpProxy.Run(ctx, func(p []byte) (err error) {
 					slog.Debug("[TCP] GameClient => Remote", "data", p, logging.PeerID(peerID))
 					return tcpParams.OnReceive(p)
 				})
+				slog.Debug("Closed TCP proxy")
+				return err
 			})
 		}
 		if udpProxy != nil {
 			g.Go(func() error {
-				return udpProxy.Run(ctx, func(p []byte) (err error) {
+				err := udpProxy.Run(ctx, func(p []byte) (err error) {
 					slog.Debug("[UDP] GameClient => Remote", "data", p, logging.PeerID(peerID))
 					return udpParams.OnReceive(p)
 				})
+				slog.Debug("Closed UDP proxy")
+				return err
 			})
 		}
 
