@@ -169,11 +169,9 @@ func (hm *HostManager) StartGuest(
 // StartHost starts a fake host listening on a loopback IP
 func (hm *HostManager) StartHost(
 	ctx context.Context,
-	peerID string,
-	ipAddress string,
+	peerID, ipAddress string,
 	realTCPPort, realUDPPort int,
 	onReceiveTCP, onReceiveUDP func([]byte) error,
-	livenessProbe func() error,
 ) (*FakeHost, error) {
 	if net.ParseIP(ipAddress) == nil {
 		return nil, fmt.Errorf("invalid IP address: %s", ipAddress)

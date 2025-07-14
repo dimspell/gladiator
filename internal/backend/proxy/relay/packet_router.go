@@ -191,7 +191,7 @@ func (r *PacketRouter) handleHostMigration(ctx context.Context, player wire.Play
 	}
 
 	var err error
-	host, err = r.manager.StartHost(ctx, newHostID, ipAddress, 6114, 6113, onTCPMessage, onUDPMessage, nil)
+	host, err = r.manager.StartHost(ctx, newHostID, ipAddress, 6114, 6113, onTCPMessage, onUDPMessage)
 	if err != nil {
 		r.logger.Warn("failed to start host", logging.Error(err), logging.PeerID(newHostID))
 		return nil
