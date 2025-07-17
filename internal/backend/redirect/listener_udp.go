@@ -43,7 +43,7 @@ func ListenUDP(ipv4 string, portNumber string) (*ListenerUDP, error) {
 
 	logger := slog.With(
 		slog.String("redirect", "listen-udp"),
-		slog.String("remoteAddr", srcAddr.String()),
+		slog.String("address", srcAddr.String()),
 	)
 	logger.Info("UDP listener started")
 

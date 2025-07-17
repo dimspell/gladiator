@@ -297,28 +297,6 @@ func (r *PacketRouter) stop(host *redirect.FakeHost, peerID string, ipAddress st
 	r.manager.StopHost(host, ipAddress)
 }
 
-var hmacKey = []byte("shared-secret-key")
-
-func sign(data []byte) []byte {
-	// mac := hmac.New(sha256.New, hmacKey)
-	// mac.Write(data)
-	// return append(mac.Sum(nil), data...)
-	return data
-}
-
-func verify(packet []byte) ([]byte, bool) {
-	// if len(packet) < 32 {
-	//	return nil, false
-	// }
-	// sig := packet[:32]
-	// data := packet[32:]
-	// mac := hmac.New(sha256.New, hmacKey)
-	// mac.Write(data)
-	// expected := mac.Sum(nil)
-	// return data, hmac.Equal(sig, expected)
-	return packet, true
-}
-
 type RelayPacket struct {
 	Type    string `json:"type"` // "join", "leave", "data", "broadcast", "migrate", "tcp", "udp"
 	RoomID  string `json:"room"`
@@ -339,9 +317,6 @@ func (r *PacketRouter) sendPacket(pkt RelayPacket) error {
 	if err != nil {
 		return fmt.Errorf("marshal packet failed: %w", err)
 	}
-	// packet := sign(data)
-
-	// r.logger.Debug("Sending packet", "fromID", pkt.FromID, "type", pkt.Type, "data", pkt.Payload, "datastr", string(pkt.Payload), "toId", pkt.ToID)
 
 	data = append(data, '\n')
 
@@ -363,13 +338,7 @@ func (r *PacketRouter) receiveLoop(ctx context.Context, stream *quic.Stream) {
 			r.logger.Error("received error while reading packet", logging.Error(err))
 			return
 		}
-		data, ok := verify(buf[:n])
-		if !ok {
-			r.logger.Warn("received invalid packet - signature is incorrect")
-			continue
-		}
-
-		// r.logger.Debug("Received packet", "data", data, "datastr", string(data))
+		data := buf[:n]
 
 		d := json.NewDecoder(bytes.NewReader(data))
 		for {
@@ -415,9 +384,6 @@ func (r *PacketRouter) readMessage(fromID string, pkt RelayPacket) {
 func (r *PacketRouter) writeTCP(peerID string, pkt RelayPacket) {
 	slog.Debug("[TCP] Remote => GameClient", "data", pkt.Payload, logging.PeerID(peerID))
 
-	// r.manager.mu.Lock()
-	// defer r.manager.mu.Unlock()
-
 	host, ok := r.manager.PeerHosts[peerID]
 	if !ok {
 		r.logger.Warn("peer not found, nothing to write", logging.PeerID(peerID))
@@ -430,10 +396,7 @@ func (r *PacketRouter) writeTCP(peerID string, pkt RelayPacket) {
 }
 
 func (r *PacketRouter) writeUDP(peerID string, pkt RelayPacket) {
-	//slog.Debug("[UDP] Remote => GameClient", "data", pkt.Payload, logging.PeerID(peerID))
-
-	// r.manager.mu.Lock()
-	// defer r.manager.mu.Unlock()
+	slog.Debug("[UDP] Remote => GameClient", "data", pkt.Payload, logging.PeerID(peerID))
 
 	host, ok := r.manager.PeerHosts[peerID]
 	if !ok {
