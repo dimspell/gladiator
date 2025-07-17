@@ -137,7 +137,6 @@ func (p *ListenerTCP) handleConnection(conn TCPConn, onReceive func(p []byte) (e
 
 	for {
 		clear(buf)
-		fmt.Println("handling")
 
 		msg, err := p.readNext(conn, buf)
 		if err != nil {
