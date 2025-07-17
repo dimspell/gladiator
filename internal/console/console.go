@@ -227,7 +227,7 @@ func (c *Console) Handlers() (start GracefulFunc, shutdown GracefulFunc) {
 			go func() {
 				for {
 					for event := range c.Relay.Server.Events {
-						c.Multiplayer.handleRelayEvent(event)
+						c.Multiplayer.HandleRelayEvent(event)
 					}
 				}
 			}()
