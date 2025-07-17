@@ -3,10 +3,10 @@ package relay
 import (
 	"context"
 	"fmt"
+	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"log/slog"
 	"net"
-
-	"github.com/dimspell/gladiator/internal/app/logger/logging"
+	"time"
 
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/proxy"
@@ -101,7 +101,13 @@ func (r *Relay) HostRoom(ctx context.Context, params proxy.HostParams) error {
 	onDisconnect := func() {
 		slog.Warn("Game server went offline")
 		r.router.Reset()
+		r.router.disconnect()
 	}
+	go func() {
+		time.Sleep(30 * time.Second)
+		r.router.Reset()
+		r.router.disconnect()
+	}()
 	if err := probe.StartProbeTCP(ctx, net.JoinHostPort("127.0.0.1", "6114"), onDisconnect); err != nil {
 		return fmt.Errorf("failed start the game server probe: %w", err)
 	}
