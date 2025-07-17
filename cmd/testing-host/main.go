@@ -7,9 +7,9 @@ import (
 	"log/slog"
 	"net"
 	"os"
+	"time"
 
 	"github.com/dimspell/gladiator/internal/app/logger"
-	"github.com/dimspell/gladiator/internal/backend/proxy/relay"
 	"github.com/dimspell/gladiator/internal/backend/redirect"
 )
 
@@ -49,7 +49,7 @@ func main() {
 
 	ctx := context.Background()
 
-	r := relay.PacketRouter{}
+	// r := relay.PacketRouter{}
 
 	hm := redirect.NewManager(net.IPv4(127, 0, 0, 1))
 
@@ -96,7 +96,7 @@ func main() {
 			},
 			func(host *redirect.FakeHost) {
 				fmt.Println("Disconnecting", peerID, host)
-				hm.StopHost(host, params.NotUsedIP)
+				hm.StopHost(host)
 			},
 		)
 		if err != nil {
@@ -106,6 +106,10 @@ func main() {
 		params.peerID = peerID
 		params.fakeHost = h
 	}
+
+	<-time.After(1 * time.Second)
+	h := hm.Hosts["127.0.0.2"]
+	hm.StopHost(h)
 
 	select {}
 

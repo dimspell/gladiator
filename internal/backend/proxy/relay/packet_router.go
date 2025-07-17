@@ -114,6 +114,7 @@ func (r *PacketRouter) handleLeaveRoom(ctx context.Context, player wire.Player) 
 }
 
 func (r *PacketRouter) handleHostMigration(ctx context.Context, player wire.Player) error {
+	// oldHostID := r.currentHostID
 	newHostID := strconv.Itoa(int(player.UserID))
 
 	r.mu.Lock()
