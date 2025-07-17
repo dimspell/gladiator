@@ -9,6 +9,7 @@ import (
 	"os"
 
 	"github.com/dimspell/gladiator/internal/app/logger"
+	"github.com/dimspell/gladiator/internal/backend/proxy/relay"
 	"github.com/dimspell/gladiator/internal/backend/redirect"
 )
 
@@ -33,13 +34,13 @@ var variant1 = map[string]*Host{
 		NotUsedIP: "127.0.3.1",
 		HostType:  "LISTEN",
 		UDPPort:   5033,
-		TCPPort:   5034,
+		// TCPPort:   5034,
 	},
 	"player4": {
 		NotUsedIP: "127.0.4.1",
 		HostType:  "LISTEN",
 		UDPPort:   5043,
-		TCPPort:   5044,
+		// TCPPort:   5044,
 	},
 }
 
@@ -48,16 +49,20 @@ func main() {
 
 	ctx := context.Background()
 
+	r := relay.PacketRouter{}
+
 	hm := redirect.NewManager(net.IPv4(127, 0, 0, 1))
 
 	for peerID, params := range variant1 {
+		ip, _ := hm.AssignIP(peerID)
+
 		h, err := hm.CreateFakeHost(ctx,
 			"TEST",
 			peerID,
-			params.NotUsedIP,
-			&redirect.ProxyParams{
-				IPAddress: "127.0.0.1",
-				Port:      params.TCPPort,
+			ip,
+			&redirect.ProxySpec{
+				LocalIP: "127.0.0.1",
+				Port:    params.TCPPort,
 				Create: func(ipv4, port string) (redirect.Redirect, error) {
 					if params.HostType == "LISTEN" {
 						return redirect.ListenTCP(ipv4, port)
@@ -72,9 +77,9 @@ func main() {
 					return nil
 				},
 			},
-			&redirect.ProxyParams{
-				IPAddress: "127.0.0.1",
-				Port:      params.UDPPort,
+			&redirect.ProxySpec{
+				LocalIP: "127.0.0.1",
+				Port:    params.UDPPort,
 				Create: func(ipv4, port string) (redirect.Redirect, error) {
 					if params.HostType == "LISTEN" {
 						return redirect.ListenUDP(ipv4, port)

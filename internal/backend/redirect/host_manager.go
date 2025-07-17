@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"golang.org/x/sync/errgroup"
@@ -98,14 +97,14 @@ func (hm *HostManager) StartGuest(
 		"DIAL",
 		peerID,
 		ipAddress,
-		&ProxyParams{
-			IPAddress: "127.0.0.1",
+		&ProxySpec{
+			LocalIP:   "127.0.0.1",
 			Port:      tcpPort,
 			Create:    func(ipv4, port string) (Redirect, error) { return DialTCP(ipv4, port) },
 			OnReceive: onReceiveTCP,
 		},
-		&ProxyParams{
-			IPAddress: "127.0.0.1",
+		&ProxySpec{
+			LocalIP:   "127.0.0.1",
 			Port:      udpPort,
 			Create:    func(ipv4, port string) (Redirect, error) { return DialUDP(ipv4, port) },
 			OnReceive: onReceiveUDP,
@@ -127,14 +126,14 @@ func (hm *HostManager) StartHost(
 		"LISTEN",
 		peerID,
 		ipAddress,
-		&ProxyParams{
-			IPAddress: ipAddress,
+		&ProxySpec{
+			LocalIP:   ipAddress,
 			Port:      tcpPort,
 			Create:    func(ipv4, port string) (Redirect, error) { return ListenTCP(ipv4, port) },
 			OnReceive: onReceiveTCP,
 		},
-		&ProxyParams{
-			IPAddress: ipAddress,
+		&ProxySpec{
+			LocalIP:   ipAddress,
 			Port:      udpPort,
 			Create:    func(ipv4, port string) (Redirect, error) { return ListenUDP(ipv4, port) },
 			OnReceive: onReceiveUDP,
@@ -143,8 +142,8 @@ func (hm *HostManager) StartHost(
 	)
 }
 
-type ProxyParams struct {
-	IPAddress string
+type ProxySpec struct {
+	LocalIP   string
 	Port      int
 	Create    func(ipv4, port string) (Redirect, error)
 	OnReceive func([]byte) error
@@ -155,8 +154,8 @@ func (hm *HostManager) CreateFakeHost(
 	fakeHostType string,
 	peerID string,
 	ipAddress string,
-	tcpParams *ProxyParams,
-	udpParams *ProxyParams,
+	tcpParams *ProxySpec,
+	udpParams *ProxySpec,
 	onHostDisconnect func(host *FakeHost),
 ) (*FakeHost, error) {
 	if net.ParseIP(ipAddress).To4() == nil {
@@ -174,13 +173,13 @@ func (hm *HostManager) CreateFakeHost(
 	var tcpProxy, udpProxy Redirect
 
 	if tcpParams != nil && tcpParams.Port > 0 {
-		tcpProxy, err = tcpParams.Create(tcpParams.IPAddress, strconv.Itoa(tcpParams.Port))
+		tcpProxy, err = tcpParams.Create(tcpParams.LocalIP, strconv.Itoa(tcpParams.Port))
 		if err != nil {
 			return nil, err
 		}
 	}
 	if udpParams != nil && udpParams.Port > 0 {
-		udpProxy, err = udpParams.Create(udpParams.IPAddress, strconv.Itoa(udpParams.Port))
+		udpProxy, err = udpParams.Create(udpParams.LocalIP, strconv.Itoa(udpParams.Port))
 		if err != nil {
 			return nil, err
 		}
@@ -226,8 +225,9 @@ func (hm *HostManager) CreateFakeHost(
 		if err := g.Wait(); err != nil {
 			slog.Warn("UDP/TCP fake host failed", logging.Error(err))
 			cancel()
-			hm.StopHost(host, ipAddress)
-			return
+		}
+		if onHostDisconnect != nil {
+			onHostDisconnect(host)
 		}
 	}(host, wg)
 
@@ -298,17 +298,4 @@ func (hm *HostManager) StopHost(host *FakeHost, ipAddress string) {
 	delete(hm.PeerHosts, remoteID)
 
 	slog.Info("Fake host cleaned up", "ip", ipAddress)
-}
-
-func (hm *HostManager) CleanupInactive(timeout time.Duration) {
-	hm.mu.Lock()
-	defer hm.mu.Unlock()
-
-	// now := time.Now().Add(timeout)
-	// for ipAddress, host := range hm.Hosts {
-	// 	if host.LastSeen.After(now) {
-	// 		slog.Info("Removing inactive host", "ip", ipAddress)
-	// 		hm.StopHost(host, ipAddress)
-	// 	}
-	// }
 }
