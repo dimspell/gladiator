@@ -81,7 +81,9 @@ type FakeHost struct {
 
 	ProxyUDP Redirect
 	ProxyTCP Redirect
+
 	stopFunc context.CancelFunc
+	closed   bool
 }
 
 // StartGuest adds a new dynamic joiner that dials our game client address
@@ -213,7 +215,7 @@ func (hm *HostManager) CreateFakeHost(
 
 	go func(host *FakeHost) {
 		if err := g.Wait(); err != nil {
-			slog.Warn("UDP/TCP fake host failed", logging.Error(err))
+			slog.Warn("Shutting down the fake host", logging.Error(err), logging.PeerID(peerID), slog.String("type", fakeHostType), slog.String("assignedIP", assignedIP))
 			cancel()
 		}
 		if onHostDisconnect != nil {
@@ -263,6 +265,10 @@ func (hm *HostManager) RemoveByRemoteID(remoteID string) {
 }
 
 func (hm *HostManager) StopHost(host *FakeHost) {
+	if host.closed {
+		return
+	}
+
 	// Trigger a stop
 	host.stopFunc()
 
@@ -280,6 +286,7 @@ func (hm *HostManager) StopHost(host *FakeHost) {
 	delete(hm.IPToPeerID, host.AssignedIP)
 	delete(hm.PeerIPs, remoteID)
 	delete(hm.PeerHosts, remoteID)
+	host.closed = true
 
 	slog.Info("Fake host cleaned up", "ip", host.AssignedIP)
 }
