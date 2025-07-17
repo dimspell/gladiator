@@ -165,12 +165,7 @@ func (r *PacketRouter) handleHostMigration(ctx context.Context, player wire.Play
 	time.Sleep(3 * time.Second)
 
 	// Someone else became a host
-	ipAddress, ok := r.manager.PeerIPs[newHostID]
-	if !ok {
-		r.logger.Warn("ip address if peer not found, nothing to migrate", logging.PeerID(newHostID))
-		return nil
-	}
-	host, ok := r.manager.Hosts[ipAddress]
+	host, ok := r.manager.PeerHosts[newHostID]
 	if !ok {
 		r.logger.Warn("peer not found, nothing to migrate", logging.PeerID(newHostID))
 		return nil
@@ -199,13 +194,13 @@ func (r *PacketRouter) handleHostMigration(ctx context.Context, player wire.Play
 		r.stop(host)
 	}
 	var err error
-	host, err = r.manager.StartHost(ctx, newHostID, ipAddress, 6114, 6113, onTCPMessage, onUDPMessage, onHostDisconnected)
+	host, err = r.manager.StartHost(ctx, newHostID, host.AssignedIP, 6114, 6113, onTCPMessage, onUDPMessage, onHostDisconnected)
 	if err != nil {
 		r.logger.Warn("failed to start host", logging.Error(err), logging.PeerID(newHostID))
 		return nil
 	}
 
-	payload := packet.NewHostSwitch(true, net.ParseIP(ipAddress))
+	payload := packet.NewHostSwitch(true, net.ParseIP(host.AssignedIP))
 	if err := r.session.SendToGame(packet.HostMigration, payload); err != nil {
 		r.logger.Error("failed to send host migration packet", logging.Error(err))
 		return nil

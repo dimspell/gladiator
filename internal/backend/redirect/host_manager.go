@@ -41,8 +41,8 @@ func NewManager(ipPrefix net.IP) *HostManager {
 }
 
 func (hm *HostManager) StopAll() {
-	for ipAddress, host := range hm.Hosts {
-		hm.StopHost(host, ipAddress)
+	for _, host := range hm.Hosts {
+		hm.StopHost(host)
 	}
 
 	hm.Hosts = make(map[string]*FakeHost)
