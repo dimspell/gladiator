@@ -32,7 +32,6 @@ type RelayStream interface {
 type RelayConn interface {
 	AcceptStream(context.Context) (*quic.Stream, error)
 	CloseWithError(code quic.ApplicationErrorCode, msg string) error
-	RemoteAddr() net.Addr
 }
 
 type PacketRouter struct {
