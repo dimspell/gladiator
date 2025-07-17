@@ -88,7 +88,7 @@ type FakeHost struct {
 func (hm *HostManager) StartGuest(
 	ctx context.Context,
 	peerID string,
-	ipAddress string,
+	assignedIP string,
 	tcpPort, udpPort int,
 	onReceiveTCP, onReceiveUDP func([]byte) error,
 	onHostDisconnect func(host *FakeHost),
@@ -97,7 +97,7 @@ func (hm *HostManager) StartGuest(
 		ctx,
 		"DIAL",
 		peerID,
-		ipAddress,
+		assignedIP,
 		&ProxySpec{
 			LocalIP:   "127.0.0.1",
 			Port:      tcpPort,
@@ -117,7 +117,7 @@ func (hm *HostManager) StartGuest(
 // StartHost starts a fake host listening on a loopback IP
 func (hm *HostManager) StartHost(
 	ctx context.Context,
-	peerID, ipAddress string,
+	peerID, assignedIP string,
 	tcpPort, udpPort int,
 	onReceiveTCP, onReceiveUDP func([]byte) error,
 	onHostDisconnect func(host *FakeHost),
@@ -126,15 +126,15 @@ func (hm *HostManager) StartHost(
 		ctx,
 		"LISTEN",
 		peerID,
-		ipAddress,
+		assignedIP,
 		&ProxySpec{
-			LocalIP:   ipAddress,
+			LocalIP:   assignedIP,
 			Port:      tcpPort,
 			Create:    func(ipv4, port string) (Redirect, error) { return ListenTCP(ipv4, port) },
 			OnReceive: onReceiveTCP,
 		},
 		&ProxySpec{
-			LocalIP:   ipAddress,
+			LocalIP:   assignedIP,
 			Port:      udpPort,
 			Create:    func(ipv4, port string) (Redirect, error) { return ListenUDP(ipv4, port) },
 			OnReceive: onReceiveUDP,
@@ -154,20 +154,20 @@ func (hm *HostManager) CreateFakeHost(
 	ctx context.Context,
 	fakeHostType string,
 	peerID string,
-	ipAddress string,
+	assignedIP string,
 	tcpParams *ProxySpec,
 	udpParams *ProxySpec,
 	onHostDisconnect func(host *FakeHost),
 ) (*FakeHost, error) {
-	if net.ParseIP(ipAddress).To4() == nil {
-		return nil, fmt.Errorf("invalid IP address: %s", ipAddress)
+	if net.ParseIP(assignedIP).To4() == nil {
+		return nil, fmt.Errorf("invalid IP address: %s", assignedIP)
 	}
 
 	hm.mu.Lock()
 	defer hm.mu.Unlock()
 
-	if _, exists := hm.Hosts[ipAddress]; exists {
-		return nil, fmt.Errorf("host %s already running", ipAddress)
+	if _, exists := hm.Hosts[assignedIP]; exists {
+		return nil, fmt.Errorf("host %s already running", assignedIP)
 	}
 
 	ctx, cancel := context.WithCancel(ctx)
@@ -176,7 +176,7 @@ func (hm *HostManager) CreateFakeHost(
 	host := &FakeHost{
 		Type:       fakeHostType,
 		PeerID:     peerID,
-		AssignedIP: ipAddress,
+		AssignedIP: assignedIP,
 		stopFunc:   cancel,
 	}
 
@@ -221,7 +221,7 @@ func (hm *HostManager) CreateFakeHost(
 		}
 	}(host)
 
-	hm.Hosts[ipAddress] = host
+	hm.Hosts[assignedIP] = host
 	hm.PeerHosts[peerID] = host
 
 	return host, nil
