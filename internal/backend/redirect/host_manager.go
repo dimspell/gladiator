@@ -75,8 +75,9 @@ func (hm *HostManager) AssignIP(remoteID string) (string, error) {
 }
 
 type FakeHost struct {
-	Type string
-	IP   string
+	Type       string
+	PeerID     string
+	AssignedIP string
 
 	ProxyUDP Redirect
 	ProxyTCP Redirect
@@ -169,59 +170,48 @@ func (hm *HostManager) CreateFakeHost(
 		return nil, fmt.Errorf("host %s already running", ipAddress)
 	}
 
-	var err error
-	var tcpProxy, udpProxy Redirect
-
-	if tcpParams != nil && tcpParams.Port > 0 {
-		tcpProxy, err = tcpParams.Create(tcpParams.LocalIP, strconv.Itoa(tcpParams.Port))
-		if err != nil {
-			return nil, err
-		}
-	}
-	if udpParams != nil && udpParams.Port > 0 {
-		udpProxy, err = udpParams.Create(udpParams.LocalIP, strconv.Itoa(udpParams.Port))
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	ctx, cancel := context.WithCancel(ctx)
 	g, ctx := errgroup.WithContext(ctx)
 
 	host := &FakeHost{
-		Type:     fakeHostType,
-		IP:       ipAddress,
-		stopFunc: cancel,
-		ProxyTCP: tcpProxy,
-		ProxyUDP: udpProxy,
+		Type:       fakeHostType,
+		PeerID:     peerID,
+		AssignedIP: ipAddress,
+		stopFunc:   cancel,
 	}
 
-	wg := &sync.WaitGroup{}
-	wg.Add(1)
-
-	go func(host *FakeHost, wg *sync.WaitGroup) {
-		if tcpProxy != nil {
-			g.Go(func() error {
-				err := tcpProxy.Run(ctx, func(p []byte) (err error) {
-					slog.Debug("[TCP] GameClient => Remote", "data", p, logging.PeerID(peerID))
-					return tcpParams.OnReceive(p)
-				})
-				slog.Debug("Closed TCP proxy", "error", err)
-				return err
-			})
+	if tcpParams != nil && tcpParams.Port > 0 {
+		tcpProxy, err := tcpParams.Create(tcpParams.LocalIP, strconv.Itoa(tcpParams.Port))
+		if err != nil {
+			return nil, err
 		}
-		if udpProxy != nil {
-			g.Go(func() error {
-				err := udpProxy.Run(ctx, func(p []byte) (err error) {
-					slog.Debug("[UDP] GameClient => Remote", "data", p, logging.PeerID(peerID))
-					return udpParams.OnReceive(p)
-				})
-				slog.Debug("Closed UDP proxy", "error", err)
-				return err
+		host.ProxyTCP = tcpProxy
+		g.Go(func() error {
+			err := tcpProxy.Run(ctx, func(p []byte) (err error) {
+				slog.Debug("[TCP] GameClient => Remote", "data", p, logging.PeerID(peerID))
+				return tcpParams.OnReceive(p)
 			})
+			slog.Debug("Closed TCP proxy", "error", err)
+			return err
+		})
+	}
+	if udpParams != nil && udpParams.Port > 0 {
+		udpProxy, err := udpParams.Create(udpParams.LocalIP, strconv.Itoa(udpParams.Port))
+		if err != nil {
+			return nil, err
 		}
+		host.ProxyUDP = udpProxy
+		g.Go(func() error {
+			err := udpProxy.Run(ctx, func(p []byte) (err error) {
+				slog.Debug("[UDP] GameClient => Remote", "data", p, logging.PeerID(peerID))
+				return udpParams.OnReceive(p)
+			})
+			slog.Debug("Closed UDP proxy", "error", err)
+			return err
+		})
+	}
 
-		wg.Done()
+	go func(host *FakeHost) {
 		if err := g.Wait(); err != nil {
 			slog.Warn("UDP/TCP fake host failed", logging.Error(err))
 			cancel()
@@ -229,12 +219,11 @@ func (hm *HostManager) CreateFakeHost(
 		if onHostDisconnect != nil {
 			onHostDisconnect(host)
 		}
-	}(host, wg)
+	}(host)
 
 	hm.Hosts[ipAddress] = host
 	hm.PeerHosts[peerID] = host
 
-	wg.Wait()
 	return host, nil
 }
 
@@ -254,7 +243,7 @@ func (hm *HostManager) RemoveByIP(ipAddrOrPrefix string) {
 
 	for ipAddress, host := range hm.Hosts {
 		if strings.HasPrefix(ipAddress, ipAddrOrPrefix) {
-			hm.StopHost(host, ipAddress)
+			hm.StopHost(host)
 		}
 	}
 }
@@ -265,20 +254,15 @@ func (hm *HostManager) RemoveByRemoteID(remoteID string) {
 	hm.mu.Lock()
 	defer hm.mu.Unlock()
 
-	ip, exists := hm.PeerIPs[remoteID]
+	host, exists := hm.PeerHosts[remoteID]
 	if !exists {
 		return
 	}
 
-	host, exists := hm.Hosts[ip]
-	if !exists {
-		return
-	}
-
-	hm.StopHost(host, ip)
+	hm.StopHost(host)
 }
 
-func (hm *HostManager) StopHost(host *FakeHost, ipAddress string) {
+func (hm *HostManager) StopHost(host *FakeHost) {
 	// Trigger a stop
 	host.stopFunc()
 
@@ -291,11 +275,11 @@ func (hm *HostManager) StopHost(host *FakeHost, ipAddress string) {
 	}
 
 	// Remove from maps
-	remoteID, _ := hm.IPToPeerID[ipAddress]
-	delete(hm.Hosts, ipAddress)
-	delete(hm.IPToPeerID, ipAddress)
+	remoteID, _ := hm.IPToPeerID[host.AssignedIP]
+	delete(hm.Hosts, host.AssignedIP)
+	delete(hm.IPToPeerID, host.AssignedIP)
 	delete(hm.PeerIPs, remoteID)
 	delete(hm.PeerHosts, remoteID)
 
-	slog.Info("Fake host cleaned up", "ip", ipAddress)
+	slog.Info("Fake host cleaned up", "ip", host.AssignedIP)
 }
