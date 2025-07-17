@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"net"
 	"os"
-	"time"
 
 	"github.com/dimspell/gladiator/internal/app/logger"
 	"github.com/dimspell/gladiator/internal/backend/redirect"
@@ -107,9 +106,9 @@ func main() {
 		params.fakeHost = h
 	}
 
-	<-time.After(1 * time.Second)
-	h := hm.Hosts["127.0.0.2"]
-	hm.StopHost(h)
+	// <-time.After(1 * time.Second)
+	// h := hm.Hosts["127.0.0.2"]
+	// hm.StopHost(h)
 
 	select {}
 
