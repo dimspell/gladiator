@@ -122,8 +122,8 @@ func (r *PacketRouter) handleHostMigration(ctx context.Context, player wire.Play
 		// reuse them.
 		rebindHosts := make(map[string]string)
 		for peerID, host := range r.manager.PeerHosts {
-			rebindHosts[peerID] = host.IP
-			r.manager.StopHost(host, host.IP)
+			rebindHosts[peerID] = host.AssignedIP
+			r.manager.StopHost(host)
 		}
 
 		// Recreate the proxies to the new host
@@ -145,15 +145,15 @@ func (r *PacketRouter) handleHostMigration(ctx context.Context, player wire.Play
 				})
 			}
 			onHostDisconnected := func(host *redirect.FakeHost) {
-				slog.Warn("Host went offline", logging.PeerID(peerID), "ip", host.IP)
-				r.stop(host, peerID, host.IP)
+				slog.Warn("Host went offline", logging.PeerID(peerID), "ip", host.AssignedIP)
+				r.stop(host)
 			}
 			host, err := r.manager.StartGuest(ctx, peerID, ip, 6114, 6113, onTCPMessage, onUDPMessage, onHostDisconnected)
 			if err != nil {
 				r.logger.Warn("failed to start dial host", logging.Error(err), logging.PeerID(peerID))
 				return nil
 			}
-			r.logger.Info("dial host started", logging.PeerID(peerID), "ip", host.IP)
+			r.logger.Info("dial host started", logging.PeerID(peerID), "ip", host.AssignedIP)
 		}
 
 		// TODO: Send notice about the completion
@@ -175,7 +175,7 @@ func (r *PacketRouter) handleHostMigration(ctx context.Context, player wire.Play
 		r.logger.Warn("peer not found, nothing to migrate", logging.PeerID(newHostID))
 		return nil
 	}
-	r.manager.StopHost(host, ipAddress)
+	r.manager.StopHost(host)
 
 	onTCPMessage := func(p []byte) error {
 		return r.sendPacket(RelayPacket{
@@ -195,8 +195,8 @@ func (r *PacketRouter) handleHostMigration(ctx context.Context, player wire.Play
 	}
 
 	onHostDisconnected := func(host *redirect.FakeHost) {
-		slog.Warn("Host went offline", logging.PeerID(newHostID), "ip", host.IP)
-		r.stop(host, newHostID, host.IP)
+		slog.Warn("Host went offline", logging.PeerID(newHostID), "ip", host.AssignedIP)
+		r.stop(host)
 	}
 	var err error
 	host, err = r.manager.StartHost(ctx, newHostID, ipAddress, 6114, 6113, onTCPMessage, onUDPMessage, onHostDisconnected)
@@ -289,12 +289,11 @@ func (r *PacketRouter) keepAliveHost(ctx context.Context) {
 	}(r.pingTicker)
 }
 
-func (r *PacketRouter) stop(host *redirect.FakeHost, peerID string, ipAddress string) {
+func (r *PacketRouter) stop(host *redirect.FakeHost) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	slog.Info("Stopping host", logging.PeerID(peerID), "ip", ipAddress)
-	r.manager.StopHost(host, ipAddress)
+	r.manager.StopHost(host)
 }
 
 type RelayPacket struct {
@@ -441,7 +440,7 @@ func (r *PacketRouter) dynamicJoin(ctx context.Context, roomID string, peerID st
 
 	onHostDisconnected := func(host *redirect.FakeHost) {
 		slog.Warn("Host went offline", logging.PeerID(peerID), "ip", ip)
-		r.stop(host, peerID, ip)
+		r.stop(host)
 	}
 
 	host, err := r.manager.StartGuest(ctx, peerID, ip, tcpPort, 6113, onTCPMessage, onUDPMessage, onHostDisconnected)
