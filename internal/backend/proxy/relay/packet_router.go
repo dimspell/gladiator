@@ -158,9 +158,13 @@ func (r *PacketRouter) handleHostMigration(ctx context.Context, player wire.Play
 					Payload: p,
 				})
 			}
-			onHostDisconnected := func(host *redirect.FakeHost) {
-				slog.Warn("Host went offline", logging.PeerID(peerID), "ip", host.AssignedIP)
+			onHostDisconnected := func(host *redirect.FakeHost, forced bool) {
+				slog.Warn("Host went offline", logging.PeerID(peerID), "ip", host.AssignedIP, "forced", forced)
 				r.stop(host)
+				if forced {
+					r.disconnect()
+					r.Reset()
+				}
 			}
 			host, err := r.manager.StartGuest(ctx, peerID, ip, 6114, 6113, onTCPMessage, onUDPMessage, onHostDisconnected)
 			if err != nil {
@@ -203,9 +207,13 @@ func (r *PacketRouter) handleHostMigration(ctx context.Context, player wire.Play
 		})
 	}
 
-	onHostDisconnected := func(host *redirect.FakeHost) {
-		slog.Warn("Host went offline", logging.PeerID(newHostID), "ip", host.AssignedIP)
+	onHostDisconnected := func(host *redirect.FakeHost, forced bool) {
+		slog.Warn("Host went offline", logging.PeerID(newHostID), "ip", host.AssignedIP, "forced", forced)
 		r.stop(host)
+		if forced {
+			r.disconnect()
+			r.Reset()
+		}
 	}
 	var err error
 	host, err = r.manager.StartHost(ctx, newHostID, host.AssignedIP, 6114, 6113, onTCPMessage, onUDPMessage, onHostDisconnected)
@@ -447,9 +455,13 @@ func (r *PacketRouter) dynamicJoin(ctx context.Context, roomID string, peerID st
 		}
 	}
 
-	onHostDisconnected := func(host *redirect.FakeHost) {
-		slog.Warn("Host went offline", logging.PeerID(peerID), "ip", ip)
+	onHostDisconnected := func(host *redirect.FakeHost, forced bool) {
+		slog.Warn("Host went offline", logging.PeerID(peerID), "ip", ip, "forced", forced)
 		r.stop(host)
+		if forced {
+			r.disconnect()
+			r.Reset()
+		}
 	}
 
 	host, err := r.manager.StartGuest(ctx, peerID, ip, tcpPort, 6113, onTCPMessage, onUDPMessage, onHostDisconnected)

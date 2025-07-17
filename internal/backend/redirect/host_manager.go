@@ -2,7 +2,9 @@ package redirect
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"log"
 	"log/slog"
 	"net"
@@ -93,7 +95,7 @@ func (hm *HostManager) StartGuest(
 	assignedIP string,
 	tcpPort, udpPort int,
 	onReceiveTCP, onReceiveUDP func([]byte) error,
-	onHostDisconnect func(host *FakeHost),
+	onHostDisconnect func(host *FakeHost, forced bool),
 ) (*FakeHost, error) {
 	return hm.CreateFakeHost(
 		ctx,
@@ -122,7 +124,7 @@ func (hm *HostManager) StartHost(
 	peerID, assignedIP string,
 	tcpPort, udpPort int,
 	onReceiveTCP, onReceiveUDP func([]byte) error,
-	onHostDisconnect func(host *FakeHost),
+	onHostDisconnect func(host *FakeHost, forced bool),
 ) (*FakeHost, error) {
 	return hm.CreateFakeHost(
 		ctx,
@@ -159,7 +161,7 @@ func (hm *HostManager) CreateFakeHost(
 	assignedIP string,
 	tcpParams *ProxySpec,
 	udpParams *ProxySpec,
-	onHostDisconnect func(host *FakeHost),
+	onHostDisconnect func(host *FakeHost, forced bool),
 ) (*FakeHost, error) {
 	if net.ParseIP(assignedIP).To4() == nil {
 		return nil, fmt.Errorf("invalid IP address: %s", assignedIP)
@@ -214,12 +216,14 @@ func (hm *HostManager) CreateFakeHost(
 	}
 
 	go func(host *FakeHost) {
-		if err := g.Wait(); err != nil {
+		err := g.Wait()
+		if err != nil {
 			slog.Warn("Shutting down the fake host", logging.Error(err), logging.PeerID(peerID), slog.String("type", fakeHostType), slog.String("assignedIP", assignedIP))
 			cancel()
+			hm.StopHost(host)
 		}
 		if onHostDisconnect != nil {
-			onHostDisconnect(host)
+			onHostDisconnect(host, errors.Is(err, io.EOF))
 		}
 	}(host)
 

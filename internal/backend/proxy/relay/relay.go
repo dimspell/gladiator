@@ -180,6 +180,14 @@ func (r *Relay) Join(ctx context.Context, params proxy.JoinParams) (net.IP, erro
 			})
 		}
 
+		onHostDisconnected := func(host *redirect.FakeHost, forced bool) {
+			slog.Warn("Host went offline", logging.PeerID(peerID), "ip", host.AssignedIP, "forced", forced)
+			r.router.stop(host)
+			if forced {
+				r.router.disconnect()
+				r.router.Reset()
+			}
+		}
 		if peerID == hostID {
 			onTCPMessage := func(p []byte) error {
 				return r.router.sendPacket(RelayPacket{
@@ -190,10 +198,6 @@ func (r *Relay) Join(ctx context.Context, params proxy.JoinParams) (net.IP, erro
 				})
 			}
 
-			onHostDisconnected := func(host *redirect.FakeHost) {
-				slog.Warn("Host went offline", logging.PeerID(peerID), "ip", ipAddress)
-				r.router.stop(host)
-			}
 			_, err := r.router.manager.StartHost(ctx, peerID, ipAddress, 6114, 6113, onTCPMessage, onUDPMessage, onHostDisconnected)
 			if err != nil {
 				return nil, err
@@ -203,10 +207,6 @@ func (r *Relay) Join(ctx context.Context, params proxy.JoinParams) (net.IP, erro
 			//	return nil, fmt.Errorf("failed start the game server probe: %w", err)
 			// }
 		} else {
-			onHostDisconnected := func(host *redirect.FakeHost) {
-				slog.Warn("Host went offline", logging.PeerID(peerID), "ip", ipAddress)
-				r.router.stop(host)
-			}
 			if _, err := r.router.manager.StartHost(ctx, peerID, ipAddress, 0, 6113, nil, onUDPMessage, onHostDisconnected); err != nil {
 				return nil, err
 			}
