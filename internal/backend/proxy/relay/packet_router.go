@@ -21,6 +21,20 @@ import (
 	"github.com/quic-go/quic-go"
 )
 
+type RelayStream interface {
+	io.Reader
+	io.Writer
+	CancelRead(code quic.StreamErrorCode)
+	CancelWrite(code quic.StreamErrorCode)
+	Close() error
+}
+
+type RelayConn interface {
+	AcceptStream(context.Context) (*quic.Stream, error)
+	CloseWithError(code quic.ApplicationErrorCode, msg string) error
+	RemoteAddr() net.Addr
+}
+
 type PacketRouter struct {
 	mu        sync.Mutex
 	logger    *slog.Logger
@@ -31,8 +45,8 @@ type PacketRouter struct {
 
 	roomID        string
 	currentHostID string
-	relayConn     *quic.Conn
-	stream        *quic.Stream
+	relayConn     RelayConn
+	stream        RelayStream
 	pingTicker    *time.Ticker
 }
 
