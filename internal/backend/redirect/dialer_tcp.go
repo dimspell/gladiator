@@ -67,8 +67,6 @@ func (p *DialerTCP) Run(ctx context.Context, onReceive func(p []byte) (err error
 			p.conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 			n, err := p.conn.Read(buf)
 			if err != nil {
-				fmt.Println("dial-tcp", err)
-
 				var ne net.Error
 				if errors.As(err, &ne) && ne.Timeout() {
 					continue
