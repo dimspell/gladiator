@@ -39,7 +39,7 @@ func main() {
 	// tcpConn, err := net.Dial("tcp4", "127.21.37.10:6114")
 	// tcpConn, err := net.Dial("tcp4", "127.0.0.1:6114")
 	// tcpConn, err := net.Dial("tcp", fmt.Sprintf("%s:6114", gameServerIP))
-	tcpConn, err := net.Dial("tcp", peerTCP)
+	tcpConn, err := net.DialTimeout("tcp", peerTCP, time.Second)
 	if err != nil {
 		log.Fatal(err)
 	}

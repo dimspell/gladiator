@@ -560,7 +560,7 @@ func (mp *Multiplayer) listSessions() []wire.Player {
 	return list
 }
 
-func (mp *Multiplayer) handleRelayEvent(event RelayEvent) {
+func (mp *Multiplayer) HandleRelayEvent(event RelayEvent) {
 	switch event.Type {
 	case "join":
 		// mp.JoinRoom(event.RoomID, event.PeerID, "")
