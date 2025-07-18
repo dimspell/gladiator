@@ -1,0 +1,38 @@
+name: container
+
+on:
+  push:
+    branches:
+      - "relay-bug-persisting-user"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Go environment
+        id: setup-go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+
+      - name: Package for Linux
+        run: |
+          go run -v github.com/fyne-io/fyne-cross@latest linux \
+            -arch=amd64 \
+            -debug \
+            -ldflags="main.version=${BUILD_VERSION}" \
+            -ldflags="main.commit=${BUILD_REVISION}" \
+            -ldflags="main.date=${BUILD_TIME}" \
+            -env="GOTOOLCHAIN=go1.24.4" \
+            -tags=gui
+
+      - name: Extract packaged app
+        run: |
+          ls -l "fyne-cross/dist"
+          ls -l "fyne-cross/dist/linux-amd64"
