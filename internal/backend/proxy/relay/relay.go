@@ -172,10 +172,11 @@ func (r *Relay) Join(ctx context.Context, params proxy.JoinParams) (net.IP, erro
 
 		onHostDisconnected := func(host *redirect.FakeHost, forced bool) {
 			slog.Warn("Host went offline", logging.PeerID(peerID), "ip", host.AssignedIP, "forced", forced)
-			r.router.stop(host)
 			if forced {
 				r.router.disconnect()
 				r.router.Reset()
+			} else {
+				r.router.stop(host)
 			}
 		}
 		if peerID == hostID {
