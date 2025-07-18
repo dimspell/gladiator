@@ -4,15 +4,12 @@ import (
 	"context"
 	"fmt"
 	"github.com/dimspell/gladiator/internal/app/logger/logging"
-	"log/slog"
-	"net"
-	"time"
-
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/proxy"
 	"github.com/dimspell/gladiator/internal/backend/redirect"
 	"github.com/dimspell/gladiator/internal/model"
-	"github.com/dimspell/gladiator/probe"
+	"log/slog"
+	"net"
 )
 
 var _ proxy.ProxyClient = (*Relay)(nil)
@@ -98,19 +95,14 @@ func (r *Relay) HostRoom(ctx context.Context, params proxy.HostParams) error {
 	r.router.keepAliveHost(ctx)
 
 	// Probe to check if the game server is still running
-	onDisconnect := func() {
-		slog.Warn("Game server went offline")
-		r.router.Reset()
-		r.router.disconnect()
-	}
-	go func() {
-		time.Sleep(30 * time.Second)
-		r.router.Reset()
-		r.router.disconnect()
-	}()
-	if err := probe.StartProbeTCP(ctx, net.JoinHostPort("127.0.0.1", "6114"), onDisconnect); err != nil {
-		return fmt.Errorf("failed start the game server probe: %w", err)
-	}
+	//onDisconnect := func() {
+	//	slog.Warn("Game server went offline")
+	//	r.router.Reset()
+	//	r.router.disconnect()
+	//}
+	//if err := probe.StartProbeTCP(ctx, net.JoinHostPort("127.0.0.1", "6114"), onDisconnect); err != nil {
+	//	return fmt.Errorf("failed start the game server probe: %w", err)
+	//}
 
 	return nil
 }
