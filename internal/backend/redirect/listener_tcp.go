@@ -96,7 +96,6 @@ func (p *ListenerTCP) Run(ctx context.Context, onReceive func(p []byte) (err err
 		break
 	}
 
-	p.logger.Error("HANDLING connection")
 	if err := p.handleConnection(p.conn, onReceive); err != nil {
 		p.logger.Error("Failed to handle connection", "error", err)
 		return err
@@ -113,20 +112,17 @@ func (p *ListenerTCP) handleHandshake(conn TCPConn) error {
 	}
 
 	buf := make([]byte, 64)
-
 	msg, err := p.readNext(conn, buf)
 	if err != nil {
 		return err
 	}
-	if !bytes.HasPrefix(msg, []byte("##")) {
+	if !bytes.HasPrefix(msg, []byte{'#', '#'}) { // exactly `##username` of the connecting user
 		return fmt.Errorf("invalid first packet, got: %s", string(msg))
 	}
 
 	p.conn = conn
 	p.lastActive = time.Now()
 
-	//user, _ := bytes.CutSuffix(msg[2:], []byte("\x00"))
-	//p.logger.Debug("User has connected to the TCP listener", "user", string(user))
 	return nil
 }
 
