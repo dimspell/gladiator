@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"log/slog"
 	"net"
 	"strconv"
@@ -255,16 +254,16 @@ func (hm *HostManager) RemoveByIP(ipAddrOrPrefix string) {
 }
 
 func (hm *HostManager) RemoveByRemoteID(remoteID string) {
-	log.Printf("Cleaning up guest host for peer %s", remoteID)
-
 	hm.mu.Lock()
 	defer hm.mu.Unlock()
 
 	host, exists := hm.PeerHosts[remoteID]
 	if !exists {
+		slog.Debug("Cleaning up guest host - not exist", logging.PeerID(remoteID))
 		return
 	}
 
+	slog.Debug("Cleaning up guest host - going to stop", logging.PeerID(remoteID))
 	hm.StopHost(host)
 }
 
