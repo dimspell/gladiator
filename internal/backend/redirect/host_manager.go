@@ -218,9 +218,9 @@ func (hm *HostManager) CreateFakeHost(
 		err := g.Wait()
 		if err != nil {
 			slog.Warn("Shutting down the fake host", logging.Error(err), logging.PeerID(peerID), slog.String("type", fakeHostType), slog.String("assignedIP", assignedIP))
-			cancel()
-			hm.StopHost(host)
 		}
+		cancel()
+		hm.StopHost(host)
 		if onHostDisconnect != nil {
 			onHostDisconnect(host, errors.Is(err, io.EOF))
 		}

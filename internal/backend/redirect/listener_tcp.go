@@ -1,7 +1,6 @@
 package redirect
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -111,21 +110,21 @@ func (p *ListenerTCP) handleHandshake(conn TCPConn) error {
 		return fmt.Errorf("someone is already connected")
 	}
 
-	buf := make([]byte, 64)
+	//buf := make([]byte, 64)
 
-	msg, err := p.readNext(conn, buf)
-	if err != nil {
-		return err
-	}
-	if !bytes.HasPrefix(msg, []byte("##")) {
-		return fmt.Errorf("invalid first packet, got: %s", string(msg))
-	}
+	//msg, err := p.readNext(conn, buf)
+	//if err != nil {
+	//	return err
+	//}
+	//if !bytes.HasPrefix(msg, []byte("##")) {
+	//	return fmt.Errorf("invalid first packet, got: %s", string(msg))
+	//}
 
 	p.conn = conn
 	p.lastActive = time.Now()
 
-	user, _ := bytes.CutSuffix(msg[2:], []byte("\x00"))
-	p.logger.Debug("User has connected to the TCP listener", "user", string(user))
+	//user, _ := bytes.CutSuffix(msg[2:], []byte("\x00"))
+	//p.logger.Debug("User has connected to the TCP listener", "user", string(user))
 	return nil
 }
 
