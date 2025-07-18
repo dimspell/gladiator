@@ -495,3 +495,10 @@ func (r *PacketRouter) dynamicJoin(ctx context.Context, roomID string, peerID st
 func (r *PacketRouter) leaveRoom(peerID string) {
 	r.manager.RemoveByRemoteID(peerID)
 }
+
+func (r *PacketRouter) disconnect() {
+	r.stream.CancelRead(0xDEAD)
+	r.stream.CancelWrite(0xDEAD)
+	r.stream.Close()
+	r.relayConn.CloseWithError(0xDEAD, "disconnect")
+}

@@ -1,7 +1,6 @@
 package redirect
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -37,6 +36,7 @@ type TCPConn interface {
 	Write(b []byte) (n int, err error)
 	Close() error
 	SetReadDeadline(t time.Time) error
+	RemoteAddr() net.Addr
 }
 
 // ListenTCP initializes a TCP listener on the given IP and port.
@@ -75,112 +75,77 @@ func (p *ListenerTCP) Run(ctx context.Context, onReceive func(p []byte) (err err
 		_ = p.Close()
 	}()
 
-	// Wait for the right client who wants to connect - the game client.
-	for {
-		conn, err := p.listener.Accept()
-		if err != nil {
-			if ctx.Err() != nil {
-				return ctx.Err()
-			}
-			return fmt.Errorf("failed to accept TCP connection: %w", err)
-		}
-		p.logger.Debug("Accepted new connection")
-
-		// Recognise who is trying to connect by handling the initial data.
-		if err := p.handleHandshake(conn); err != nil {
-			p.logger.Debug("Handshake has failed")
-			return err
-		}
-
-		p.logger.Debug("Successful handshake")
-		break
-	}
-
-	if err := p.handleConnection(p.conn, onReceive); err != nil {
-		p.logger.Error("Failed to handle connection", "error", err)
-		return err
-	}
-	return nil
-}
-
-func (p *ListenerTCP) handleHandshake(conn TCPConn) error {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	if p.conn != nil {
-		return fmt.Errorf("someone is already connected")
-	}
-
-	buf := make([]byte, 64)
-
-	msg, err := p.readNext(conn, buf)
+	conn, err := p.listener.Accept()
 	if err != nil {
-		return err
-	}
-	if !bytes.HasPrefix(msg, []byte("##")) {
-		return fmt.Errorf("invalid first packet, got: %s", string(msg))
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		return fmt.Errorf("failed to accept TCP connection: %w", err)
 	}
 
+	p.logger.Debug("Accepted new connection", "remote-addr", conn.RemoteAddr())
+
+	// Store the first active connection
+	p.mu.Lock()
 	p.conn = conn
 	p.lastActive = time.Now()
+	p.mu.Unlock()
 
-	user, _ := bytes.CutSuffix(msg[2:], []byte("\x00"))
-	p.logger.Debug("User has connected to the TCP listener", "user", string(user))
+	if err := p.handleConnection(ctx, conn, onReceive); err != nil {
+		p.logger.Error("Failed to handle connection", "remote-addr", conn.RemoteAddr(), "error", err)
+		return err
+	}
 	return nil
 }
 
 // handleConnection reads from the TCP connection and forwards the data received
 // from the game client.
-func (p *ListenerTCP) handleConnection(conn TCPConn, onReceive func(p []byte) (err error)) error {
+func (p *ListenerTCP) handleConnection(ctx context.Context, conn TCPConn, onReceive func(p []byte) (err error)) error {
+	defer func() {
+		_ = conn.Close()
+	}()
+
 	// Handle incoming data from the game client
 	buf := make([]byte, 1024)
 
 	for {
-		clear(buf)
-		fmt.Println("handling")
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+			clear(buf)
 
-		msg, err := p.readNext(conn, buf)
-		if err != nil {
-			return err
-		}
+			_ = conn.SetReadDeadline(time.Now().Add(3 * time.Second))
 
-		// Mark when the last activity has happened
-		p.lastActive = time.Now()
+			n, err := conn.Read(buf)
+			if err != nil {
+				var ne net.Error
+				if errors.As(err, &ne) && ne.Timeout() {
+					p.lastActive = time.Now()
+					continue
+				}
+				if errors.Is(err, io.EOF) {
+					return fmt.Errorf("game client has closed the TCP connection: %w", err)
+				}
+				if errors.Is(err, net.ErrClosed) {
+					return fmt.Errorf("tcp-listener has closed the connection: %w", err)
+				}
+				if errors.Is(err, io.ErrClosedPipe) {
+					return nil
+				}
 
-		if len(msg) == 0 {
-			continue
-		}
+				return fmt.Errorf("failed to read data: %w", err)
+			}
 
-		p.logger.Debug("Received packet from the game client", "data", msg)
+			p.lastActive = time.Now()
+			// p.logger.Debug("Received packet from the game client", "size", n, "data", buf[:n])
 
-		if err := onReceive(msg); err != nil {
-			p.logger.Warn("Failed to write data", logging.Error(err))
-			return fmt.Errorf("failed to write to data channel: %w", err)
+			if err := onReceive(buf[:n]); err != nil {
+				p.logger.Warn("Failed to write data", logging.Error(err))
+				return fmt.Errorf("failed to write to data channel: %w", err)
+			}
 		}
 	}
-}
-
-func (_ *ListenerTCP) readNext(conn TCPConn, buf []byte) ([]byte, error) {
-	_ = conn.SetReadDeadline(time.Now().Add(3 * time.Second))
-	n, err := conn.Read(buf)
-	if err != nil {
-		var ne net.Error
-		if errors.As(err, &ne) && ne.Timeout() {
-			return nil, nil
-		}
-		if errors.Is(err, io.EOF) {
-			return nil, fmt.Errorf("game client has closed the TCP connection: %w", err)
-		}
-		if errors.Is(err, net.ErrClosed) {
-			return nil, fmt.Errorf("tcp-listener has closed the connection: %w", err)
-		}
-		if errors.Is(err, io.ErrClosedPipe) {
-			return nil, fmt.Errorf("tcp-listener has already closed the connection: %w", err)
-		}
-
-		return nil, fmt.Errorf("failed to read data: %w", err)
-	}
-	return buf[:n], nil
 }
 
 // Write sends data to the active TCP connection (game client).
@@ -198,7 +163,6 @@ func (p *ListenerTCP) Write(msg []byte) (int, error) {
 		return n, fmt.Errorf("listen-tcp: write failed: %w", err)
 	}
 
-	p.lastActive = time.Now()
 	// p.logger.Debug("Sent to the game client", "size", n, "data", msg[:n])
 	return n, nil
 }
@@ -226,9 +190,62 @@ func (p *ListenerTCP) Close() error {
 	return err
 }
 
-func (p *ListenerTCP) Alive(now time.Time, timeout time.Duration) bool {
+const defaultTimeout = time.Second * 5
+
+func (p *ListenerTCP) Alive(now time.Time) bool {
 	p.mu.RLock()
-	alive := !p.closed && p.conn != nil && p.lastActive.After(now.Add(-timeout))
+	alive := !p.closed && p.conn != nil && p.lastActive.After(now.Add(-defaultTimeout))
 	p.mu.RUnlock()
 	return alive
+}
+
+func StartProbeTCP(ctx context.Context, addr string, onDisconnect func()) error {
+	logger := slog.With("component", "probe-tcp")
+
+	// Check if the connection to the game server can be established
+	conn, err := net.DialTimeout("tcp", addr, time.Second)
+	if err != nil {
+		return fmt.Errorf("could not connect to game server: %w", err)
+	}
+
+	// Check if the game server is still running
+	go func() {
+		defer func() {
+			onDisconnect()
+			_ = conn.Close()
+		}()
+
+		time.Sleep(10 * time.Second)
+
+		buf := make([]byte, 1)
+		for {
+			select {
+			case <-ctx.Done():
+				logger.Info("Context cancelled")
+				return
+			default:
+				_ = conn.SetReadDeadline(time.Now().Add(3 * time.Second))
+
+				if _, err := conn.Read(buf); err != nil {
+					var ne net.Error
+					if errors.As(err, &ne) && ne.Timeout() {
+						continue
+					}
+					if errors.Is(err, io.EOF) {
+						logger.Debug("[TCP Probe] listener host has closed the connection")
+						return
+					}
+					if errors.Is(err, net.ErrClosed) {
+						logger.Debug("[TCP Probe] probe has closed the connection")
+						return
+					}
+					logger.Info("Connection to the listener is closed", logging.Error(err))
+					return
+				}
+				continue
+			}
+		}
+	}()
+
+	return nil
 }
