@@ -1,6 +1,7 @@
 package redirect
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -95,6 +96,7 @@ func (p *ListenerTCP) Run(ctx context.Context, onReceive func(p []byte) (err err
 		break
 	}
 
+	p.logger.Error("HANDLING connection")
 	if err := p.handleConnection(p.conn, onReceive); err != nil {
 		p.logger.Error("Failed to handle connection", "error", err)
 		return err
@@ -110,15 +112,15 @@ func (p *ListenerTCP) handleHandshake(conn TCPConn) error {
 		return fmt.Errorf("someone is already connected")
 	}
 
-	//buf := make([]byte, 64)
+	buf := make([]byte, 64)
 
-	//msg, err := p.readNext(conn, buf)
-	//if err != nil {
-	//	return err
-	//}
-	//if !bytes.HasPrefix(msg, []byte("##")) {
-	//	return fmt.Errorf("invalid first packet, got: %s", string(msg))
-	//}
+	msg, err := p.readNext(conn, buf)
+	if err != nil {
+		return err
+	}
+	if !bytes.HasPrefix(msg, []byte("##")) {
+		return fmt.Errorf("invalid first packet, got: %s", string(msg))
+	}
 
 	p.conn = conn
 	p.lastActive = time.Now()
