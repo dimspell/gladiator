@@ -92,7 +92,7 @@ func (r *Relay) HostRoom(ctx context.Context, params proxy.HostParams) error {
 
 	// A scheduled interval to keep connection to the relay server
 	// Note: In case of players playing alone
-	r.router.keepAliveHost(ctx)
+	//r.router.keepAliveHost(ctx)
 
 	// Probe to check if the game server is still running
 	//onDisconnect := func() {
@@ -156,14 +156,6 @@ func (r *Relay) Join(ctx context.Context, params proxy.JoinParams) (net.IP, erro
 	roomID := params.GameID
 	if err := r.router.connect(ctx, roomID); err != nil {
 		return nil, fmt.Errorf("failed connect to the relay server: %w", err)
-	}
-
-	if err := r.router.sendPacket(RelayPacket{
-		Type:    "broadcast",
-		RoomID:  roomID,
-		Payload: []byte("Hello everyone!"),
-	}); err != nil {
-		return nil, err
 	}
 
 	hostID := remoteID(params.HostUserID)
