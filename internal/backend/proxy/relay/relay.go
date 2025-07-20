@@ -161,15 +161,8 @@ func (r *Relay) Join(ctx context.Context, params proxy.JoinParams) (net.IP, erro
 	hostID := remoteID(params.HostUserID)
 
 	for peerID, ipAddress := range r.router.manager.PeerIPs {
-		onUDPMessage := func(p []byte) error {
-			return r.router.sendPacket(RelayPacket{
-				Type:    "udp",
-				RoomID:  roomID,
-				ToID:    peerID,
-				Payload: p,
-			})
-		}
-
+		onTCPMessage := r.router.onTCPMessage(roomID, peerID) // TCP is Not needed for guest but run it anyway
+		onUDPMessage := r.router.onUDPMessage(roomID, peerID)
 		onHostDisconnected := func(host *redirect.FakeHost, forced bool) {
 			slog.Warn("Host went offline", logging.PeerID(peerID), "ip", host.AssignedIP, "forced", forced)
 			if forced {
@@ -179,29 +172,14 @@ func (r *Relay) Join(ctx context.Context, params proxy.JoinParams) (net.IP, erro
 				r.router.stop(host)
 			}
 		}
-		if peerID == hostID {
-			onTCPMessage := func(p []byte) error {
-				return r.router.sendPacket(RelayPacket{
-					Type:    "tcp",
-					RoomID:  roomID,
-					ToID:    peerID,
-					Payload: p,
-				})
-			}
 
-			_, err := r.router.manager.StartHost(ctx, peerID, ipAddress, 6114, 6113, onTCPMessage, onUDPMessage, onHostDisconnected)
-			if err != nil {
-				return nil, err
-			}
+		r.router.logger.Debug("Starting fake host for", logging.PeerID(peerID), "host", peerID == hostID)
 
-			// if err := probe.StartProbeTCP(ctx, net.JoinHostPort(ipAddress, "6114"), onHostDisconnected); err != nil {
-			//	return nil, fmt.Errorf("failed start the game server probe: %w", err)
-			// }
-		} else {
-			if _, err := r.router.manager.StartHost(ctx, peerID, ipAddress, 0, 6113, nil, onUDPMessage, onHostDisconnected); err != nil {
-				return nil, err
-			}
+		_, err := r.router.manager.StartHost(ctx, peerID, ipAddress, 6114, 6113, onTCPMessage, onUDPMessage, onHostDisconnected)
+		if err != nil {
+			return nil, err
 		}
+
 	}
 
 	return net.IPv4(127, 0, 0, 1), nil

@@ -57,14 +57,22 @@ func (r *PacketRouter) Reset() {
 		r.pingTicker.Stop()
 	}
 
-	if r.relayConn != nil {
-		_ = r.stream.Close()
-		_ = r.relayConn.CloseWithError(0, "done")
-	}
+	r.disconnect()
 
 	r.manager.StopAll()
 	r.roomID = ""
 	r.currentHostID = ""
+}
+
+func (r *PacketRouter) disconnect() {
+	if r.stream != nil {
+		r.stream.CancelRead(0xDEAD)
+		r.stream.CancelWrite(0xDEAD)
+		_ = r.stream.Close()
+	}
+	if r.relayConn != nil {
+		_ = r.relayConn.CloseWithError(0xDEAD, "done")
+	}
 }
 
 func (r *PacketRouter) Handle(ctx context.Context, payload []byte) error {
@@ -314,7 +322,7 @@ func (r *PacketRouter) stop(host *redirect.FakeHost) {
 }
 
 type RelayPacket struct {
-	Type    string `json:"type"` // "join", "leave", "data", "broadcast", "migrate", "tcp", "udp"
+	Type    string `json:"type"` // "join", "leave", "tcp", "udp"
 	RoomID  string `json:"room"`
 	FromID  string `json:"from"`
 	ToID    string `json:"to,omitempty"`
@@ -347,9 +355,6 @@ func (r *PacketRouter) receiveLoop(ctx context.Context, stream *quic.Stream) {
 	buf := make([]byte, 4096)
 	for {
 		n, err := stream.Read(buf)
-		if err == io.EOF {
-			return
-		}
 		if err != nil {
 			r.logger.Error("received error while reading packet", logging.Error(err))
 			return
@@ -364,15 +369,13 @@ func (r *PacketRouter) receiveLoop(ctx context.Context, stream *quic.Stream) {
 					break
 				}
 				r.logger.Warn("failed to unmarshal packet", logging.Error(err))
-				break
+				r.logger.Debug("invalid packet", slog.Any("data", data))
+				continue
 			}
 
 			switch pkt.Type {
 			case "join":
-				r.dynamicJoin(ctx, pkt.RoomID, pkt.FromID, pkt)
-
-			case "data":
-				r.readMessage(pkt.FromID, pkt)
+				r.dynamicJoin(ctx, pkt.RoomID, pkt.FromID)
 
 			case "tcp":
 				r.writeTCP(pkt.FromID, pkt)
@@ -380,21 +383,62 @@ func (r *PacketRouter) receiveLoop(ctx context.Context, stream *quic.Stream) {
 			case "udp":
 				r.writeUDP(pkt.FromID, pkt)
 
-			case "broadcast":
-				r.readBroadcast(pkt.FromID, pkt)
-
 			case "leave":
 				r.leaveRoom(pkt.FromID)
+
+			default:
+				r.logger.Debug("Unhandled relay packet", slog.Any("packet", pkt))
 			}
 		}
 	}
 }
-func (r *PacketRouter) readBroadcast(fromID string, pkt RelayPacket) {
-	r.logger.Info("broadcast packet received", slog.String("fromID", fromID), slog.String("payload", string(pkt.Payload)))
+
+func (r *PacketRouter) dynamicJoin(ctx context.Context, roomID string, peerID string) {
+	// TODO: There is no probe for checking if it exist?
+
+	ip, err := r.manager.AssignIP(peerID)
+	if err != nil {
+		r.logger.Warn("failed to assign IP for the peer ", logging.Error(err), logging.PeerID(peerID))
+		return
+	}
+	var (
+		tcpPort      int
+		onTCPMessage func(p []byte) error = nil
+		onUDPMessage                      = r.onUDPMessage(roomID, peerID)
+	)
+	if r.selfID == r.currentHostID {
+		tcpPort, onTCPMessage = 6114, r.onTCPMessage(roomID, peerID)
+	}
+
+	host, err := r.manager.StartGuest(ctx, peerID, ip, tcpPort, 6113, onTCPMessage, onUDPMessage, r.onFakeHostDisconnect(peerID, ip))
+	if err != nil {
+		r.logger.Warn("failed to start dial host", logging.Error(err), logging.PeerID(peerID))
+		return
+	}
+	r.manager.SetHost(ip, peerID, host)
 }
 
-func (r *PacketRouter) readMessage(fromID string, pkt RelayPacket) {
-	r.logger.Info("data packet received", slog.String("fromID", fromID), slog.String("payload", string(pkt.Payload)))
+func (r *PacketRouter) leaveRoom(peerID string) {
+	r.manager.RemoveByRemoteID(peerID)
+}
+
+func (r *PacketRouter) onFakeHostDisconnect(peerID string, ip string) func(host *redirect.FakeHost, forced bool) {
+	return func(host *redirect.FakeHost, forced bool) {
+		slog.Warn("Host went offline", logging.PeerID(peerID), "ip", ip, "forced", forced)
+		r.stop(host)
+	}
+}
+
+func (r *PacketRouter) onTCPMessage(roomID string, peerID string) func(p []byte) error {
+	return func(p []byte) error {
+		return r.sendPacket(RelayPacket{Type: "tcp", RoomID: roomID, ToID: peerID, Payload: p})
+	}
+}
+
+func (r *PacketRouter) onUDPMessage(roomID string, peerID string) func(p []byte) error {
+	return func(p []byte) error {
+		return r.sendPacket(RelayPacket{Type: "udp", RoomID: roomID, ToID: peerID, Payload: p})
+	}
 }
 
 func (r *PacketRouter) writeTCP(peerID string, pkt RelayPacket) {
@@ -423,65 +467,4 @@ func (r *PacketRouter) writeUDP(peerID string, pkt RelayPacket) {
 		r.logger.Warn("failed to write packet", logging.Error(err))
 		return
 	}
-}
-
-func (r *PacketRouter) dynamicJoin(ctx context.Context, roomID string, peerID string, pkt RelayPacket) {
-	ip, err := r.manager.AssignIP(peerID)
-	if err != nil {
-		r.logger.Warn("failed to assign IP for the peer ", logging.Error(err), logging.PeerID(peerID))
-		return
-	}
-	var (
-		tcpPort      int
-		onTCPMessage func(p []byte) error = nil
-
-		onUDPMessage = func(p []byte) error {
-			return r.sendPacket(RelayPacket{
-				Type:    "udp",
-				RoomID:  roomID,
-				ToID:    peerID,
-				Payload: p,
-			})
-		}
-	)
-	if r.selfID == r.currentHostID {
-		tcpPort, onTCPMessage = 6114, func(p []byte) error {
-			return r.sendPacket(RelayPacket{
-				Type:    "tcp",
-				RoomID:  roomID,
-				ToID:    peerID,
-				Payload: p,
-			})
-		}
-	}
-
-	onHostDisconnected := func(host *redirect.FakeHost, forced bool) {
-		slog.Warn("Host went offline", logging.PeerID(peerID), "ip", ip, "forced", forced)
-		r.stop(host)
-		if forced {
-			r.disconnect()
-			r.Reset()
-		}
-	}
-
-	host, err := r.manager.StartGuest(ctx, peerID, ip, tcpPort, 6113, onTCPMessage, onUDPMessage, onHostDisconnected)
-	if err != nil {
-		r.logger.Warn("failed to start dial host", logging.Error(err), logging.PeerID(peerID))
-		// TODO: Unassign IP address
-		return
-	}
-	r.manager.SetHost(ip, peerID, host)
-
-	// TODO: There is no probe for checking if it exist?
-}
-
-func (r *PacketRouter) leaveRoom(peerID string) {
-	r.manager.RemoveByRemoteID(peerID)
-}
-
-func (r *PacketRouter) disconnect() {
-	r.stream.CancelRead(0xDEAD)
-	r.stream.CancelWrite(0xDEAD)
-	r.stream.Close()
-	r.relayConn.CloseWithError(0xDEAD, "disconnect")
 }
