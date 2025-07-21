@@ -39,6 +39,8 @@ type PeerToPeer struct {
 	Session      *bsession.Session
 	GameManager  *GameManager
 	EventHandler *PeerToPeerMessageHandler
+
+	HostManager *redirect.HostManager // NEW: HostManager for IP/proxy management
 }
 
 func NewPeerToPeer(session *bsession.Session, iceServers ...webrtc.ICEServer) *PeerToPeer {
@@ -50,6 +52,9 @@ func NewPeerToPeer(session *bsession.Session, iceServers ...webrtc.ICEServer) *P
 		config:  config,
 	}
 
+	// NEW: Initialize HostManager with 127.0.0.1 prefix
+	hostManager := redirect.NewManager(net.IPv4(127, 0, 0, 1))
+
 	p := &PeerToPeer{
 		hostIPAddress:  net.IPv4(127, 0, 1, 2),
 		WebRTCConfig:   config,
@@ -57,6 +62,7 @@ func NewPeerToPeer(session *bsession.Session, iceServers ...webrtc.ICEServer) *P
 		NewUDPRedirect: redirect.NewUDPRedirect,
 		Session:        session,
 		GameManager:    gameManager,
+		HostManager:    hostManager, // NEW
 	}
 
 	handler := &PeerToPeerMessageHandler{
@@ -75,17 +81,22 @@ func NewPeerToPeer(session *bsession.Session, iceServers ...webrtc.ICEServer) *P
 
 // CreateRoom creates a new game room and assigns the session as the host.
 // Returns the assigned IP address for the host player
-func (p *PeerToPeer) CreateRoom(params proxy.CreateParams) (net.IP, error) {
+func (p *PeerToPeer) CreateRoom(ctx context.Context, params proxy.CreateParams) (net.IP, error) {
 	p.GameManager.Reset()
 
-	ipAddr := net.IPv4(127, 0, 0, 1)
+	// NEW: Assign IP using HostManager
+	userID := p.Session.GetUserID()
+	ipStr, err := p.HostManager.AssignIP(fmt.Sprintf("%d", userID))
+	if err != nil {
+		return nil, fmt.Errorf("failed to assign IP for host: %w", err)
+	}
+	ipAddr := net.ParseIP(ipStr)
 	hostPlayer := p.Session.ToPlayer(ipAddr)
 
 	gameRoom := &Game{
-		ID:     params.GameID,
-		Host:   hostPlayer,
-		Peers:  map[int64]*Peer{}, // FIXME: Add size limit
-		IpRing: NewIpRing(),
+		ID:    params.GameID,
+		Host:  hostPlayer,
+		Peers: map[int64]*Peer{}, // FIXME: Add size limit
 	}
 
 	p.GameManager.Game = gameRoom
@@ -118,10 +129,9 @@ func (p *PeerToPeer) SelectGame(params proxy.GameData) error {
 	}
 
 	gameRoom := &Game{
-		ID:     params.Game.GameId,
-		Host:   hostPlayer,
-		Peers:  map[int64]*Peer{}, // FIXME: Add size limit
-		IpRing: NewIpRing(),
+		ID:    params.Game.GameId,
+		Host:  hostPlayer,
+		Peers: map[int64]*Peer{}, // FIXME: Add size limit
 	}
 
 	for _, player := range params.ToWirePlayers() {
@@ -130,23 +140,20 @@ func (p *PeerToPeer) SelectGame(params proxy.GameData) error {
 			return err
 		}
 
-		isCurrentUser := p.Session.GetUserID() == player.UserID
-		isHostUser := gameRoom.Host.UserID == player.UserID
-
-		peer, err := NewPeer(peerConnection,
-			gameRoom.IpRing,
-			player.UserID,
-			isCurrentUser,
-			isHostUser)
+		// Assign IP using HostManager
+		ipStr, err := p.HostManager.AssignIP(fmt.Sprintf("%d", player.UserID))
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to assign IP for user %d: %w", player.UserID, err)
+		}
+		ipAddr := net.ParseIP(ipStr)
+
+		peer := &Peer{
+			UserID:     player.UserID,
+			Addr:       &redirect.Addressing{IP: ipAddr},
+			Mode:       redirect.None, // TODO: Get rid of the Mode field
+			Connection: peerConnection,
 		}
 		gameRoom.Peers[player.UserID] = peer
-
-		// if !isCurrentUser {
-		// if err := peer.setupPeerConnection(context.TODO(), session, player, false); err != nil {
-		// 	return err
-		// }
 	}
 
 	p.GameManager.Game = gameRoom
@@ -164,16 +171,22 @@ func (p *PeerToPeer) GetPlayerAddr(params proxy.GetPlayerAddrParams) (net.IP, er
 }
 
 func (p *PeerToPeer) Join(ctx context.Context, params proxy.JoinParams) (net.IP, error) {
-	ip := net.IPv4(127, 0, 0, 1)
-
 	if p.GameManager.Game == nil {
 		return nil, fmt.Errorf("no game mananged for session: %d", p.Session.GetUserID())
 	}
 
+	// Assign IP using HostManager
+	userID := p.Session.GetUserID()
+	ipStr, err := p.HostManager.AssignIP(fmt.Sprintf("%d", userID))
+	if err != nil {
+		return nil, fmt.Errorf("failed to assign IP for joining user: %w", err)
+	}
+	ip := net.ParseIP(ipStr)
+
 	peer := &Peer{
-		UserID: p.Session.GetUserID(),
+		UserID: userID,
 		Addr:   &redirect.Addressing{IP: ip},
-		Mode:   redirect.None,
+		Mode:   redirect.None, // TODO: Get rid of the Mode field
 	}
 	p.GameManager.AddPeer(peer)
 
@@ -182,7 +195,7 @@ func (p *PeerToPeer) Join(ctx context.Context, params proxy.JoinParams) (net.IP,
 		pr.Connected = ch
 	}
 
-	return ip, nil
+	return net.IPv4(127, 0, 0, 1), nil
 }
 
 func (p *PeerToPeer) ConnectToPlayer(ctx context.Context, params proxy.GetPlayerAddrParams) (net.IP, error) {
@@ -221,6 +234,11 @@ func (p *PeerToPeer) Close() {
 	}
 
 	gameManager.Reset()
+
+	// Cleanup all fake hosts/proxies
+	if p.HostManager != nil {
+		p.HostManager.StopAll()
+	}
 }
 
 func (p *PeerToPeer) Handle(ctx context.Context, payload []byte) error {

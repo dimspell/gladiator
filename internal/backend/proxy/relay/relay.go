@@ -1,15 +1,17 @@
+// Package relay provides the implementation of a relay-based packet router for multiplayer networking.
 package relay
 
 import (
 	"context"
 	"fmt"
+	"log/slog"
+	"net"
+
 	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/proxy"
 	"github.com/dimspell/gladiator/internal/backend/redirect"
 	"github.com/dimspell/gladiator/internal/model"
-	"log/slog"
-	"net"
 )
 
 var _ proxy.ProxyClient = (*Relay)(nil)
@@ -69,8 +71,7 @@ func (r *Relay) GetHostIP(ip net.IP) net.IP {
 	return net.IPv4(127, 0, 0, 2)
 }
 
-func (r *Relay) CreateRoom(params proxy.CreateParams) (net.IP, error) {
-	ctx := context.Background()
+func (r *Relay) CreateRoom(ctx context.Context, params proxy.CreateParams) (net.IP, error) {
 	roomID := params.GameID
 
 	r.router.Reset()
@@ -195,31 +196,4 @@ func (r *Relay) Close() {
 
 func (r *Relay) Handle(ctx context.Context, payload []byte) error {
 	return r.router.Handle(ctx, payload)
-}
-
-func (r *Relay) Debug() any {
-	hosts := r.router.manager.Hosts
-	peerHosts := r.router.manager.PeerHosts
-	ipToPeerID := r.router.manager.IPToPeerID
-	peerIPs := r.router.manager.PeerIPs
-	currentHostID := r.router.currentHostID
-	selfID := r.router.selfID
-
-	var state = struct {
-		Hosts         map[string]*redirect.FakeHost
-		PeerHosts     map[string]*redirect.FakeHost
-		IPToPeerID    map[string]string
-		PeerIPs       map[string]string
-		CurrentHostID string
-		SelfID        string
-	}{
-		Hosts:         hosts,
-		PeerHosts:     peerHosts,
-		IPToPeerID:    ipToPeerID,
-		PeerIPs:       peerIPs,
-		CurrentHostID: currentHostID,
-		SelfID:        selfID,
-	}
-
-	return state
 }

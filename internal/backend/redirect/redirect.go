@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"net"
+	"time"
 )
 
 var ErrClosed = errors.New("server closed")
@@ -55,7 +56,8 @@ func (s Mode) String() string {
 }
 
 type Redirect interface {
-	Run(ctx context.Context, onReceive func(p []byte) (err error)) error
+	Run(ctx context.Context) error
+	Alive(now time.Time, timeout time.Duration) bool
 
 	io.Writer
 	io.Closer
@@ -83,16 +85,16 @@ func NewUDPRedirect(joinType Mode, addr *Addressing) (Redirect, error) {
 	switch joinType {
 	case CurrentUserIsHost:
 		logger.Info("Creating client to dial TCP and UDP on default ports")
-		return DialUDP(addr.IP.To4().String(), "")
+		return NewDialUDP(addr.IP.To4().String(), "", nil)
 	case OtherUserIsHost:
 		logger.Info("Creating TCP and UDP listeners on custom ports")
-		return ListenUDP(addr.IP.To4().String(), addr.UDPPort)
+		return NewListenerUDP(addr.IP.To4().String(), addr.UDPPort, nil)
 	case OtherUserHasJoined:
 		logger.Info("Creating UDP listener only on a custom port")
-		return ListenUDP(addr.IP.To4().String(), addr.UDPPort)
+		return NewListenerUDP(addr.IP.To4().String(), addr.UDPPort, nil)
 	case OtherUserIsJoining:
 		logger.Info("Creating UDP dialler on the default port")
-		return DialUDP(addr.IP.To4().String(), "")
+		return NewDialUDP(addr.IP.To4().String(), "", nil)
 	default:
 		return nil, fmt.Errorf("unknown joining type: %s", joinType)
 	}
@@ -109,13 +111,13 @@ func NewTCPRedirect(joinType Mode, addr *Addressing) (Redirect, error) {
 	switch joinType {
 	case CurrentUserIsHost:
 		logger.Info("Creating client to dial TCP and UDP on default ports")
-		return DialTCP(addr.IP.To4().String(), "")
+		return NewDialTCP(addr.IP.To4().String(), "", nil)
 	case OtherUserIsHost:
 		logger.Info("Creating TCP and UDP listeners on custom ports")
-		return ListenTCP(addr.IP.To4().String(), addr.TCPPort)
+		return NewListenerTCP(addr.IP.To4().String(), addr.TCPPort, nil)
 	case OtherUserHasJoined:
 		logger.Info("Creating UDP listener only on a custom port")
-		return ListenUDP(addr.IP.To4().String(), addr.UDPPort)
+		return NewListenerUDP(addr.IP.To4().String(), addr.UDPPort, nil)
 	default:
 		return &Noop{}, nil
 	}

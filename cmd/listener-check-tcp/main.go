@@ -19,7 +19,10 @@ func main() {
 
 	host, port := "127.0.0.1", "21370"
 
-	l, err := redirect.ListenTCP(host, port)
+	l, err := redirect.NewListenerTCP(host, port, func(p []byte) (err error) {
+		log.Printf("Received on TCP %s", p)
+		return nil
+	})
 	if err != nil {
 		log.Fatalf("listener start error: %v", err)
 	}
@@ -40,12 +43,7 @@ func main() {
 	// }()
 
 	go func() {
-		onReceive := func(p []byte) (err error) {
-			log.Printf("Received on TCP %s", p)
-			return nil
-		}
-
-		if err := l.Run(lctx, onReceive); err != nil {
+		if err := l.Run(lctx); err != nil {
 			log.Printf("run error: %v", err)
 			return
 		}

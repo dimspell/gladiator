@@ -28,7 +28,7 @@ type HostProxy interface {
 
 	// CreateRoom creates a new game room with the provided parameters and returns
 	// the IP address of the game host.
-	CreateRoom(CreateParams) (net.IP, error)
+	CreateRoom(context.Context, CreateParams) (net.IP, error)
 
 	// HostRoom creates a new game room with the provided parameters and returns
 	// an error if the operation fails.

@@ -180,7 +180,7 @@ func main() {
 	}
 
 	if mode == "HOST" {
-		roomIP, err := px.CreateRoom(proxy.CreateParams{GameID: gameID})
+		roomIP, err := px.CreateRoom(ctx, proxy.CreateParams{GameID: gameID})
 		if err != nil {
 			log.Fatal(err)
 		}

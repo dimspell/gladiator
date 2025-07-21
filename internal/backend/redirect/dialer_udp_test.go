@@ -3,170 +3,191 @@ package redirect
 import (
 	"context"
 	"errors"
-	"log/slog"
+	"io"
 	"net"
-	"sync"
 	"testing"
 	"time"
+
+	"github.com/dimspell/gladiator/internal/app/logger"
+	"github.com/stretchr/testify/require"
 )
 
-// ---- MOCK IMPLEMENTATIONS ----
+// ---- Mocks ----
 
-// fakeUDPConn implements udp.UDPConn
-type fakeUDPConn struct {
-	mu sync.Mutex
-
-	ReadDeadline time.Time
-	ReadData     [][]byte
-	WriteData    [][]byte
-	ReadIndex    int
-	CloseCalled  bool
+type mockUDPConn struct {
+	readData  [][]byte
+	writeData [][]byte
+	readIndex int
+	closed    bool
+	remote    *net.UDPAddr
 }
 
-func (m *fakeUDPConn) ReadFromUDP(b []byte) (int, *net.UDPAddr, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	if m.ReadIndex >= len(m.ReadData) {
-		time.Sleep(100 * time.Millisecond)            // simulate blocking read
-		return 0, nil, &net.DNSError{IsTimeout: true} // simulate timeout
+func (m *mockUDPConn) ReadFromUDP(b []byte) (int, *net.UDPAddr, error) {
+	if m.closed {
+		return 0, nil, io.EOF
 	}
-
-	copy(b, m.ReadData[m.ReadIndex])
-	n := len(m.ReadData[m.ReadIndex])
-	m.ReadIndex++
-	return n, &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 4321}, nil
+	if m.readIndex >= len(m.readData) {
+		return 0, nil, io.EOF
+	}
+	copy(b, m.readData[m.readIndex])
+	n := len(m.readData[m.readIndex])
+	addr := m.remote
+	m.readIndex++
+	return n, addr, nil
 }
-
-func (m *fakeUDPConn) Write(b []byte) (int, error) { return m.WriteTo(b, m.RemoteAddr()) }
-
-func (m *fakeUDPConn) WriteTo(b []byte, addr net.Addr) (int, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	d := make([]byte, len(b))
-	copy(d, b)
-	m.WriteData = append(m.WriteData, d)
+func (m *mockUDPConn) Write(b []byte) (int, error) {
+	if m.closed {
+		return 0, io.ErrClosedPipe
+	}
+	if string(b) == "fail" {
+		return 0, io.ErrUnexpectedEOF
+	}
+	m.writeData = append(m.writeData, append([]byte{}, b...))
 	return len(b), nil
 }
+func (m *mockUDPConn) WriteTo(b []byte, addr net.Addr) (int, error) { return m.Write(b) }
+func (m *mockUDPConn) Close() error                                 { m.closed = true; return nil }
+func (m *mockUDPConn) SetReadDeadline(t time.Time) error            { return nil }
+func (m *mockUDPConn) LocalAddr() net.Addr                          { return nil }
+func (m *mockUDPConn) RemoteAddr() net.Addr                         { return nil }
 
-func (m *fakeUDPConn) Close() error {
-	m.CloseCalled = true
-	return nil
-}
+// ---- Unit Tests ----
 
-func (m *fakeUDPConn) SetReadDeadline(t time.Time) error {
-	m.ReadDeadline = t
-	return nil
-}
-
-func (m *fakeUDPConn) LocalAddr() net.Addr {
-	return &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 1234}
-}
-
-func (m *fakeUDPConn) RemoteAddr() net.Addr {
-	return &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 4321}
-}
-
-// ---- UNIT TESTS ----
-
-func TestDialerUDP_Run(t *testing.T) {
-	t.Run("Read and forward", func(t *testing.T) {
-		// Arrange
-		fakeConn := &fakeUDPConn{
-			ReadData: [][]byte{
-				[]byte("one"),
-				[]byte("two"),
-			},
-		}
-		d := &DialerUDP{
-			conn:   fakeConn,
-			logger: slog.Default(),
-		}
-
-		ctx, cancel := context.WithCancel(t.Context())
-		defer cancel()
-
-		var received [][]byte
-		errCh := make(chan error, 1)
-		defer close(errCh)
-
-		// Act
-		go func() {
-			err := d.Run(ctx, func(p []byte) error {
-				data := make([]byte, len(p))
-				copy(data, p)
-				received = append(received, data)
-
-				// Stop the loop after 2 messages
-				if len(received) == 2 {
-					cancel()
-				}
-				return nil
-			})
-			errCh <- err
-		}()
-
-		// Assert
-		select {
-		case err := <-errCh:
-			if err != nil && !errors.Is(err, context.Canceled) {
-				t.Fatalf("unexpected error: %v", err)
-			}
-		case <-time.After(1 * time.Second):
-			t.Fatal("test timeout: Run did not exit")
-		}
-
-		if len(received) != 2 || string(received[0]) != "one" || string(received[1]) != "two" {
-			t.Fatalf("unexpected received data: %v", received)
-		}
-	})
-
-	t.Run("Context cancelled", func(t *testing.T) {
-		// Arrange
-		fakeConn := &fakeUDPConn{
-			ReadData: [][]byte{}, // no data - it will block
-		}
-		d := &DialerUDP{
-			conn:   fakeConn,
-			logger: slog.Default(),
-		}
-
-		ctx, cancel := context.WithCancel(t.Context())
-		cancel()
-
-		// Act
-		err := d.Run(ctx, func(p []byte) error {
-			return nil
-		})
-
-		// Assert
-		if err == nil || err.Error() == "" {
-			t.Fatalf("expected context canceled error, got: %v", err)
-		}
-	})
+func TestDialerUDP_Close_Idempotent(t *testing.T) {
+	mock := &mockUDPConn{}
+	dialer := &DialerUDP{conn: mock, logger: logger.NewDiscardLogger()}
+	require.NoError(t, dialer.Close())
+	require.NoError(t, dialer.Close()) // Should not error
 }
 
 func TestDialerUDP_Write(t *testing.T) {
-	// Arrange
-	fakeConn := &fakeUDPConn{}
-	d := &DialerUDP{
-		conn:   fakeConn,
-		logger: slog.Default(),
-	}
+	mock := &mockUDPConn{}
+	dialer := &DialerUDP{conn: mock, logger: logger.NewDiscardLogger()}
+	n, err := dialer.Write([]byte("hello"))
+	require.NoError(t, err)
+	require.Equal(t, 5, n)
+	require.Equal(t, "hello", string(mock.writeData[0]))
+}
 
-	// Act
-	msg := []byte("hello")
-	n, err := d.Write(msg)
+func TestDialerUDP_Write_AfterClose(t *testing.T) {
+	mock := &mockUDPConn{}
+	dialer := &DialerUDP{conn: mock, logger: logger.NewDiscardLogger()}
+	_ = dialer.Close()
+	_, err := dialer.Write([]byte("fail"))
+	require.Error(t, err)
+}
 
-	// Assert
-	if err != nil {
-		t.Fatalf("expected no error, got: %v", err)
-	}
-	if n != len(msg) {
-		t.Fatalf("expected %d bytes written, got %d", len(msg), n)
-	}
-	if len(fakeConn.WriteData) != 1 || string(fakeConn.WriteData[0]) != "hello" {
-		t.Fatalf("unexpected data written: %v", fakeConn.WriteData)
-	}
+func TestDialerUDP_Run_NilConn(t *testing.T) {
+	dialer := &DialerUDP{conn: nil, logger: logger.NewDiscardLogger()}
+	err := dialer.Run(context.Background())
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "UDP connection is nil")
+}
+
+func TestDialerUDP_Run_OnReceiveError(t *testing.T) {
+	mock := &mockUDPConn{readData: [][]byte{[]byte("data")}}
+	dialer := &DialerUDP{conn: mock, logger: logger.NewDiscardLogger(), OnReceive: func(p []byte) error { return errors.New("fail") }}
+	err := dialer.Run(context.Background())
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "failed to handle data")
+}
+
+func TestDialerUDP_Run_EOF(t *testing.T) {
+	count := 0
+	mock := &mockUDPConn{readData: [][]byte{[]byte("msg")}}
+	dialer := &DialerUDP{conn: mock, logger: logger.NewDiscardLogger(), OnReceive: func(p []byte) error {
+		count++
+		return nil
+	}}
+	// After one message, mock returns EOF
+	err := dialer.Run(context.Background())
+	require.Error(t, err)
+	require.Equal(t, 1, count)
+}
+
+func TestDialerUDP_WriteTo(t *testing.T) {
+	mock := &mockUDPConn{}
+	dialer := &DialerUDP{conn: mock, logger: logger.NewDiscardLogger()}
+	n, err := dialer.conn.WriteTo([]byte("hello"), &net.UDPAddr{})
+	require.NoError(t, err)
+	require.Equal(t, 5, n)
+	require.Equal(t, "hello", string(mock.writeData[0]))
+}
+
+func TestDialerUDP_Close_AfterAlreadyClosed(t *testing.T) {
+	mock := &mockUDPConn{}
+	dialer := &DialerUDP{conn: mock, logger: logger.NewDiscardLogger()}
+	require.NoError(t, dialer.Close())
+	require.NoError(t, dialer.Close()) // Should not error
+}
+
+func TestDialerUDP_Run_HandlerPanic(t *testing.T) {
+	mock := &mockUDPConn{readData: [][]byte{[]byte("panic")}}
+	dialer := &DialerUDP{conn: mock, logger: logger.NewDiscardLogger(), OnReceive: func(p []byte) error {
+		panic("handler panic")
+	}}
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("expected panic to propagate")
+		}
+	}()
+	_ = dialer.Run(context.Background())
+}
+
+func TestDialerUDP_Run_Timeout(t *testing.T) {
+	mock := &mockUDPConn{}
+	dialer := &DialerUDP{conn: mock, logger: logger.NewDiscardLogger(), OnReceive: func(p []byte) error { return nil }}
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	err := dialer.Run(ctx)
+	require.Error(t, err)
+}
+
+func TestDialerUDP_Write_Error(t *testing.T) {
+	mock := &mockUDPConn{}
+	dialer := &DialerUDP{conn: mock, logger: logger.NewDiscardLogger()}
+	_, err := dialer.Write([]byte("fail"))
+	require.Error(t, err)
+}
+
+// ---- Acceptance Tests ----
+
+func startTestUDPServer(t *testing.T, handler func(conn *net.UDPConn, addr *net.UDPAddr, data []byte)) (addr string, stop func()) {
+	udpAddr, err := net.ResolveUDPAddr("udp", "127.0.0.1:0")
+	require.NoError(t, err)
+	conn, err := net.ListenUDP("udp", udpAddr)
+	require.NoError(t, err)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		buf := make([]byte, 1024)
+		for {
+			n, addr, err := conn.ReadFromUDP(buf)
+			if err != nil {
+				return
+			}
+			handler(conn, addr, buf[:n])
+		}
+	}()
+	return conn.LocalAddr().String(), func() { conn.Close(); <-done }
+}
+
+func TestDialUDP_SuccessAndClose(t *testing.T) {
+	addr, stop := startTestUDPServer(t, func(conn *net.UDPConn, addr *net.UDPAddr, data []byte) {
+		conn.WriteTo([]byte("pong"), addr)
+	})
+	defer stop()
+
+	host, port, _ := net.SplitHostPort(addr)
+	dialer, err := NewDialUDP(host, port, func(p []byte) error { return nil })
+	require.NoError(t, err)
+	n, err := dialer.Write([]byte("ping"))
+	require.NoError(t, err)
+	require.Equal(t, 4, n)
+	buf := make([]byte, 4)
+	dialer.conn.SetReadDeadline(time.Now().Add(time.Second))
+	_, _, err = dialer.conn.ReadFromUDP(buf)
+	require.NoError(t, err)
+	require.Equal(t, "pong", string(buf))
+	dialer.Close()
 }

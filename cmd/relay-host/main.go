@@ -72,7 +72,7 @@ func main() {
 
 	var err error
 
-	_, err = session.Proxy.CreateRoom(proxy.CreateParams{
+	_, err = session.Proxy.CreateRoom(ctx, proxy.CreateParams{
 		GameID: roomID,
 	})
 	if err != nil {
@@ -103,7 +103,7 @@ func main() {
 
 	r := chi.NewRouter()
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		v := proxyClient.Debug()
+		v := proxyClient
 
 		doc, err := json.MarshalIndent(v, "", "  ")
 		if err != nil {

@@ -11,7 +11,12 @@ type Relay struct {
 }
 
 func NewRelay(addr string, multiplayer *Multiplayer) (*Relay, error) {
-	server, err := NewQUICRelay(addr, multiplayer)
+	server, err := NewQUICRelay(
+		addr,
+		multiplayer,
+		WithVerifyFunc(verify),
+		WithEventHooks(multiplayer.HandleRelayJoin, multiplayer.HandleRelayLeave, multiplayer.HandleRelayDelete),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("relay failed to listen: %v", err)
 	}
@@ -37,8 +42,6 @@ func (r *Relay) Stop(ctx context.Context) error {
 	if r.cancel != nil {
 		r.cancel()
 	}
-
-	close(r.Server.Events)
 
 	return nil
 }

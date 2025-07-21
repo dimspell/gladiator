@@ -62,9 +62,47 @@ type PeerConn struct {
 }
 
 type Room struct {
-	ID    string
-	Peers map[string]*PeerConn
+	ID        string
+	Peers     map[string]*PeerConn
+	CreatedAt time.Time
 }
+
+// Metrics interface for testability
+// Only a subset shown for brevity
+
+type RelayMetrics interface {
+	IncConnectedPeers()
+	DecConnectedPeers()
+	IncPacketIn()
+	IncPacketOut()
+	SetPeersInRoom(roomID string, n int) // rs.metrics.SetPeersInRoom(roomID, len(room.Peers))
+	IncActiveRooms()
+	DecActiveRooms()
+	DeletePeersInRoom(roomID string)
+}
+
+// Default implementation using the global metrics
+
+type defaultRelayMetrics struct{}
+
+func (defaultRelayMetrics) IncConnectedPeers() { metrics.ConnectedPeers.Inc() }
+func (defaultRelayMetrics) DecConnectedPeers() { metrics.ConnectedPeers.Dec() }
+func (defaultRelayMetrics) IncPacketIn()       { metrics.PacketIn.Inc() }
+func (defaultRelayMetrics) IncPacketOut()      { metrics.PacketOut.Inc() }
+func (defaultRelayMetrics) SetPeersInRoom(roomID string, n int) {
+	metrics.PeersInRoom.WithLabelValues(roomID).Set(float64(n))
+}
+func (defaultRelayMetrics) IncActiveRooms() { metrics.ActiveRooms.Inc() }
+func (defaultRelayMetrics) DecActiveRooms() { metrics.ActiveRooms.Dec() }
+func (defaultRelayMetrics) DeletePeersInRoom(roomID string) {
+	metrics.PeersInRoom.DeleteLabelValues(roomID)
+}
+
+// Event hooks
+
+type RelayEventHook func(eventType, peerID, roomID string)
+
+// Extend RelayServer struct
 
 type RelayServer struct {
 	listener      *quic.Listener
@@ -75,7 +113,11 @@ type RelayServer struct {
 
 	Multiplayer *Multiplayer
 
-	Events chan RelayEvent
+	verifyFunc func([]byte) ([]byte, bool) // Injected for testability
+
+	OnJoin   RelayEventHook
+	OnLeave  RelayEventHook
+	OnDelete RelayEventHook
 }
 
 type RelayEvent struct {
@@ -84,7 +126,25 @@ type RelayEvent struct {
 	RoomID string
 }
 
-func NewQUICRelay(addr string, multiplayer *Multiplayer) (*RelayServer, error) {
+type RelayServerOption func(*RelayServer)
+
+func WithLogger(l *slog.Logger) RelayServerOption {
+	return func(rs *RelayServer) { rs.logger = l }
+}
+
+func WithVerifyFunc(f func([]byte) ([]byte, bool)) RelayServerOption {
+	return func(rs *RelayServer) { rs.verifyFunc = f }
+}
+
+func WithEventHooks(join, leave, delete RelayEventHook) RelayServerOption {
+	return func(rs *RelayServer) {
+		rs.OnJoin = join
+		rs.OnLeave = leave
+		rs.OnDelete = delete
+	}
+}
+
+func NewQUICRelay(addr string, multiplayer *Multiplayer, opts ...RelayServerOption) (*RelayServer, error) {
 	tlsConf := &tls.Config{
 		InsecureSkipVerify: true,
 		NextProtos:         []string{"game-relay"},
@@ -99,18 +159,22 @@ func NewQUICRelay(addr string, multiplayer *Multiplayer) (*RelayServer, error) {
 		return nil, err
 	}
 
-	return &RelayServer{
+	rs := &RelayServer{
 		listener:      listener,
 		rooms:         make(map[string]*Room),
 		peerToRoomIDs: make(map[string]string),
 		logger:        slog.With(slog.String("component", "relay")),
 		Multiplayer:   multiplayer,
-		Events:        make(chan RelayEvent),
-	}, nil
+		verifyFunc:    verify,
+	}
+	for _, opt := range opts {
+		opt(rs)
+	}
+	return rs, nil
 }
 
 func (rs *RelayServer) Start(ctx context.Context) error {
-	slog.Info("QUIC Relay Server listening", "addr", rs.listener.Addr())
+	rs.logger.Info("QUIC Relay Server listening", "addr", rs.listener.Addr())
 
 	for {
 		conn, err := rs.listener.Accept(ctx)
@@ -118,7 +182,7 @@ func (rs *RelayServer) Start(ctx context.Context) error {
 			if errors.Is(err, context.Canceled) {
 				return nil
 			}
-			slog.Warn("Relay server failed to accept", logging.Error(err))
+			rs.logger.Warn("Relay server failed to accept", logging.Error(err))
 			continue
 		}
 		go rs.handleConn(ctx, conn)
@@ -156,7 +220,7 @@ func (rs *RelayServer) closeStream(conn RelayConn, stream RelayStream) {
 	stream.CancelRead(errorCode)
 	_ = conn.CloseWithError(0xdead, "done")
 
-	slog.Info("Closed relay connection", "addr", conn.RemoteAddr())
+	rs.logger.Info("Closed relay connection", "addr", conn.RemoteAddr())
 }
 
 func (rs *RelayServer) handshake(stream RelayStream) (string, string, error) {
@@ -167,7 +231,7 @@ func (rs *RelayServer) handshake(stream RelayStream) (string, string, error) {
 		return "", "", fmt.Errorf("error reading stream: %w", err)
 	}
 
-	data, ok := verify(buf[:n])
+	data, ok := rs.verifyFunc(buf[:n])
 	if !ok {
 		return "", "", fmt.Errorf("signature failed from client")
 	}
@@ -196,7 +260,7 @@ func (rs *RelayServer) joinRoom(roomID, peerID string, conn RelayConn, stream Re
 
 	room, ok := rs.rooms[roomID]
 	if !ok {
-		room = &Room{ID: roomID, Peers: make(map[string]*PeerConn)}
+		room = &Room{ID: roomID, Peers: make(map[string]*PeerConn), CreatedAt: time.Now().In(time.UTC)}
 		rs.rooms[roomID] = room
 		rs.logger.Info("new room created", logging.RoomID(roomID), logging.PeerID(peerID))
 		metrics.ActiveRooms.Inc()
@@ -228,12 +292,11 @@ func (rs *RelayServer) joinRoom(roomID, peerID string, conn RelayConn, stream Re
 		})
 	}
 
-	rs.Events <- RelayEvent{
-		Type:   "join",
-		PeerID: peerID,
-		RoomID: roomID,
-	}
 	metrics.PeersInRoom.WithLabelValues(roomID).Set(float64(len(room.Peers)))
+
+	if rs.OnJoin != nil {
+		rs.OnJoin("join", peerID, roomID)
+	}
 
 	return pc
 }
@@ -255,12 +318,17 @@ func (rs *RelayServer) relayLoop(roomID, peerID string, peer *PeerConn) {
 				break
 			}
 			rs.logger.Warn("stream error when reading", logging.Error(err), logging.PeerID(peerID))
+			metrics.RelayErrors.WithLabelValues("stream_read").Inc()
 			break
 		}
 
-		data, ok := verify(buf[:n])
+		metrics.BytesReceived.Add(float64(n))
+
+		start := time.Now()
+		data, ok := rs.verifyFunc(buf[:n]) // Use injected verifyFunc
 		if !ok {
 			rs.logger.Warn("signature check failed when reading", logging.PeerID(peerID))
+			metrics.PacketsDropped.Inc()
 			continue
 		}
 
@@ -275,6 +343,7 @@ func (rs *RelayServer) relayLoop(roomID, peerID string, peer *PeerConn) {
 					break
 				}
 				rs.logger.Warn("relay packet unmarshal error", logging.Error(err), logging.PeerID(peerID))
+				metrics.RelayErrors.WithLabelValues("unmarshal").Inc()
 				break
 			}
 			metrics.PacketIn.Inc()
@@ -283,27 +352,30 @@ func (rs *RelayServer) relayLoop(roomID, peerID string, peer *PeerConn) {
 			rs.logger.Debug("[RELAY]", "payload", pkt.Payload, "from", pkt.FromID, "to", pkt.ToID, "type", pkt.Type)
 			// }
 
-			switch pkt.Type {
-			case "udp", "tcp":
-				rs.sendTo(pkt.RoomID, pkt.ToID, pkt)
-
-			case "broadcast":
-				rs.broadcastFrom(pkt.RoomID, pkt.FromID, pkt)
-
-			case "leave":
-				if pkt.FromID != peerID && pkt.RoomID != roomID {
-					continue
-				}
-
-				slog.Info("leave room", logging.PeerID(peerID))
-				rs.leaveRoom(peerID, roomID)
-				return
-			}
+			rs.handlePacket(pkt, peer)
+			metrics.PacketLatency.Observe(time.Since(start).Seconds())
 		}
 	}
 
 	rs.logger.Info("disconnected from relay", logging.PeerID(peerID))
 	rs.leaveRoom(peerID, roomID)
+	metrics.PeerDisconnects.WithLabelValues("relay_loop_exit").Inc()
+}
+
+func (rs *RelayServer) handlePacket(pkt RelayPacket, peer *PeerConn) {
+	switch pkt.Type {
+	case "udp", "tcp":
+		rs.sendTo(pkt.RoomID, pkt.ToID, pkt)
+
+	case "leave":
+		if pkt.FromID != peer.ID && pkt.RoomID != peer.RoomID {
+			return
+		}
+
+		rs.logger.Info("leave room", logging.PeerID(peer.ID))
+		rs.leaveRoom(peer.ID, peer.RoomID)
+		return
+	}
 }
 
 func (rs *RelayServer) leaveRoom(peerID, roomID string) {
@@ -328,20 +400,19 @@ func (rs *RelayServer) leaveRoom(peerID, roomID string) {
 	rs.closeStream(leaver.Conn, leaver.Stream)
 	delete(room.Peers, peerID)
 
-	rs.Events <- RelayEvent{
-		Type:   "leave",
-		PeerID: peerID,
-		RoomID: roomID,
-	}
 	rs.logger.Info("peer left room", logging.RoomID(roomID), logging.PeerID(peerID))
+	metrics.PeerDisconnects.WithLabelValues("leave_room").Inc()
+
+	if rs.OnLeave != nil {
+		rs.OnLeave("leave", peerID, roomID)
+	}
 
 	if len(room.Peers) == 0 {
+		metrics.RelayRoomLifetime.Observe(time.Since(room.CreatedAt).Seconds())
 		delete(rs.rooms, roomID)
 		rs.logger.Info("room deleted (empty)", logging.RoomID(roomID))
-		rs.Events <- RelayEvent{
-			Type:   "delete",
-			PeerID: peerID,
-			RoomID: roomID,
+		if rs.OnDelete != nil {
+			rs.OnDelete("delete", peerID, roomID)
 		}
 
 		metrics.ActiveRooms.Dec()
@@ -370,7 +441,7 @@ func (rs *RelayServer) cleanupPeers() {
 		rs.mu.Unlock()
 
 		for _, peer := range toLeave {
-			slog.Info("cleaning up users", logging.PeerID(peer.ID), logging.RoomID(peer.RoomID))
+			rs.logger.Info("cleaning up users", logging.PeerID(peer.ID), logging.RoomID(peer.RoomID))
 			rs.leaveRoom(peer.ID, peer.RoomID)
 		}
 	}
@@ -415,13 +486,16 @@ func (rs *RelayServer) broadcastFrom(roomID, fromID string, pkt RelayPacket) {
 func (rs *RelayServer) sendSigned(stream RelayStream, pkt RelayPacket) {
 	data, err := json.Marshal(pkt)
 	if err != nil {
-		slog.Error("json marshal failed", logging.Error(err))
+		rs.logger.Error("json marshal failed", logging.Error(err))
+		metrics.RelayErrors.WithLabelValues("marshal").Inc()
 	}
 	// packet := sign(data)
 	data = append(data, '\n')
 	if _, err := stream.Write(data); err != nil {
-		slog.Error("could not write the msg", logging.Error(err))
+		rs.logger.Error("could not write the msg", logging.Error(err))
+		metrics.RelayErrors.WithLabelValues("write").Inc()
 		return
 	}
 	metrics.PacketOut.Inc()
+	metrics.BytesSent.Add(float64(len(data)))
 }

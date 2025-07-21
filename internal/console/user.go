@@ -76,11 +76,19 @@ func (s *userServiceServer) AuthenticateUser(ctx context.Context, req *connect.R
 		return nil, connect.NewError(connect.CodeUnauthenticated, fmt.Errorf("incorrect password or username"))
 	}
 
+	// TODO: pass the secret to generate the token
+	// token, err := generateJWT(user.ID)
+	// if err != nil {
+	// 	return nil, connect.NewError(connect.CodeInternal, err)
+	// }
+
 	resp := connect.NewResponse(&multiv1.AuthenticateUserResponse{
 		User: &multiv1.User{
 			UserId:   user.ID,
 			Username: user.Username,
-		}},
+		},
+		// Token: token,
+	},
 	)
 	return resp, nil
 }

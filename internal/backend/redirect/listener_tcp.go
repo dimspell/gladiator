@@ -16,22 +16,14 @@ import (
 
 var _ Redirect = (*ListenerTCP)(nil)
 
-type ListenerTCP struct {
-	mu     sync.RWMutex
-	logger *slog.Logger
-
-	listener   TCPListener
-	conn       TCPConn
-	closed     bool
-	lastActive time.Time
-}
-
+// TCPListener is an interface that abstracts a TCP listener for accepting connections.
 type TCPListener interface {
 	Accept() (net.Conn, error)
 	Close() error
 	Addr() net.Addr
 }
 
+// TCPConn is an interface that abstracts a TCP connection for reading and writing data.
 type TCPConn interface {
 	Read(b []byte) (n int, err error)
 	Write(b []byte) (n int, err error)
@@ -39,8 +31,22 @@ type TCPConn interface {
 	SetReadDeadline(t time.Time) error
 }
 
-// ListenTCP initializes a TCP listener on the given IP and port.
-func ListenTCP(ipv4 string, portNumber string) (*ListenerTCP, error) {
+// ListenerTCP implements a TCP listener that can receive and forward TCP packets from a game client.
+// It implements the Redirect interface.
+type ListenerTCP struct {
+	mu        sync.RWMutex
+	logger    *slog.Logger
+	OnReceive ReceiveFunc
+
+	listener   TCPListener
+	conn       TCPConn
+	closed     bool
+	lastActive time.Time
+}
+
+// NewListenerTCP initializes a TCP listener on the given IP and port.
+// It returns a ListenerTCP instance or an error if the listener cannot be started.
+func NewListenerTCP(ipv4 string, portNumber string, onReceive ReceiveFunc) (*ListenerTCP, error) {
 	if net.ParseIP(ipv4) == nil {
 		return nil, fmt.Errorf("listen-tcp: invalid IPv4 address format")
 	}
@@ -61,14 +67,15 @@ func ListenTCP(ipv4 string, portNumber string) (*ListenerTCP, error) {
 	logger.Info("TCP listener started")
 
 	return &ListenerTCP{
-		listener: listener,
-		logger:   logger,
+		listener:  listener,
+		OnReceive: onReceive,
+		logger:    logger,
 	}, nil
 }
 
-// Run listens for incoming TCP connection from the game client and forwards the
-// received data.
-func (p *ListenerTCP) Run(ctx context.Context, onReceive func(p []byte) (err error)) error {
+// Run starts the TCP listener loop, handling handshakes and forwarding packets.
+// It blocks until the context is cancelled or an error occurs.
+func (p *ListenerTCP) Run(ctx context.Context) error {
 	go func() {
 		<-ctx.Done()
 		p.logger.Info("Listener shutting down due to context cancellation")
@@ -89,14 +96,14 @@ func (p *ListenerTCP) Run(ctx context.Context, onReceive func(p []byte) (err err
 		// Recognise who is trying to connect by handling the initial data.
 		if err := p.handleHandshake(conn); err != nil {
 			p.logger.Debug("Handshake has failed")
-			return err
+			continue
 		}
 
 		p.logger.Debug("Successful handshake")
 		break
 	}
 
-	if err := p.handleConnection(p.conn, onReceive); err != nil {
+	if err := p.handleConnection(ctx, p.conn, p.OnReceive); err != nil {
 		p.logger.Error("Failed to handle connection", "error", err)
 		return err
 	}
@@ -112,7 +119,7 @@ func (p *ListenerTCP) handleHandshake(conn TCPConn) error {
 	}
 
 	buf := make([]byte, 64)
-	msg, err := p.readNext(conn, buf)
+	msg, err := readNext(conn, buf)
 	if err != nil {
 		return err
 	}
@@ -128,35 +135,38 @@ func (p *ListenerTCP) handleHandshake(conn TCPConn) error {
 
 // handleConnection reads from the TCP connection and forwards the data received
 // from the game client.
-func (p *ListenerTCP) handleConnection(conn TCPConn, onReceive func(p []byte) (err error)) error {
+func (p *ListenerTCP) handleConnection(ctx context.Context, conn TCPConn, onReceive func(p []byte) (err error)) error {
 	// Handle incoming data from the game client
 	buf := make([]byte, 1024)
 
 	for {
-		clear(buf)
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+			msg, err := readNext(conn, buf)
+			if err != nil {
+				return err
+			}
 
-		msg, err := p.readNext(conn, buf)
-		if err != nil {
-			return err
-		}
+			// Mark when the last activity has happened
+			p.lastActive = time.Now()
 
-		// Mark when the last activity has happened
-		p.lastActive = time.Now()
+			if len(msg) == 0 {
+				continue
+			}
 
-		if len(msg) == 0 {
-			continue
-		}
+			p.logger.Debug("Received packet from the game client", "data", msg)
 
-		p.logger.Debug("Received packet from the game client", "data", msg)
-
-		if err := onReceive(msg); err != nil {
-			p.logger.Warn("Failed to write data", logging.Error(err))
-			return fmt.Errorf("failed to write to data channel: %w", err)
+			if err := onReceive(msg); err != nil {
+				p.logger.Warn("Failed to write data", logging.Error(err))
+				return fmt.Errorf("failed to write to data channel: %w", err)
+			}
 		}
 	}
 }
 
-func (_ *ListenerTCP) readNext(conn TCPConn, buf []byte) ([]byte, error) {
+func readNext(conn TCPConn, buf []byte) ([]byte, error) {
 	_ = conn.SetReadDeadline(time.Now().Add(3 * time.Second))
 	n, err := conn.Read(buf)
 	if err != nil {
@@ -180,6 +190,7 @@ func (_ *ListenerTCP) readNext(conn TCPConn, buf []byte) ([]byte, error) {
 }
 
 // Write sends data to the active TCP connection (game client).
+// Returns the number of bytes written or an error if the connection is closed or unavailable.
 func (p *ListenerTCP) Write(msg []byte) (int, error) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
@@ -200,6 +211,7 @@ func (p *ListenerTCP) Write(msg []byte) (int, error) {
 }
 
 // Close shuts down the listener and any active connection.
+// It is safe to call multiple times.
 func (p *ListenerTCP) Close() error {
 	p.logger.Info("Closing TCP listener")
 
@@ -207,24 +219,37 @@ func (p *ListenerTCP) Close() error {
 	defer p.mu.Unlock()
 
 	if p.closed {
-		return fmt.Errorf("listen-tcp: already closed")
+		// Idempotent: do not error if already closed
+		return nil
 	}
 
 	// Close active TCP connection if present
 	var err error
 	if p.conn != nil {
 		err = p.conn.Close()
+		p.conn = nil
 	}
 
 	// Close the TCP listener
-	err = errors.Join(err, p.listener.Close())
+	if p.listener != nil {
+		err = errors.Join(err, p.listener.Close())
+		p.listener = nil
+	}
+
 	p.closed = true
+	p.logger.Info("TCP listener closed")
 	return err
 }
 
+// Alive reports whether the listener is alive based on the last activity time and a timeout.
 func (p *ListenerTCP) Alive(now time.Time, timeout time.Duration) bool {
 	p.mu.RLock()
-	alive := !p.closed && p.conn != nil && p.lastActive.After(now.Add(-timeout))
-	p.mu.RUnlock()
-	return alive
+	defer p.mu.RUnlock()
+	if p.closed {
+		return false
+	}
+	if p.conn == nil {
+		return false
+	}
+	return p.lastActive.After(now.Add(-timeout))
 }

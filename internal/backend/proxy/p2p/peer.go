@@ -215,19 +215,23 @@ func NewPipeRouter(ctx context.Context, logger *slog.Logger, dc DataChannel, tcp
 	g, gctx := errgroup.WithContext(ctx)
 
 	if tcpProxy != nil {
+		// tcpProxy.OnReceive = func(p []byte) error {
+		// 	_, err := pipe.WriteTCP(p)
+		// 	return err
+		// }
+
 		g.Go(func() error {
-			return tcpProxy.Run(gctx, func(p []byte) (err error) {
-				_, err = pipe.WriteTCP(p)
-				return err
-			})
+			return tcpProxy.Run(gctx)
 		})
 	}
 	if udpProxy != nil {
+		// udpProxy.OnReceive = func(p []byte) error {
+		// 	_, err := pipe.WriteUDP(p)
+		// 	return err
+		// }
+
 		g.Go(func() error {
-			return udpProxy.Run(gctx, func(p []byte) (err error) {
-				_, err = pipe.WriteUDP(p)
-				return err
-			})
+			return udpProxy.Run(gctx)
 		})
 	}
 

@@ -3,8 +3,10 @@ package backend
 import (
 	"context"
 	"fmt"
-	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"log/slog"
+	"net"
+
+	"github.com/dimspell/gladiator/internal/app/logger/logging"
 
 	"connectrpc.com/connect"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
@@ -27,7 +29,7 @@ func (b *Backend) HandleCreateGame(ctx context.Context, session *bsession.Sessio
 
 	switch data.State {
 	case uint32(model.GameStateNone):
-		hostIPAddress, err := session.Proxy.CreateRoom(proxy.CreateParams{GameID: data.RoomName})
+		hostIPAddress, err := session.Proxy.CreateRoom(ctx, proxy.CreateParams{GameID: data.RoomName})
 		if err != nil {
 			slog.Info("Failed to obtain host address when creating a game", logging.Error(err))
 			return session.SendToGame(packet.CreateGame, []byte{2, 0, 0, 0})
@@ -54,12 +56,12 @@ func (b *Backend) HandleCreateGame(ctx context.Context, session *bsession.Sessio
 		}))
 		if err != nil {
 			slog.Info("Failed to get a game room", logging.Error(err))
-			return nil // Note: It is not possible to cancel the game creation now.
+			return session.SendToGame(packet.HostMigration, packet.NewKickPlayer(net.IPv4(127, 0, 0, 1)))
 		}
 
 		if err := session.Proxy.HostRoom(ctx, proxy.HostParams{GameID: respGame.Msg.GetGame().Name}); err != nil {
 			slog.Info("Failed to host a game room", logging.Error(err))
-			return nil // Note: It is not possible to cancel the game creation now.
+			return session.SendToGame(packet.HostMigration, packet.NewKickPlayer(net.IPv4(127, 0, 0, 1)))
 		}
 		return session.SendToGame(packet.CreateGame, []byte{model.GameStateStarted, 0, 0, 0})
 	}

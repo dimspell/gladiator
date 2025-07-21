@@ -2,6 +2,7 @@ package redirect
 
 import (
 	"context"
+	"time"
 )
 
 var _ Redirect = (*Noop)(nil)
@@ -20,6 +21,10 @@ func (r *Noop) Close() error {
 	return nil
 }
 
-func (r *Noop) Run(_ context.Context, _ func(p []byte) (err error)) error {
+func (r *Noop) Run(_ context.Context) error {
 	return nil
+}
+
+func (r *Noop) Alive(_ time.Time, _ time.Duration) bool {
+	return true
 }
