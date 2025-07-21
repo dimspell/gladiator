@@ -49,7 +49,7 @@ func (p *LAN) GetHostIP(hostIpAddress net.IP) net.IP {
 	return hostIpAddress
 }
 
-func (p *LAN) CreateRoom(params proxy.CreateParams) (net.IP, error) {
+func (p *LAN) CreateRoom(ctx context.Context, params proxy.CreateParams) (net.IP, error) {
 	p.Close()
 
 	ip := net.ParseIP(p.MyIPAddress)

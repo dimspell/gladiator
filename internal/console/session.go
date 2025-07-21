@@ -8,6 +8,7 @@ import (
 
 	"github.com/coder/websocket"
 	"github.com/dimspell/gladiator/internal/app/logger/logging"
+	"github.com/dimspell/gladiator/internal/metrics"
 	"github.com/dimspell/gladiator/internal/wire"
 )
 
@@ -53,17 +54,22 @@ func (us *UserSession) ReadNext(ctx context.Context) ([]byte, error) {
 func (us *UserSession) Send(ctx context.Context, payload []byte) {
 	if len(payload) < 1 {
 		slog.Debug("payload is too short", "length", len(payload))
+		metrics.FailedMessageSends.WithLabelValues(fmt.Sprintf("%d", us.UserID), "payload_too_short").Inc()
 		return
 	}
 	if !us.Connected {
 		slog.Debug("not connected", "userId", us.UserID)
+		metrics.FailedMessageSends.WithLabelValues(fmt.Sprintf("%d", us.UserID), "not_connected").Inc()
 		return
 	}
 
 	if err := wire.Write(ctx, us.wsConn, payload); err != nil {
 		slog.Warn("Could not send a WS message", "to", us.UserID, logging.Error(err))
 		us.Connected = false
+		metrics.FailedMessageSends.WithLabelValues(fmt.Sprintf("%d", us.UserID), "write_error").Inc()
 		// TODO: There is no logic to disconnect and remove the failing session
+	} else {
+		metrics.MessagesSentPerPlayer.WithLabelValues(fmt.Sprintf("%d", us.UserID)).Inc()
 	}
 }
 

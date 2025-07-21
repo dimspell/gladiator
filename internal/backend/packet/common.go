@@ -15,3 +15,11 @@ func NewHostSwitch(external bool, ip net.IP) []byte {
 
 	return payload
 }
+
+func NewKickPlayer(ip net.IP) []byte {
+	payload := make([]byte, 8)
+	copy(payload[0:4], []byte{0, 0, 0, 0})
+	copy(payload[4:], ip.To4())
+
+	return payload
+}

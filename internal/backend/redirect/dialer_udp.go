@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/dimspell/gladiator/internal/app/logger/logging"
@@ -27,14 +28,16 @@ type UDPConn interface {
 // DialerUDP wraps the UDP connection used to communicate with a remote game
 // server.
 type DialerUDP struct {
+	mu         sync.RWMutex
 	conn       UDPConn
+	OnReceive  ReceiveFunc
 	logger     *slog.Logger
 	lastActive time.Time
 }
 
-// DialUDP establishes the UDP connection with the given IPv4 and port.
+// NewDialUDP establishes the UDP connection with the given IPv4 and port.
 // It can be used to connect to the game server of a guest peers.
-func DialUDP(ipv4 string, portNumber string) (*DialerUDP, error) {
+func NewDialUDP(ipv4 string, portNumber string, onReceive ReceiveFunc) (*DialerUDP, error) {
 	if net.ParseIP(ipv4) == nil {
 		return nil, fmt.Errorf("dial-udp: invalid IPv4 address format")
 	}
@@ -48,20 +51,21 @@ func DialUDP(ipv4 string, portNumber string) (*DialerUDP, error) {
 		return nil, fmt.Errorf("dial-udp: could not resolve UDP address: %w", err)
 	}
 
-	rawConn, err := net.DialUDP("udp", nil, udpAddr)
+	dialConn, err := net.DialUDP("udp", nil, udpAddr)
 	if err != nil {
 		return nil, fmt.Errorf("dial-udp: could not dial over udp: %w", err)
 	}
 
 	log := slog.With(
 		slog.String("redirect", "dial-udp"),
-		slog.String("local", rawConn.LocalAddr().String()),
-		slog.String("remote", rawConn.RemoteAddr().String()),
+		slog.String("local", dialConn.LocalAddr().String()),
+		slog.String("remote", dialConn.RemoteAddr().String()),
 	)
 	log.Info("Dialed via UDP")
 
 	return &DialerUDP{
-		conn:       rawConn,
+		conn:       dialConn,
+		OnReceive:  onReceive,
 		logger:     log,
 		lastActive: time.Now(),
 	}, nil
@@ -69,36 +73,39 @@ func DialUDP(ipv4 string, portNumber string) (*DialerUDP, error) {
 
 // Run reads UDP packets and calls the provided onReceive callback for each
 // message received from the game client.
-func (p *DialerUDP) Run(ctx context.Context, onReceive func(p []byte) (err error)) error {
+func (p *DialerUDP) Run(ctx context.Context) error {
 	defer func() {
-		_ = p.Close()
+		if err := p.Close(); err != nil {
+			p.logger.Error("Error during UDP connection close", logging.Error(err))
+		}
 	}()
 
-	buf := make([]byte, 1024)
+	dialerConn := p.conn
 
+	buf := make([]byte, 1024)
 	for {
+		if p.conn == nil {
+			return fmt.Errorf("dial-udp: UDP connection is nil")
+		}
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("dial-udp: %w", ctx.Err())
-
+			return ctx.Err()
 		default:
-			clear(buf)
-
-			p.conn.SetReadDeadline(time.Now().Add(10 * time.Second))
-			n, _, err := p.conn.ReadFromUDP(buf)
+			dialerConn.SetReadDeadline(time.Now().Add(10 * time.Second))
+			n, _, err := dialerConn.ReadFromUDP(buf)
 			if err != nil {
 				var ne net.Error
 				if errors.As(err, &ne) && ne.Timeout() {
 					p.lastActive = time.Now()
 					continue
 				}
+				p.logger.Warn("UDP read error", logging.Error(err))
 				return fmt.Errorf("dial-udp: failed to read UDP message: %w", err)
 			}
 
 			p.lastActive = time.Now()
-			// p.logger.Debug("Received UDP message", slog.Int("size", n)))
 
-			if err := onReceive(buf[:n]); err != nil {
+			if err := p.OnReceive(buf[:n]); err != nil {
 				return fmt.Errorf("dial-udp: failed to handle data received from game client: %w", err)
 			}
 		}
@@ -107,20 +114,46 @@ func (p *DialerUDP) Run(ctx context.Context, onReceive func(p []byte) (err error
 
 // Write sends a message over the UDP connection to the game client.
 func (p *DialerUDP) Write(msg []byte) (int, error) {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	if p.conn == nil {
+		return 0, fmt.Errorf("dial-udp: UDP connection is nil")
+	}
 	n, err := p.conn.Write(msg)
 	if err != nil {
 		p.logger.Error("Failed to send UDP message", logging.Error(err))
 		return n, fmt.Errorf("dial-udp: failed to write UDP message: %w", err)
 	}
-	// p.logger.Debug("Message sent", "size", n, "msg", msg)
+	p.lastActive = time.Now()
 	return n, nil
 }
 
 // Close terminates the UDP connection.
 func (p *DialerUDP) Close() error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if p.conn == nil {
+		return nil // Already closed or never opened
+	}
 	err := p.conn.Close()
 	if err != nil {
-		p.logger.Debug("Failed to close UDP connection", logging.Error(err))
+		p.logger.Error("Failed to close UDP connection", logging.Error(err))
+		return err
 	}
-	return err
+	p.conn = nil // Prevent double close
+	p.logger.Info("UDP connection closed")
+	return nil
+}
+
+// Alive reports whether the UDP dialer is alive based on the last activity time and a timeout.
+func (p *DialerUDP) Alive(now time.Time, timeout time.Duration) bool {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	if p.conn == nil {
+		return false
+	}
+	return p.lastActive.After(now.Add(-timeout))
 }

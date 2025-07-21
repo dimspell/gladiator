@@ -68,6 +68,8 @@ func createServiceClients(consoleAddr string) (
 		},
 	}
 
+	// req.Header().Set("Authorization", "Bearer "+token)
+
 	consoleUri := fmt.Sprintf("%s/grpc", consoleAddr)
 
 	characterClient := multiv1connect.NewCharacterServiceClient(httpClient, consoleUri)
@@ -193,7 +195,7 @@ func (b *Backend) handleClient(conn net.Conn) error {
 
 func GetMetadata(ctx context.Context, consoleAddr string) (*model.WellKnown, error) {
 	httpClient := &http.Client{Timeout: 3 * time.Second}
-	
+
 	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("%s/.well-known/console.json", consoleAddr), nil)
 	if err != nil {
 		return nil, err

@@ -1,3 +1,5 @@
+// Package console provides the main server logic for the control panel for the game backend.
+// It handles HTTP/gRPC APIs, WebSocket lobbies, relay server integration, and configuration.
 package console
 
 import (
@@ -27,8 +29,11 @@ import (
 func init() {
 	metrics.InitConsole()
 	metrics.InitRelay()
+	metrics.InitMultiplayer()
 }
 
+// Console is the main server struct for the control panel for the game backend.
+// It holds configuration, database, multiplayer, and relay server references.
 type Console struct {
 	Config      *Config
 	DB          *database.SQLite
@@ -36,6 +41,8 @@ type Console struct {
 	Relay       *Relay
 }
 
+// NewConsole creates a new Console server instance with the given database and options.
+// Options can configure CORS, addresses, version, JWT secret, and TLS certificates.
 func NewConsole(db *database.SQLite, opts ...Option) *Console {
 	config := DefaultConfig()
 	for _, fn := range opts {
@@ -65,8 +72,10 @@ func NewConsole(db *database.SQLite, opts ...Option) *Console {
 	}
 }
 
+// Option is a function that configures the Console server via its Config.
 type Option func(*Config) error
 
+// Config holds all runtime configuration for the Console server.
 type Config struct {
 	RunMode            model.RunMode
 	ConsoleBindAddr    string
@@ -75,8 +84,12 @@ type Config struct {
 	RelayPublicAddr    string
 	CORSAllowedOrigins []string
 	Version            string
+	JWTSecret          string
+	TLSCertPath        string
+	TLSKeyPath         string
 }
 
+// DefaultConfig returns a Config with default values for local development.
 func DefaultConfig() *Config {
 	return &Config{
 		RunMode:            model.RunModeLAN,
@@ -86,10 +99,14 @@ func DefaultConfig() *Config {
 		RelayPublicAddr:    "localhost:9999",
 		CORSAllowedOrigins: []string{"*"},
 		Version:            "dev",
+		JWTSecret:          "dev-secret-key",
+		TLSCertPath:        "",
+		TLSKeyPath:         "",
 	}
 }
 
-// TODO: For production replace it with []string{"https://dispel-multi.net"}
+// WithCORSAllowedOrigins configures allowed origins for CORS policy.
+// Usage: NewConsole(db, WithCORSAllowedOrigins([]string{"https://game.example.com"}))
 func WithCORSAllowedOrigins(allowedOrigins []string) Option {
 	return func(c *Config) error {
 		c.CORSAllowedOrigins = allowedOrigins
@@ -97,6 +114,8 @@ func WithCORSAllowedOrigins(allowedOrigins []string) Option {
 	}
 }
 
+// WithConsoleAddr configures the bind and public address of the console server.
+// Usage: NewConsole(db, WithConsoleAddr("localhost:2137", "http://localhost:2137"))
 func WithConsoleAddr(bindAddr, publicAddr string) Option {
 	return func(c *Config) error {
 		c.ConsoleBindAddr = bindAddr
@@ -105,6 +124,8 @@ func WithConsoleAddr(bindAddr, publicAddr string) Option {
 	}
 }
 
+// WithRelayAddr configures the bind and public address of the relay server.
+// Usage: NewConsole(db, WithRelayAddr("localhost:9999", "localhost:9999"))
 func WithRelayAddr(bindAddr, publicAddr string) Option {
 	return func(c *Config) error {
 		c.RelayBindAddr = bindAddr
@@ -114,6 +135,8 @@ func WithRelayAddr(bindAddr, publicAddr string) Option {
 	}
 }
 
+// WithVersion sets the version string for the Console server.
+// Usage: NewConsole(db, WithVersion("1.0.0"))
 func WithVersion(version string) Option {
 	return func(c *Config) error {
 		c.Version = version
@@ -121,6 +144,55 @@ func WithVersion(version string) Option {
 	}
 }
 
+// WithJWTSecret sets the secret used to sign JWT tokens.
+func WithJWTSecret(secret string) Option {
+	return func(c *Config) error {
+		c.JWTSecret = secret
+		return nil
+	}
+}
+
+// WithTLSCert sets the path to the TLS certificate file.
+// Usage: NewConsole(db, WithTLSCert("cert.pem"), WithTLSKey("key.pem"))
+func WithTLSCert(certPath string) Option {
+	return func(c *Config) error {
+		c.TLSCertPath = certPath
+		return nil
+	}
+}
+
+// WithTLSKey sets the path to the TLS key file.
+// Usage: NewConsole(db, WithTLSKey("key.pem"))
+func WithTLSKey(keyPath string) Option {
+	return func(c *Config) error {
+		c.TLSKeyPath = keyPath
+		return nil
+	}
+}
+
+// func authMiddleware(next http.Handler) http.Handler {
+// 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+// 		token := r.Header.Get("Authorization")
+// 		if token == "" || !strings.HasPrefix(token, "Bearer ") {
+// 			w.WriteHeader(http.StatusUnauthorized)
+// 			w.Write([]byte("missing or invalid Authorization header"))
+// 			return
+// 		}
+// 		token = strings.TrimPrefix(token, "Bearer ")
+// 		// TODO: validate token (e.g., validateJWT(token)), set user info in context if valid
+// 		userID, err := validateJWT(token)
+// 		if err != nil {
+// 			w.WriteHeader(http.StatusUnauthorized)
+// 			w.Write([]byte("invalid or expired token"))
+// 			return
+// 		}
+// 		// Optionally, set userID in context for downstream handlers
+// 		r = r.WithContext(context.WithValue(r.Context(), "userID", userID))
+// 		next.ServeHTTP(w, r)
+// 	})
+// }
+
+// HttpRouter returns the main HTTP router for the Console server, including all endpoints and middleware.
 func (c *Console) HttpRouter() http.Handler {
 	mux := chi.NewRouter()
 
@@ -164,6 +236,7 @@ func (c *Console) HttpRouter() http.Handler {
 	{ // Set up gRPC routes for the backend
 		api := chi.NewRouter()
 		api.Use(middleware.Timeout(5 * time.Second))
+		// api.Use(authMiddleware)
 		// api.Use(slogchi.New(slog.Default()))
 		api.Use(cors.New(cors.Options{
 			AllowedOrigins:   c.Config.CORSAllowedOrigins,
@@ -207,6 +280,7 @@ func (c *Console) HttpRouter() http.Handler {
 	return mux
 }
 
+// Handlers returns start and shutdown functions for running the Console server with graceful shutdown support.
 func (c *Console) Handlers() (start GracefulFunc, shutdown GracefulFunc) {
 	httpServer := &http.Server{
 		Addr:         c.Config.ConsoleBindAddr,
@@ -223,15 +297,15 @@ func (c *Console) Handlers() (start GracefulFunc, shutdown GracefulFunc) {
 		go c.Relay.Start(ctx)
 
 		// TODO: Move it elsewhere
-		if c.Relay != nil && c.Relay.Server != nil {
-			go func() {
-				for {
-					for event := range c.Relay.Server.Events {
-						c.Multiplayer.HandleRelayEvent(event)
-					}
-				}
-			}()
-		}
+		// if c.Relay != nil && c.Relay.Server != nil {
+		// 	go func() {
+		// 		for {
+		// 			for event := range c.Relay.Server.Events {
+		// 				c.Multiplayer.HandleRelayEvent(event)
+		// 			}
+		// 		}
+		// 	}()
+		// }
 
 		return httpServer.ListenAndServe()
 	}
@@ -255,8 +329,10 @@ func (c *Console) Handlers() (start GracefulFunc, shutdown GracefulFunc) {
 	return start, shutdown
 }
 
+// GracefulFunc is a function type for starting or shutting down the server gracefully.
 type GracefulFunc func(context.Context) error
 
+// Graceful runs the server with graceful shutdown on SIGINT/SIGTERM, using the provided start and shutdown functions.
 func (c *Console) Graceful(ctx context.Context, start GracefulFunc, shutdown GracefulFunc) error {
 	var (
 		stopChan = make(chan os.Signal, 1)
@@ -291,6 +367,7 @@ func (c *Console) Graceful(ctx context.Context, start GracefulFunc, shutdown Gra
 	return <-errChan
 }
 
+// WellKnownInfo returns an HTTP handler that serves the /.well-known/console.json endpoint with server metadata.
 func (c *Console) WellKnownInfo() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		wk := model.WellKnown{
@@ -310,6 +387,7 @@ func (c *Console) WellKnownInfo() http.HandlerFunc {
 	}
 }
 
+// getCallerIP extracts the IPv4 address from a remote address string.
 func getCallerIP(remoteAddr string) string {
 	host, _, err := net.SplitHostPort(remoteAddr)
 	if err != nil {

@@ -93,7 +93,7 @@ func TestWebRTC(t *testing.T) {
 
 	// Create new game room by the player1
 	roomId := "room"
-	if _, err := session1.Proxy.CreateRoom(proxy.CreateParams{GameID: roomId}); err != nil {
+	if _, err := session1.Proxy.CreateRoom(ctx, proxy.CreateParams{GameID: roomId}); err != nil {
 		t.Fatalf("failed to create room: %v", err)
 		return
 	}

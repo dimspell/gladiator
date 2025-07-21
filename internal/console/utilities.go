@@ -1,8 +1,14 @@
 package console
 
 import (
+	"crypto/rand"
 	"crypto/tls"
 	_ "embed"
+	"encoding/base64"
+	"fmt"
+	"time"
+
+	"github.com/golang-jwt/jwt/v5"
 )
 
 var hmacKey = []byte("shared-secret-key")
@@ -48,3 +54,40 @@ var devCertPEM []byte
 
 //go:embed key.pem
 var devKeyPEM []byte
+
+func generateToken() (string, error) {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return base64.URLEncoding.EncodeToString(b), nil
+}
+
+var jwtSecret = []byte("your-very-secret-key")
+
+func generateJWT(userID int64) (string, error) {
+	claims := jwt.MapClaims{
+		"user_id": userID,
+		"exp":     time.Now().Add(24 * time.Hour).Unix(),
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString(jwtSecret)
+}
+
+func validateJWT(tokenString string) (int64, error) {
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		return jwtSecret, nil
+	})
+	if err != nil || !token.Valid {
+		return 0, fmt.Errorf("invalid token")
+	}
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return 0, fmt.Errorf("invalid claims")
+	}
+	userID, ok := claims["user_id"].(float64)
+	if !ok {
+		return 0, fmt.Errorf("user_id missing")
+	}
+	return int64(userID), nil
+}

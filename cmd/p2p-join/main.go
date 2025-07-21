@@ -17,7 +17,6 @@ import (
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/proxy"
 	"github.com/dimspell/gladiator/internal/backend/proxy/p2p"
-	"github.com/dimspell/gladiator/internal/backend/redirect"
 	"github.com/dimspell/gladiator/internal/model"
 )
 
@@ -58,8 +57,8 @@ func main() {
 		Username: meName,
 	}
 	px := p2p.NewPeerToPeer(session)
-	px.NewUDPRedirect = redirect.NewNoop
-	px.NewTCPRedirect = redirect.NewLineReader
+	// px.NewUDPRedirect = redirect.NewNoop
+	// px.NewTCPRedirect = redirect.NewLineReader
 
 	if err := session.ConnectOverWebsocket(ctx, user2, fmt.Sprintf("ws://%s/lobby", consoleUri)); err != nil {
 		slog.Error("failed to connect over websocket", logging.Error(err))

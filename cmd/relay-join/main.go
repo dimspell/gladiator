@@ -204,8 +204,8 @@ func main() {
 	r := chi.NewRouter()
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		v := State{
-			User:  user,
-			Debug: proxyClient.Debug(),
+			User: user,
+			// Debug: proxyClient.Debug(),
 		}
 
 		doc, err := json.MarshalIndent(v, "", "  ")

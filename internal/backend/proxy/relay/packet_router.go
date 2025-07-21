@@ -21,6 +21,7 @@ import (
 	"github.com/quic-go/quic-go"
 )
 
+// RelayStream abstracts a QUIC stream for reading and writing relay packets.
 type RelayStream interface {
 	io.Reader
 	io.Writer
@@ -29,11 +30,14 @@ type RelayStream interface {
 	Close() error
 }
 
+// RelayConn abstracts a QUIC connection for accepting streams and closing with an error.
 type RelayConn interface {
 	AcceptStream(context.Context) (*quic.Stream, error)
 	CloseWithError(code quic.ApplicationErrorCode, msg string) error
 }
 
+// PacketRouter manages the routing of packets between the local game client and the remote relay server.
+// It handles connection management, host migration, and packet forwarding.
 type PacketRouter struct {
 	mu        sync.Mutex
 	logger    *slog.Logger
@@ -49,6 +53,7 @@ type PacketRouter struct {
 	pingTicker    *time.Ticker
 }
 
+// Reset cleans up all resources, closes connections, stops hosts, and resets the router state.
 func (r *PacketRouter) Reset() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -64,6 +69,7 @@ func (r *PacketRouter) Reset() {
 	r.currentHostID = ""
 }
 
+// disconnect closes the current stream and relay connection, if any.
 func (r *PacketRouter) disconnect() {
 	if r.stream != nil {
 		r.stream.CancelRead(0xDEAD)
@@ -75,6 +81,7 @@ func (r *PacketRouter) disconnect() {
 	}
 }
 
+// Handle processes an incoming payload from the relay and dispatches it to the appropriate handler.
 func (r *PacketRouter) Handle(ctx context.Context, payload []byte) error {
 	eventType := wire.ParseEventType(payload)
 
@@ -137,7 +144,7 @@ func (r *PacketRouter) handleHostMigration(ctx context.Context, player wire.Play
 		payload := packet.NewHostSwitch(false, net.IPv4(127, 0, 0, 1))
 		if err := r.session.SendToGame(packet.HostMigration, payload); err != nil {
 			r.logger.Error("failed to send host migration packet", logging.Error(err))
-			return nil
+			return fmt.Errorf("failed to send host migration packet: %w", err)
 		}
 
 		// Shutdown the previous proxies and save {[peerID: IPv4]} parameters to
@@ -233,12 +240,13 @@ func (r *PacketRouter) handleHostMigration(ctx context.Context, player wire.Play
 	payload := packet.NewHostSwitch(true, net.ParseIP(host.AssignedIP))
 	if err := r.session.SendToGame(packet.HostMigration, payload); err != nil {
 		r.logger.Error("failed to send host migration packet", logging.Error(err))
-		return nil
+		return fmt.Errorf("failed to send host migration packet: %w", err)
 	}
 
 	return nil
 }
 
+// connect establishes a new QUIC connection and stream to the relay server for the given room.
 func (r *PacketRouter) connect(ctx context.Context, roomID string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -279,6 +287,7 @@ func (r *PacketRouter) connect(ctx context.Context, roomID string) error {
 	return nil
 }
 
+// keepAliveHost periodically sends ping packets to the relay server to keep the connection alive.
 func (r *PacketRouter) keepAliveHost(ctx context.Context) {
 	r.mu.Lock()
 	if r.pingTicker != nil {
@@ -314,6 +323,7 @@ func (r *PacketRouter) keepAliveHost(ctx context.Context) {
 	}(r.pingTicker)
 }
 
+// stop stops and cleans up the given fake host.
 func (r *PacketRouter) stop(host *redirect.FakeHost) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -329,6 +339,7 @@ type RelayPacket struct {
 	Payload []byte `json:"payload"`
 }
 
+// sendPacket marshals and sends a RelayPacket over the current stream.
 func (r *PacketRouter) sendPacket(pkt RelayPacket) error {
 	if r.stream == nil {
 		return fmt.Errorf("stream is nil")
@@ -351,54 +362,61 @@ func (r *PacketRouter) sendPacket(pkt RelayPacket) error {
 	return nil
 }
 
+// receiveLoop continuously reads packets from the relay stream and dispatches them for handling.
 func (r *PacketRouter) receiveLoop(ctx context.Context, stream *quic.Stream) {
 	buf := make([]byte, 4096)
 	for {
-		n, err := stream.Read(buf)
-		if err != nil {
-			r.logger.Error("received error while reading packet", logging.Error(err))
+		select {
+		case <-ctx.Done():
 			return
-		}
-		data := buf[:n]
-
-		d := json.NewDecoder(bytes.NewReader(data))
-		for {
-			var pkt RelayPacket
-			if err := d.Decode(&pkt); err != nil {
-				if err == io.EOF {
-					break
-				}
-				r.logger.Warn("failed to unmarshal packet", logging.Error(err))
-				r.logger.Debug("invalid packet", slog.Any("data", data))
-				continue
+		default:
+			n, err := stream.Read(buf)
+			if err != nil {
+				r.logger.Error("received error while reading packet", logging.Error(err), logging.RoomID(r.roomID))
+				return
 			}
+			data := buf[:n]
 
-			switch pkt.Type {
-			case "join":
-				r.dynamicJoin(ctx, pkt.RoomID, pkt.FromID)
+			d := json.NewDecoder(bytes.NewReader(data))
+			for {
+				var pkt RelayPacket
+				if err := d.Decode(&pkt); err != nil {
+					if err == io.EOF {
+						break
+					}
+					r.logger.Warn("failed to unmarshal packet", logging.Error(err))
+					r.logger.Debug("invalid packet", slog.Any("data", data))
+					continue
+				}
 
-			case "tcp":
-				r.writeTCP(pkt.FromID, pkt)
+				switch pkt.Type {
+				case "join":
+					r.dynamicJoin(ctx, pkt.RoomID, pkt.FromID)
 
-			case "udp":
-				r.writeUDP(pkt.FromID, pkt)
+				case "tcp":
+					r.writeTCP(pkt.FromID, pkt)
 
-			case "leave":
-				r.leaveRoom(pkt.FromID)
+				case "udp":
+					r.writeUDP(pkt.FromID, pkt)
 
-			default:
-				r.logger.Debug("Unhandled relay packet", slog.Any("packet", pkt))
+				case "leave":
+					r.leaveRoom(pkt.FromID)
+
+				default:
+					r.logger.Debug("Unhandled relay packet", slog.Any("packet", pkt))
+				}
 			}
 		}
 	}
 }
 
+// dynamicJoin handles a new peer dynamically joining the room and sets up the necessary hosts.
 func (r *PacketRouter) dynamicJoin(ctx context.Context, roomID string, peerID string) {
 	// TODO: There is no probe for checking if it exist?
 
 	ip, err := r.manager.AssignIP(peerID)
 	if err != nil {
-		r.logger.Warn("failed to assign IP for the peer ", logging.Error(err), logging.PeerID(peerID))
+		r.logger.Warn("failed to assign IP for the peer", logging.Error(err), logging.PeerID(peerID))
 		return
 	}
 	var (
@@ -418,10 +436,12 @@ func (r *PacketRouter) dynamicJoin(ctx context.Context, roomID string, peerID st
 	r.manager.SetHost(ip, peerID, host)
 }
 
+// leaveRoom removes a peer from the room and cleans up its resources.
 func (r *PacketRouter) leaveRoom(peerID string) {
 	r.manager.RemoveByRemoteID(peerID)
 }
 
+// onFakeHostDisconnect returns a handler for when a fake host disconnects.
 func (r *PacketRouter) onFakeHostDisconnect(peerID string, ip string) func(host *redirect.FakeHost, forced bool) {
 	return func(host *redirect.FakeHost, forced bool) {
 		slog.Warn("Host went offline", logging.PeerID(peerID), "ip", ip, "forced", forced)
@@ -429,18 +449,21 @@ func (r *PacketRouter) onFakeHostDisconnect(peerID string, ip string) func(host 
 	}
 }
 
+// onTCPMessage returns a handler for sending TCP packets to a peer via the relay.
 func (r *PacketRouter) onTCPMessage(roomID string, peerID string) func(p []byte) error {
 	return func(p []byte) error {
 		return r.sendPacket(RelayPacket{Type: "tcp", RoomID: roomID, ToID: peerID, Payload: p})
 	}
 }
 
+// onUDPMessage returns a handler for sending UDP packets to a peer via the relay.
 func (r *PacketRouter) onUDPMessage(roomID string, peerID string) func(p []byte) error {
 	return func(p []byte) error {
 		return r.sendPacket(RelayPacket{Type: "udp", RoomID: roomID, ToID: peerID, Payload: p})
 	}
 }
 
+// writeTCP writes a TCP packet to the local game client for the given peer.
 func (r *PacketRouter) writeTCP(peerID string, pkt RelayPacket) {
 	slog.Debug("[TCP] Remote => GameClient", "data", pkt.Payload, logging.PeerID(peerID))
 
@@ -455,6 +478,7 @@ func (r *PacketRouter) writeTCP(peerID string, pkt RelayPacket) {
 	}
 }
 
+// writeUDP writes a UDP packet to the local game client for the given peer.
 func (r *PacketRouter) writeUDP(peerID string, pkt RelayPacket) {
 	slog.Debug("[UDP] Remote => GameClient", "data", pkt.Payload, logging.PeerID(peerID))
 

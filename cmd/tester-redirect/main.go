@@ -28,22 +28,22 @@ func main() {
 
 	ctx := context.Background()
 
-	listenerTCP, err := redirect.ListenTCP("127.0.0.1", "61140")
+	listenerTCP, err := redirect.NewListenerTCP("127.0.0.1", "61140", nil)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	listenerUDP, err := redirect.ListenUDP("127.0.0.1", "61130")
+	listenerUDP, err := redirect.NewListenerUDP("127.0.0.1", "61130", nil)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	dialTCP, err := redirect.DialTCP("127.0.0.1", "6114")
+	dialTCP, err := redirect.NewDialTCP("127.0.0.1", "6114", nil)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	dialUDP, err := redirect.DialUDP("127.0.0.1", "6113")
+	dialUDP, err := redirect.NewDialUDP("127.0.0.1", "6113", nil)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -59,30 +59,35 @@ func main() {
 		},
 	}
 
+	listenerTCP.OnReceive = func(p []byte) (err error) {
+		_, err = redirectTCP.Write(p)
+		return err
+	}
+	listenerUDP.OnReceive = func(p []byte) (err error) {
+		_, err = redirectUDP.Write(p)
+		return err
+	}
+	dialTCP.OnReceive = func(p []byte) (err error) {
+		_, err = listenerTCP.Write(p)
+		return err
+	}
+	dialUDP.OnReceive = func(p []byte) (err error) {
+		_, err = listenerUDP.Write(p)
+		return err
+	}
+
 	g, ctx := errgroup.WithContext(ctx)
 	g.Go(func() error {
-		return listenerTCP.Run(ctx, func(p []byte) (err error) {
-			_, err = redirectTCP.Write(p)
-			return err
-		})
+		return listenerTCP.Run(ctx)
 	})
 	g.Go(func() error {
-		return listenerUDP.Run(ctx, func(p []byte) (err error) {
-			_, err = redirectUDP.Write(p)
-			return err
-		})
+		return listenerUDP.Run(ctx)
 	})
 	g.Go(func() error {
-		return dialTCP.Run(ctx, func(p []byte) (err error) {
-			_, err = listenerTCP.Write(p)
-			return err
-		})
+		return dialTCP.Run(ctx)
 	})
 	g.Go(func() error {
-		return dialUDP.Run(ctx, func(p []byte) (err error) {
-			_, err = listenerUDP.Write(p)
-			return err
-		})
+		return dialUDP.Run(ctx)
 	})
 	if err := g.Wait(); err != nil {
 		log.Println(err)

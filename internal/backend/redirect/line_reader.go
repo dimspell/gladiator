@@ -6,23 +6,25 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"time"
 
 	"github.com/dimspell/gladiator/internal/app/logger/logging"
 )
 
 // LineReader reads lines from stdin and writes to an io.Writer.
 type LineReader struct {
-	logger *slog.Logger
+	logger    *slog.Logger
+	onReceive func(p []byte) (err error)
 }
 
 // NewLineReader creates a new LineReader instance.
-func NewLineReader(_ Mode, _ *Addressing) (Redirect, error) {
+func NewLineReader(_ Mode, _ *Addressing, onReceive func(p []byte) (err error)) (Redirect, error) {
 	logger := slog.With(slog.String("component", "line-reader"))
-	return &LineReader{logger: logger}, nil
+	return &LineReader{logger: logger, onReceive: onReceive}, nil
 }
 
 // Run reads from stdin and writes to the provided io.Writer.
-func (p *LineReader) Run(ctx context.Context, onReceive func(p []byte) (err error)) error {
+func (p *LineReader) Run(ctx context.Context) error {
 	scanner := bufio.NewScanner(os.Stdin)
 
 	p.logger.Info("LineReader started, waiting for input...")
@@ -34,7 +36,7 @@ func (p *LineReader) Run(ctx context.Context, onReceive func(p []byte) (err erro
 			return ctx.Err()
 		default:
 			line := scanner.Text()
-			if err := onReceive([]byte(line + "\n")); err != nil {
+			if err := p.onReceive([]byte(line + "\n")); err != nil {
 				p.logger.Error("Failed to write line", logging.Error(err))
 				return fmt.Errorf("line-reader: failed to write output: %w", err)
 			}
@@ -64,4 +66,8 @@ func (p *LineReader) Write(msg []byte) (int, error) {
 func (p *LineReader) Close() error {
 	p.logger.Info("LineReader closed")
 	return nil
+}
+
+func (p *LineReader) Alive(_ time.Time, _ time.Duration) bool {
+	return true
 }
