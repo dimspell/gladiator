@@ -47,7 +47,7 @@ func (b *Backend) HandleCreateGame(ctx context.Context, session *bsession.Sessio
 			return session.SendToGame(packet.CreateGame, []byte{2, 0, 0, 0})
 		}
 
-		slog.Info("packet-28: created game room", "id", respGame.Msg.Game.GameId, "name", respGame.Msg.Game.Name)
+		slog.Info("packet-28: created game room", logging.RoomID(respGame.Msg.Game.GameId), "name", respGame.Msg.Game.Name)
 		return session.SendToGame(packet.CreateGame, []byte{model.GameStateCreating, 0, 0, 0})
 
 	case uint32(model.GameStateCreating):
@@ -63,6 +63,7 @@ func (b *Backend) HandleCreateGame(ctx context.Context, session *bsession.Sessio
 			slog.Info("Failed to host a game room", logging.Error(err))
 			return session.SendToGame(packet.HostMigration, packet.NewKickPlayer(net.IPv4(127, 0, 0, 1)))
 		}
+		slog.Info("packet-28: hosted a game room", logging.RoomID(respGame.Msg.Game.GameId))
 		return session.SendToGame(packet.CreateGame, []byte{model.GameStateStarted, 0, 0, 0})
 	}
 
