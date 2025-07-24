@@ -165,7 +165,7 @@ func NewQUICRelay(addr string, multiplayer *Multiplayer, opts ...RelayServerOpti
 		peerToRoomIDs: make(map[string]string),
 		logger:        slog.With(slog.String("component", "relay")),
 		Multiplayer:   multiplayer,
-		verifyFunc:    verify,
+		verifyFunc:    verifyRelayPacket,
 	}
 	for _, opt := range opts {
 		opt(rs)
@@ -173,14 +173,14 @@ func NewQUICRelay(addr string, multiplayer *Multiplayer, opts ...RelayServerOpti
 	return rs, nil
 }
 
-func (rs *RelayServer) Start(ctx context.Context) error {
+func (rs *RelayServer) Start(ctx context.Context) {
 	rs.logger.Info("QUIC Relay Server listening", "addr", rs.listener.Addr())
 
 	for {
 		conn, err := rs.listener.Accept(ctx)
 		if err != nil {
 			if errors.Is(err, context.Canceled) {
-				return nil
+				return
 			}
 			rs.logger.Warn("Relay server failed to accept", logging.Error(err))
 			continue

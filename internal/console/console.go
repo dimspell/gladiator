@@ -35,48 +35,7 @@ func init() {
 // Console is the main server struct for the control panel for the game backend.
 // It holds configuration, database, multiplayer, and relay server references.
 type Console struct {
-	Config      *Config
-	DB          *database.SQLite
-	Multiplayer *Multiplayer
-	Relay       *Relay
-}
-
-// NewConsole creates a new Console server instance with the given database and options.
-// Options can configure CORS, addresses, version, JWT secret, and TLS certificates.
-func NewConsole(db *database.SQLite, opts ...Option) *Console {
-	config := DefaultConfig()
-	for _, fn := range opts {
-		if err := fn(config); err != nil {
-			panic("failed to initialize config: " + err.Error())
-		}
-	}
-
-	multiplayer := NewMultiplayer()
-
-	var relay *Relay
-	var err error
-	if config.RunMode == model.RunModeRelay {
-		relay, err = NewRelay(config.RelayBindAddr, multiplayer)
-		if err != nil {
-			panic("failed to initialize relay: " + err.Error())
-		}
-
-		multiplayer.Relay = relay
-	}
-
-	return &Console{
-		DB:          db,
-		Multiplayer: multiplayer,
-		Relay:       relay,
-		Config:      config,
-	}
-}
-
-// Option is a function that configures the Console server via its Config.
-type Option func(*Config) error
-
-// Config holds all runtime configuration for the Console server.
-type Config struct {
+	// Inlined configuration fields
 	RunMode            model.RunMode
 	ConsoleBindAddr    string
 	ConsolePublicAddr  string
@@ -87,11 +46,20 @@ type Config struct {
 	JWTSecret          string
 	TLSCertPath        string
 	TLSKeyPath         string
+
+	DB          *database.SQLite
+	Multiplayer *Multiplayer
+	Relay       *Relay
 }
 
-// DefaultConfig returns a Config with default values for local development.
-func DefaultConfig() *Config {
-	return &Config{
+// Option is a function that configures the Console server via its fields.
+type Option func(*Console) error
+
+// NewConsole creates a new Console server instance with the given database and options.
+// Options can configure CORS, addresses, version, JWT secret, and TLS certificates.
+func NewConsole(db *database.SQLite, opts ...Option) *Console {
+	// Set default values
+	console := &Console{
 		RunMode:            model.RunModeLAN,
 		ConsoleBindAddr:    "localhost:2137",
 		ConsolePublicAddr:  "http://localhost:2137",
@@ -102,32 +70,47 @@ func DefaultConfig() *Config {
 		JWTSecret:          "dev-secret-key",
 		TLSCertPath:        "",
 		TLSKeyPath:         "",
+		DB:                 db,
 	}
+
+	for _, fn := range opts {
+		if err := fn(console); err != nil {
+			panic("failed to initialize config: " + err.Error())
+		}
+	}
+
+	console.Multiplayer = NewMultiplayer()
+
+	var err error
+	if console.RunMode == model.RunModeRelay {
+		console.Relay, err = NewRelay(console.RelayBindAddr, console.Multiplayer)
+		if err != nil {
+			panic("failed to initialize relay: " + err.Error())
+		}
+		console.Multiplayer.Relay = console.Relay
+	}
+
+	return console
 }
 
-// WithCORSAllowedOrigins configures allowed origins for CORS policy.
-// Usage: NewConsole(db, WithCORSAllowedOrigins([]string{"https://game.example.com"}))
+// Option functions for configuring Console
 func WithCORSAllowedOrigins(allowedOrigins []string) Option {
-	return func(c *Config) error {
+	return func(c *Console) error {
 		c.CORSAllowedOrigins = allowedOrigins
 		return nil
 	}
 }
 
-// WithConsoleAddr configures the bind and public address of the console server.
-// Usage: NewConsole(db, WithConsoleAddr("localhost:2137", "http://localhost:2137"))
 func WithConsoleAddr(bindAddr, publicAddr string) Option {
-	return func(c *Config) error {
+	return func(c *Console) error {
 		c.ConsoleBindAddr = bindAddr
 		c.ConsolePublicAddr = publicAddr
 		return nil
 	}
 }
 
-// WithRelayAddr configures the bind and public address of the relay server.
-// Usage: NewConsole(db, WithRelayAddr("localhost:9999", "localhost:9999"))
 func WithRelayAddr(bindAddr, publicAddr string) Option {
-	return func(c *Config) error {
+	return func(c *Console) error {
 		c.RelayBindAddr = bindAddr
 		c.RelayPublicAddr = publicAddr
 		c.RunMode = model.RunModeRelay
@@ -135,36 +118,29 @@ func WithRelayAddr(bindAddr, publicAddr string) Option {
 	}
 }
 
-// WithVersion sets the version string for the Console server.
-// Usage: NewConsole(db, WithVersion("1.0.0"))
 func WithVersion(version string) Option {
-	return func(c *Config) error {
+	return func(c *Console) error {
 		c.Version = version
 		return nil
 	}
 }
 
-// WithJWTSecret sets the secret used to sign JWT tokens.
 func WithJWTSecret(secret string) Option {
-	return func(c *Config) error {
+	return func(c *Console) error {
 		c.JWTSecret = secret
 		return nil
 	}
 }
 
-// WithTLSCert sets the path to the TLS certificate file.
-// Usage: NewConsole(db, WithTLSCert("cert.pem"), WithTLSKey("key.pem"))
 func WithTLSCert(certPath string) Option {
-	return func(c *Config) error {
+	return func(c *Console) error {
 		c.TLSCertPath = certPath
 		return nil
 	}
 }
 
-// WithTLSKey sets the path to the TLS key file.
-// Usage: NewConsole(db, WithTLSKey("key.pem"))
 func WithTLSKey(keyPath string) Option {
-	return func(c *Config) error {
+	return func(c *Console) error {
 		c.TLSKeyPath = keyPath
 		return nil
 	}
@@ -221,7 +197,7 @@ func (c *Console) HttpRouter() http.Handler {
 		wellKnown := chi.NewRouter()
 		// wellKnown.Use(slogchi.New(slog.Default()))
 		wellKnown.Use(cors.New(cors.Options{
-			AllowedOrigins:   c.Config.CORSAllowedOrigins,
+			AllowedOrigins:   c.CORSAllowedOrigins,
 			AllowCredentials: false,
 			Debug:            false,
 			AllowedMethods:   []string{http.MethodGet},
@@ -239,7 +215,7 @@ func (c *Console) HttpRouter() http.Handler {
 		// api.Use(authMiddleware)
 		// api.Use(slogchi.New(slog.Default()))
 		api.Use(cors.New(cors.Options{
-			AllowedOrigins:   c.Config.CORSAllowedOrigins,
+			AllowedOrigins:   c.CORSAllowedOrigins,
 			AllowCredentials: false,
 			Debug:            false,
 			AllowedMethods: []string{
@@ -283,7 +259,7 @@ func (c *Console) HttpRouter() http.Handler {
 // Handlers returns start and shutdown functions for running the Console server with graceful shutdown support.
 func (c *Console) Handlers() (start GracefulFunc, shutdown GracefulFunc) {
 	httpServer := &http.Server{
-		Addr:         c.Config.ConsoleBindAddr,
+		Addr:         c.ConsoleBindAddr,
 		Handler:      h2c.NewHandler(c.HttpRouter(), &http2.Server{}),
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,
@@ -291,7 +267,7 @@ func (c *Console) Handlers() (start GracefulFunc, shutdown GracefulFunc) {
 	}
 
 	start = func(ctx context.Context) error {
-		slog.Info("Configured console server", "addr", c.Config.ConsoleBindAddr)
+		slog.Info("Configured console server", "addr", c.ConsoleBindAddr)
 
 		go c.Multiplayer.Run(ctx)
 		go c.Relay.Start(ctx)
@@ -371,14 +347,14 @@ func (c *Console) Graceful(ctx context.Context, start GracefulFunc, shutdown Gra
 func (c *Console) WellKnownInfo() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		wk := model.WellKnown{
-			Version: c.Config.Version,
-			Addr:    c.Config.ConsolePublicAddr,
-			RunMode: c.Config.RunMode,
+			Version: c.Version,
+			Addr:    c.ConsolePublicAddr,
+			RunMode: c.RunMode,
 		}
 
-		switch c.Config.RunMode {
+		switch c.RunMode {
 		case model.RunModeRelay:
-			wk.RelayServerAddr = c.Config.RelayPublicAddr
+			wk.RelayServerAddr = c.RelayPublicAddr
 		case model.RunModeLAN:
 			wk.CallerIP = getCallerIP(r.RemoteAddr)
 		}

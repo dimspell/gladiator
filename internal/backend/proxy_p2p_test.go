@@ -49,22 +49,18 @@ func TestE2E_P2P(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	cs := &console.Console{
-		Multiplayer: console.NewMultiplayer(),
-		Config:      console.DefaultConfig(),
-		DB:          db,
-	}
+	cs := console.NewConsole(db)
 	ts := httptest.NewServer(cs.HttpRouter())
 	defer ts.Close()
 
 	// go cs.Multiplayer.Run(ctx)
 
 	// Remove the HTTP schema prefix
-	cs.Config.ConsoleBindAddr = ts.URL[len("http://"):]
+	cs.ConsoleBindAddr = ts.URL[len("http://"):]
 
 	// proxy1.NewRedirect = redirectFunc
-	bd1 := NewBackend("", cs.Config.ConsoleBindAddr, proxy)
-	bd1.SignalServerURL = "ws://" + cs.Config.ConsoleBindAddr + "/lobby"
+	bd1 := NewBackend("", cs.ConsoleBindAddr, proxy)
+	bd1.SignalServerURL = "ws://" + cs.ConsoleBindAddr + "/lobby"
 
 	conn1 := &mockConn{}
 	session1 := bd1.AddSession(conn1)
@@ -135,8 +131,8 @@ func TestE2E_P2P(t *testing.T) {
 	assert.Equal(t, byte(v1.ClassType_Archer), room.Players[1].Character.ClassType)
 
 	// Other user
-	bd2 := NewBackend("", cs.Config.ConsoleBindAddr, proxy)
-	bd2.SignalServerURL = "ws://" + cs.Config.ConsoleBindAddr + "/lobby"
+	bd2 := NewBackend("", cs.ConsoleBindAddr, proxy)
+	bd2.SignalServerURL = "ws://" + cs.ConsoleBindAddr + "/lobby"
 
 	conn2 := &mockConn{}
 	session2 := bd2.AddSession(conn2)
