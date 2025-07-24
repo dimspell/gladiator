@@ -105,8 +105,8 @@ func TestConsole_Handlers(t *testing.T) {
 			}
 
 			// Assert
-			assert.Equal(t, c.Config.ConsoleBindAddr, "127.0.0.1:2137")
-			assert.Equal(t, c.Config.RelayBindAddr, "0.0.0.0:9999")
+			assert.Equal(t, c.ConsoleBindAddr, "127.0.0.1:2137")
+			assert.Equal(t, c.RelayBindAddr, "0.0.0.0:9999")
 
 			assert.Equal(t, wellKnown.Version, "v2.13.7-dev1")
 			assert.Equal(t, wellKnown.Addr, "https://console.example.com")
@@ -143,7 +143,7 @@ func TestConsole_Handlers(t *testing.T) {
 			}
 
 			// Assert
-			assert.Equal(t, c.Config.ConsoleBindAddr, "127.0.0.1:2137")
+			assert.Equal(t, c.ConsoleBindAddr, "127.0.0.1:2137")
 
 			assert.Equal(t, wellKnown.Version, "v2.13.7-dev1")
 			assert.Equal(t, wellKnown.Addr, "https://console.example.com")
@@ -154,7 +154,7 @@ func TestConsole_Handlers(t *testing.T) {
 	})
 
 	t.Run("Connect to websocket", func(t *testing.T) {
-		c := &Console{Config: DefaultConfig()}
+		c := NewConsole(nil)
 		ts := httptest.NewServer(c.HttpRouter())
 		defer ts.Close()
 

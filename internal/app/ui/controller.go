@@ -95,7 +95,7 @@ func (c *Controller) StartConsole(databaseType, databasePath, consoleAddr string
 	}()
 
 	c.Console = console.NewConsole(db, console.WithConsoleAddr(consoleAddr, "http://"+consoleAddr))
-	c.Console.Config.RunMode = runMode
+	c.Console.RunMode = runMode
 
 	start, stop := c.Console.Handlers()
 	c.consoleStop = func(ctx context.Context) error {
