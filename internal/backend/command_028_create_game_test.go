@@ -34,7 +34,7 @@ func TestCreateGameRequest(t *testing.T) {
 
 func TestBackend_HandleCreateGame(t *testing.T) {
 	b, _, _ := helperNewBackend(t)
-	b.gameClient = &mockGameClient{
+	gameClient := &mockGameClient{
 		CreateGameResponse: connect.NewResponse(&v1.CreateGameResponse{
 			Game: &v1.Game{
 				GameId:        "room",
@@ -65,7 +65,7 @@ func TestBackend_HandleCreateGame(t *testing.T) {
 			},
 		}),
 	}
-
+	b.gameClient = gameClient
 	conn := &mockConn{}
 	session := b.AddSession(conn)
 	session.SetLogonData(&v1.User{UserId: 2137, Username: "JP"})

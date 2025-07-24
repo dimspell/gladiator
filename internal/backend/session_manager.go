@@ -8,6 +8,7 @@ import (
 
 	"github.com/coder/websocket"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
+	"github.com/dimspell/gladiator/gen/multi/v1/multiv1connect"
 	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/proxy"
@@ -18,7 +19,7 @@ func (b *Backend) AddSession(tcpConn net.Conn) *bsession.Session {
 	slog.Debug("New session")
 
 	session := bsession.NewSession(tcpConn)
-	session.Proxy = b.CreateProxy.Create(session)
+	session.Proxy = b.ProxyFactory.Create(session, b.gameClient)
 
 	b.ConnectedSessions.Store(session.ID, session)
 	return session
@@ -77,8 +78,7 @@ func (b *Backend) RegisterNewObserver(ctx context.Context, session *bsession.Ses
 	return session.StartObserver(ctx, observe)
 }
 
-type Proxy interface {
-	// Create creates a proxy for the session
-	Create(session *bsession.Session) proxy.ProxyClient
+type ProxyFactory interface {
+	Create(session *bsession.Session, gameClient multiv1connect.GameServiceClient) proxy.ProxyClient
 	Mode() model.RunMode
 }

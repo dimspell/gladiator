@@ -46,14 +46,14 @@ var (
 	proxyTypeRelay  = model.RunModeRelay.String()
 )
 
-func selectProxy(c *cli.Command) (p backend.Proxy, err error) {
+func selectProxy(c *cli.Command) (p backend.ProxyFactory, err error) {
 	switch c.String("proxy") {
 	case proxyTypeLAN:
 		myIPAddr := c.String("lan-my-ip-addr")
 		if ip := net.ParseIP(myIPAddr); ip == nil {
 			return nil, fmt.Errorf("invalid lan-my-ip-addr: %q", myIPAddr)
 		}
-		return &direct.ProxyLAN{myIPAddr}, nil
+		return &direct.ProxyLAN{MyIPAddress: myIPAddr}, nil
 	case proxyTypeWebRTC:
 		return &p2p.ProxyP2P{
 			ICEServers: []webrtc.ICEServer{

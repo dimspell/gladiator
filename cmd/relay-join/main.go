@@ -12,13 +12,11 @@ import (
 	"os"
 	"time"
 
-	"connectrpc.com/connect"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/gen/multi/v1/multiv1connect"
 	"github.com/dimspell/gladiator/internal/app/logger"
 	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"github.com/dimspell/gladiator/internal/backend/bsession"
-	"github.com/dimspell/gladiator/internal/backend/proxy"
 	"github.com/dimspell/gladiator/internal/backend/proxy/relay"
 	"github.com/dimspell/gladiator/internal/model"
 	"github.com/go-chi/chi/v5"
@@ -113,6 +111,9 @@ func main() {
 	flag.StringVar(&userID, "player", "", "ID of player variant")
 	flag.Parse()
 
+	consoleUri := fmt.Sprintf("%s://%s/grpc", "http", "localhost:2137")
+	gameClient := multiv1connect.NewGameServiceClient(&http.Client{Timeout: 10 * time.Second}, consoleUri)
+
 	user, ok := mapping[userID]
 	if !ok {
 		return
@@ -129,7 +130,7 @@ func main() {
 	session.Username = user.UserName
 	session.CharacterID = int64(user.CharacterID)
 	session.ClassType = user.ClassType
-	proxyClient := px.Create(session).(*relay.Relay)
+	proxyClient := px.Create(session, gameClient).(*relay.Relay)
 	session.Proxy = proxyClient
 	session.Conn = &mockConn{}
 
@@ -164,39 +165,12 @@ func main() {
 		}
 	}(ctx)
 
-	consoleUri := fmt.Sprintf("%s://%s/grpc", "http", "localhost:2137")
-	gameClient := multiv1connect.NewGameServiceClient(&http.Client{Timeout: 10 * time.Second}, consoleUri)
-
-	gameRes, err := gameClient.GetGame(ctx, connect.NewRequest(&multiv1.GetGameRequest{
-		GameRoomId: roomID,
-	}))
-	if err != nil {
-		slog.Error("GetGame", logging.Error(err))
-		return
-	}
-
-	if err := session.Proxy.SelectGame(proxy.GameData{
-		Game:    gameRes.Msg.Game,
-		Players: gameRes.Msg.Players,
-	}); err != nil {
+	if _, _, err := session.Proxy.GetGame(ctx, roomID); err != nil {
 		slog.Error("SelectGame", logging.Error(err))
 		return
 	}
 
-	if _, err := gameClient.JoinGame(ctx, connect.NewRequest(&multiv1.JoinGameRequest{
-		UserId:     session.UserID,
-		GameRoomId: roomID,
-		IpAddress:  "127.0.0.1",
-	})); err != nil {
-		slog.Error("JoinGame", logging.Error(err))
-		return
-	}
-
-	if _, err := session.Proxy.Join(ctx, proxy.JoinParams{
-		HostUserID: 1,
-		GameID:     roomID,
-		HostUserIP: "127.0.0.2",
-	}); err != nil {
+	if _, err := session.Proxy.JoinGame(ctx, roomID, ""); err != nil {
 		slog.Error("Join", logging.Error(err))
 		return
 	}

@@ -1,11 +1,16 @@
 package model
 
-import "net"
+import (
+	"net"
+
+	v1 "github.com/dimspell/gladiator/gen/multi/v1"
+)
 
 type LobbyRoom struct {
 	HostIPAddress net.IP
 	Name          string
 	Password      string
+	MapID         v1.GameMap
 }
 
 func (room *LobbyRoom) ToBytes() []byte {
@@ -24,7 +29,7 @@ func (room *LobbyRoom) ToBytes() []byte {
 }
 
 type LobbyPlayer struct {
-	ClassType ClassType
+	ClassType v1.ClassType
 	IPAddress net.IP
 	Name      string
 }

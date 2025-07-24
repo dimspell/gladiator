@@ -27,11 +27,13 @@ func TestListGamesRequest(t *testing.T) {
 
 func TestBackend_HandleListGames(t *testing.T) {
 	t.Run("no games", func(t *testing.T) {
-		b := &Backend{gameClient: &mockGameClient{
+		gameClient := &mockGameClient{
 			ListGamesResponse: connect.NewResponse(&v1.ListGamesResponse{Games: []*v1.Game{}}),
-		}}
+		}
+		b := &Backend{gameClient: gameClient, ProxyFactory: &direct.ProxyLAN{"127.0.100.1"}}
 		conn := &mockConn{}
 		session := &bsession.Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
+		session.Proxy = b.ProxyFactory.Create(session, gameClient)
 
 		assert.NoError(t, b.HandleListGames(context.Background(), session, ListGamesRequest{}))
 		assert.Len(t, conn.Written, 8)
@@ -40,22 +42,23 @@ func TestBackend_HandleListGames(t *testing.T) {
 	})
 
 	t.Run("with one game", func(t *testing.T) {
+		gameClient := &mockGameClient{
+			ListGamesResponse: connect.NewResponse(&v1.ListGamesResponse{Games: []*v1.Game{
+				{
+					GameId:        "gameId",
+					Name:          "retreat",
+					Password:      "",
+					HostIpAddress: "127.0.21.37",
+					MapId:         v1.GameMap_UnderworldRetreat,
+				},
+			}}),
+		}
 		b := &Backend{
-			CreateProxy: &direct.ProxyLAN{"127.0.100.1"},
-			gameClient: &mockGameClient{
-				ListGamesResponse: connect.NewResponse(&v1.ListGamesResponse{Games: []*v1.Game{
-					{
-						GameId:        "gameId",
-						Name:          "retreat",
-						Password:      "",
-						HostIpAddress: "127.0.21.37",
-						MapId:         v1.GameMap_UnderworldRetreat,
-					},
-				}}),
-			}}
+			ProxyFactory: &direct.ProxyLAN{"127.0.100.1"},
+			gameClient:   gameClient}
 		conn := &mockConn{}
 		session := &bsession.Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
-		session.Proxy = b.CreateProxy.Create(session)
+		session.Proxy = b.ProxyFactory.Create(session, gameClient)
 
 		assert.NoError(t, b.HandleListGames(context.Background(), session, ListGamesRequest{}))
 		assert.Len(t, conn.Written, 21)
@@ -68,29 +71,31 @@ func TestBackend_HandleListGames(t *testing.T) {
 	})
 
 	t.Run("with games", func(t *testing.T) {
+		gameClient := &mockGameClient{
+			ListGamesResponse: connect.NewResponse(&v1.ListGamesResponse{Games: []*v1.Game{
+				{
+					GameId:        "gameId",
+					Name:          "RoomName",
+					Password:      "secret",
+					HostIpAddress: "127.0.21.37",
+					MapId:         v1.GameMap_UnderworldRetreat,
+				},
+				{
+					GameId:        "gameId",
+					Name:          "Other",
+					Password:      "",
+					HostIpAddress: "127.0.13.37",
+					MapId:         v1.GameMap_AbandonedRealm,
+				},
+			}}),
+		}
+
 		b := &Backend{
-			CreateProxy: &direct.ProxyLAN{"127.0.100.1"},
-			gameClient: &mockGameClient{
-				ListGamesResponse: connect.NewResponse(&v1.ListGamesResponse{Games: []*v1.Game{
-					{
-						GameId:        "gameId",
-						Name:          "RoomName",
-						Password:      "secret",
-						HostIpAddress: "127.0.21.37",
-						MapId:         v1.GameMap_UnderworldRetreat,
-					},
-					{
-						GameId:        "gameId",
-						Name:          "Other",
-						Password:      "",
-						HostIpAddress: "127.0.13.37",
-						MapId:         v1.GameMap_AbandonedRealm,
-					},
-				}}),
-			}}
+			ProxyFactory: &direct.ProxyLAN{"127.0.100.1"},
+			gameClient:   gameClient}
 		conn := &mockConn{}
 		session := &bsession.Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
-		session.Proxy = b.CreateProxy.Create(session)
+		session.Proxy = b.ProxyFactory.Create(session, gameClient)
 
 		assert.NoError(t, b.HandleListGames(context.Background(), session, ListGamesRequest{}))
 		assert.Len(t, conn.Written, 39)

@@ -1,4 +1,4 @@
-package backend
+package acceptance
 
 import (
 	"bytes"
@@ -10,6 +10,7 @@ import (
 
 	v1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/internal/app/logger"
+	"github.com/dimspell/gladiator/internal/backend"
 	"github.com/dimspell/gladiator/internal/backend/packet"
 	"github.com/dimspell/gladiator/internal/backend/proxy/direct"
 	"github.com/dimspell/gladiator/internal/console"
@@ -18,7 +19,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestBackend_Acceptance_CreatesAndJoinRoom_ProxyLAN(t *testing.T) {
+func TestProxyLAN_CreatesAndJoinRoom(t *testing.T) {
 	logger.SetDiscardLogger()
 
 	db, err := database.NewMemory()
@@ -45,14 +46,14 @@ func TestBackend_Acceptance_CreatesAndJoinRoom_ProxyLAN(t *testing.T) {
 	_ = console.WithConsoleAddr(ts.URL[len("http://"):], ts.URL)(cs)
 
 	proxy1 := &direct.ProxyLAN{"198.51.100.1"}
-	bd1 := NewBackend("", ts.URL, proxy1)
+	bd1 := backend.NewBackend("", ts.URL, proxy1)
 	bd1.SignalServerURL = "ws://" + cs.ConsoleBindAddr + "/lobby"
 
 	conn1 := &mockConn{}
 	session1 := bd1.AddSession(conn1)
 
 	t.Run("Host user has signs in and selects the character", func(t *testing.T) {
-		assert.NoError(t, bd1.HandleClientAuthentication(ctx, session1, ClientAuthenticationRequest{
+		assert.NoError(t, bd1.HandleClientAuthentication(ctx, session1, backend.ClientAuthenticationRequest{
 			2, 0, 0, 0, // Unknown
 			't', 'e', 's', 't', 0, // Password
 			'a', 'r', 'c', 'h', 'e', 'r', 0, // Username
@@ -64,7 +65,7 @@ func TestBackend_Acceptance_CreatesAndJoinRoom_ProxyLAN(t *testing.T) {
 		t.Log("Host user authenticated")
 
 		// Select character
-		assert.NoError(t, bd1.HandleSelectCharacter(ctx, session1, SelectCharacterRequest{
+		assert.NoError(t, bd1.HandleSelectCharacter(ctx, session1, backend.SelectCharacterRequest{
 			'a', 'r', 'c', 'h', 'e', 'r', 0, // User name
 			'a', 'r', 'c', 'h', 'e', 'r', 0, // Character name
 		}))
@@ -84,13 +85,13 @@ func TestBackend_Acceptance_CreatesAndJoinRoom_ProxyLAN(t *testing.T) {
 
 	t.Run("Host creates a game room", func(t *testing.T) {
 		// Create new game room
-		assert.NoError(t, bd1.HandleCreateGame(ctx, session1, CreateGameRequest{
+		assert.NoError(t, bd1.HandleCreateGame(ctx, session1, backend.CreateGameRequest{
 			0, 0, 0, 0, // State
 			byte(v1.GameMap_FrozenLabyrinth), 0, 0, 0, // Map ID
 			'r', 'o', 'o', 'm', 0, // Game room name
 			0, // Password
 		}))
-		assert.NoError(t, bd1.HandleCreateGame(ctx, session1, CreateGameRequest{
+		assert.NoError(t, bd1.HandleCreateGame(ctx, session1, backend.CreateGameRequest{
 			1, 0, 0, 0, // State
 			byte(v1.GameMap_FrozenLabyrinth), 0, 0, 0, // Map ID
 			'r', 'o', 'o', 'm', 0, // Game room name
@@ -125,7 +126,7 @@ func TestBackend_Acceptance_CreatesAndJoinRoom_ProxyLAN(t *testing.T) {
 	conn2 := &mockConn{}
 
 	proxy2 := &direct.ProxyLAN{"198.51.100.2"}
-	bd2 := NewBackend("", ts.URL, proxy2)
+	bd2 := backend.NewBackend("", ts.URL, proxy2)
 	bd2.SignalServerURL = "ws://" + cs.ConsoleBindAddr + "/lobby"
 
 	session2 := bd2.AddSession(conn2)
@@ -133,7 +134,7 @@ func TestBackend_Acceptance_CreatesAndJoinRoom_ProxyLAN(t *testing.T) {
 	t.Run("Guest user signs in and selects the character", func(t *testing.T) {
 
 		// Sign-in by player2
-		assert.NoError(t, bd2.HandleClientAuthentication(ctx, session2, ClientAuthenticationRequest{
+		assert.NoError(t, bd2.HandleClientAuthentication(ctx, session2, backend.ClientAuthenticationRequest{
 			2, 0, 0, 0, // Unknown
 			't', 'e', 's', 't', 0, // Password
 			'm', 'a', 'g', 'e', 0, // Username
@@ -146,7 +147,7 @@ func TestBackend_Acceptance_CreatesAndJoinRoom_ProxyLAN(t *testing.T) {
 		t.Log("Guest user authenticated")
 
 		// Select character by player2
-		assert.NoError(t, bd2.HandleSelectCharacter(ctx, session2, SelectCharacterRequest{
+		assert.NoError(t, bd2.HandleSelectCharacter(ctx, session2, backend.SelectCharacterRequest{
 			'm', 'a', 'g', 'e', 0, // User name
 			'm', 'a', 'g', 'e', 0, // Character name
 		}))
@@ -167,7 +168,7 @@ func TestBackend_Acceptance_CreatesAndJoinRoom_ProxyLAN(t *testing.T) {
 	t.Run("Guest user joins the game room", func(t *testing.T) {
 		// List games
 		conn2.Written = nil // Truncate
-		assert.NoError(t, bd2.HandleListGames(ctx, session2, ListGamesRequest{}))
+		assert.NoError(t, bd2.HandleListGames(ctx, session2, backend.ListGamesRequest{}))
 
 		// Check if user has received the game list with corresponding payload
 		assert.Equal(t, []byte{
@@ -179,7 +180,7 @@ func TestBackend_Acceptance_CreatesAndJoinRoom_ProxyLAN(t *testing.T) {
 
 		// Select game
 		conn2.Written = nil // Truncate
-		assert.NoError(t, bd2.HandleSelectGame(ctx, session2, SelectGameRequest{
+		assert.NoError(t, bd2.HandleSelectGame(ctx, session2, backend.SelectGameRequest{
 			'r', 'o', 'o', 'm', 0, // Game name
 			0, // Password
 		}))
@@ -195,7 +196,7 @@ func TestBackend_Acceptance_CreatesAndJoinRoom_ProxyLAN(t *testing.T) {
 		conn2.Written = nil // Truncate
 
 		// Join to host
-		assert.NoError(t, bd2.HandleJoinGame(ctx, session2, JoinGameRequest{
+		assert.NoError(t, bd2.HandleJoinGame(ctx, session2, backend.JoinGameRequest{
 			'r', 'o', 'o', 'm', 0, // Game name
 			0, // Password
 		}))
