@@ -9,13 +9,11 @@ import (
 	"os"
 	"time"
 
-	"connectrpc.com/connect"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/gen/multi/v1/multiv1connect"
 	"github.com/dimspell/gladiator/internal/app/logger"
 	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"github.com/dimspell/gladiator/internal/backend/bsession"
-	"github.com/dimspell/gladiator/internal/backend/proxy"
 	"github.com/dimspell/gladiator/internal/backend/proxy/p2p"
 	"github.com/dimspell/gladiator/internal/model"
 )
@@ -56,7 +54,7 @@ func main() {
 		UserId:   meUserId,
 		Username: meName,
 	}
-	px := p2p.NewPeerToPeer(session)
+	px := p2p.NewPeerToPeer(session, gm)
 	// px.NewUDPRedirect = redirect.NewNoop
 	// px.NewTCPRedirect = redirect.NewLineReader
 
@@ -86,66 +84,16 @@ func main() {
 		}
 	}()
 
-	game, err := gm.GetGame(ctx, connect.NewRequest(&multiv1.GetGameRequest{
-		GameRoomId: roomId,
-	}))
-	if err != nil {
-		slog.Error("failed to get game", logging.Error(err))
-		return
-	}
-	slog.Info("got game", "game", game.Msg.Game, "players", game.Msg.Players)
-
-	if err := px.SelectGame(proxy.GameData{
-		Game:    game.Msg.Game,
-		Players: game.Msg.Players,
-	}); err != nil {
+	if _, _, err := px.GetGame(ctx, roomId); err != nil {
 		slog.Error("failed to select a game", logging.Error(err))
 		return
 	}
-
-	addr, err := px.GetPlayerAddr(proxy.GetPlayerAddrParams{
-		GameID:     roomId,
-		UserID:     otherUserId,
-		IPAddress:  "127.0.1.2",
-		HostUserID: fmt.Sprintf("%d", otherUserId),
-	})
-	if err != nil {
-		slog.Error("failed to get player address", logging.Error(err))
-		return
-	}
-	slog.Info("got player address", "address", addr)
-
-	join, err := gm.JoinGame(ctx, connect.NewRequest(&multiv1.JoinGameRequest{
-		UserId:     meUserId,
-		GameRoomId: roomId,
-		IpAddress:  "127.0.0.1",
-	}))
-	if err != nil {
-		slog.Error("failed to join game", logging.Error(err))
-		return
-	}
-	slog.Info("joined game", "players", join.Msg.Players)
-
-	if _, err := px.Join(ctx, proxy.JoinParams{
-		HostUserID: otherUserId,
-		GameID:     roomId,
-		HostUserIP: "127.0.1.2",
-	}); err != nil {
+	if _, err := px.JoinGame(ctx, roomId, ""); err != nil {
 		slog.Error("failed to join game", logging.Error(err))
 		return
 	}
 
-	addr2, err := px.ConnectToPlayer(ctx, proxy.GetPlayerAddrParams{
-		GameID:     roomId,
-		UserID:     otherUserId,
-		IPAddress:  "127.0.1.2",
-		HostUserID: fmt.Sprintf("%d", otherUserId),
-	})
-	if err != nil {
-		slog.Error("failed to get player address", logging.Error(err))
-		return
-	}
-	slog.Info("connected to player", "address", addr2)
+	slog.Info("joined game")
 
 	select {}
 }

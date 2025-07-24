@@ -134,7 +134,7 @@ func (c *Controller) StopConsole() error {
 	return nil
 }
 
-func (c *Controller) StartBackend(consoleAddr string, proxy backend.Proxy) error {
+func (c *Controller) StartBackend(consoleAddr string, proxy backend.ProxyFactory) error {
 	if c.Backend != nil {
 		slog.Warn("Backend is already running")
 		return nil

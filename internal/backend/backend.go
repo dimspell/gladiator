@@ -19,6 +19,19 @@ import (
 	"github.com/dimspell/gladiator/internal/model"
 )
 
+var SharedHttpClient = &http.Client{
+	Timeout: 5 * time.Second,
+	Transport: &http.Transport{
+		Proxy:                 http.DefaultTransport.(*http.Transport).Proxy,
+		DialContext:           http.DefaultTransport.(*http.Transport).DialContext,
+		ForceAttemptHTTP2:     true,
+		MaxIdleConns:          100,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+	},
+}
+
 type Backend struct {
 	Addr            string
 	SignalServerURL string
@@ -27,7 +40,7 @@ type Backend struct {
 
 	ConnectedSessions sync.Map
 
-	CreateProxy Proxy
+	ProxyFactory ProxyFactory
 
 	characterClient multiv1connect.CharacterServiceClient
 	gameClient      multiv1connect.GameServiceClient
@@ -35,12 +48,12 @@ type Backend struct {
 	rankingClient   multiv1connect.RankingServiceClient
 }
 
-func NewBackend(backendAddr, consolePublicAddr string, createProxy Proxy) *Backend {
+func NewBackend(backendAddr, consolePublicAddr string, createProxy ProxyFactory) *Backend {
 	characterClient, gameClient, userClient, rankingClient := createServiceClients(consolePublicAddr)
 
 	return &Backend{
-		Addr:        backendAddr,
-		CreateProxy: createProxy,
+		Addr:         backendAddr,
+		ProxyFactory: createProxy,
 
 		characterClient: characterClient,
 		gameClient:      gameClient,
@@ -55,27 +68,14 @@ func createServiceClients(consoleAddr string) (
 	multiv1connect.UserServiceClient,
 	multiv1connect.RankingServiceClient,
 ) {
-	httpClient := &http.Client{
-		Timeout: 5 * time.Second,
-		Transport: &http.Transport{
-			Proxy:                 http.DefaultTransport.(*http.Transport).Proxy,
-			DialContext:           http.DefaultTransport.(*http.Transport).DialContext,
-			ForceAttemptHTTP2:     true,
-			MaxIdleConns:          100,
-			IdleConnTimeout:       90 * time.Second,
-			TLSHandshakeTimeout:   10 * time.Second,
-			ExpectContinueTimeout: 1 * time.Second,
-		},
-	}
-
 	// req.Header().Set("Authorization", "Bearer "+token)
 
 	consoleUri := fmt.Sprintf("%s/grpc", consoleAddr)
 
-	characterClient := multiv1connect.NewCharacterServiceClient(httpClient, consoleUri)
-	gameClient := multiv1connect.NewGameServiceClient(httpClient, consoleUri)
-	userClient := multiv1connect.NewUserServiceClient(httpClient, consoleUri)
-	rankingClient := multiv1connect.NewRankingServiceClient(httpClient, consoleUri)
+	characterClient := multiv1connect.NewCharacterServiceClient(SharedHttpClient, consoleUri)
+	gameClient := multiv1connect.NewGameServiceClient(SharedHttpClient, consoleUri)
+	userClient := multiv1connect.NewUserServiceClient(SharedHttpClient, consoleUri)
+	rankingClient := multiv1connect.NewRankingServiceClient(SharedHttpClient, consoleUri)
 
 	return characterClient, gameClient, userClient, rankingClient
 }
@@ -92,7 +92,7 @@ func (b *Backend) Start() error {
 	}
 	b.listener = listener
 
-	slog.Info("Backend listening", "addr", b.listener.Addr(), "mode", b.CreateProxy.Mode())
+	slog.Info("Backend listening", "addr", b.listener.Addr(), "mode", b.ProxyFactory.Mode())
 	return nil
 }
 

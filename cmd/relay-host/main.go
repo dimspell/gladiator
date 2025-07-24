@@ -10,7 +10,6 @@ import (
 	"os"
 	"time"
 
-	"connectrpc.com/connect"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/gen/multi/v1/multiv1connect"
 	"github.com/dimspell/gladiator/internal/app/logger"
@@ -25,6 +24,9 @@ import (
 func main() {
 	logger.SetColoredLogger(os.Stderr, slog.LevelDebug, false)
 
+	consoleUri := fmt.Sprintf("%s://%s/grpc", "http", "localhost:2137")
+	gameClient := multiv1connect.NewGameServiceClient(&http.Client{Timeout: 10 * time.Second}, consoleUri)
+
 	px := &relay.ProxyRelay{
 		RelayServerAddr: "localhost:9999",
 	}
@@ -34,7 +36,7 @@ func main() {
 	session.Username = "knight"
 	session.CharacterID = 1
 	session.ClassType = model.ClassTypeKnight
-	proxyClient := px.Create(session).(*relay.Relay)
+	proxyClient := px.Create(session, gameClient).(*relay.Relay)
 	session.Proxy = proxyClient
 
 	ctx := context.TODO()
@@ -72,30 +74,21 @@ func main() {
 
 	var err error
 
-	_, err = session.Proxy.CreateRoom(ctx, proxy.CreateParams{
-		GameID: roomID,
-	})
+	params := proxy.CreateParams{
+		GameID:   roomID,
+		MapId:    multiv1.GameMap_FrozenLabyrinth,
+		Password: "",
+	}
+
+	err = session.Proxy.CreateRoom(ctx, params)
 	if err != nil {
 		slog.Error("CreateRoom", logging.Error(err))
 		return
 	}
 
-	consoleUri := fmt.Sprintf("%s://%s/grpc", "http", "localhost:2137")
-	gameClient := multiv1connect.NewGameServiceClient(&http.Client{Timeout: 10 * time.Second}, consoleUri)
-	if _, err := gameClient.CreateGame(ctx, connect.NewRequest(&multiv1.CreateGameRequest{
-		GameName:      roomID,
-		Password:      "",
-		MapId:         multiv1.GameMap(1),
-		HostUserId:    session.UserID,
-		HostIpAddress: "127.0.0.1",
-	})); err != nil {
-		slog.Error("CreateGame", logging.Error(err))
-		return
-	}
-
 	// startFakeBackendServer(ctx)
 
-	err = session.Proxy.HostRoom(ctx, proxy.HostParams{GameID: roomID})
+	err = session.Proxy.SetRoomReady(ctx, params)
 	if err != nil {
 		slog.Error("HostRoom", logging.Error(err))
 		return

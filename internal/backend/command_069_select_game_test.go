@@ -13,7 +13,7 @@ import (
 func TestBackend_HandleSelectGame(t *testing.T) {
 	t.Run("Sample mocked game", func(t *testing.T) {
 		b, _, _ := helperNewBackend(t)
-		b.gameClient = &mockGameClient{
+		gameClient := &mockGameClient{
 			GetGameResponse: connect.NewResponse(&v1.GetGameResponse{
 				Game: &v1.Game{
 					GameId:        "gameId",
@@ -38,10 +38,10 @@ func TestBackend_HandleSelectGame(t *testing.T) {
 				},
 			}),
 		}
-
+		b.gameClient = gameClient
 		conn := &mockConn{}
 		session := &bsession.Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "mage"}
-		session.Proxy = b.CreateProxy.Create(session)
+		session.Proxy = b.ProxyFactory.Create(session, gameClient)
 
 		assert.NoError(t, b.HandleSelectGame(context.Background(), session, SelectGameRequest{
 			'r', 'e', 't', 'r', 'e', 'a', 'a', 't', 0, // Game name
@@ -57,7 +57,7 @@ func TestBackend_HandleSelectGame(t *testing.T) {
 
 	t.Run("HostRoom only", func(t *testing.T) {
 		b, _, _ := helperNewBackend(t)
-		b.gameClient = &mockGameClient{
+		gameClient := &mockGameClient{
 			GetGameResponse: connect.NewResponse(&v1.GetGameResponse{
 				Game: &v1.Game{
 					GameId:        "gameId",
@@ -78,7 +78,7 @@ func TestBackend_HandleSelectGame(t *testing.T) {
 		}
 		conn := &mockConn{}
 		session := &bsession.Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
-		session.Proxy = b.CreateProxy.Create(session)
+		session.Proxy = b.ProxyFactory.Create(session, gameClient)
 
 		assert.NoError(t, b.HandleSelectGame(context.Background(), session, SelectGameRequest{
 			103, 97, 109, 101, 82, 111, 111, 109, 0, // Game name

@@ -7,14 +7,12 @@ import (
 	"connectrpc.com/connect"
 	v1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/internal/backend/bsession"
-	"github.com/dimspell/gladiator/internal/backend/proxy/direct"
-	"github.com/dimspell/gladiator/internal/wire"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestBackend_HandleJoinGame(t *testing.T) {
 	b, _, _ := helperNewBackend(t)
-	b.gameClient = &mockGameClient{
+	gameClient := &mockGameClient{
 		GetGameResponse: connect.NewResponse(&v1.GetGameResponse{
 			Game: &v1.Game{
 				GameId:        "gameId",
@@ -41,39 +39,11 @@ func TestBackend_HandleJoinGame(t *testing.T) {
 			},
 		}),
 	}
+	b.gameClient = gameClient
 
 	conn := &mockConn{}
 	session := &bsession.Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
-	session.Proxy = b.CreateProxy.Create(session)
-
-	lan := session.Proxy.(*direct.LAN)
-	lan.GameRoom = &direct.GameRoom{
-		ID:   "gameId",
-		Name: "gameId",
-		Host: wire.Player{
-			UserID:      1,
-			Username:    "archer",
-			CharacterID: 1,
-			ClassType:   byte(v1.ClassType_Archer),
-			IPAddress:   "192.168.121.212",
-		},
-		Players: map[int64]wire.Player{
-			1: {
-				UserID:      1,
-				Username:    "archer",
-				CharacterID: 1,
-				ClassType:   byte(v1.ClassType_Archer),
-				IPAddress:   "192.168.121.212",
-			},
-			2: {
-				UserID:      2,
-				Username:    "mage",
-				CharacterID: 2,
-				ClassType:   byte(v1.ClassType_Mage),
-				IPAddress:   "192.168.121.169",
-			},
-		},
-	}
+	session.Proxy = b.ProxyFactory.Create(session, gameClient)
 
 	assert.NoError(t, b.HandleJoinGame(context.Background(), session, JoinGameRequest{
 		'r', 'e', 't', 'r', 'e', 'a', 't', 0, // Game name

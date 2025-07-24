@@ -149,7 +149,7 @@ func helperNewBackend(tb testing.TB) (bd *Backend, px *direct.ProxyLAN, cs *cons
 		// Replace the HTTP schema prefix for websocket connection.
 		SignalServerURL: "ws://" + ts.URL[len("http://"):],
 
-		CreateProxy: px,
+		ProxyFactory: px,
 	}
 
 	tb.Cleanup(func() {
