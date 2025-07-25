@@ -42,7 +42,7 @@ func newTestSession(id int64, sendFunc func(ctx context.Context, payload []byte)
 		UserID:    id,
 		User:      wire.User{UserID: id, Username: "user"},
 		Character: wire.Character{CharacterID: id, ClassType: 1},
-		Websocket: &mockWsConn{
+		WebSocket: &mockWsConn{
 			writeFunc: func(ctx context.Context, messageType websocket.MessageType, payload []byte) error {
 				if sendFunc != nil {
 					sendFunc(ctx, payload)
@@ -54,7 +54,7 @@ func newTestSession(id int64, sendFunc func(ctx context.Context, payload []byte)
 }
 
 func TestAddGetDeleteUserSession(t *testing.T) {
-	mp := NewMultiplayer()
+	mp := NewRoomService()
 	sess := newTestSession(1, nil)
 	mp.AddUserSession(sess.UserID, sess)
 
@@ -68,7 +68,7 @@ func TestAddGetDeleteUserSession(t *testing.T) {
 }
 
 func TestCreateRoomAndJoinRoom(t *testing.T) {
-	mp := NewMultiplayer()
+	mp := NewRoomService()
 	sess := newTestSession(1, nil)
 	mp.AddUserSession(sess.UserID, sess)
 
@@ -85,7 +85,7 @@ func TestCreateRoomAndJoinRoom(t *testing.T) {
 }
 
 func TestLeaveRoomAndHostMigration(t *testing.T) {
-	mp := NewMultiplayer()
+	mp := NewRoomService()
 	sess1 := newTestSession(1, nil)
 	sess2 := newTestSession(2, nil)
 	mp.AddUserSession(sess1.UserID, sess1)
@@ -101,7 +101,7 @@ func TestLeaveRoomAndHostMigration(t *testing.T) {
 }
 
 func TestGetNextHost(t *testing.T) {
-	mp := NewMultiplayer()
+	mp := NewRoomService()
 	sess1 := newTestSession(1, nil)
 	sess2 := newTestSession(2, nil)
 	sess1.JoinedAt = time.Now().Add(-time.Minute)
@@ -112,7 +112,7 @@ func TestGetNextHost(t *testing.T) {
 }
 
 func TestSetRoomReady(t *testing.T) {
-	mp := NewMultiplayer()
+	mp := NewRoomService()
 	sess := newTestSession(1, nil)
 	mp.AddUserSession(sess.UserID, sess)
 	room, _ := mp.CreateRoom(sess.UserID, "room1", "", 0, "127.0.0.1")
@@ -122,7 +122,7 @@ func TestSetRoomReady(t *testing.T) {
 }
 
 func TestJoinRoomErrors(t *testing.T) {
-	mp := NewMultiplayer()
+	mp := NewRoomService()
 	_, err := mp.JoinRoom("room1", 1, "127.0.0.1")
 	require.Error(t, err, "should error if user or room missing")
 
@@ -138,7 +138,7 @@ func TestJoinRoomErrors(t *testing.T) {
 }
 
 func TestDestroyRoom(t *testing.T) {
-	mp := NewMultiplayer()
+	mp := NewRoomService()
 	sess := newTestSession(1, nil)
 	mp.AddUserSession(sess.UserID, sess)
 	room, _ := mp.CreateRoom(sess.UserID, "room1", "", 0, "127.0.0.1")
@@ -149,7 +149,7 @@ func TestDestroyRoom(t *testing.T) {
 }
 
 func TestBroadcastMessage(t *testing.T) {
-	mp := NewMultiplayer()
+	mp := NewRoomService()
 	var sent []int64
 	mockSess := &mockSession{newTestSession(1, func(ctx context.Context, payload []byte) { sent = append(sent, 1) }), nil}
 	mp.AddUserSession(1, mockSess.UserSession)
@@ -162,7 +162,7 @@ func TestBroadcastMessage(t *testing.T) {
 }
 
 func TestAnnounceJoin(t *testing.T) {
-	mp := NewMultiplayer()
+	mp := NewRoomService()
 	var sentTo []int64
 	mockSess := &mockSession{newTestSession(1, func(ctx context.Context, payload []byte) { sentTo = append(sentTo, 1) }), nil}
 	mp.AddUserSession(1, mockSess.UserSession)
@@ -179,7 +179,7 @@ func TestAnnounceJoin(t *testing.T) {
 }
 
 func TestListRoomsAndGetRoom(t *testing.T) {
-	mp := NewMultiplayer()
+	mp := NewRoomService()
 	sess := newTestSession(1, nil)
 	mp.AddUserSession(sess.UserID, sess)
 	_, _ = mp.CreateRoom(sess.UserID, "room1", "", 0, "127.0.0.1")
@@ -192,7 +192,7 @@ func TestListRoomsAndGetRoom(t *testing.T) {
 
 func TestSetPlayerConnectedDisconnected(t *testing.T) {
 	t.Skip("Failing - needs to be fixed")
-	mp := NewMultiplayer()
+	mp := NewRoomService()
 	sess := newTestSession(1, nil)
 	called := false
 	mockSess := &mockSession{sess, func(ctx context.Context, payload []byte) { called = true }}
@@ -206,7 +206,7 @@ func TestSetPlayerConnectedDisconnected(t *testing.T) {
 }
 
 func TestForEachSessionAndListSessions(t *testing.T) {
-	mp := NewMultiplayer()
+	mp := NewRoomService()
 	for i := int64(1); i <= 2; i++ {
 		mp.AddUserSession(i, newTestSession(i, nil))
 	}
@@ -218,7 +218,7 @@ func TestForEachSessionAndListSessions(t *testing.T) {
 }
 
 func TestResetClearsSessionsAndRooms(t *testing.T) {
-	mp := NewMultiplayer()
+	mp := NewRoomService()
 	mp.AddUserSession(1, newTestSession(1, nil))
 	mp.Rooms["room1"] = &GameRoom{ID: "room1", Players: map[int64]*UserSession{1: mp.sessions[1]}}
 	mp.Reset()
@@ -227,7 +227,7 @@ func TestResetClearsSessionsAndRooms(t *testing.T) {
 }
 
 func TestRegisterRelayHooks(t *testing.T) {
-	mp := NewMultiplayer()
+	mp := NewRoomService()
 	relay := &RelayServer{}
 	mp.RegisterRelayHooks(relay)
 	require.NotNil(t, relay.OnJoin)
@@ -236,7 +236,7 @@ func TestRegisterRelayHooks(t *testing.T) {
 }
 
 func TestHandleRelayLeaveRemovesUser(t *testing.T) {
-	mp := NewMultiplayer()
+	mp := NewRoomService()
 	sess := newTestSession(1, nil)
 	mp.AddUserSession(sess.UserID, sess)
 	room, _ := mp.CreateRoom(sess.UserID, "room1", "", 0, "127.0.0.1")

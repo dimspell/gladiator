@@ -16,8 +16,8 @@ import (
 	"github.com/dimspell/gladiator/internal/wire"
 )
 
-// Multiplayer is a control plane for the lobby, presence and the matchmaking.
-type Multiplayer struct {
+// RoomService is a control plane for the lobby, presence and the matchmaking.
+type RoomService struct {
 	done context.CancelFunc
 
 	// Presence in a lobby
@@ -30,11 +30,11 @@ type Multiplayer struct {
 	roomsMutex sync.RWMutex
 	Rooms      map[string]*GameRoom
 
-	Relay *Relay
+	RelayService *RelayService
 }
 
-func NewMultiplayer() *Multiplayer {
-	mp := &Multiplayer{
+func NewRoomService() *RoomService {
+	mp := &RoomService{
 		sessions: make(map[int64]*UserSession),
 		Rooms:    make(map[string]*GameRoom),
 		Messages: make(chan wire.Message),
@@ -42,12 +42,12 @@ func NewMultiplayer() *Multiplayer {
 	return mp
 }
 
-func (mp *Multiplayer) Stop() { mp.done() }
+func (mp *RoomService) Stop() { mp.done() }
 
-func (mp *Multiplayer) Reset() {
+func (mp *RoomService) Reset() {
 	mp.forEachSession(func(userSession *UserSession) bool {
-		if userSession.Websocket != nil {
-			_ = userSession.Websocket.CloseNow()
+		if userSession.WebSocket != nil {
+			_ = userSession.WebSocket.CloseNow()
 		}
 		return true
 	})
@@ -56,7 +56,7 @@ func (mp *Multiplayer) Reset() {
 	clear(mp.Rooms)
 }
 
-func (mp *Multiplayer) Run(ctx context.Context) {
+func (mp *RoomService) Run(ctx context.Context) {
 	ctx, done := context.WithCancel(ctx)
 	mp.done = done
 	defer done()
@@ -79,7 +79,7 @@ func (mp *Multiplayer) Run(ctx context.Context) {
 
 // HandleIncomingMessage handles the incoming message pump by dispatching
 // commands based on the message type.
-func (mp *Multiplayer) HandleIncomingMessage(ctx context.Context, msg wire.Message) {
+func (mp *RoomService) HandleIncomingMessage(ctx context.Context, msg wire.Message) {
 	slog.Debug("Received a signal message", "type", msg.Type.String(), "from", msg.From, "to", msg.To)
 	start := time.Now()
 	metrics.MessagesReceived.WithLabelValues(msg.Type.String()).Inc()
@@ -103,7 +103,7 @@ func (mp *Multiplayer) HandleIncomingMessage(ctx context.Context, msg wire.Messa
 	metrics.MessageProcessingLatency.Observe(time.Since(start).Seconds())
 }
 
-func (mp *Multiplayer) HandleSession(ctx context.Context, session *UserSession) error {
+func (mp *RoomService) HandleSession(ctx context.Context, session *UserSession) error {
 	startSession := time.Now()
 	// Expect the "hello" and send back "welcome" message.
 	if err := mp.HandleHello(ctx, session); err != nil {
@@ -173,7 +173,7 @@ func (mp *Multiplayer) HandleSession(ctx context.Context, session *UserSession) 
 	}
 }
 
-func (mp *Multiplayer) ForwardRTCMessage(ctx context.Context, msg wire.Message) {
+func (mp *RoomService) ForwardRTCMessage(ctx context.Context, msg wire.Message) {
 	slog.Debug("Forwarding RTC message", "type", msg.Type.String(), "from", msg.From, "to", msg.To)
 
 	ctx, cancel := context.WithTimeout(ctx, time.Second*5)
@@ -190,7 +190,7 @@ func (mp *Multiplayer) ForwardRTCMessage(ctx context.Context, msg wire.Message) 
 }
 
 // DebugState returns all information about the lobby.
-func (mp *Multiplayer) DebugState() {
+func (mp *RoomService) DebugState() {
 	fmt.Println("Connected players", len(mp.sessions))
 	for key, session := range mp.sessions {
 		fmt.Println(key, fmt.Sprintf("%#v", session.ToPlayer()))
@@ -213,14 +213,14 @@ type GameRoom struct {
 }
 
 // ListRooms returns list of all created game rooms.
-func (mp *Multiplayer) ListRooms() map[string]*GameRoom {
+func (mp *RoomService) ListRooms() map[string]*GameRoom {
 	mp.roomsMutex.RLock()
 	defer mp.roomsMutex.RUnlock()
 
 	return mp.Rooms
 }
 
-func (mp *Multiplayer) GetRoom(roomId string) (GameRoom, bool) {
+func (mp *RoomService) GetRoom(roomId string) (GameRoom, bool) {
 	mp.roomsMutex.RLock()
 	defer mp.roomsMutex.RUnlock()
 
@@ -232,7 +232,7 @@ func (mp *Multiplayer) GetRoom(roomId string) (GameRoom, bool) {
 }
 
 // CreateRoom creates new game room.
-func (mp *Multiplayer) CreateRoom(hostUserID int64, gameID string, password string, mapID v1.GameMap, hostIpAddress string) (*GameRoom, error) {
+func (mp *RoomService) CreateRoom(hostUserID int64, gameID string, password string, mapID v1.GameMap, hostIpAddress string) (*GameRoom, error) {
 	mp.roomsMutex.Lock()
 	defer mp.roomsMutex.Unlock()
 
@@ -274,7 +274,7 @@ func (mp *Multiplayer) CreateRoom(hostUserID int64, gameID string, password stri
 }
 
 // DestroyRoom deletes an existing game room.
-func (mp *Multiplayer) DestroyRoom(roomId string) {
+func (mp *RoomService) DestroyRoom(roomId string) {
 	room, ok := mp.Rooms[roomId]
 	if ok {
 		lifetime := time.Since(room.CreatedAt).Seconds()
@@ -286,7 +286,7 @@ func (mp *Multiplayer) DestroyRoom(roomId string) {
 }
 
 // JoinRoom adds a player to an existing game room.
-func (mp *Multiplayer) JoinRoom(roomId string, userId int64, ipAddr string) (GameRoom, error) {
+func (mp *RoomService) JoinRoom(roomId string, userId int64, ipAddr string) (GameRoom, error) {
 	mp.roomsMutex.Lock()
 	defer mp.roomsMutex.Unlock()
 
@@ -327,7 +327,7 @@ func (mp *Multiplayer) JoinRoom(roomId string, userId int64, ipAddr string) (Gam
 }
 
 // LeaveRoom removes a player from a game room.
-func (mp *Multiplayer) LeaveRoom(ctx context.Context, session *UserSession) {
+func (mp *RoomService) LeaveRoom(ctx context.Context, session *UserSession) {
 	mp.roomsMutex.Lock()
 	defer mp.roomsMutex.Unlock()
 
@@ -389,7 +389,7 @@ func (mp *Multiplayer) LeaveRoom(ctx context.Context, session *UserSession) {
 }
 
 // GetNextHost returns the next host of the game room.
-func (mp *Multiplayer) GetNextHost(room *GameRoom) *UserSession {
+func (mp *RoomService) GetNextHost(room *GameRoom) *UserSession {
 	var earliest *UserSession
 
 	// Find the player who joined the room earliest
@@ -402,7 +402,7 @@ func (mp *Multiplayer) GetNextHost(room *GameRoom) *UserSession {
 	return earliest
 }
 
-func (mp *Multiplayer) AnnounceJoin(room GameRoom, userId int64) {
+func (mp *RoomService) AnnounceJoin(room GameRoom, userId int64) {
 	mp.sessionMutex.Lock()
 
 	// Finding the user session of the player who joins
@@ -436,7 +436,7 @@ func (mp *Multiplayer) AnnounceJoin(room GameRoom, userId int64) {
 }
 
 // SetRoomReady notifies the LobbyRoom that it can start accepting players.
-func (mp *Multiplayer) SetRoomReady(msg wire.Message) {
+func (mp *RoomService) SetRoomReady(msg wire.Message) {
 	mp.roomsMutex.Lock()
 	defer mp.roomsMutex.Unlock()
 
@@ -454,7 +454,7 @@ func (mp *Multiplayer) SetRoomReady(msg wire.Message) {
 	metrics.RoomReadyEvents.Inc()
 }
 
-func (mp *Multiplayer) HandleHello(ctx context.Context, session *UserSession) error {
+func (mp *RoomService) HandleHello(ctx context.Context, session *UserSession) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Second*5)
 	defer cancel()
 
@@ -476,7 +476,7 @@ func (mp *Multiplayer) HandleHello(ctx context.Context, session *UserSession) er
 	return nil
 }
 
-func (mp *Multiplayer) HandleJoinLobby(ctx context.Context, session *UserSession) error {
+func (mp *RoomService) HandleJoinLobby(ctx context.Context, session *UserSession) error {
 	payload, err := session.ReadNext(ctx)
 	if err != nil {
 		return err
@@ -497,7 +497,7 @@ func (mp *Multiplayer) HandleJoinLobby(ctx context.Context, session *UserSession
 }
 
 // SetPlayerConnected notifies the user has connected to the lobby.
-func (mp *Multiplayer) SetPlayerConnected(session *UserSession) {
+func (mp *RoomService) SetPlayerConnected(session *UserSession) {
 	players := mp.listSessions()
 	mp.AddUserSession(session.UserID, session)
 
@@ -522,11 +522,11 @@ func (mp *Multiplayer) SetPlayerConnected(session *UserSession) {
 }
 
 // SetPlayerDisconnected notifies the user has left the lobby.
-func (mp *Multiplayer) SetPlayerDisconnected(session *UserSession) {
+func (mp *RoomService) SetPlayerDisconnected(session *UserSession) {
 	slog.Info("Closing player connection", "user", session.UserID)
 
 	// Close the websocket connection
-	if err := session.Websocket.CloseNow(); err != nil {
+	if err := session.WebSocket.CloseNow(); err != nil {
 		slog.Debug("Could not close the connection", "user", session.UserID, logging.Error(err))
 	}
 
@@ -534,9 +534,9 @@ func (mp *Multiplayer) SetPlayerDisconnected(session *UserSession) {
 	mp.LeaveRoom(context.Background(), session)
 
 	// Notify the relay server the user has disconnected
-	if mp.Relay != nil {
+	if mp.RelayService != nil {
 		slog.Info("Closing relay connection", "user", session.UserID)
-		mp.Relay.Server.leaveRoom(fmt.Sprintf("%d", session.UserID), session.GameID)
+		mp.RelayService.Server.leaveRoom(fmt.Sprintf("%d", session.UserID), session.GameID)
 	}
 
 	// Delete the session from the map
@@ -551,7 +551,7 @@ func (mp *Multiplayer) SetPlayerDisconnected(session *UserSession) {
 }
 
 // BroadcastMessage sends a message to all connected users.
-func (mp *Multiplayer) BroadcastMessage(ctx context.Context, payload []byte) {
+func (mp *RoomService) BroadcastMessage(ctx context.Context, payload []byte) {
 	// slog.Info("Broadcasting message", "type", wire.EventType(payload[0]).String(), "payload", string(payload[1:]))
 	metrics.MessagesBroadcasted.Inc()
 	mp.forEachSession(func(session *UserSession) bool {
@@ -561,7 +561,7 @@ func (mp *Multiplayer) BroadcastMessage(ctx context.Context, payload []byte) {
 }
 
 // GetUserSession is a thread-safe method to receive a session by ID.
-func (mp *Multiplayer) GetUserSession(id int64) (*UserSession, bool) {
+func (mp *RoomService) GetUserSession(id int64) (*UserSession, bool) {
 	mp.sessionMutex.RLock()
 	member, ok := mp.sessions[id]
 	mp.sessionMutex.RUnlock()
@@ -569,7 +569,7 @@ func (mp *Multiplayer) GetUserSession(id int64) (*UserSession, bool) {
 }
 
 // AddUserSession is a thread-safe operation to add a session identified by ID.
-func (mp *Multiplayer) AddUserSession(id int64, session *UserSession) {
+func (mp *RoomService) AddUserSession(id int64, session *UserSession) {
 	if _, exists := mp.GetUserSession(id); exists {
 		return
 	}
@@ -579,14 +579,14 @@ func (mp *Multiplayer) AddUserSession(id int64, session *UserSession) {
 }
 
 // DeleteUserSession is a thread-safe operation to delete a session by ID.
-func (mp *Multiplayer) DeleteUserSession(id int64) {
+func (mp *RoomService) DeleteUserSession(id int64) {
 	mp.sessionMutex.Lock()
 	delete(mp.sessions, id)
 	mp.sessionMutex.Unlock()
 }
 
 // forEachSession is a thread-safe method to iterate over all session entries.
-func (mp *Multiplayer) forEachSession(f func(session *UserSession) bool) {
+func (mp *RoomService) forEachSession(f func(session *UserSession) bool) {
 	mp.sessionMutex.RLock()
 	defer mp.sessionMutex.RUnlock()
 	for _, member := range mp.sessions {
@@ -597,7 +597,7 @@ func (mp *Multiplayer) forEachSession(f func(session *UserSession) bool) {
 }
 
 // listSession is a thread-safe method to retrieve the session list.
-func (mp *Multiplayer) listSessions() []wire.Player {
+func (mp *RoomService) listSessions() []wire.Player {
 	mp.sessionMutex.RLock()
 	defer mp.sessionMutex.RUnlock()
 
@@ -611,7 +611,7 @@ func (mp *Multiplayer) listSessions() []wire.Player {
 }
 
 // In Multiplayer, add a method to register relay event hooks
-func (mp *Multiplayer) RegisterRelayHooks(relay *RelayServer) {
+func (mp *RoomService) RegisterRelayHooks(relay *RelayServer) {
 	relay.OnJoin = func(eventType, peerID, roomID string) {
 		mp.HandleRelayJoin(eventType, peerID, roomID)
 	}
@@ -624,11 +624,11 @@ func (mp *Multiplayer) RegisterRelayHooks(relay *RelayServer) {
 }
 
 // Stub handler methods (implement as needed)
-func (mp *Multiplayer) HandleRelayJoin(eventType, peerID, roomID string) {
+func (mp *RoomService) HandleRelayJoin(eventType, peerID, roomID string) {
 	// TODO: Implement join event handling
 }
 
-func (mp *Multiplayer) HandleRelayLeave(eventType, peerID, roomID string) {
+func (mp *RoomService) HandleRelayLeave(eventType, peerID, roomID string) {
 	userID, err := strconv.ParseInt(peerID, 10, 64)
 	if err != nil {
 		return
@@ -640,6 +640,6 @@ func (mp *Multiplayer) HandleRelayLeave(eventType, peerID, roomID string) {
 	mp.LeaveRoom(context.Background(), sess)
 }
 
-func (mp *Multiplayer) HandleRelayDelete(eventType, peerID, roomID string) {
+func (mp *RoomService) HandleRelayDelete(eventType, peerID, roomID string) {
 	// TODO: Implement delete event handling
 }
