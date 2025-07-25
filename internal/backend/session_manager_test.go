@@ -7,16 +7,11 @@ import (
 	"time"
 
 	v1 "github.com/dimspell/gladiator/gen/multi/v1"
-	"github.com/dimspell/gladiator/internal/app/logger"
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/proxy/direct"
 	"github.com/dimspell/gladiator/internal/model"
 	"github.com/stretchr/testify/assert"
 )
-
-func init() {
-	logger.SetDiscardLogger()
-}
 
 func TestBackend_RegisterNewObserver(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -60,7 +55,7 @@ func TestBackend_UpdateCharacterInfo(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	if err := b.RegisterNewObserver(ctx, session); err != nil {
+	if err := session.RegisterNewObserver(ctx); err != nil {
 		t.Error(err)
 		return
 	}

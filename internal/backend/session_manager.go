@@ -2,83 +2,88 @@ package backend
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 	"net"
+	"sync"
 
-	"github.com/coder/websocket"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/gen/multi/v1/multiv1connect"
 	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"github.com/dimspell/gladiator/internal/backend/bsession"
+	"github.com/dimspell/gladiator/internal/backend/packet"
 	"github.com/dimspell/gladiator/internal/backend/proxy"
 	"github.com/dimspell/gladiator/internal/model"
 )
 
-func (b *Backend) AddSession(tcpConn net.Conn) *bsession.Session {
-	slog.Debug("New session")
+type ProxyFactory interface {
+	Create(session *bsession.Session, gameClient multiv1connect.GameServiceClient) proxy.ProxyClient
+	Mode() model.RunMode
+}
 
+type SessionManager struct {
+	ConnectedSessions *sync.Map
+	ProxyFactory      ProxyFactory
+	GameClient        multiv1connect.GameServiceClient
+}
+
+func NewSessionManager(proxyFactory ProxyFactory, gameClient multiv1connect.GameServiceClient) *SessionManager {
+	return &SessionManager{
+		ConnectedSessions: new(sync.Map),
+		ProxyFactory:      proxyFactory,
+		GameClient:        gameClient,
+	}
+}
+
+func (s *SessionManager) Add(tcpConn net.Conn) *bsession.Session {
 	session := bsession.NewSession(tcpConn)
-	session.Proxy = b.ProxyFactory.Create(session, b.gameClient)
+	session.Proxy = s.ProxyFactory.Create(session, s.GameClient)
 
-	b.ConnectedSessions.Store(session.ID, session)
+	s.ConnectedSessions.Store(session.ID, session)
 	return session
 }
 
-func (b *Backend) CloseSession(session *bsession.Session) error {
+func (s *SessionManager) Remove(session *bsession.Session) {
 	slog.Info("Session closed", "session", session.ID)
 
 	if session.Proxy != nil {
 		session.Proxy.Close()
 	}
+
 	session.StopObserver()
-
-	b.ConnectedSessions.Delete(session.ID)
-
+	s.ConnectedSessions.Delete(session.ID)
 	session = nil
-	return nil
+}
+
+func (s *SessionManager) RemoveAll() {
+	// Close all open connections
+	s.ConnectedSessions.Range(func(k, v any) bool {
+		session := v.(*bsession.Session)
+
+		// TODO: Send a system message "(system) The server is going to close in less than 30 seconds"
+		_ = session.SendToGame(
+			packet.ReceiveMessage,
+			packet.NewGlobalMessage("system-info", "The server is going to shut down..."))
+
+		// TODO: Send a packet to trigger stats saving
+		// TODO: Send a system message "(system): Your stats were saving, your game client might close in the next 10 seconds"
+
+		// TODO: Send a packet to close the connection (malformed 255-21?)
+		if err := session.Conn.Close(); err != nil {
+			slog.Error("Could not close session", logging.Error(err), "session", session.ID)
+		}
+
+		return true
+	})
+}
+
+func (b *Backend) AddSession(tcpConn net.Conn) *bsession.Session {
+	return b.SessionManager.Add(tcpConn)
+}
+
+func (b *Backend) CloseSession(session *bsession.Session) {
+	b.SessionManager.Remove(session)
 }
 
 func (b *Backend) ConnectToLobby(ctx context.Context, user *multiv1.User, session *bsession.Session) error {
 	return session.ConnectOverWebsocket(ctx, user, b.SignalServerURL)
-}
-
-func (b *Backend) RegisterNewObserver(ctx context.Context, session *bsession.Session) error {
-	handlers := []proxy.MessageHandler{
-		NewLobbyEventHandler(session).Handle,
-		session.Proxy.Handle,
-	}
-	observe := func(ctx context.Context, wsConn *websocket.Conn) {
-		for {
-			if ctx.Err() != nil {
-				return
-			}
-
-			// Read the broadcast and handle them as commands.
-			p, err := session.ConsumeWebSocket(ctx)
-			if err != nil {
-				if errors.Is(err, context.Canceled) {
-					return
-				}
-				slog.Error("Error reading from WebSocket", "session", session.ID, logging.Error(err))
-				return
-			}
-
-			// slog.Debug("Signal from lobby", "type", et.String(), "session", session.ID, "payload", string(p[1:]))
-
-			// TODO: Register handlers and handle them here.
-			for _, handleFn := range handlers {
-				if err := handleFn(ctx, p); err != nil {
-					slog.Error("Error handling message", "session", session.ID, logging.Error(err))
-					return
-				}
-			}
-		}
-	}
-	return session.StartObserver(ctx, observe)
-}
-
-type ProxyFactory interface {
-	Create(session *bsession.Session, gameClient multiv1connect.GameServiceClient) proxy.ProxyClient
-	Mode() model.RunMode
 }
