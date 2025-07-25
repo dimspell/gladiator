@@ -239,7 +239,7 @@ func (c *Console) HttpRouter() http.Handler {
 		}).Handler)
 
 		api.Mount(multiv1connect.NewCharacterServiceHandler(&characterServiceServer{c.DB}))
-		api.Mount(multiv1connect.NewGameServiceHandler(&gameServiceServer{Multiplayer: c.Multiplayer}))
+		api.Mount(multiv1connect.NewGameServiceHandler(&GameServiceServer{Multiplayer: c.Multiplayer}))
 		api.Mount(multiv1connect.NewUserServiceHandler(&userServiceServer{c.DB}))
 		api.Mount(multiv1connect.NewRankingServiceHandler(&rankingServiceServer{c.DB}))
 		mux.Mount("/grpc/", http.StripPrefix("/grpc", api))

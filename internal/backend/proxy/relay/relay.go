@@ -213,7 +213,7 @@ func (r *Relay) JoinGame(ctx context.Context, roomID string, password string) ([
 		return nil, fmt.Errorf("could not join game room: %w", err)
 	}
 
-	hostPlayer, err := proxy.FindPlayer(respGame.Msg.Players, respGame.Msg.Game.HostUserId)
+	hostPlayer, err := proxy.FindPlayer(respGame.Msg.GetPlayers(), respGame.Msg.GetGame().GetHostUserId())
 	if err != nil {
 		return nil, fmt.Errorf("could not find the host player: %w", err)
 	}

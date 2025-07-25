@@ -40,10 +40,9 @@ func (m *mockWsConn) CloseNow() error { return nil }
 func newTestSession(id int64, sendFunc func(ctx context.Context, payload []byte)) *UserSession {
 	return &UserSession{
 		UserID:    id,
-		Connected: true,
 		User:      wire.User{UserID: id, Username: "user"},
 		Character: wire.Character{CharacterID: id, ClassType: 1},
-		wsConn: &mockWsConn{
+		Websocket: &mockWsConn{
 			writeFunc: func(ctx context.Context, messageType websocket.MessageType, payload []byte) error {
 				if sendFunc != nil {
 					sendFunc(ctx, payload)
