@@ -65,7 +65,7 @@ func TestPacketRouter_GuestLeavesBeforeHost(t *testing.T) {
 	roomID := "guestLeavesFirstRoom"
 
 	// Start multiplayer backend and relay server
-	mp := console.NewMultiplayer()
+	mp := console.NewRoomService()
 	relayServer, err := console.NewQUICRelay("localhost:9995", mp)
 	if err != nil {
 		t.Fatalf("failed to start relay server: %v", err)
@@ -74,7 +74,7 @@ func TestPacketRouter_GuestLeavesBeforeHost(t *testing.T) {
 	go relayServer.Start(ctx)
 
 	// gameClient := newMockGameServiceClient()
-	gameClient := &console.GameServiceServer{Multiplayer: mp}
+	gameClient := &console.GameService{RoomService: mp}
 
 	// --- Host setup ---
 	hostSession := &bsession.Session{
@@ -169,7 +169,7 @@ func TestPacketRouter_DoubleJoinLeave(t *testing.T) {
 	defer cancel()
 
 	roomID := "doubleJoinRoom"
-	mp := console.NewMultiplayer()
+	mp := console.NewRoomService()
 	relayServer, err := console.NewQUICRelay("localhost:9994", mp)
 	if err != nil {
 		t.Fatalf("failed to start relay server: %v", err)
@@ -236,7 +236,7 @@ func TestPacketRouter_ErrorPath_FailedConnection(t *testing.T) {
 	}
 }
 
-func createSession(mp *console.Multiplayer, userID int64) (*bsession.Session, *Relay, *console.UserSession) {
+func createSession(mp *console.RoomService, userID int64) (*bsession.Session, *Relay, *console.UserSession) {
 	username := fmt.Sprintf("player%d", userID)
 	classType := byte(userID - 1)
 

@@ -66,7 +66,7 @@ func TestBackend_UpdateCharacterInfo(t *testing.T) {
 	}
 	defer session.Stop()
 
-	us, ok := cs.Multiplayer.GetUserSession(2137)
+	us, ok := cs.RoomService.GetUserSession(2137)
 	if !ok {
 		t.Error("expected user session connected to the lobby")
 		return

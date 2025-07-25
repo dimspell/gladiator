@@ -11,15 +11,15 @@ import (
 	"github.com/dimspell/gladiator/internal/app/logger/logging"
 )
 
-var _ multiv1connect.GameServiceHandler = (*GameServiceServer)(nil)
+var _ multiv1connect.GameServiceHandler = (*GameService)(nil)
 
-type GameServiceServer struct {
-	Multiplayer *Multiplayer
+type GameService struct {
+	RoomService *RoomService
 }
 
 // ListGames returns a list of all open games.
-func (s *GameServiceServer) ListGames(_ context.Context, req *connect.Request[multiv1.ListGamesRequest]) (*connect.Response[multiv1.ListGamesResponse], error) {
-	rooms := s.Multiplayer.ListRooms()
+func (s *GameService) ListGames(_ context.Context, req *connect.Request[multiv1.ListGamesRequest]) (*connect.Response[multiv1.ListGamesResponse], error) {
+	rooms := s.RoomService.ListRooms()
 
 	games := make([]*multiv1.Game, 0, len(rooms))
 	for _, room := range rooms {
@@ -38,8 +38,8 @@ func (s *GameServiceServer) ListGames(_ context.Context, req *connect.Request[mu
 }
 
 // GetGame finds the game room by name.
-func (s *GameServiceServer) GetGame(_ context.Context, req *connect.Request[multiv1.GetGameRequest]) (*connect.Response[multiv1.GetGameResponse], error) {
-	room, found := s.Multiplayer.GetRoom(req.Msg.GetGameRoomId())
+func (s *GameService) GetGame(_ context.Context, req *connect.Request[multiv1.GetGameRequest]) (*connect.Response[multiv1.GetGameResponse], error) {
+	room, found := s.RoomService.GetRoom(req.Msg.GetGameRoomId())
 	if !found {
 		return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("game %s not found", req.Msg.GetGameRoomId()))
 	}
@@ -69,10 +69,10 @@ func (s *GameServiceServer) GetGame(_ context.Context, req *connect.Request[mult
 }
 
 // CreateGame creates a new game.
-func (s *GameServiceServer) CreateGame(_ context.Context, req *connect.Request[multiv1.CreateGameRequest]) (*connect.Response[multiv1.CreateGameResponse], error) {
+func (s *GameService) CreateGame(_ context.Context, req *connect.Request[multiv1.CreateGameRequest]) (*connect.Response[multiv1.CreateGameResponse], error) {
 	gameId := req.Msg.GetGameName()
 
-	room, err := s.Multiplayer.CreateRoom(
+	room, err := s.RoomService.CreateRoom(
 		req.Msg.HostUserId,
 		req.Msg.GameName,
 		req.Msg.Password,
@@ -100,8 +100,8 @@ func (s *GameServiceServer) CreateGame(_ context.Context, req *connect.Request[m
 }
 
 // JoinGame tries to get the player to join a game.
-func (s *GameServiceServer) JoinGame(_ context.Context, req *connect.Request[multiv1.JoinGameRequest]) (*connect.Response[multiv1.JoinGameResponse], error) {
-	room, err := s.Multiplayer.JoinRoom(
+func (s *GameService) JoinGame(_ context.Context, req *connect.Request[multiv1.JoinGameRequest]) (*connect.Response[multiv1.JoinGameResponse], error) {
+	room, err := s.RoomService.JoinRoom(
 		req.Msg.GameRoomId,
 		req.Msg.UserId,
 		req.Msg.IpAddress,
@@ -111,7 +111,7 @@ func (s *GameServiceServer) JoinGame(_ context.Context, req *connect.Request[mul
 		return nil, connect.NewError(connect.CodeAborted, err)
 	}
 
-	s.Multiplayer.AnnounceJoin(room, req.Msg.UserId)
+	s.RoomService.AnnounceJoin(room, req.Msg.UserId)
 
 	players := make([]*multiv1.Player, 0, len(room.Players))
 	for _, player := range room.Players {

@@ -102,7 +102,7 @@ func TestProxyLAN_CreatesAndJoinRoom(t *testing.T) {
 			t.Error("Failed to handle a message")
 		}
 
-		room, ok := cs.Multiplayer.GetRoom("room")
+		room, ok := cs.RoomService.GetRoom("room")
 		if !ok {
 			t.Errorf("failed to find room")
 			return
@@ -214,7 +214,7 @@ func TestProxyLAN_CreatesAndJoinRoom(t *testing.T) {
 
 	t.Run("Ensure the response is correct", func(t *testing.T) {
 		// Room contains all data
-		room, ok := cs.Multiplayer.GetRoom("room")
+		room, ok := cs.RoomService.GetRoom("room")
 		if !ok {
 			t.Errorf("failed to find room")
 			return
@@ -234,12 +234,12 @@ func TestProxyLAN_CreatesAndJoinRoom(t *testing.T) {
 		assert.Equal(t, "mage", room.Players[2].User.Username)
 		assert.Equal(t, byte(v1.ClassType_Mage), room.Players[2].Character.ClassType)
 
-		mpSession1, ok := cs.Multiplayer.GetUserSession(1)
+		mpSession1, ok := cs.RoomService.GetUserSession(1)
 		assert.True(t, ok)
 		assert.Equal(t, session1.UserID, mpSession1.UserID)
 		assert.Equal(t, "room", mpSession1.GameID)
 
-		mpSession2, ok := cs.Multiplayer.GetUserSession(2)
+		mpSession2, ok := cs.RoomService.GetUserSession(2)
 		assert.True(t, ok)
 		assert.Equal(t, session2.UserID, mpSession2.UserID)
 		assert.Equal(t, "room", mpSession2.GameID)
@@ -256,8 +256,8 @@ func TestProxyLAN_CreatesAndJoinRoom(t *testing.T) {
 	})
 
 	t.Run("Ensure there are no unhandled messages", func(t *testing.T) {
-		close(cs.Multiplayer.Messages)
-		for message := range cs.Multiplayer.Messages {
+		close(cs.RoomService.Messages)
+		for message := range cs.RoomService.Messages {
 			t.Error("unhandled message", message)
 		}
 	})
@@ -285,8 +285,8 @@ func handleMultiplayerMessage(ctx context.Context, cs *console.Console) bool {
 		return false
 	case <-timeout:
 		return false
-	case msg := <-cs.Multiplayer.Messages:
-		cs.Multiplayer.HandleIncomingMessage(ctx, msg)
+	case msg := <-cs.RoomService.Messages:
+		cs.RoomService.HandleIncomingMessage(ctx, msg)
 		return true
 	}
 }

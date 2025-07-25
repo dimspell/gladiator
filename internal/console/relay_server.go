@@ -111,7 +111,7 @@ type RelayServer struct {
 	peerToRoomIDs map[string]string // key: peerID, value: roomID
 	logger        *slog.Logger
 
-	Multiplayer *Multiplayer
+	Multiplayer *RoomService
 
 	verifyFunc func([]byte) ([]byte, bool) // Injected for testability
 
@@ -144,7 +144,7 @@ func WithEventHooks(join, leave, delete RelayEventHook) RelayServerOption {
 	}
 }
 
-func NewQUICRelay(addr string, multiplayer *Multiplayer, opts ...RelayServerOption) (*RelayServer, error) {
+func NewQUICRelay(addr string, multiplayer *RoomService, opts ...RelayServerOption) (*RelayServer, error) {
 	tlsConf := &tls.Config{
 		InsecureSkipVerify: true,
 		NextProtos:         []string{"game-relay"},

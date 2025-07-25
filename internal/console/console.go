@@ -47,9 +47,9 @@ type Console struct {
 	TLSCertPath        string
 	TLSKeyPath         string
 
-	DB          *database.SQLite
-	Multiplayer *Multiplayer
-	Relay       *Relay
+	DB           *database.SQLite
+	RoomService  *RoomService
+	RelayService *RelayService
 }
 
 // Option is a function that configures the Console server via its fields.
@@ -79,15 +79,15 @@ func NewConsole(db *database.SQLite, opts ...Option) *Console {
 		}
 	}
 
-	console.Multiplayer = NewMultiplayer()
+	console.RoomService = NewRoomService()
 
 	var err error
 	if console.RunMode == model.RunModeRelay {
-		console.Relay, err = NewRelay(console.RelayBindAddr, console.Multiplayer)
+		console.RelayService, err = NewRelayService(console.RelayBindAddr, console.RoomService)
 		if err != nil {
 			panic("failed to initialize relay: " + err.Error())
 		}
-		console.Multiplayer.Relay = console.Relay
+		console.RoomService.RelayService = console.RelayService
 	}
 
 	return console
@@ -239,7 +239,7 @@ func (c *Console) HttpRouter() http.Handler {
 		}).Handler)
 
 		api.Mount(multiv1connect.NewCharacterServiceHandler(&characterServiceServer{c.DB}))
-		api.Mount(multiv1connect.NewGameServiceHandler(&GameServiceServer{Multiplayer: c.Multiplayer}))
+		api.Mount(multiv1connect.NewGameServiceHandler(&GameService{RoomService: c.RoomService}))
 		api.Mount(multiv1connect.NewUserServiceHandler(&userServiceServer{c.DB}))
 		api.Mount(multiv1connect.NewRankingServiceHandler(&rankingServiceServer{c.DB}))
 		mux.Mount("/grpc/", http.StripPrefix("/grpc", api))
@@ -269,8 +269,8 @@ func (c *Console) Handlers() (start GracefulFunc, shutdown GracefulFunc) {
 	start = func(ctx context.Context) error {
 		slog.Info("Configured console server", "addr", c.ConsoleBindAddr)
 
-		go c.Multiplayer.Run(ctx)
-		go c.Relay.Start(ctx)
+		go c.RoomService.Run(ctx)
+		go c.RelayService.Start(ctx)
 
 		// TODO: Move it elsewhere
 		// if c.Relay != nil && c.Relay.Server != nil {
@@ -289,8 +289,8 @@ func (c *Console) Handlers() (start GracefulFunc, shutdown GracefulFunc) {
 	shutdown = func(ctx context.Context) error {
 		slog.Info("Started shutting down the console server")
 
-		c.Multiplayer.Stop()
-		if err := c.Relay.Stop(ctx); err != nil {
+		c.RoomService.Stop()
+		if err := c.RelayService.Stop(ctx); err != nil {
 			slog.Warn("Failed to shut down relay", "error", logging.Error(err))
 		}
 
