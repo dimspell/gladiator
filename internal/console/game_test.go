@@ -22,7 +22,7 @@ func (m *mockConn) CloseNow() error                                             
 
 func TestGameServiceServer_CreateGame(t *testing.T) {
 	t.Run("ok", func(t *testing.T) {
-		g := &gameServiceServer{
+		g := &GameServiceServer{
 			Multiplayer: NewMultiplayer(),
 		}
 		g.Multiplayer.AddUserSession(10, NewUserSession(10, nil))
@@ -68,7 +68,7 @@ func TestGameServiceServer_CreateGame(t *testing.T) {
 
 	t.Run("create and leave", func(t *testing.T) {
 		roomID := "testing"
-		g := &gameServiceServer{
+		g := &GameServiceServer{
 			Multiplayer: NewMultiplayer(),
 		}
 		sess := NewUserSession(10, nil)
@@ -96,7 +96,7 @@ func TestGameServiceServer_CreateGame(t *testing.T) {
 }
 
 func TestGameServiceServer_ListGames(t *testing.T) {
-	g := &gameServiceServer{
+	g := &GameServiceServer{
 		Multiplayer: NewMultiplayer(),
 	}
 	g.Multiplayer.AddUserSession(10, NewUserSession(10, nil))
@@ -138,7 +138,7 @@ func TestGameServiceServer_ListGames(t *testing.T) {
 }
 
 func TestGameServiceServer_GetGame(t *testing.T) {
-	g := &gameServiceServer{
+	g := &GameServiceServer{
 		Multiplayer: NewMultiplayer(),
 	}
 	g.Multiplayer.AddUserSession(10, NewUserSession(10, nil))
@@ -180,7 +180,7 @@ func TestGameServiceServer_GetGame(t *testing.T) {
 func TestGameServiceServer_JoinGame(t *testing.T) {
 	t.Run("ok", func(t *testing.T) {
 		roomID := "testing"
-		g := &gameServiceServer{
+		g := &GameServiceServer{
 			Multiplayer: NewMultiplayer(),
 		}
 		g.Multiplayer.AddUserSession(10, NewUserSession(10, &mockConn{}))
@@ -225,7 +225,7 @@ func TestGameServiceServer_JoinGame(t *testing.T) {
 
 	t.Run("rejoin", func(t *testing.T) {
 		roomID := "testing"
-		g := &gameServiceServer{
+		g := &GameServiceServer{
 			Multiplayer: NewMultiplayer(),
 		}
 
@@ -281,7 +281,7 @@ func TestGameServiceServer_JoinGame(t *testing.T) {
 }
 
 func TestGameServiceServer_CreateGame_Errors(t *testing.T) {
-	g := &gameServiceServer{Multiplayer: NewMultiplayer()}
+	g := &GameServiceServer{Multiplayer: NewMultiplayer()}
 	// No user session added
 	_, err := g.CreateGame(context.Background(), connect.NewRequest(&multiv1.CreateGameRequest{
 		GameName:   "fail",
@@ -291,7 +291,7 @@ func TestGameServiceServer_CreateGame_Errors(t *testing.T) {
 }
 
 func TestGameServiceServer_JoinGame_Errors(t *testing.T) {
-	g := &gameServiceServer{Multiplayer: NewMultiplayer()}
+	g := &GameServiceServer{Multiplayer: NewMultiplayer()}
 	// No room, no user
 	_, err := g.JoinGame(context.Background(), connect.NewRequest(&multiv1.JoinGameRequest{
 		UserId: 1, GameRoomId: "nope",
@@ -300,7 +300,7 @@ func TestGameServiceServer_JoinGame_Errors(t *testing.T) {
 }
 
 func TestGameServiceServer_DuplicateRoom(t *testing.T) {
-	g := &gameServiceServer{Multiplayer: NewMultiplayer()}
+	g := &GameServiceServer{Multiplayer: NewMultiplayer()}
 	g.Multiplayer.AddUserSession(1, NewUserSession(1, nil))
 	_, err := g.CreateGame(context.Background(), connect.NewRequest(&multiv1.CreateGameRequest{
 		GameName: "dup", HostUserId: 1,
@@ -314,7 +314,7 @@ func TestGameServiceServer_DuplicateRoom(t *testing.T) {
 
 func TestGameServiceServer_JoinTwice(t *testing.T) {
 	t.Skip("Failing - needs to be fixed")
-	g := &gameServiceServer{Multiplayer: NewMultiplayer()}
+	g := &GameServiceServer{Multiplayer: NewMultiplayer()}
 	g.Multiplayer.AddUserSession(1, NewUserSession(1, nil))
 	g.Multiplayer.AddUserSession(2, NewUserSession(2, nil))
 	_, _ = g.CreateGame(context.Background(), connect.NewRequest(&multiv1.CreateGameRequest{

@@ -46,7 +46,9 @@ func (mp *Multiplayer) Stop() { mp.done() }
 
 func (mp *Multiplayer) Reset() {
 	mp.forEachSession(func(userSession *UserSession) bool {
-		_ = userSession.wsConn.CloseNow()
+		if userSession.Websocket != nil {
+			_ = userSession.Websocket.CloseNow()
+		}
 		return true
 	})
 	clear(mp.sessions)
@@ -524,7 +526,7 @@ func (mp *Multiplayer) SetPlayerDisconnected(session *UserSession) {
 	slog.Info("Closing player connection", "user", session.UserID)
 
 	// Close the websocket connection
-	if err := session.wsConn.CloseNow(); err != nil {
+	if err := session.Websocket.CloseNow(); err != nil {
 		slog.Debug("Could not close the connection", "user", session.UserID, logging.Error(err))
 	}
 

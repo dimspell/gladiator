@@ -3,7 +3,9 @@ package relay
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
+	"net"
 	"os"
 	"sync"
 	"testing"
@@ -20,9 +22,42 @@ import (
 	"github.com/dimspell/gladiator/internal/wire"
 )
 
+func startDummyTCPServer(t *testing.T, addr string) (stop func()) {
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		t.Fatalf("failed to start dummy TCP server on %s: %v", addr, err)
+	}
+	done := make(chan struct{})
+	go func() {
+		for {
+			conn, err := ln.Accept()
+			if err != nil {
+				select {
+				case <-done:
+					return
+				default:
+					continue
+				}
+			}
+			go func(c net.Conn) {
+				defer c.Close()
+				// Optionally, read/write to c here if needed
+				io.Copy(io.Discard, c)
+			}(conn)
+		}
+	}()
+	return func() {
+		close(done)
+		ln.Close()
+	}
+}
+
 func TestPacketRouter_GuestLeavesBeforeHost(t *testing.T) {
-	t.Skip("Failing - needs to be fixed")
+	// t.Skip("Failing - needs to be fixed")
 	logger.SetPlainTextLogger(os.Stderr, slog.LevelDebug)
+
+	stopDummy := startDummyTCPServer(t, "127.0.0.1:6114")
+	defer stopDummy()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -35,9 +70,11 @@ func TestPacketRouter_GuestLeavesBeforeHost(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to start relay server: %v", err)
 	}
+	go mp.Run(ctx)
 	go relayServer.Start(ctx)
 
-	gameClient := newMockGameServiceClient()
+	// gameClient := newMockGameServiceClient()
+	gameClient := &console.GameServiceServer{Multiplayer: mp}
 
 	// --- Host setup ---
 	hostSession := &bsession.Session{
@@ -53,7 +90,6 @@ func TestPacketRouter_GuestLeavesBeforeHost(t *testing.T) {
 
 	hostUserSession := &console.UserSession{
 		UserID:      hostSession.UserID,
-		Connected:   true,
 		ConnectedAt: time.Now().In(time.UTC),
 		User:        wire.User{UserID: hostSession.UserID, Username: hostSession.Username},
 		Character:   wire.Character{CharacterID: hostSession.CharacterID, ClassType: byte(hostSession.ClassType)},
@@ -80,7 +116,6 @@ func TestPacketRouter_GuestLeavesBeforeHost(t *testing.T) {
 
 	guestUserSession := &console.UserSession{
 		UserID:      guestSession.UserID,
-		Connected:   true,
 		ConnectedAt: time.Now().In(time.UTC),
 		User:        wire.User{UserID: guestSession.UserID, Username: guestSession.Username},
 		Character:   wire.Character{CharacterID: guestSession.CharacterID, ClassType: byte(guestSession.ClassType)},
@@ -213,7 +248,6 @@ func createSession(mp *console.Multiplayer, userID int64) (*bsession.Session, *R
 	}
 	lobbySession := &console.UserSession{
 		UserID:      userID,
-		Connected:   true,
 		ConnectedAt: time.Now().In(time.UTC),
 		User:        wire.User{UserID: userID, Username: username},
 		Character:   wire.Character{CharacterID: userID, ClassType: classType},
