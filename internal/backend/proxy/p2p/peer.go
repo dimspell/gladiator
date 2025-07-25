@@ -28,8 +28,6 @@ type Peer struct {
 	Connection *webrtc.PeerConnection
 	Connected  chan struct{}
 
-	// PipeTCP *Pipe
-	// PipeUDP *Pipe
 	PipeRouter *PipeRouter
 }
 
@@ -150,13 +148,6 @@ func (p *Peer) createDataChannels(ctx context.Context, logger *slog.Logger, newT
 	logger.Debug("Created data channel")
 
 	p.PipeRouter = NewPipeRouter(ctx, logger, dc, redirTCP, redirUDP)
-
-	// if err := p.initDataChannel(ctx, logger, "tcp", myUserID, newTCPRedirect); err != nil {
-	// 	return err
-	// }
-	// if err := p.initDataChannel(ctx, logger, "udp", myUserID, newUDPRedirect); err != nil {
-	// 	return err
-	// }
 	return nil
 }
 
@@ -180,17 +171,6 @@ func (p *Peer) Terminate() {
 			slog.Error("Failed to close the game pipe router", "userID", p.UserID, logging.Error(err))
 		}
 	}
-
-	// if p.PipeTCP != nil {
-	// 	if err := p.PipeTCP.Close(); err != nil {
-	// 		slog.Error("Failed to close TCP pipe", "userID", p.CreatorID, logging.Error(err))
-	// 	}
-	// }
-	// if p.PipeUDP != nil {
-	// 	if err := p.PipeUDP.Close(); err != nil {
-	// 		slog.Error("Failed to close UDP pipe", "userID", p.CreatorID, logging.Error(err))
-	// 	}
-	// }
 }
 
 type PipeRouter struct {
