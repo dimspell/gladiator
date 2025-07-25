@@ -493,12 +493,24 @@ func TestPeerToPeerMessageHandler_handleHostMigration(t *testing.T) {
 			},
 		}
 		h := &PeerToPeerMessageHandler{
-			UserID:         2,
-			session:        &mockSession{ID: 2},
-			peerManager:    peerManager,
-			newTCPRedirect: redirect.NewNoop,
-			newUDPRedirect: redirect.NewNoop,
-			logger:         slog.Default(),
+			UserID:      2,
+			session:     &mockSession{ID: 2},
+			peerManager: peerManager,
+			proxyFactory: &mockProxyFactory{
+				onNewListenerTCP: func(ip, port string, onReceive redirect.ReceiveFunc) (redirect.Redirect, error) {
+					return nil, nil
+				},
+				onNewListenerUDP: func(ip, port string, onReceive redirect.ReceiveFunc) (redirect.Redirect, error) {
+					return nil, nil
+				},
+				onNewDialTCP: func(ip, port string, onReceive redirect.ReceiveFunc) (redirect.Redirect, error) {
+					return nil, nil
+				},
+				onNewDialUDP: func(ip, port string, onReceive redirect.ReceiveFunc) (redirect.Redirect, error) {
+					return nil, nil
+				},
+			},
+			logger: slog.Default(),
 		}
 		if err := h.handleHostMigration(t.Context(), newHostPlayer); err != nil {
 			t.Error(err)
@@ -507,4 +519,24 @@ func TestPeerToPeerMessageHandler_handleHostMigration(t *testing.T) {
 			t.Error("host not migrated")
 		}
 	})
+}
+
+type mockProxyFactory struct {
+	onNewListenerTCP func(ip, port string, onReceive redirect.ReceiveFunc) (redirect.Redirect, error)
+	onNewListenerUDP func(ip, port string, onReceive redirect.ReceiveFunc) (redirect.Redirect, error)
+	onNewDialTCP     func(ip, port string, onReceive redirect.ReceiveFunc) (redirect.Redirect, error)
+	onNewDialUDP     func(ip, port string, onReceive redirect.ReceiveFunc) (redirect.Redirect, error)
+}
+
+func (m *mockProxyFactory) NewListenerTCP(ip, port string, onReceive redirect.ReceiveFunc) (redirect.Redirect, error) {
+	return m.onNewListenerTCP(ip, port, onReceive)
+}
+func (m *mockProxyFactory) NewListenerUDP(ip, port string, onReceive redirect.ReceiveFunc) (redirect.Redirect, error) {
+	return m.onNewListenerUDP(ip, port, onReceive)
+}
+func (m *mockProxyFactory) NewDialTCP(ip, port string, onReceive redirect.ReceiveFunc) (redirect.Redirect, error) {
+	return m.onNewDialTCP(ip, port, onReceive)
+}
+func (m *mockProxyFactory) NewDialUDP(ip, port string, onReceive redirect.ReceiveFunc) (redirect.Redirect, error) {
+	return m.onNewDialUDP(ip, port, onReceive)
 }

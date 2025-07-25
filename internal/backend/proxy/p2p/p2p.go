@@ -20,13 +20,14 @@ import (
 var _ proxy.ProxyClient = (*PeerToPeer)(nil)
 
 type ProxyP2P struct {
-	ICEServers []webrtc.ICEServer
+	ICEServers   []webrtc.ICEServer
+	ProxyFactory redirect.ProxyFactory
 }
 
 func (p *ProxyP2P) Mode() model.RunMode { return model.RunModeWebRTC }
 
 func (p *ProxyP2P) Create(session *bsession.Session, gameClient multiv1connect.GameServiceClient) proxy.ProxyClient {
-	return NewPeerToPeer(session, gameClient, p.ICEServers...)
+	return NewPeerToPeer(session, gameClient, p.ICEServers, p.ProxyFactory)
 }
 
 // PeerToPeer implements the Proxy interface for WebRTC-based peer-to-peer connections.
@@ -35,9 +36,8 @@ type PeerToPeer struct {
 	// A custom IP address to which we will connect to.
 	hostIPAddress net.IP
 
-	WebRTCConfig   webrtc.Configuration
-	NewTCPRedirect redirect.NewRedirect
-	NewUDPRedirect redirect.NewRedirect
+	WebRTCConfig webrtc.Configuration
+	ProxyFactory redirect.ProxyFactory
 
 	Session      *bsession.Session
 	GameManager  *GameManager
@@ -47,7 +47,12 @@ type PeerToPeer struct {
 	GameServiceClient multiv1connect.GameServiceClient
 }
 
-func NewPeerToPeer(session *bsession.Session, gameClient multiv1connect.GameServiceClient, iceServers ...webrtc.ICEServer) *PeerToPeer {
+// NewPeerToPeer now accepts ICEServers as a slice and ProxyFactory as a separate argument
+func NewPeerToPeer(session *bsession.Session, gameClient multiv1connect.GameServiceClient, iceServers []webrtc.ICEServer, proxyFactory redirect.ProxyFactory) *PeerToPeer {
+	if proxyFactory == nil {
+		proxyFactory = &redirect.DefaultProxyFactory{}
+	}
+
 	config := webrtc.Configuration{}
 	config.ICEServers = append(config.ICEServers, iceServers...)
 
@@ -56,13 +61,12 @@ func NewPeerToPeer(session *bsession.Session, gameClient multiv1connect.GameServ
 		config:  config,
 	}
 
-	hostManager := redirect.NewManager(net.IPv4(127, 0, 0, 1))
+	hostManager := redirect.NewManager(net.IPv4(127, 0, 0, 1), redirect.WithProxyFactory(proxyFactory))
 
 	p := &PeerToPeer{
 		hostIPAddress:     net.IPv4(127, 0, 0, 2),
 		WebRTCConfig:      config,
-		NewTCPRedirect:    redirect.NewTCPRedirect,
-		NewUDPRedirect:    redirect.NewUDPRedirect,
+		ProxyFactory:      proxyFactory,
 		Session:           session,
 		GameManager:       gameManager,
 		HostManager:       hostManager,
@@ -73,8 +77,7 @@ func NewPeerToPeer(session *bsession.Session, gameClient multiv1connect.GameServ
 		p.Session.GetUserID(),
 		p.Session,
 		p.GameManager,
-		p.NewTCPRedirect,
-		p.NewUDPRedirect,
+		proxyFactory,
 		slog.With("user_id", p.Session.GetUserID()),
 	}
 

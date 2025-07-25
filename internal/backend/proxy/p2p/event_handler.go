@@ -33,11 +33,9 @@ type PeerToPeerMessageHandler struct {
 	// UserID is the identifier of the current user.
 	UserID int64
 
-	session     PeerInterface
-	peerManager PeerManager
-
-	newTCPRedirect redirect.NewRedirect
-	newUDPRedirect redirect.NewRedirect
+	session      PeerInterface
+	peerManager  PeerManager
+	proxyFactory redirect.ProxyFactory
 
 	logger *slog.Logger
 }
@@ -139,7 +137,7 @@ func (h *PeerToPeerMessageHandler) handleJoinRoom(ctx context.Context, player wi
 	if err := peer.setupPeerConnection(ctx, logger, h.session, player.UserID, true); err != nil {
 		return err
 	}
-	if err := peer.createDataChannels(ctx, logger, h.newTCPRedirect, h.newUDPRedirect, h.UserID); err != nil {
+	if err := peer.createDataChannels(ctx, logger, h.proxyFactory, h.UserID); err != nil {
 		return err
 	}
 
@@ -175,33 +173,18 @@ func (h *PeerToPeerMessageHandler) handleRTCOffer(ctx context.Context, offer wir
 		// var err error
 		switch dc.Label() {
 		case peer.channelName("game", fromUserID, h.UserID):
-			redirTCP, err := h.newTCPRedirect(peer.Mode, peer.Addr)
+			redirTCP, err := h.proxyFactory.NewListenerTCP(peer.Addr.IP.String(), peer.Addr.TCPPort, nil)
 			if err != nil {
 				logger.Error("Could not create TCP redirect", logging.Error(err))
 				return
 			}
-			redirUDP, err := h.newUDPRedirect(peer.Mode, peer.Addr)
+			redirUDP, err := h.proxyFactory.NewListenerUDP(peer.Addr.IP.String(), peer.Addr.UDPPort, nil)
 			if err != nil {
 				logger.Error("Could not create UDP redirect", logging.Error(err))
 				return
 			}
 
 			peer.PipeRouter = NewPipeRouter(ctx, logger, dc, redirTCP, redirUDP)
-
-		// case peer.channelName("tcp", fromUserID, h.CreatorID):
-		// 	redir, err = h.newTCPRedirect(peer.Mode, peer.Addr)
-		// 	if err != nil {
-		// 		logger.Error("Could not create TCP redirect", logging.Error(err))
-		// 		return
-		// 	}
-		// 	peer.PipeTCP = NewPipe(ctx, logger, dc, redir)
-		// case peer.channelName("udp", fromUserID, h.CreatorID):
-		// 	redir, err = h.newUDPRedirect(peer.Mode, peer.Addr)
-		// 	if err != nil {
-		// 		logger.Error("Could not create UDP redirect", logging.Error(err))
-		// 		return
-		// 	}
-		// 	peer.PipeUDP = NewPipe(ctx, logger, dc, redir)
 		default:
 			logger.Error("Unknown channel")
 			return

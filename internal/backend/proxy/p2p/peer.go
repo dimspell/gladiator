@@ -127,18 +127,17 @@ func (p *Peer) handleNegotiation(ctx context.Context, session PeerInterface, pla
 }
 
 // createDataChannels initializes WebRTC data channels for TCP and UDP.
-func (p *Peer) createDataChannels(ctx context.Context, logger *slog.Logger, newTCPRedirect, newUDPRedirect redirect.NewRedirect, myUserID int64) error {
-	redirTCP, err := newTCPRedirect(p.Mode, p.Addr)
+func (p *Peer) createDataChannels(ctx context.Context, logger *slog.Logger, proxyFactory redirect.ProxyFactory, myUserID int64) error {
+	redirTCP, err := proxyFactory.NewListenerTCP(p.Addr.IP.String(), p.Addr.TCPPort, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create TCP redirect: %w", err)
 	}
-	redirUDP, err := newUDPRedirect(p.Mode, p.Addr)
+	redirUDP, err := proxyFactory.NewListenerUDP(p.Addr.IP.String(), p.Addr.UDPPort, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create UDP redirect: %w", err)
 	}
 
 	label := p.channelName("game", myUserID, p.UserID)
-
 	dc, err := p.Connection.CreateDataChannel(label, nil)
 	if err != nil {
 		return fmt.Errorf("could not create data channel %q: %w", label, err)
