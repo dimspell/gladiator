@@ -50,7 +50,7 @@ func TestProxyLAN_CreatesAndJoinRoom(t *testing.T) {
 	bd1.SignalServerURL = "ws://" + cs.ConsoleBindAddr + "/lobby"
 
 	conn1 := &mockConn{}
-	session1 := bd1.AddSession(conn1)
+	session1 := bd1.SessionManager.Add(conn1)
 
 	t.Run("Host user has signs in and selects the character", func(t *testing.T) {
 		assert.NoError(t, bd1.HandleClientAuthentication(ctx, session1, backend.ClientAuthenticationRequest{
@@ -74,7 +74,7 @@ func TestProxyLAN_CreatesAndJoinRoom(t *testing.T) {
 			t.Errorf("failed to join lobby: %v", err)
 			return
 		}
-		err = bd1.RegisterNewObserver(ctx, session1)
+		err = session1.RegisterNewObserver(ctx)
 		if err != nil {
 			t.Errorf("failed to register new observer: %v", err)
 			return
@@ -129,7 +129,7 @@ func TestProxyLAN_CreatesAndJoinRoom(t *testing.T) {
 	bd2 := backend.NewBackend("", ts.URL, proxy2)
 	bd2.SignalServerURL = "ws://" + cs.ConsoleBindAddr + "/lobby"
 
-	session2 := bd2.AddSession(conn2)
+	session2 := bd2.SessionManager.Add(conn2)
 
 	t.Run("Guest user signs in and selects the character", func(t *testing.T) {
 
@@ -156,7 +156,7 @@ func TestProxyLAN_CreatesAndJoinRoom(t *testing.T) {
 			t.Errorf("failed to join lobby: %v", err)
 			return
 		}
-		err = bd2.RegisterNewObserver(ctx, session2)
+		err = session2.RegisterNewObserver(ctx)
 		if err != nil {
 			t.Errorf("failed to register new observer: %v", err)
 			return

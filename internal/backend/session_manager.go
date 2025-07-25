@@ -1,12 +1,10 @@
 package backend
 
 import (
-	"context"
 	"log/slog"
 	"net"
 	"sync"
 
-	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/gen/multi/v1/multiv1connect"
 	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"github.com/dimspell/gladiator/internal/backend/bsession"
@@ -74,16 +72,4 @@ func (s *SessionManager) RemoveAll() {
 
 		return true
 	})
-}
-
-func (b *Backend) AddSession(tcpConn net.Conn) *bsession.Session {
-	return b.SessionManager.Add(tcpConn)
-}
-
-func (b *Backend) CloseSession(session *bsession.Session) {
-	b.SessionManager.Remove(session)
-}
-
-func (b *Backend) ConnectToLobby(ctx context.Context, user *multiv1.User, session *bsession.Session) error {
-	return session.ConnectOverWebsocket(ctx, user, b.SignalServerURL)
 }

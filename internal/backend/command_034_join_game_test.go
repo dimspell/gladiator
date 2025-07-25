@@ -6,13 +6,11 @@ import (
 
 	"connectrpc.com/connect"
 	v1 "github.com/dimspell/gladiator/gen/multi/v1"
-	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestBackend_HandleJoinGame(t *testing.T) {
-	b, _, _ := helperNewBackend(t)
-	gameClient := &mockGameClient{
+	b, _, _ := helperNewBackend(t, &mockGameClient{
 		GetGameResponse: connect.NewResponse(&v1.GetGameResponse{
 			Game: &v1.Game{
 				GameId:        "gameId",
@@ -38,12 +36,11 @@ func TestBackend_HandleJoinGame(t *testing.T) {
 				},
 			},
 		}),
-	}
-	b.gameClient = gameClient
+	})
 
 	conn := &mockConn{}
-	session := &bsession.Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
-	session.Proxy = b.ProxyFactory.Create(session, gameClient)
+	session := b.SessionManager.Add(conn)
+	session.SetLogonData(&v1.User{UserId: 2137, Username: "JP"})
 
 	assert.NoError(t, b.HandleJoinGame(context.Background(), session, JoinGameRequest{
 		'r', 'e', 't', 'r', 'e', 'a', 't', 0, // Game name

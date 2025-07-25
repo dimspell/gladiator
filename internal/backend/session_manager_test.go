@@ -7,7 +7,6 @@ import (
 	"time"
 
 	v1 "github.com/dimspell/gladiator/gen/multi/v1"
-	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/proxy/direct"
 	"github.com/dimspell/gladiator/internal/model"
 	"github.com/stretchr/testify/assert"
@@ -17,11 +16,12 @@ func TestBackend_RegisterNewObserver(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	b, _, _ := helperNewBackend(t)
+	b, _, _ := helperNewBackend(t, nil)
 	conn := &mockConn{RemoteAddress: &net.IPAddr{IP: net.ParseIP("127.0.0.1")}}
-	session := &bsession.Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
+	session := b.SessionManager.Add(conn)
+	session.SetLogonData(&v1.User{UserId: 2137, Username: "JP"})
 
-	if err := b.ConnectToLobby(ctx, &v1.User{UserId: session.UserID, Username: session.Username}, session); err != nil {
+	if err := session.ConnectOverWebsocket(ctx, &v1.User{UserId: session.UserID, Username: session.Username}, b.SignalServerURL); err != nil {
 		t.Error(err)
 		return
 	}
@@ -35,12 +35,13 @@ func TestBackend_UpdateCharacterInfo(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	b, _, cs := helperNewBackend(t)
+	b, _, cs := helperNewBackend(t, nil)
 	conn := &mockConn{}
-	session := &bsession.Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP", State: &bsession.SessionState{}}
+	session := b.SessionManager.Add(conn)
+	session.SetLogonData(&v1.User{UserId: 2137, Username: "JP"})
 
 	// Authentication
-	if err := b.ConnectToLobby(ctx, &v1.User{UserId: session.UserID, Username: session.Username}, session); err != nil {
+	if err := session.ConnectOverWebsocket(ctx, &v1.User{UserId: session.UserID, Username: session.Username}, b.SignalServerURL); err != nil {
 		t.Error(err)
 		return
 	}
