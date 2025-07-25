@@ -137,10 +137,8 @@ func (m *mockCharacterClient) ListCharacters(context.Context, *connect.Request[v
 func helperNewBackend(tb testing.TB, gameClient multiv1connect.GameServiceClient) (bd *Backend, px *direct.ProxyLAN, cs *console.Console) {
 	tb.Helper()
 
-	roomService := console.NewRoomService()
-
 	cs = &console.Console{
-		RoomService: roomService,
+		RoomService: console.NewRoomService(),
 	}
 	ts := httptest.NewServer(http.HandlerFunc(cs.HandleWebSocket))
 

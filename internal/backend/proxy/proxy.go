@@ -30,34 +30,6 @@ type CreateParams struct {
 	Password string
 }
 
-type GameData struct {
-	Game    *multiv1.Game
-	Players []*multiv1.Player
-}
-
-func (d *GameData) ToWirePlayers() []wire.Player {
-	players := make([]wire.Player, len(d.Players))
-	for i, player := range d.Players {
-		players[i] = toWirePlayer(player)
-	}
-	return players
-}
-
-func (d *GameData) FindHostUser() (wire.Player, error) {
-	player, err := FindPlayer(d.Players, d.Game.HostUserId)
-	if err != nil {
-		return player, fmt.Errorf("host user not found")
-	}
-	return player, nil
-}
-
-type GetPlayerAddrParams struct {
-	GameID     string
-	UserID     int64
-	IPAddress  string
-	HostUserID string
-}
-
 type MessageHandler func(ctx context.Context, payload []byte) error
 
 func ToWirePlayers(players []*multiv1.Player) []wire.Player {
