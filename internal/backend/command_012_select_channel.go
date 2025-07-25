@@ -14,13 +14,13 @@ func (b *Backend) HandleSelectChannel(ctx context.Context, session *bsession.Ses
 	serverName, channelName, err := req.Parse()
 	slog.Info("Selected channel", "serverName", serverName, "channelName", channelName, "error", err)
 
-	if err := session.SendToGame(packet.ReceiveMessage, SetChannelName(channelName)); err != nil {
+	if err := session.SendToGame(packet.ReceiveMessage, packet.SetChannelName(channelName)); err != nil {
 		return err
 	}
 
 	if serverName == "DISPEL" && channelName == "DISPEL" {
 		for idx, user := range session.State.GetLobbyUsers() {
-			session.SendToGame(packet.ReceiveMessage, AppendCharacterToLobby(user.Username, model.ClassType(user.ClassType), uint32(idx)))
+			session.SendToGame(packet.ReceiveMessage, packet.AppendCharacterToLobby(user.Username, model.ClassType(user.ClassType), uint32(idx)))
 		}
 		// session.Send(ReceiveMessage, NewGlobalMessage("admin", "hello"))
 	}

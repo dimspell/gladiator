@@ -21,7 +21,7 @@ func (b *Backend) HandleGetCharacterInventory(ctx context.Context, session *bses
 	// Once the character is selected (or created), the next packet will
 	// be 68 (GetCharacterInventory). This is the perfect time to tell the
 	// lobby server that someone has joined and is ready to chat & play.
-	if err := session.InitObserver(b.RegisterNewObserver); err != nil {
+	if err := session.InitObserver(session.RegisterNewObserver); err != nil {
 		return fmt.Errorf("packet-68: could not select the character: %w", err)
 	}
 

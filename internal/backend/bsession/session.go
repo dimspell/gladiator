@@ -2,7 +2,9 @@ package bsession
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"strconv"
 	"sync"
@@ -11,6 +13,7 @@ import (
 	"github.com/coder/websocket"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/internal/app/logger"
+	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"github.com/dimspell/gladiator/internal/backend/packet"
 	"github.com/dimspell/gladiator/internal/backend/proxy"
 	"github.com/dimspell/gladiator/internal/model"
@@ -105,7 +108,7 @@ func (s *Session) ToPlayer(ipAddr net.IP) wire.Player {
 	}
 }
 
-func (s *Session) InitObserver(registerNewObserver func(context.Context, *Session) error) error {
+func (s *Session) InitObserver(registerNewObserver func(context.Context) error) error {
 	var err error
 	s.OnceSelectedCharacter.Do(func() {
 		ctx := context.TODO()
@@ -114,7 +117,7 @@ func (s *Session) InitObserver(registerNewObserver func(context.Context, *Sessio
 		if err != nil {
 			return
 		}
-		err = registerNewObserver(ctx, s)
+		err = registerNewObserver(ctx)
 		if err != nil {
 			return
 		}
@@ -167,6 +170,39 @@ func (s *Session) ConnectOverWebsocket(ctx context.Context, user *multiv1.User, 
 func (s *Session) ConsumeWebSocket(ctx context.Context) ([]byte, error) {
 	_, p, err := s.wsConn.Read(ctx)
 	return p, err
+}
+
+func (s *Session) RegisterNewObserver(ctx context.Context) error {
+	handlers := []proxy.MessageHandler{
+		NewLobbyEventHandler(s).Handle,
+		s.Proxy.Handle,
+	}
+	observe := func(ctx context.Context, wsConn *websocket.Conn) {
+		for {
+			if ctx.Err() != nil {
+				return
+			}
+
+			// Read the broadcast and handle them as commands.
+			p, err := s.ConsumeWebSocket(ctx)
+			if err != nil {
+				if errors.Is(err, context.Canceled) {
+					return
+				}
+				slog.Error("Error reading from WebSocket", "session", s.ID, logging.Error(err))
+				return
+			}
+
+			// TODO: Register handlers and handle them here.
+			for _, handleFn := range handlers {
+				if err := handleFn(ctx, p); err != nil {
+					slog.Error("Error handling message", "session", s.ID, logging.Error(err))
+					return
+				}
+			}
+		}
+	}
+	return s.StartObserver(ctx, observe)
 }
 
 func (s *Session) SendEvent(ctx context.Context, eventType wire.EventType, content any) error {
