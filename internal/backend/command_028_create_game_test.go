@@ -33,8 +33,7 @@ func TestCreateGameRequest(t *testing.T) {
 }
 
 func TestBackend_HandleCreateGame(t *testing.T) {
-	b, _, _ := helperNewBackend(t)
-	gameClient := &mockGameClient{
+	b, _, _ := helperNewBackend(t, &mockGameClient{
 		CreateGameResponse: connect.NewResponse(&v1.CreateGameResponse{
 			Game: &v1.Game{
 				GameId:        "room",
@@ -64,19 +63,17 @@ func TestBackend_HandleCreateGame(t *testing.T) {
 				},
 			},
 		}),
-	}
-	b.gameClient = gameClient
+	})
 	conn := &mockConn{}
-	session := b.AddSession(conn)
+	session := b.SessionManager.Add(conn)
 	session.SetLogonData(&v1.User{UserId: 2137, Username: "JP"})
-	session.ID = "TEST"
 
 	ctx := context.Background()
-	if err := b.ConnectToLobby(ctx, &v1.User{UserId: session.UserID, Username: session.Username}, session); err != nil {
+	if err := session.ConnectOverWebsocket(ctx, &v1.User{UserId: session.UserID, Username: session.Username}, b.SignalServerURL); err != nil {
 		t.Error(err)
 		return
 	}
-	if err := b.RegisterNewObserver(ctx, session); err != nil {
+	if err := session.RegisterNewObserver(ctx); err != nil {
 		t.Errorf("error registering observer: %v", err)
 		return
 	}

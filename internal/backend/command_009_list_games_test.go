@@ -6,7 +6,6 @@ import (
 
 	"connectrpc.com/connect"
 	v1 "github.com/dimspell/gladiator/gen/multi/v1"
-	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/proxy/direct"
 	"github.com/stretchr/testify/assert"
 )
@@ -30,10 +29,10 @@ func TestBackend_HandleListGames(t *testing.T) {
 		gameClient := &mockGameClient{
 			ListGamesResponse: connect.NewResponse(&v1.ListGamesResponse{Games: []*v1.Game{}}),
 		}
-		b := &Backend{gameClient: gameClient, ProxyFactory: &direct.ProxyLAN{"127.0.100.1"}}
+		b := &Backend{SessionManager: NewSessionManager(&direct.ProxyLAN{"127.0.100.1"}, gameClient)}
 		conn := &mockConn{}
-		session := &bsession.Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
-		session.Proxy = b.ProxyFactory.Create(session, gameClient)
+		session := b.SessionManager.Add(conn)
+		session.SetLogonData(&v1.User{UserId: 2137, Username: "mage"})
 
 		assert.NoError(t, b.HandleListGames(context.Background(), session, ListGamesRequest{}))
 		assert.Len(t, conn.Written, 8)
@@ -53,12 +52,10 @@ func TestBackend_HandleListGames(t *testing.T) {
 				},
 			}}),
 		}
-		b := &Backend{
-			ProxyFactory: &direct.ProxyLAN{"127.0.100.1"},
-			gameClient:   gameClient}
+		b := &Backend{SessionManager: NewSessionManager(&direct.ProxyLAN{"127.0.100.1"}, gameClient)}
 		conn := &mockConn{}
-		session := &bsession.Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
-		session.Proxy = b.ProxyFactory.Create(session, gameClient)
+		session := b.SessionManager.Add(conn)
+		session.SetLogonData(&v1.User{UserId: 2137, Username: "mage"})
 
 		assert.NoError(t, b.HandleListGames(context.Background(), session, ListGamesRequest{}))
 		assert.Len(t, conn.Written, 21)
@@ -90,12 +87,10 @@ func TestBackend_HandleListGames(t *testing.T) {
 			}}),
 		}
 
-		b := &Backend{
-			ProxyFactory: &direct.ProxyLAN{"127.0.100.1"},
-			gameClient:   gameClient}
+		b := &Backend{SessionManager: NewSessionManager(&direct.ProxyLAN{"127.0.100.1"}, gameClient)}
 		conn := &mockConn{}
-		session := &bsession.Session{ID: "TEST", Conn: conn, UserID: 2137, Username: "JP"}
-		session.Proxy = b.ProxyFactory.Create(session, gameClient)
+		session := b.SessionManager.Add(conn)
+		session.SetLogonData(&v1.User{UserId: 2137, Username: "mage"})
 
 		assert.NoError(t, b.HandleListGames(context.Background(), session, ListGamesRequest{}))
 		assert.Len(t, conn.Written, 39)

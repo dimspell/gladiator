@@ -134,22 +134,23 @@ func (m *mockCharacterClient) ListCharacters(context.Context, *connect.Request[v
 	return m.ListCharactersResponse, nil
 }
 
-func helperNewBackend(tb testing.TB) (bd *Backend, px *direct.ProxyLAN, cs *console.Console) {
+func helperNewBackend(tb testing.TB, gameClient multiv1connect.GameServiceClient) (bd *Backend, px *direct.ProxyLAN, cs *console.Console) {
 	tb.Helper()
 
+	roomService := console.NewRoomService()
+
 	cs = &console.Console{
-		RoomService: console.NewRoomService(),
+		RoomService: roomService,
 	}
 	ts := httptest.NewServer(http.HandlerFunc(cs.HandleWebSocket))
 
 	// Use bogon IP addressing for tests (https://datatracker.ietf.org/doc/rfc6752/).
-	px = &direct.ProxyLAN{"198.51.100.1"}
+	px = &direct.ProxyLAN{MyIPAddress: "198.51.100.1"}
 
 	bd = &Backend{
 		// Replace the HTTP schema prefix for websocket connection.
 		SignalServerURL: "ws://" + ts.URL[len("http://"):],
-
-		ProxyFactory: px,
+		SessionManager:  NewSessionManager(px, gameClient),
 	}
 
 	tb.Cleanup(func() {

@@ -38,7 +38,6 @@ type Backend struct {
 	SessionManager *SessionManager
 
 	characterClient multiv1connect.CharacterServiceClient
-	gameClient      multiv1connect.GameServiceClient
 	userClient      multiv1connect.UserServiceClient
 	rankingClient   multiv1connect.RankingServiceClient
 }
@@ -51,7 +50,6 @@ func NewBackend(backendAddr, consolePublicAddr string, proxyFactory ProxyFactory
 		SessionManager: NewSessionManager(proxyFactory, gameClient),
 
 		characterClient: characterClient,
-		gameClient:      gameClient,
 		userClient:      userClient,
 		rankingClient:   rankingClient,
 	}
