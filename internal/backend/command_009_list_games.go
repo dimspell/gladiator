@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"log/slog"
 
 	"github.com/dimspell/gladiator/internal/backend/bsession"
@@ -18,7 +19,7 @@ func (b *Backend) HandleListGames(ctx context.Context, session *bsession.Session
 
 	games, err := session.Proxy.ListGames(ctx)
 	if err != nil {
-		slog.Error("packet-09: could not list game rooms")
+		slog.Error("packet-09: could not list game rooms", logging.Error(err))
 		return nil
 	}
 
