@@ -142,7 +142,7 @@ func (r *Relay) ListGames(ctx context.Context) ([]model.LobbyRoom, error) {
 		lobbyRooms = append(lobbyRooms, model.LobbyRoom{
 			Name:          room.Name,
 			Password:      room.Password,
-			HostIPAddress: net.IPv4(127, 0, 0, 2),
+			HostIPAddress: net.IPv4(127, 0, 0, 2).To4(),
 		})
 	}
 	return lobbyRooms, nil
