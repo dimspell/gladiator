@@ -148,8 +148,8 @@ func (p *ListenerUDP) handleConnection(ctx context.Context, conn UDPConn, onRece
 
 			// Ignore packets from other sources
 			if !remoteAddr.IP.Equal(p.remoteAddr.IP) || remoteAddr.Port != p.remoteAddr.Port {
-				p.logger.Warn("Received packet from an unknown source", "data", buf[:n], "remoteAddr", remoteAddr)
-				continue
+				p.logger.Warn("Received packet from an unknown source", "data", buf[:n], "remoteAddr", remoteAddr, "length", n)
+				//continue
 			}
 
 			p.lastActive = time.Now()
