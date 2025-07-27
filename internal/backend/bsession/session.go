@@ -12,7 +12,6 @@ import (
 
 	"github.com/coder/websocket"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
-	"github.com/dimspell/gladiator/internal/app/logger"
 	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"github.com/dimspell/gladiator/internal/backend/packet"
 	"github.com/dimspell/gladiator/internal/backend/proxy"
@@ -85,13 +84,11 @@ func sendPacket(conn net.Conn, packetType packet.Code, payload []byte) error {
 
 	data := packet.EncodePacket(packetType, payload)
 
-	if logger.PacketLogger != nil {
-		logger.PacketLogger.Debug("Sent",
-			"packetType", packetType,
-			"bytes", data,
-			"length", len(data),
-		)
-	}
+	slog.Debug("Sent",
+		"packetType", packetType,
+		"bytes", data,
+		"length", len(data),
+	)
 
 	_, err := conn.Write(data)
 	return err

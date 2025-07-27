@@ -14,10 +14,6 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
-var (
-	PacketLogger = NewDiscardLogger()
-)
-
 // logLevels maps log level names to slog.Level values.
 var logLevels = map[string]slog.Level{
 	"trace":   slog.LevelDebug,
