@@ -66,7 +66,7 @@ func (p *ListenerUDP) Run(ctx context.Context) error {
 		if p.conn == nil {
 			return fmt.Errorf("conn is nil")
 		}
-		if err := p.handleHandshake(p.conn); err != nil {
+		if err := p.handleHandshake(p.conn, p.OnReceive); err != nil {
 			p.logger.Warn("Failed to handle handshake", logging.Error(err))
 			continue
 		}
@@ -84,7 +84,7 @@ func (p *ListenerUDP) Run(ctx context.Context) error {
 
 // handleHandshake waits for the initial handshake packet from a client and records the remote address.
 // Returns an error if the handshake fails or a client is already connected.
-func (p *ListenerUDP) handleHandshake(conn UDPConn) error {
+func (p *ListenerUDP) handleHandshake(conn UDPConn, onReceive ReceiveFunc) error {
 	p.Lock()
 	defer p.Unlock()
 
@@ -103,6 +103,10 @@ func (p *ListenerUDP) handleHandshake(conn UDPConn) error {
 		return fmt.Errorf("invalid first packet, got: %v", buf[:n])
 	}
 
+	if err := onReceive(buf[:n]); err != nil {
+		return fmt.Errorf("failed to forward data: %w", err)
+	}
+
 	p.remoteAddr = remoteAddr
 	p.lastActive = time.Now()
 	return nil
@@ -110,7 +114,7 @@ func (p *ListenerUDP) handleHandshake(conn UDPConn) error {
 
 // handleConnection processes incoming UDP packets from the connected client.
 // It calls the provided onReceive callback for each valid packet.
-func (p *ListenerUDP) handleConnection(ctx context.Context, conn UDPConn, onReceive func(p []byte) error) error {
+func (p *ListenerUDP) handleConnection(ctx context.Context, conn UDPConn, onReceive ReceiveFunc) error {
 	buf := make([]byte, 1024)
 
 	for {

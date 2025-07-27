@@ -94,8 +94,8 @@ func (p *ListenerTCP) Run(ctx context.Context) error {
 		p.logger.Debug("Accepted new connection")
 
 		// Recognise who is trying to connect by handling the initial data.
-		if err := p.handleHandshake(conn); err != nil {
-			p.logger.Debug("Handshake has failed")
+		if err := p.handleHandshake(conn, p.OnReceive); err != nil {
+			p.logger.Warn("Failed to handle a handshake", logging.Error(err))
 			continue
 		}
 
@@ -110,7 +110,7 @@ func (p *ListenerTCP) Run(ctx context.Context) error {
 	return nil
 }
 
-func (p *ListenerTCP) handleHandshake(conn TCPConn) error {
+func (p *ListenerTCP) handleHandshake(conn TCPConn, onReceive ReceiveFunc) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -127,6 +127,10 @@ func (p *ListenerTCP) handleHandshake(conn TCPConn) error {
 		return fmt.Errorf("invalid first packet, got: %s", string(msg))
 	}
 
+	if err := onReceive(msg); err != nil {
+		return fmt.Errorf("failed to forward data: %w", err)
+	}
+
 	p.conn = conn
 	p.lastActive = time.Now()
 
@@ -135,7 +139,7 @@ func (p *ListenerTCP) handleHandshake(conn TCPConn) error {
 
 // handleConnection reads from the TCP connection and forwards the data received
 // from the game client.
-func (p *ListenerTCP) handleConnection(ctx context.Context, conn TCPConn, onReceive func(p []byte) (err error)) error {
+func (p *ListenerTCP) handleConnection(ctx context.Context, conn TCPConn, onReceive ReceiveFunc) error {
 	// Handle incoming data from the game client
 	buf := make([]byte, 1024)
 
