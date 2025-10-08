@@ -5,20 +5,25 @@ import (
 	"fmt"
 )
 
-type Relay struct {
+type RelayService struct {
 	Server *RelayServer
 	cancel context.CancelFunc
 }
 
-func NewRelay(addr string, multiplayer *Multiplayer) (*Relay, error) {
-	server, err := NewQUICRelay(addr, multiplayer)
+func NewRelayService(addr string, multiplayer *RoomService) (*RelayService, error) {
+	server, err := NewQUICRelay(
+		addr,
+		multiplayer,
+		WithVerifyFunc(verifyRelayPacket),
+		WithEventHooks(multiplayer.HandleRelayJoin, multiplayer.HandleRelayLeave, multiplayer.HandleRelayDelete),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("relay failed to listen: %v", err)
 	}
-	return &Relay{Server: server}, nil
+	return &RelayService{Server: server}, nil
 }
 
-func (r *Relay) Start(ctx context.Context) error {
+func (r *RelayService) Start(ctx context.Context) error {
 	if r == nil || r.Server == nil {
 		return nil
 	}
@@ -26,10 +31,11 @@ func (r *Relay) Start(ctx context.Context) error {
 	ctx, r.cancel = context.WithCancel(ctx)
 	// go r.Server.cleanupPeers()
 
-	return r.Server.Start(ctx)
+	r.Server.Start(ctx)
+	return nil
 }
 
-func (r *Relay) Stop(ctx context.Context) error {
+func (r *RelayService) Stop(ctx context.Context) error {
 	if r == nil || r.Server == nil {
 		return nil
 	}
@@ -37,8 +43,6 @@ func (r *Relay) Stop(ctx context.Context) error {
 	if r.cancel != nil {
 		r.cancel()
 	}
-
-	close(r.Server.Events)
 
 	return nil
 }

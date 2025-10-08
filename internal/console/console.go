@@ -1,3 +1,5 @@
+// Package console provides the main server logic for the control panel for the game backend.
+// It handles HTTP/gRPC APIs, WebSocket lobbies, relay server integration, and configuration.
 package console
 
 import (
@@ -27,47 +29,13 @@ import (
 func init() {
 	metrics.InitConsole()
 	metrics.InitRelay()
+	metrics.InitMultiplayer()
 }
 
+// Console is the main server struct for the control panel for the game backend.
+// It holds configuration, database, multiplayer, and relay server references.
 type Console struct {
-	Config      *Config
-	DB          *database.SQLite
-	Multiplayer *Multiplayer
-	Relay       *Relay
-}
-
-func NewConsole(db *database.SQLite, opts ...Option) *Console {
-	config := DefaultConfig()
-	for _, fn := range opts {
-		if err := fn(config); err != nil {
-			panic("failed to initialize config: " + err.Error())
-		}
-	}
-
-	multiplayer := NewMultiplayer()
-
-	var relay *Relay
-	var err error
-	if config.RunMode == model.RunModeRelay {
-		relay, err = NewRelay(config.RelayBindAddr, multiplayer)
-		if err != nil {
-			panic("failed to initialize relay: " + err.Error())
-		}
-
-		multiplayer.Relay = relay
-	}
-
-	return &Console{
-		DB:          db,
-		Multiplayer: multiplayer,
-		Relay:       relay,
-		Config:      config,
-	}
-}
-
-type Option func(*Config) error
-
-type Config struct {
+	// Inlined configuration fields
 	RunMode            model.RunMode
 	ConsoleBindAddr    string
 	ConsolePublicAddr  string
@@ -75,10 +43,23 @@ type Config struct {
 	RelayPublicAddr    string
 	CORSAllowedOrigins []string
 	Version            string
+	JWTSecret          string
+	TLSCertPath        string
+	TLSKeyPath         string
+
+	DB           *database.SQLite
+	RoomService  *RoomService
+	RelayService *RelayService
 }
 
-func DefaultConfig() *Config {
-	return &Config{
+// Option is a function that configures the Console server via its fields.
+type Option func(*Console) error
+
+// NewConsole creates a new Console server instance with the given database and options.
+// Options can configure CORS, addresses, version, JWT secret, and TLS certificates.
+func NewConsole(db *database.SQLite, opts ...Option) *Console {
+	// Set default values
+	console := &Console{
 		RunMode:            model.RunModeLAN,
 		ConsoleBindAddr:    "localhost:2137",
 		ConsolePublicAddr:  "http://localhost:2137",
@@ -86,19 +67,42 @@ func DefaultConfig() *Config {
 		RelayPublicAddr:    "localhost:9999",
 		CORSAllowedOrigins: []string{"*"},
 		Version:            "dev",
+		JWTSecret:          "dev-secret-key",
+		TLSCertPath:        "",
+		TLSKeyPath:         "",
+		DB:                 db,
 	}
+
+	for _, fn := range opts {
+		if err := fn(console); err != nil {
+			panic("failed to initialize config: " + err.Error())
+		}
+	}
+
+	console.RoomService = NewRoomService()
+
+	var err error
+	if console.RunMode == model.RunModeRelay {
+		console.RelayService, err = NewRelayService(console.RelayBindAddr, console.RoomService)
+		if err != nil {
+			panic("failed to initialize relay: " + err.Error())
+		}
+		console.RoomService.RelayService = console.RelayService
+	}
+
+	return console
 }
 
-// TODO: For production replace it with []string{"https://dispel-multi.net"}
+// Option functions for configuring Console
 func WithCORSAllowedOrigins(allowedOrigins []string) Option {
-	return func(c *Config) error {
+	return func(c *Console) error {
 		c.CORSAllowedOrigins = allowedOrigins
 		return nil
 	}
 }
 
 func WithConsoleAddr(bindAddr, publicAddr string) Option {
-	return func(c *Config) error {
+	return func(c *Console) error {
 		c.ConsoleBindAddr = bindAddr
 		c.ConsolePublicAddr = publicAddr
 		return nil
@@ -106,7 +110,7 @@ func WithConsoleAddr(bindAddr, publicAddr string) Option {
 }
 
 func WithRelayAddr(bindAddr, publicAddr string) Option {
-	return func(c *Config) error {
+	return func(c *Console) error {
 		c.RelayBindAddr = bindAddr
 		c.RelayPublicAddr = publicAddr
 		c.RunMode = model.RunModeRelay
@@ -115,12 +119,56 @@ func WithRelayAddr(bindAddr, publicAddr string) Option {
 }
 
 func WithVersion(version string) Option {
-	return func(c *Config) error {
+	return func(c *Console) error {
 		c.Version = version
 		return nil
 	}
 }
 
+func WithJWTSecret(secret string) Option {
+	return func(c *Console) error {
+		c.JWTSecret = secret
+		return nil
+	}
+}
+
+func WithTLSCert(certPath string) Option {
+	return func(c *Console) error {
+		c.TLSCertPath = certPath
+		return nil
+	}
+}
+
+func WithTLSKey(keyPath string) Option {
+	return func(c *Console) error {
+		c.TLSKeyPath = keyPath
+		return nil
+	}
+}
+
+// func authMiddleware(next http.Handler) http.Handler {
+// 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+// 		token := r.Header.Get("Authorization")
+// 		if token == "" || !strings.HasPrefix(token, "Bearer ") {
+// 			w.WriteHeader(http.StatusUnauthorized)
+// 			w.Write([]byte("missing or invalid Authorization header"))
+// 			return
+// 		}
+// 		token = strings.TrimPrefix(token, "Bearer ")
+// 		// TODO: validate token (e.g., validateJWT(token)), set user info in context if valid
+// 		userID, err := validateJWT(token)
+// 		if err != nil {
+// 			w.WriteHeader(http.StatusUnauthorized)
+// 			w.Write([]byte("invalid or expired token"))
+// 			return
+// 		}
+// 		// Optionally, set userID in context for downstream handlers
+// 		r = r.WithContext(context.WithValue(r.Context(), "userID", userID))
+// 		next.ServeHTTP(w, r)
+// 	})
+// }
+
+// HttpRouter returns the main HTTP router for the Console server, including all endpoints and middleware.
 func (c *Console) HttpRouter() http.Handler {
 	mux := chi.NewRouter()
 
@@ -149,7 +197,7 @@ func (c *Console) HttpRouter() http.Handler {
 		wellKnown := chi.NewRouter()
 		// wellKnown.Use(slogchi.New(slog.Default()))
 		wellKnown.Use(cors.New(cors.Options{
-			AllowedOrigins:   c.Config.CORSAllowedOrigins,
+			AllowedOrigins:   c.CORSAllowedOrigins,
 			AllowCredentials: false,
 			Debug:            false,
 			AllowedMethods:   []string{http.MethodGet},
@@ -164,9 +212,10 @@ func (c *Console) HttpRouter() http.Handler {
 	{ // Set up gRPC routes for the backend
 		api := chi.NewRouter()
 		api.Use(middleware.Timeout(5 * time.Second))
+		// api.Use(authMiddleware)
 		// api.Use(slogchi.New(slog.Default()))
 		api.Use(cors.New(cors.Options{
-			AllowedOrigins:   c.Config.CORSAllowedOrigins,
+			AllowedOrigins:   c.CORSAllowedOrigins,
 			AllowCredentials: false,
 			Debug:            false,
 			AllowedMethods: []string{
@@ -190,7 +239,7 @@ func (c *Console) HttpRouter() http.Handler {
 		}).Handler)
 
 		api.Mount(multiv1connect.NewCharacterServiceHandler(&characterServiceServer{c.DB}))
-		api.Mount(multiv1connect.NewGameServiceHandler(&gameServiceServer{Multiplayer: c.Multiplayer}))
+		api.Mount(multiv1connect.NewGameServiceHandler(&GameService{RoomService: c.RoomService}))
 		api.Mount(multiv1connect.NewUserServiceHandler(&userServiceServer{c.DB}))
 		api.Mount(multiv1connect.NewRankingServiceHandler(&rankingServiceServer{c.DB}))
 		mux.Mount("/grpc/", http.StripPrefix("/grpc", api))
@@ -207,9 +256,10 @@ func (c *Console) HttpRouter() http.Handler {
 	return mux
 }
 
+// Handlers returns start and shutdown functions for running the Console server with graceful shutdown support.
 func (c *Console) Handlers() (start GracefulFunc, shutdown GracefulFunc) {
 	httpServer := &http.Server{
-		Addr:         c.Config.ConsoleBindAddr,
+		Addr:         c.ConsoleBindAddr,
 		Handler:      h2c.NewHandler(c.HttpRouter(), &http2.Server{}),
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,
@@ -217,21 +267,21 @@ func (c *Console) Handlers() (start GracefulFunc, shutdown GracefulFunc) {
 	}
 
 	start = func(ctx context.Context) error {
-		slog.Info("Configured console server", "addr", c.Config.ConsoleBindAddr)
+		slog.Info("Configured console server", "addr", c.ConsoleBindAddr)
 
-		go c.Multiplayer.Run(ctx)
-		go c.Relay.Start(ctx)
+		go c.RoomService.Run(ctx)
+		go c.RelayService.Start(ctx)
 
 		// TODO: Move it elsewhere
-		if c.Relay != nil && c.Relay.Server != nil {
-			go func() {
-				for {
-					for event := range c.Relay.Server.Events {
-						c.Multiplayer.handleRelayEvent(event)
-					}
-				}
-			}()
-		}
+		// if c.Relay != nil && c.Relay.Server != nil {
+		// 	go func() {
+		// 		for {
+		// 			for event := range c.Relay.Server.Events {
+		// 				c.Multiplayer.HandleRelayEvent(event)
+		// 			}
+		// 		}
+		// 	}()
+		// }
 
 		return httpServer.ListenAndServe()
 	}
@@ -239,8 +289,8 @@ func (c *Console) Handlers() (start GracefulFunc, shutdown GracefulFunc) {
 	shutdown = func(ctx context.Context) error {
 		slog.Info("Started shutting down the console server")
 
-		c.Multiplayer.Stop()
-		if err := c.Relay.Stop(ctx); err != nil {
+		c.RoomService.Stop()
+		if err := c.RelayService.Stop(ctx); err != nil {
 			slog.Warn("Failed to shut down relay", "error", logging.Error(err))
 		}
 
@@ -255,8 +305,10 @@ func (c *Console) Handlers() (start GracefulFunc, shutdown GracefulFunc) {
 	return start, shutdown
 }
 
+// GracefulFunc is a function type for starting or shutting down the server gracefully.
 type GracefulFunc func(context.Context) error
 
+// Graceful runs the server with graceful shutdown on SIGINT/SIGTERM, using the provided start and shutdown functions.
 func (c *Console) Graceful(ctx context.Context, start GracefulFunc, shutdown GracefulFunc) error {
 	var (
 		stopChan = make(chan os.Signal, 1)
@@ -291,17 +343,18 @@ func (c *Console) Graceful(ctx context.Context, start GracefulFunc, shutdown Gra
 	return <-errChan
 }
 
+// WellKnownInfo returns an HTTP handler that serves the /.well-known/console.json endpoint with server metadata.
 func (c *Console) WellKnownInfo() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		wk := model.WellKnown{
-			Version: c.Config.Version,
-			Addr:    c.Config.ConsolePublicAddr,
-			RunMode: c.Config.RunMode,
+			Version: c.Version,
+			Addr:    c.ConsolePublicAddr,
+			RunMode: c.RunMode,
 		}
 
-		switch c.Config.RunMode {
+		switch c.RunMode {
 		case model.RunModeRelay:
-			wk.RelayServerAddr = c.Config.RelayPublicAddr
+			wk.RelayServerAddr = c.RelayPublicAddr
 		case model.RunModeLAN:
 			wk.CallerIP = getCallerIP(r.RemoteAddr)
 		}
@@ -310,6 +363,7 @@ func (c *Console) WellKnownInfo() http.HandlerFunc {
 	}
 }
 
+// getCallerIP extracts the IPv4 address from a remote address string.
 func getCallerIP(remoteAddr string) string {
 	host, _, err := net.SplitHostPort(remoteAddr)
 	if err != nil {

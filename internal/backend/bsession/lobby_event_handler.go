@@ -1,22 +1,21 @@
-package backend
+package bsession
 
 import (
 	"context"
 	"log/slog"
 
 	"github.com/dimspell/gladiator/internal/app/logger/logging"
-	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/packet"
 	"github.com/dimspell/gladiator/internal/model"
 	"github.com/dimspell/gladiator/internal/wire"
 )
 
 type LobbyEventHandler struct {
-	Session *bsession.Session
+	Session *Session
 }
 
 // NewLobbyEventHandler creates a new LobbyEventHandler for the given Session.
-func NewLobbyEventHandler(session *bsession.Session) *LobbyEventHandler {
+func NewLobbyEventHandler(session *Session) *LobbyEventHandler {
 	return &LobbyEventHandler{session}
 }
 
@@ -31,7 +30,7 @@ func (h *LobbyEventHandler) Handle(ctx context.Context, payload []byte) error {
 			return nil
 		}
 		// if err := session.Send(ReceiveMessage, NewGlobalMessage(msg.Content.User, msg.Content.Text)); err != nil {
-		if err := h.Session.SendToGame(packet.ReceiveMessage, NewLobbyMessage(msg.Content.User, msg.Content.Text)); err != nil {
+		if err := h.Session.SendToGame(packet.ReceiveMessage, packet.NewLobbyMessage(msg.Content.User, msg.Content.Text)); err != nil {
 			slog.Error("Error writing chat message over the backend wire", "session", h.Session.ID, logging.Error(err))
 			return nil
 		}
@@ -59,7 +58,7 @@ func (h *LobbyEventHandler) Handle(ctx context.Context, payload []byte) error {
 		h.Session.State.UpdateLobbyUsers(lobbyUsers)
 		idx := uint32(len(lobbyUsers))
 
-		if err := h.Session.SendToGame(packet.ReceiveMessage, AppendCharacterToLobby(player.Username, model.ClassType(player.ClassType), idx)); err != nil {
+		if err := h.Session.SendToGame(packet.ReceiveMessage, packet.AppendCharacterToLobby(player.Username, model.ClassType(player.ClassType), idx)); err != nil {
 			slog.Warn("Error appending lobby user", "session", h.Session.ID, logging.Error(err))
 			return nil
 		}
@@ -72,7 +71,7 @@ func (h *LobbyEventHandler) Handle(ctx context.Context, payload []byte) error {
 
 		h.Session.State.DeleteLobbyUser(msg.Content.UserID)
 
-		if err := h.Session.SendToGame(packet.ReceiveMessage, RemoveCharacterFromLobby(msg.Content.Username)); err != nil {
+		if err := h.Session.SendToGame(packet.ReceiveMessage, packet.RemoveCharacterFromLobby(msg.Content.Username)); err != nil {
 			slog.Warn("Error appending lobby user", "session", h.Session.ID, logging.Error(err))
 			return nil
 		}

@@ -79,7 +79,7 @@ func (c *Controller) playView(w fyne.Window, consoleAddr string, metadata *model
 		loadingDialog := dialog.NewCustomWithoutButtons("Starting backend...", widget.NewProgressBarInfinite(), w)
 		loadingDialog.Show()
 
-		var proxyCreator backend.Proxy
+		var proxyCreator backend.ProxyFactory
 		switch metadata.RunMode {
 		case model.RunModeRelay:
 			proxyCreator = &relay.ProxyRelay{RelayServerAddr: metadata.RelayServerAddr}

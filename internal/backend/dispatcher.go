@@ -3,9 +3,9 @@ package backend
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net"
 
-	"github.com/dimspell/gladiator/internal/app/logger"
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/packet"
 )
@@ -24,7 +24,7 @@ func (b *Backend) handshake(conn net.Conn) (*bsession.Session, error) {
 		}
 	}
 
-	session := b.AddSession(conn)
+	session := b.SessionManager.Add(conn)
 
 	// Command 255 30 aka 0x1eff
 	{
@@ -72,13 +72,7 @@ func (b *Backend) handleCommands(ctx context.Context, session *bsession.Session)
 		}
 
 		code := packet.Code(data[1])
-		if logger.PacketLogger != nil {
-			logger.PacketLogger.Debug("Recv",
-				"code", code,
-				"bytes", data,
-				"session_id", session.ID,
-			)
-		}
+		slog.Debug("Recv", "code", code, "bytes", data, "session_id", session.ID)
 
 		switch code {
 		case packet.CreateNewAccount:

@@ -14,8 +14,8 @@ import (
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	"github.com/dimspell/gladiator/internal/app/ui/registrypatch"
 	"github.com/dimspell/gladiator/internal/backend/proxy/direct"
-	"github.com/dimspell/gladiator/internal/backend/registrypatch"
 	"github.com/dimspell/gladiator/internal/model"
 )
 

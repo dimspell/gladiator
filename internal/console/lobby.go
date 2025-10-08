@@ -51,7 +51,7 @@ func (c *Console) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := c.Multiplayer.HandleSession(r.Context(), NewUserSession(userID, conn)); err != nil {
+	if err := c.RoomService.HandleSession(r.Context(), NewUserSession(userID, conn)); err != nil {
 		return
 	}
 }

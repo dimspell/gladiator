@@ -36,8 +36,74 @@ var (
 		},
 		[]string{"room_id"},
 	)
+
+	BytesSent = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: "gladiator_relay_bytes_sent_total",
+			Help: "Total bytes sent by the relay",
+		},
+	)
+
+	BytesReceived = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: "gladiator_relay_bytes_received_total",
+			Help: "Total bytes received by the relay",
+		},
+	)
+
+	PacketsDropped = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: "gladiator_relay_packets_dropped_total",
+			Help: "Total number of packets dropped by the relay",
+		},
+	)
+
+	PacketLatency = prometheus.NewHistogram(
+		prometheus.HistogramOpts{
+			Name:    "gladiator_relay_packet_latency_seconds",
+			Help:    "Time taken to relay a packet in seconds",
+			Buckets: prometheus.ExponentialBuckets(0.0005, 2, 12),
+		},
+	)
+
+	RelayErrors = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "gladiator_relay_errors_total",
+			Help: "Total number of relay errors by type",
+		},
+		[]string{"type"},
+	)
+
+	PeerDisconnects = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "gladiator_relay_peer_disconnects_total",
+			Help: "Total number of peer disconnects by reason",
+		},
+		[]string{"reason"},
+	)
+
+	RelayRoomLifetime = prometheus.NewHistogram(
+		prometheus.HistogramOpts{
+			Name:    "gladiator_relay_room_lifetime_seconds",
+			Help:    "Lifetime of relay rooms in seconds",
+			Buckets: prometheus.ExponentialBuckets(10, 2, 8),
+		},
+	)
 )
 
 func InitRelay() {
-	prometheus.MustRegister(PacketIn, PacketOut, ActiveRooms, ConnectedPeers, PeersInRoom)
+	prometheus.MustRegister(
+		PacketIn,
+		PacketOut,
+		ActiveRooms,
+		ConnectedPeers,
+		PeersInRoom,
+		BytesSent,
+		BytesReceived,
+		PacketsDropped,
+		PacketLatency,
+		RelayErrors,
+		PeerDisconnects,
+		RelayRoomLifetime,
+	)
 }

@@ -12,7 +12,7 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
-const appName = "dispel-multi"
+const appName = "gladiator"
 
 // Version stores what is a current version and git revision of the build.
 // See more by using `go version -m ./path/to/binary` command.
