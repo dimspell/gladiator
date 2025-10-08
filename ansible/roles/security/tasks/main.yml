@@ -1,0 +1,80 @@
+---
+- name: Ensure automatic updates are installed
+  ansible.builtin.apt:
+    name: unattended-upgrades
+    state: present
+    update_cache: true
+
+- name: Enable unattended upgrades
+  ansible.builtin.lineinfile:
+    dest: /etc/apt/apt.conf.d/20auto-upgrades
+    regexp: "^{{ item.key }}"
+    line: "{{ item.key }} \"{{ item.value }}\";"
+  loop:
+    - { key: APT::Periodic::Update-Package-Lists, value: "1" }
+    - { key: APT::Periodic::Unattended-Upgrade, value: "1" }
+
+# Disable for now
+# - name: Disable root SSH login
+#   ansible.builtin.lineinfile:
+#     path: /etc/ssh/sshd_config
+#     regexp: "^PermitRootLogin"
+#     line: "PermitRootLogin no"
+#   notify: restart ssh
+
+- name: Disable password auth (use only keys)
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "^PasswordAuthentication"
+    line: "PasswordAuthentication no"
+  notify: Restart ssh
+
+- name: Install Fail2ban
+  ansible.builtin.apt:
+    name: fail2ban
+    state: present
+
+- name: Install UFW
+  ansible.builtin.apt:
+    name: ufw
+    state: present
+
+- name: Set up UFW firewall
+  community.general.ufw:
+    rule: allow
+    port: "{{ item }}"
+  loop:
+    - 22
+    - 80
+    - 443
+    - 9999
+
+- name: Enable UFW
+  community.general.ufw:
+    state: enabled
+    policy: deny
+
+- name: Configure kernel sysctl parameters for relay server
+  ansible.builtin.copy:
+    dest: /etc/sysctl.d/90-quic-relay.conf
+    content: |
+      net.core.rmem_max=7500000
+      net.core.wmem_max=7500000
+    mode: '0644'
+
+# TODO: Tweak systcl configuration
+# - name: Configure kernel sysctl parameters to harden the OS
+#   ansible.builtin.copy:
+#     dest: /etc/sysctl.d/99-hardening.conf
+#     content: |
+#       net.ipv4.ip_forward = 0
+#       net.ipv4.icmp_ignore_bogus_error_responses = 1
+#       net.ipv4.conf.all.accept_source_route = 0
+#       net.ipv6.conf.all.accept_source_route = 0
+#       net.ipv4.conf.all.rp_filter = 1
+#       kernel.kptr_restrict = 2
+#     mode: '0644'
+
+- name: Apply sysctl settings
+  ansible.builtin.command: sysctl --system
+  changed_when: true

@@ -1,0 +1,64 @@
+---
+- name: Install nginx and certbot
+  ansible.builtin.apt:
+    name:
+      - nginx
+      - python3-certbot-nginx
+    state: present
+    update_cache: true
+
+- name: Ensure NGINX config directory exists
+  ansible.builtin.file:
+    path: /etc/nginx/sites-available
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Obtain Let's Encrypt certificate
+  ansible.builtin.command: >
+    certbot run --nginx --non-interactive --agree-tos --redirect --email {{ nginx_certbot_email }} -d {{ nginx_domain_fqdn }}
+  args:
+    creates: "/etc/letsencrypt/live/{{ nginx_domain_fqdn }}/fullchain.pem"
+
+- name: Disable NGINX default site
+  ansible.builtin.file:
+    state: absent
+    path: "/etc/nginx/sites-enabled/default"
+  register: nginx_default_site_removed_result
+
+- name: Reload NGINX after the deactivation of default site
+  ansible.builtin.service:
+    name: nginx
+    state: reloaded
+  when: nginx_default_site_removed_result is succeeded and nginx_default_site_removed_result.state == 'changed'
+
+- name: Deploy NGINX reverse proxy config
+  ansible.builtin.template:
+    src: "nginx_site.j2"
+    dest: "/etc/nginx/sites-available/{{ nginx_site_name }}"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Enable NGINX site
+  ansible.builtin.file:
+    src: "/etc/nginx/sites-available/{{ nginx_site_name }}"
+    dest: "/etc/nginx/sites-enabled/{{ nginx_site_name }}"
+    state: link
+    force: true
+
+- name: Test NGINX configuration
+  ansible.builtin.command: nginx -t
+  changed_when: false
+
+- name: Reload NGINX
+  ansible.builtin.service:
+    name: nginx
+    state: reloaded
+
+- name: Ensure certbot systemd timer is enabled
+  ansible.builtin.systemd:
+    name: certbot.timer
+    enabled: true
+    state: started

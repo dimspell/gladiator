@@ -1,0 +1,52 @@
+---
+- name: Ensure Podman and Quadlet dirs exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+    owner: "{{ appuser_name }}"
+    group: "{{ appuser_name }}"
+  loop:
+    - "/home/{{ appuser_name }}/.config/containers/systemd/"
+
+- name: Deploy .env file
+  ansible.builtin.template:
+    src: gladiator.env.j2
+    dest: "{{ gladiator_env_file }}"
+    mode: "0644"
+    owner: "{{ appuser_name }}"
+    group: "{{ appuser_name }}"
+  notify: Restart gladiator
+
+# Note: it will create the directory ~/.local/share/containers/storage/volumes/gladiator
+- name: Deploy Quadlet volume unit
+  ansible.builtin.template:
+    src: gladiator.volume.j2
+    dest: "/home/{{ appuser_name }}/.config/containers/systemd/{{ gladiator_container_name }}.volume"
+    owner: "{{ appuser_name }}"
+    group: "{{ appuser_name }}"
+    mode: "0644"
+  notify: Restart gladiator
+
+- name: Deploy Quadlet container unit
+  ansible.builtin.template:
+    src: gladiator.container.j2
+    dest: "/home/{{ appuser_name }}/.config/containers/systemd/{{ gladiator_container_name }}.container"
+    owner: "{{ appuser_name }}"
+    group: "{{ appuser_name }}"
+    mode: "0644"
+  notify: Restart gladiator
+
+- name: Enable and start container service
+  become: true
+  become_method: ansible.builtin.su
+  become_user: "{{ appuser_name }}"
+  become_flags: "-s /bin/bash" # Specify a valid shell
+  ansible.builtin.systemd:
+    name: "{{ gladiator_container_name }}.service"
+    enabled: true
+    state: started
+    scope: user
+    daemon_reload: true
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ appuser_uid }}"

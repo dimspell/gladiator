@@ -1,0 +1,11 @@
+---
+- name: Restart gladiator
+  become: true
+  become_user: "{{ appuser_name }}"
+  ansible.builtin.systemd:
+    name: "{{ gladiator_container_name }}.service"
+    state: restarted
+    daemon_reload: true
+    scope: user
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ appuser_uid }}"

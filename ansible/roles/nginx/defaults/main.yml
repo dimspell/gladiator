@@ -1,0 +1,5 @@
+---
+nginx_domain_fqdn: "example.com"
+
+nginx_site_name: "gladiator"
+nginx_certbot_email: "user+letsencrypt@example.com"

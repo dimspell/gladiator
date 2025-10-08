@@ -1,0 +1,18 @@
+---
+gladiator_container_name: gladiator
+gladiator_image: ghcr.io/dimspell/gladiator:latest
+gladiator_port: 2137
+
+gladiator_env:
+  LOG_LEVEL: "debug"
+  LOG_FORMAT: "json"
+  CONSOLE_ADDR: "0.0.0.0:2137"
+  CONSOLE_PUBLIC_ADDR: "https://example.com"
+  RELAY_ADDR: "0.0.0.0:9999"
+  RELAY_PUBLIC_ADDR: "example:9999"
+  DATABASE_TYPE: "sqlite"
+  SQLITE_PATH: "/data/gladiator-db.sqlite"
+
+gladiator_volume_container: /data
+
+gladiator_env_file: "/etc/containers/systemd/{{ gladiator_container_name }}.env"

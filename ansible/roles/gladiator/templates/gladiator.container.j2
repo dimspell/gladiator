@@ -1,0 +1,40 @@
+[Unit]
+Description=Gladiator Container
+
+[Container]
+Image={{ gladiator_image }}
+AutoUpdate=registry
+Label=io.containers.autoupdate=registry
+
+ContainerName={{ gladiator_container_name }}
+
+# Ports
+PublishPort=127.0.0.1:2137:2137
+PublishPort=0.0.0.0:9999:9999/udp
+
+# Volumes
+Volume=gladiator:{{ gladiator_volume_container }}
+
+# Env file
+EnvironmentFile={{ gladiator_env_file }}
+
+# Logging
+LogDriver=journald
+
+# Health check
+HealthCmd=curl -f http://localhost:2137/_health || exit 1
+HealthInterval=30s
+HealthRetries=3
+
+User={{ appuser_uid }}
+ReadOnly=true
+DropCapability=ALL
+NoNewPrivileges=true
+
+Exec=console
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target
