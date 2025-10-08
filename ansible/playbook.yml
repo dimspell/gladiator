@@ -1,0 +1,12 @@
+---
+- name: Deploy app
+  hosts: all
+  become: true
+  roles:
+    - podman
+    - security
+    - appuser
+    - gladiator
+    - nginx
+#    - prometheus
+#    - grafana

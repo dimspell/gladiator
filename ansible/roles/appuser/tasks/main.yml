@@ -1,0 +1,30 @@
+---
+- name: Ensure appuser exists
+  "ansible.builtin.user":
+    name: "{{ appuser_name }}"
+    shell: /usr/sbin/nologin
+    create_home: true
+    home: "/home/{{ appuser_name }}"
+
+- name: Get UID of appuser
+  ansible.builtin.command: "id -u {{ appuser_name }}"
+  register: appuser_uid_cmd
+  changed_when: false
+
+- name: Export appuser UID
+  ansible.builtin.set_fact:
+    appuser_uid: "{{ appuser_uid_cmd.stdout }}"
+
+# Rootless services require "lingering" to allow user systemd to start at boot.
+- name: Ensure linger is enabled for appuser
+  ansible.builtin.command: "loginctl enable-linger {{ appuser_name }}"
+  args:
+    creates: "/var/lib/systemd/linger/{{ appuser_name }}"
+
+- name: Set file limits for appuser
+  ansible.builtin.copy:
+    dest: /etc/security/limits.d/appuser.conf
+    content: |
+      appuser soft nofile 65535
+      appuser hard nofile 65535
+    mode: "0644"

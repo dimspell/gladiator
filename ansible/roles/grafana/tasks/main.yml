@@ -1,0 +1,45 @@
+---
+- name: Add Grafana APT key
+  "ansible.builtin.apt_key":
+    url: https://packages.grafana.com/gpg.key
+    state: present
+
+- name: Add Grafana APT repository
+  "ansible.builtin.apt_repository":
+    repo: "deb https://packages.grafana.com/oss/deb stable main"
+    state: present
+    filename: grafana
+
+- name: Install Grafana
+  "ansible.builtin.apt":
+    name: grafana
+    update_cache: true
+    state: present
+
+- name: Enable and start Grafana
+  ansible.builtin.systemd:
+    name: grafana-server
+    enabled: true
+    state: started
+
+- name: Wait for Grafana to start
+  ansible.builtin.wait_for:
+    port: "{{ grafana_port }}"
+    timeout: 30
+
+- name: Configure Prometheus data source
+  ansible.builtin.uri:
+    url: "http://localhost:{{ grafana_port }}/api/datasources"
+    method: POST
+    user: "{{ grafana_admin_user }}"
+    password: "{{ grafana_admin_password }}"
+    body_format: json
+    body:
+      name: "Prometheus"
+      type: "prometheus"
+      url: "{{ grafana_prometheus_url }}"
+      access: "proxy"
+      isDefault: true
+    status_code: 200,409 # 409 = already exists
+    headers:
+      Content-Type: "application/json"
