@@ -16,6 +16,8 @@ type Factory struct {
 	ProxyFactory redirect.ProxyFactory
 }
 
+func (p *Factory) Mode() model.RunMode { return model.RunModeWebRTC }
+
 func (p *Factory) Create(session *bsession.Session, client multiv1connect.GameServiceClient) proxy.ProxyClient {
 	return &Instance{}
 }

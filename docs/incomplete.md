@@ -1,6 +1,6 @@
 # Known gaps / incomplete areas
 
-This repository is **not finished**. This page is intentionally blunt about what is currently “dev-grade” or stubbed so users don’t assume production readiness.
+This repository is **not finished**. This page is intentionally blunt about what is currently "dev-grade" or stubbed so users don't assume production readiness.
 
 ## Security / auth
 
@@ -18,6 +18,13 @@ This repository is **not finished**. This page is intentionally blunt about what
 - WebRTC ICE config includes a public Google STUN server and a local TURN URL (`turn:127.0.0.1:3478`).
 - TURN credentials are embedded in code (see `internal/app/action/turn.go` and proxy config in `internal/app/action/action_helpers.go`).
 
+## Proxy implementations
+
+- **`proxy/p2p`** (WebRTC P2P mode): Mostly implemented but `JoinGame` still needs complete WebRTC signaling flow. See TODO in `p2p.go`.
+- **`proxy/webrtc`**: Stub package with unimplemented methods that panic. This appears to be a partially started alternative to `proxy/p2p`.
+- **`proxy/relay`**: Relay mode for clients behind strict NAT.
+- **`proxy/direct`** (LAN mode): Works for local network scenarios.
+
 ## Relay mode assumptions
 
 - Relay mode requires loopback aliasing (`127.0.0.X`) on some platforms for local testing; see `README.md` troubleshooting.
@@ -25,7 +32,7 @@ This repository is **not finished**. This page is intentionally blunt about what
 
 ## Launcher / GUI
 
-- The GUI exists behind the `gui` build tag and is currently a thin wrapper around internal controller screens, not a full “installer/launcher” experience.
+- The GUI exists behind the `gui` build tag and is currently a thin wrapper around internal controller screens, not a full "installer/launcher" experience.
 
 ## Docs coverage
 

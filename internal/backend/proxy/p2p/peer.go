@@ -21,11 +21,23 @@ type Peer struct {
 	Kind redirect.ProxyKind
 	Host bool
 
+	// Addr holds the addressing information for the peer's proxy
+	Addr *redirect.Addressing
+
+	// Mode indicates how this peer should be connected
+	Mode redirect.Mode
+
 	// Connection holds the WebRTC peer connection
 	Connection *webrtc.PeerConnection
-	FakeHost   *redirect.FakeHost
 
-	// PipeRouter *PipeRouter
+	// FakeHost is the local proxy host for this peer
+	FakeHost *redirect.FakeHost
+
+	// PipeRouter manages TCP/UDP channels over WebRTC
+	PipeRouter *PipeRouter
+
+	// Connected signals when peer connection is established
+	Connected chan struct{}
 }
 
 func (p *Peer) StartFakeHost(ctx context.Context, hostManager *redirect.HostManager) error {
@@ -142,40 +154,37 @@ func NewPeer(connection *webrtc.PeerConnection, manager *redirect.HostManager, u
 	peer := &Peer{
 		UserID:     userID,
 		Connection: connection,
+		Connected:  make(chan struct{}, 1),
 	}
 
-	ip, err := manager.AssignIP(fmt.Sprintf("%d", userID))
+	ipStr, err := manager.AssignIP(fmt.Sprintf("%d", userID))
 	if err != nil {
 		return nil, fmt.Errorf("failed to assign IP: %w", err)
 	}
-	portTCP := 6114
-	portUDP := 6113
+	ip := net.ParseIP(ipStr)
+
+	const defaultTCPPort = "6114"
+	const defaultUDPPort = "6113"
 
 	switch {
 	case isCurrentUser && isHost:
-		// peer.Kind = redirect.Host // net.IPv4(127, 0, 0, 1)
+		// Current user is the host - they connect to their own game client
 		peer.Host = true
-		peer.Kind = redirect.ProxyKind("not needed")
-
-		// peer.Addr = &redirect.Addressing{IP: net.IPv4(127, 0, 0, 1)}
-		// peer.Mode = redirect.CurrentUserIsHost
-	case isHost == true:
-		ip, portTCP, portUDP, err := r.NextAddr()
-		if err != nil {
-			return nil, fmt.Errorf("failed to get next address: %w", err)
-		}
-		peer.Addr = &redirect.Addressing{IP: ip, TCPPort: portTCP, UDPPort: portUDP}
+		peer.Kind = redirect.KindDial
+		peer.Addr = &redirect.Addressing{IP: net.IPv4(127, 0, 0, 1), TCPPort: defaultTCPPort, UDPPort: defaultUDPPort}
+		peer.Mode = redirect.CurrentUserIsHost
+	case isHost:
+		// This peer represents another user who is the host - we listen for connections
+		peer.Host = false
+		peer.Kind = redirect.KindListen
+		peer.Addr = &redirect.Addressing{IP: ip, TCPPort: defaultTCPPort, UDPPort: defaultUDPPort}
 		peer.Mode = redirect.OtherUserIsHost
-	case isHost == false:
-		ip, _, portUDP, err := r.NextAddr()
-		if err != nil {
-			return nil, fmt.Errorf("failed to get next address: %w", err)
-		}
-		peer.Addr = &redirect.Addressing{IP: ip, UDPPort: portUDP}
-		peer.Mode = redirect.OtherUserHasJoined
 	default:
-		peer.Addr = &redirect.Addressing{IP: net.IPv4(127, 0, 0, 1)}
-		peer.Mode = redirect.OtherUserIsJoining
+		// This peer is a guest who has joined - we listen on UDP only
+		peer.Host = false
+		peer.Kind = redirect.KindListen
+		peer.Addr = &redirect.Addressing{IP: ip, UDPPort: defaultUDPPort}
+		peer.Mode = redirect.OtherUserHasJoined
 	}
 
 	return peer, nil

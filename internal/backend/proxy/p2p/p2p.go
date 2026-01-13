@@ -99,9 +99,10 @@ func (p *PeerToPeer) CreateRoom(ctx context.Context, params proxy.CreateParams) 
 	hostPlayer := p.Session.ToPlayer(ipAddr)
 
 	gameRoom := &Game{
-		ID:    params.GameID,
-		Host:  hostPlayer,
-		Peers: map[int64]*Peer{}, // FIXME: Add size limit
+		ID:          params.GameID,
+		Host:        hostPlayer,
+		Peers:       make(map[int64]*Peer),
+		HostManager: p.HostManager,
 	}
 
 	_, err = p.GameServiceClient.CreateGame(ctx, connect.NewRequest(&multiv1.CreateGameRequest{
@@ -172,9 +173,10 @@ func (p *PeerToPeer) GetGame(ctx context.Context, roomID string) (*model.LobbyRo
 	}
 
 	gameRoom := &Game{
-		ID:    roomID,
-		Host:  hostPlayer,
-		Peers: map[int64]*Peer{}, // FIXME: Add size limit
+		ID:          roomID,
+		Host:        hostPlayer,
+		Peers:       make(map[int64]*Peer),
+		HostManager: p.HostManager,
 	}
 
 	lobbyRoom := &model.LobbyRoom{
@@ -201,8 +203,9 @@ func (p *PeerToPeer) GetGame(ctx context.Context, roomID string) (*model.LobbyRo
 		peer := &Peer{
 			UserID:     player.UserId,
 			Addr:       &redirect.Addressing{IP: ipAddr},
-			Mode:       redirect.None, // TODO: Get rid of the Mode field
+			Mode:       redirect.None,
 			Connection: peerConnection,
+			Connected:  make(chan struct{}, 1),
 		}
 		gameRoom.Peers[player.UserId] = peer
 
@@ -241,11 +244,12 @@ func (p *PeerToPeer) JoinGame(ctx context.Context, roomID string, password strin
 	ip := net.ParseIP(ipStr)
 
 	peer := &Peer{
-		UserID: userID,
-		Kind:   redirect.ProxyKind("not needed"),
-		Host:   false,
-		// Addr:   &redirect.Addressing{IP: ip},
-		// Mode:   redirect.None, // TODO: Get rid of the Mode field
+		UserID:    userID,
+		Kind:      redirect.KindDial,
+		Host:      false,
+		Addr:      &redirect.Addressing{IP: ip},
+		Mode:      redirect.OtherUserHasJoined,
+		Connected: make(chan struct{}, 1),
 	}
 	p.GameManager.AddPeer(peer)
 
@@ -272,7 +276,8 @@ func (p *PeerToPeer) JoinGame(ctx context.Context, roomID string, password strin
 		})
 	}
 
-	panic("implement me")
+	// TODO: Complete WebRTC signaling for joining peers
+	return lobbyPlayers, nil
 }
 
 // func (p *PeerToPeer) ConnectToPlayer(ctx context.Context, params proxy.GetPlayerAddrParams) (net.IP, error) {

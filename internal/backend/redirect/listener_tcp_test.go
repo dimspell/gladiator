@@ -314,14 +314,19 @@ func TestListenerTCP_ReceivesAndCallsCallback(t *testing.T) {
 	mockLn.acceptConns <- handleConn
 
 	done := make(chan struct{})
+	var closeOnce sync.Once
+	var received []string
+	var mu sync.Mutex
 	listener := &ListenerTCP{
 		listener: mockLn,
 		logger:   slog.Default(),
 		OnReceive: func(p []byte) error {
-			if string(p) != "ping" {
-				t.Errorf("expected 'ping', got: %s", string(p))
+			mu.Lock()
+			received = append(received, string(p))
+			if len(received) >= 2 {
+				closeOnce.Do(func() { close(done) })
 			}
-			close(done)
+			mu.Unlock()
 			return nil
 		},
 	}
@@ -354,7 +359,19 @@ func TestListenerTCP_ReceivesAndCallsCallback(t *testing.T) {
 
 	select {
 	case <-done:
-		// success
+		// success - verify received messages
+		mu.Lock()
+		if len(received) < 2 {
+			t.Errorf("expected at least 2 messages, got %d", len(received))
+		} else {
+			if received[0] != "##testuser" {
+				t.Errorf("expected first message '##testuser', got: %s", received[0])
+			}
+			if received[1] != "ping" {
+				t.Errorf("expected second message 'ping', got: %s", received[1])
+			}
+		}
+		mu.Unlock()
 	case <-time.After(1 * time.Second):
 		t.Fatal("timeout waiting for onReceive to be called")
 	}

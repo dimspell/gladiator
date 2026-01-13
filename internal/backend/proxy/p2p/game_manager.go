@@ -5,10 +5,10 @@ import (
 	"log/slog"
 	"sync"
 
+	"github.com/dimspell/gladiator/internal/backend/bsession"
+	"github.com/dimspell/gladiator/internal/backend/redirect"
 	"github.com/dimspell/gladiator/internal/wire"
 	"github.com/pion/webrtc/v4"
-
-	"github.com/dimspell/gladiator/internal/backend/bsession"
 )
 
 // GameManager coordinates peer connections and game state, while Game represents
@@ -49,7 +49,7 @@ func (g *GameManager) CreatePeer(player wire.Player) (*Peer, error) {
 	}
 
 	isHost := g.Game.IsHost(player.UserID)
-	isCurrentUser := g.Game.IsHost(g.session.UserID)
+	isCurrentUser := player.UserID == g.session.UserID
 
 	peer, err := NewPeer(peerConnection, g.Game.HostManager, player.UserID, isCurrentUser, isHost)
 	if err != nil {
@@ -125,8 +125,8 @@ type Game struct {
 	// A map of the players who are connected to the game room (except the current player) identified by user-id.
 	Peers map[int64]*Peer
 
-	// Controller to find the next free IP address
-	IpRing *IpRing
+	// HostManager manages IP allocation and fake hosts for this game
+	HostManager *redirect.HostManager
 }
 
 // IsHost checks if the provided user is hosting the game.

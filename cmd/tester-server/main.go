@@ -151,7 +151,7 @@ func (p *Proxy) listenTCP(ctx context.Context) error {
 			}
 		}
 	}
- 
+
 	// Close the listener when the application closes.
 	defer l.Close()
 	for {

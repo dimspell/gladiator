@@ -16,6 +16,7 @@ import (
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/proxy/p2p"
 	"github.com/dimspell/gladiator/internal/model"
+	"github.com/pion/webrtc/v4"
 )
 
 const (
@@ -54,9 +55,10 @@ func main() {
 		UserId:   meUserId,
 		Username: meName,
 	}
-	px := p2p.NewPeerToPeer(session, gm)
-	// px.NewUDPRedirect = redirect.NewNoop
-	// px.NewTCPRedirect = redirect.NewLineReader
+	iceServers := []webrtc.ICEServer{
+		{URLs: []string{"stun:stun.l.google.com:19302"}},
+	}
+	px := p2p.NewPeerToPeer(session, gm, iceServers, nil)
 
 	if err := session.ConnectOverWebsocket(ctx, user2, fmt.Sprintf("ws://%s/lobby", consoleUri)); err != nil {
 		slog.Error("failed to connect over websocket", logging.Error(err))
