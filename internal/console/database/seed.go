@@ -211,6 +211,101 @@ func Seed(queries *Queries) error {
 		UserID: user2.ID,
 	})
 
+	// Additional test users for multi-player scenarios
+	user3, err := queries.CreateUser(context.TODO(), CreateUserParams{
+		Username: "warrior",
+		Password: pwd.String(),
+	})
+	if err != nil {
+		return err
+	}
+
+	_, err = queries.CreateCharacter(context.TODO(), CreateCharacterParams{
+		Strength:             30,
+		Agility:              12,
+		Wisdom:               8,
+		Constitution:         25,
+		HealthPoints:         0,
+		MagicPoints:          0,
+		ExperiencePoints:     0,
+		Money:                300,
+		ScorePoints:          0,
+		ClassType:            int64(model.ClassTypeWarrior),
+		SkinCarnation:        int64(model.SkinCarnationMaleBeige),
+		HairStyle:            int64(model.HairStyleMaleShortBlack),
+		LightArmourLegs:      100,
+		LightArmourTorso:     100,
+		LightArmourHands:     100,
+		LightArmourBoots:     100,
+		FullArmour:           10,
+		ArmourEmblem:         100,
+		Helmet:               100,
+		SecondaryWeapon:      100,
+		PrimaryWeapon:        20,
+		Shield:               5,
+		UnknownEquipmentSlot: 100,
+		Gender:               int64(model.GenderMale),
+		Level:                1,
+		EdgedWeapons:         2,
+		BluntedWeapons:       1,
+		Archery:              1,
+		Polearms:             1,
+		Wizardry:             1,
+		BonusPoints:          50,
+		CharacterName:        "warrior",
+		UserID:               user3.ID,
+	})
+	if err != nil {
+		return err
+	}
+
+	user4, err := queries.CreateUser(context.TODO(), CreateUserParams{
+		Username: "necro",
+		Password: pwd.String(),
+	})
+	if err != nil {
+		return err
+	}
+
+	_, err = queries.CreateCharacter(context.TODO(), CreateCharacterParams{
+		Strength:             12,
+		Agility:              15,
+		Wisdom:               28,
+		Constitution:         18,
+		HealthPoints:         0,
+		MagicPoints:          0,
+		ExperiencePoints:     0,
+		Money:                300,
+		ScorePoints:          0,
+		ClassType:            int64(model.ClassTypeMage),
+		SkinCarnation:        int64(model.SkinCarnationFemaleLightBrown),
+		HairStyle:            int64(model.HairStyleFemaleLongBlack),
+		LightArmourLegs:      100,
+		LightArmourTorso:     100,
+		LightArmourHands:     100,
+		LightArmourBoots:     100,
+		FullArmour:           100,
+		ArmourEmblem:         100,
+		Helmet:               100,
+		SecondaryWeapon:      100,
+		PrimaryWeapon:        35,
+		Shield:               100,
+		UnknownEquipmentSlot: 100,
+		Gender:               int64(model.GenderFemale),
+		Level:                1,
+		EdgedWeapons:         1,
+		BluntedWeapons:       1,
+		Archery:              1,
+		Polearms:             1,
+		Wizardry:             2,
+		BonusPoints:          30,
+		CharacterName:        "necro",
+		UserID:               user4.ID,
+	})
+	if err != nil {
+		return err
+	}
+
 	// queries.UpdateCharacterInventory(context.TODO(), UpdateCharacterInventoryParams{
 	// 	CharacterName: character2.CharacterName,
 	// 	Inventory: sql.NullString{

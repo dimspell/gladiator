@@ -15,12 +15,14 @@ import (
 	"github.com/dimspell/gladiator/internal/app/logger"
 	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"github.com/dimspell/gladiator/internal/backend"
+	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/packet"
 	"github.com/dimspell/gladiator/internal/backend/proxy/p2p"
 	"github.com/dimspell/gladiator/internal/console"
 	"github.com/dimspell/gladiator/internal/console/database"
 	"github.com/dimspell/gladiator/internal/model"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestE2E_P2P(t *testing.T) {
@@ -386,4 +388,381 @@ func helperStartGameServer(t testing.TB) {
 		udpConn.Close()
 		tcpListener.Close()
 	})
+}
+
+// p2pTestEnv contains the test environment for P2P tests.
+type p2pTestEnv struct {
+	t              *testing.T
+	ctx            context.Context
+	cancel         context.CancelFunc
+	console        *console.Console
+	testServer     *httptest.Server
+	consoleHostPort string
+	proxy          *p2p.ProxyP2P
+}
+
+// p2pPlayer represents a player in the P2P test.
+type p2pPlayer struct {
+	backend *backend.Backend
+	conn    *mockConn
+	session *bsession.Session
+	name    string
+}
+
+// setupP2PEnv creates the test environment for P2P tests.
+func setupP2PEnv(t *testing.T) *p2pTestEnv {
+	t.Helper()
+
+	logger.SetColoredLogger(os.Stderr, slog.LevelDebug, false)
+	helperStartGameServer(t)
+
+	db, err := database.NewMemory()
+	require.NoError(t, err, "failed to create database")
+	t.Cleanup(func() { db.Close() })
+
+	require.NoError(t, database.Seed(db.Write), "failed to seed database")
+
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+
+	cs := console.NewConsole(db)
+	ts := httptest.NewServer(cs.HttpRouter())
+	t.Cleanup(ts.Close)
+
+	consoleHostPort := ts.URL[len("http://"):]
+	cs.ConsoleBindAddr = consoleHostPort
+
+	return &p2pTestEnv{
+		t:               t,
+		ctx:             ctx,
+		cancel:          cancel,
+		console:         cs,
+		testServer:      ts,
+		consoleHostPort: consoleHostPort,
+		proxy:           &p2p.ProxyP2P{},
+	}
+}
+
+// createPlayer creates and authenticates a player.
+func (env *p2pTestEnv) createPlayer(username, characterName string) *p2pPlayer {
+	bd := backend.NewBackend("", env.testServer.URL, env.proxy)
+	bd.SignalServerURL = "ws://" + env.consoleHostPort + "/lobby"
+
+	conn := &mockConn{}
+	session := bd.SessionManager.Add(conn)
+
+	// Sign-in
+	authReq := backend.ClientAuthenticationRequest(append(
+		[]byte{2, 0, 0, 0},
+		append([]byte("test\x00"), append([]byte(username), 0)...)...,
+	))
+	require.NoError(env.t, bd.HandleClientAuthentication(env.ctx, session, authReq))
+	require.True(env.t, bytes.Equal([]byte{255, 41, 8, 0, 1, 0, 0, 0}, conn.Written),
+		"Player %s not logged in, got: %v", username, conn.Written)
+
+	// Select character
+	selectReq := backend.SelectCharacterRequest(append(
+		append([]byte(username), 0),
+		append([]byte(characterName), 0)...,
+	))
+	require.NoError(env.t, bd.HandleSelectCharacter(env.ctx, session, selectReq))
+
+	require.NoError(env.t, session.JoinLobby(env.ctx), "failed to join lobby")
+	require.NoError(env.t, session.RegisterNewObserver(env.ctx), "failed to register observer")
+
+	conn.Written = nil // Clear written data
+
+	return &p2pPlayer{
+		backend: bd,
+		conn:    conn,
+		session: session,
+		name:    username,
+	}
+}
+
+// createRoom creates a game room with the host player.
+func (env *p2pTestEnv) createRoom(host *p2pPlayer, roomName string, mapID v1.GameMap) {
+	// Create game room (first call sets state=0)
+	createReq := backend.CreateGameRequest(append(
+		[]byte{0, 0, 0, 0, byte(mapID), 0, 0, 0},
+		append([]byte(roomName), 0, 0)...,
+	))
+	require.NoError(env.t, host.backend.HandleCreateGame(env.ctx, host.session, createReq))
+
+	// Set room ready (second call sets state=1)
+	readyReq := backend.CreateGameRequest(append(
+		[]byte{1, 0, 0, 0, byte(mapID), 0, 0, 0},
+		append([]byte(roomName), 0, 0)...,
+	))
+	require.NoError(env.t, host.backend.HandleCreateGame(env.ctx, host.session, readyReq))
+
+	// Process the SetRoomReady message
+	env.console.RoomService.HandleIncomingMessage(env.ctx, <-env.console.RoomService.Messages)
+
+	host.conn.Written = nil
+}
+
+// joinRoom has a player join an existing room.
+func (env *p2pTestEnv) joinRoom(player *p2pPlayer, roomName string) {
+	// List games
+	require.NoError(env.t, player.backend.HandleListGames(env.ctx, player.session, backend.ListGamesRequest{}))
+	player.conn.Written = nil
+
+	// Select game
+	selectReq := backend.SelectGameRequest(append([]byte(roomName), 0, 0))
+	require.NoError(env.t, player.backend.HandleSelectGame(env.ctx, player.session, selectReq))
+	player.conn.Written = nil
+
+	// Join game
+	joinReq := backend.JoinGameRequest(append([]byte(roomName), 0, 0))
+	require.NoError(env.t, player.backend.HandleJoinGame(env.ctx, player.session, joinReq))
+	player.conn.Written = nil
+}
+
+// processMessages processes all pending WebSocket messages for a short duration.
+func (env *p2pTestEnv) processMessages(duration time.Duration) {
+	timeout := time.After(duration)
+	for {
+		select {
+		case msg := <-env.console.RoomService.Messages:
+			env.console.RoomService.HandleIncomingMessage(env.ctx, msg)
+		case <-timeout:
+			return
+		}
+	}
+}
+
+// TestE2E_P2P_HostMigration tests that when the host leaves, another player becomes host.
+func TestE2E_P2P_HostMigration(t *testing.T) {
+	env := setupP2PEnv(t)
+
+	// Create players
+	host := env.createPlayer("archer", "archer")
+	guest := env.createPlayer("mage", "mage")
+
+	// Host creates room
+	env.createRoom(host, "testroom", v1.GameMap_FrozenLabyrinth)
+
+	room, ok := env.console.RoomService.Rooms["testroom"]
+	require.True(t, ok, "room not found")
+	require.Equal(t, host.session.UserID, room.HostPlayer.UserID, "host should be archer")
+
+	// Guest joins
+	env.joinRoom(guest, "testroom")
+
+	// Process WebRTC signaling messages
+	env.processMessages(3 * time.Second)
+
+	// Verify both players are in room
+	room, _ = env.console.RoomService.Rooms["testroom"]
+	require.Equal(t, 2, len(room.Players), "should have 2 players")
+
+	// Get the host's user session for LeaveRoom
+	hostSession, ok := env.console.RoomService.GetUserSession(host.session.UserID)
+	require.True(t, ok, "host session not found")
+
+	// Host leaves
+	env.console.RoomService.LeaveRoom(env.ctx, hostSession)
+
+	// Process any remaining messages
+	env.processMessages(1 * time.Second)
+
+	// Verify guest is now host
+	room, ok = env.console.RoomService.Rooms["testroom"]
+	require.True(t, ok, "room should still exist")
+	require.Equal(t, 1, len(room.Players), "should have 1 player after host left")
+	require.Equal(t, guest.session.UserID, room.HostPlayer.UserID, "mage should now be host")
+
+	t.Log("Host migration successful: mage is now host")
+}
+
+// TestE2E_P2P_ThirdPlayerJoins tests 3 players joining a game room.
+func TestE2E_P2P_ThirdPlayerJoins(t *testing.T) {
+	env := setupP2PEnv(t)
+
+	// Create players
+	host := env.createPlayer("archer", "archer")
+	guest1 := env.createPlayer("mage", "mage")
+	guest2 := env.createPlayer("warrior", "warrior")
+
+	// Host creates room
+	env.createRoom(host, "bigroom", v1.GameMap_AbandonedRealm)
+
+	// First guest joins
+	env.joinRoom(guest1, "bigroom")
+
+	// Process WebRTC signaling for first guest
+	env.processMessages(2 * time.Second)
+
+	room, _ := env.console.RoomService.Rooms["bigroom"]
+	require.Equal(t, 2, len(room.Players), "should have 2 players after first guest joins")
+
+	// Second guest joins
+	env.joinRoom(guest2, "bigroom")
+
+	// Process WebRTC signaling for second guest
+	env.processMessages(3 * time.Second)
+
+	// Verify all 3 players are in room
+	room, ok := env.console.RoomService.Rooms["bigroom"]
+	require.True(t, ok, "room not found")
+	require.Equal(t, 3, len(room.Players), "should have 3 players")
+	require.Equal(t, host.session.UserID, room.HostPlayer.UserID, "host should still be archer")
+
+	// Verify each player is present
+	_, hasHost := room.Players[host.session.UserID]
+	_, hasGuest1 := room.Players[guest1.session.UserID]
+	_, hasGuest2 := room.Players[guest2.session.UserID]
+	require.True(t, hasHost, "archer should be in room")
+	require.True(t, hasGuest1, "mage should be in room")
+	require.True(t, hasGuest2, "warrior should be in room")
+
+	t.Log("3-player room setup successful")
+}
+
+// TestE2E_P2P_FourPlayersOneLeaves tests a 4-player room where one player leaves.
+func TestE2E_P2P_FourPlayersOneLeaves(t *testing.T) {
+	env := setupP2PEnv(t)
+
+	// Create players
+	host := env.createPlayer("archer", "archer")
+	guest1 := env.createPlayer("mage", "mage")
+	guest2 := env.createPlayer("warrior", "warrior")
+	guest3 := env.createPlayer("necro", "necro")
+
+	// Host creates room
+	env.createRoom(host, "fullroom", v1.GameMap_CrimsonAshes)
+
+	// All guests join sequentially
+	env.joinRoom(guest1, "fullroom")
+	env.processMessages(2 * time.Second)
+
+	env.joinRoom(guest2, "fullroom")
+	env.processMessages(2 * time.Second)
+
+	env.joinRoom(guest3, "fullroom")
+	env.processMessages(3 * time.Second)
+
+	// Verify 4 players in room
+	room, ok := env.console.RoomService.Rooms["fullroom"]
+	require.True(t, ok, "room not found")
+	require.Equal(t, 4, len(room.Players), "should have 4 players")
+
+	t.Log("4-player room setup complete")
+
+	// Guest2 (warrior) leaves
+	guest2Session, ok := env.console.RoomService.GetUserSession(guest2.session.UserID)
+	require.True(t, ok, "guest2 session not found")
+	env.console.RoomService.LeaveRoom(env.ctx, guest2Session)
+
+	// Process leave messages
+	env.processMessages(1 * time.Second)
+
+	// Verify cleanup
+	room, ok = env.console.RoomService.Rooms["fullroom"]
+	require.True(t, ok, "room should still exist")
+	require.Equal(t, 3, len(room.Players), "should have 3 players after one left")
+	require.Equal(t, host.session.UserID, room.HostPlayer.UserID, "host should still be archer")
+
+	// Verify warrior is gone but others remain
+	_, hasHost := room.Players[host.session.UserID]
+	_, hasGuest1 := room.Players[guest1.session.UserID]
+	_, hasGuest2 := room.Players[guest2.session.UserID]
+	_, hasGuest3 := room.Players[guest3.session.UserID]
+	require.True(t, hasHost, "archer should be in room")
+	require.True(t, hasGuest1, "mage should be in room")
+	require.False(t, hasGuest2, "warrior should NOT be in room")
+	require.True(t, hasGuest3, "necro should be in room")
+
+	t.Log("Player cleanup after leave successful")
+}
+
+// TestE2E_P2P_HostLeavesWithMultiplePlayers tests host migration in a room with 3+ players.
+func TestE2E_P2P_HostLeavesWithMultiplePlayers(t *testing.T) {
+	env := setupP2PEnv(t)
+
+	// Create players
+	host := env.createPlayer("archer", "archer")
+	guest1 := env.createPlayer("mage", "mage")
+	guest2 := env.createPlayer("warrior", "warrior")
+
+	// Host creates room
+	env.createRoom(host, "migroom", v1.GameMap_FrozenLabyrinth)
+
+	// Guests join
+	env.joinRoom(guest1, "migroom")
+	env.processMessages(2 * time.Second)
+
+	env.joinRoom(guest2, "migroom")
+	env.processMessages(3 * time.Second)
+
+	// Verify 3 players
+	room, _ := env.console.RoomService.Rooms["migroom"]
+	require.Equal(t, 3, len(room.Players), "should have 3 players")
+	require.Equal(t, host.session.UserID, room.HostPlayer.UserID)
+
+	// Record which guest joined first (for host selection)
+	guest1Session, _ := env.console.RoomService.GetUserSession(guest1.session.UserID)
+	guest2Session, _ := env.console.RoomService.GetUserSession(guest2.session.UserID)
+	earlierGuest := guest1Session
+	if guest2Session.JoinedAt.Before(guest1Session.JoinedAt) {
+		earlierGuest = guest2Session
+	}
+
+	// Host leaves
+	hostSession, _ := env.console.RoomService.GetUserSession(host.session.UserID)
+	env.console.RoomService.LeaveRoom(env.ctx, hostSession)
+
+	// Process messages
+	env.processMessages(1 * time.Second)
+
+	// Verify new host is the earlier guest
+	room, ok := env.console.RoomService.Rooms["migroom"]
+	require.True(t, ok, "room should exist")
+	require.Equal(t, 2, len(room.Players), "should have 2 players")
+	require.Equal(t, earlierGuest.UserID, room.HostPlayer.UserID, "earlier guest should be new host")
+
+	t.Logf("Host migration with 3 players: new host is user %d", room.HostPlayer.UserID)
+}
+
+// TestE2E_P2P_AllGuestsLeave tests that room is cleaned up when all guests leave.
+func TestE2E_P2P_AllGuestsLeave(t *testing.T) {
+	env := setupP2PEnv(t)
+
+	// Create players
+	host := env.createPlayer("archer", "archer")
+	guest1 := env.createPlayer("mage", "mage")
+	guest2 := env.createPlayer("warrior", "warrior")
+
+	// Host creates room
+	env.createRoom(host, "emptyroom", v1.GameMap_CrimsonAshes)
+
+	// Guests join
+	env.joinRoom(guest1, "emptyroom")
+	env.processMessages(2 * time.Second)
+
+	env.joinRoom(guest2, "emptyroom")
+	env.processMessages(2 * time.Second)
+
+	// Verify 3 players
+	room, _ := env.console.RoomService.Rooms["emptyroom"]
+	require.Equal(t, 3, len(room.Players))
+
+	// Both guests leave
+	guest1Session, _ := env.console.RoomService.GetUserSession(guest1.session.UserID)
+	env.console.RoomService.LeaveRoom(env.ctx, guest1Session)
+
+	guest2Session, _ := env.console.RoomService.GetUserSession(guest2.session.UserID)
+	env.console.RoomService.LeaveRoom(env.ctx, guest2Session)
+
+	// Process messages
+	env.processMessages(1 * time.Second)
+
+	// Verify only host remains
+	room, ok := env.console.RoomService.Rooms["emptyroom"]
+	require.True(t, ok, "room should exist")
+	require.Equal(t, 1, len(room.Players), "only host should remain")
+	require.Equal(t, host.session.UserID, room.HostPlayer.UserID)
+
+	t.Log("All guests left, host remains alone")
 }
