@@ -276,8 +276,8 @@ func (p *PeerToPeer) onTCPMessage(peerID string) func(data []byte) error {
 		peer, ok := p.peers[peerID]
 		p.mu.Unlock()
 
-		if !ok || peer.dataChannel == nil {
-			p.logger.Debug("No data channel for peer, buffering", logging.PeerID(peerID))
+		if !ok {
+			p.logger.Debug("No peer for outbound TCP packet", logging.PeerID(peerID))
 			return nil
 		}
 
@@ -286,7 +286,7 @@ func (p *PeerToPeer) onTCPMessage(peerID string) func(data []byte) error {
 		payload[0] = 'T'
 		copy(payload[1:], data)
 
-		return peer.dataChannel.Send(payload)
+		return peer.Send(payload)
 	}
 }
 
@@ -297,8 +297,8 @@ func (p *PeerToPeer) onUDPMessage(peerID string) func(data []byte) error {
 		peer, ok := p.peers[peerID]
 		p.mu.Unlock()
 
-		if !ok || peer.dataChannel == nil {
-			p.logger.Debug("No data channel for peer, buffering", logging.PeerID(peerID))
+		if !ok {
+			p.logger.Debug("No peer for outbound UDP packet", logging.PeerID(peerID))
 			return nil
 		}
 
@@ -307,7 +307,7 @@ func (p *PeerToPeer) onUDPMessage(peerID string) func(data []byte) error {
 		payload[0] = 'U'
 		copy(payload[1:], data)
 
-		return peer.dataChannel.Send(payload)
+		return peer.Send(payload)
 	}
 }
 
@@ -364,6 +364,14 @@ func (p *PeerToPeer) handleJoinRoom(ctx context.Context, player wire.Player) err
 	}
 
 	p.logger.Info("New player joining", logging.PeerID(pid))
+
+	// Mirror relay host behavior: if we are the current host, dial into the local game server
+	// and forward packets to this joining peer.
+	if p.currentHostID == p.selfID {
+		if err := p.ensureDialHostForPeer(ctx, pid); err != nil {
+			return err
+		}
+	}
 
 	// Create WebRTC peer connection for the new player
 	if err := p.createPeerConnection(ctx, pid, true); err != nil {
@@ -565,7 +573,7 @@ func (p *PeerToPeer) createPeerConnection(ctx context.Context, remotePeerID stri
 	// Handle incoming data channels (for the answerer)
 	pc.OnDataChannel(func(dc *webrtc.DataChannel) {
 		peer.logger.Debug("Received data channel", "label", dc.Label())
-		peer.dataChannel = dc
+		peer.setDataChannel(dc)
 		p.setupDataChannel(peer, dc)
 	})
 
@@ -579,7 +587,7 @@ func (p *PeerToPeer) createPeerConnection(ctx context.Context, remotePeerID stri
 		if err != nil {
 			return fmt.Errorf("failed to create data channel: %w", err)
 		}
-		peer.dataChannel = dc
+		peer.setDataChannel(dc)
 		p.setupDataChannel(peer, dc)
 
 		// Create and send offer
@@ -598,6 +606,33 @@ func (p *PeerToPeer) createPeerConnection(ctx context.Context, remotePeerID stri
 		}
 	}
 
+	return nil
+}
+
+func (p *PeerToPeer) ensureDialHostForPeer(ctx context.Context, remotePeerID string) error {
+	ip, err := p.manager.AssignIP(remotePeerID)
+	if err != nil {
+		return fmt.Errorf("assign ip for peer %s: %w", remotePeerID, err)
+	}
+
+	// If already created, no-op.
+	if _, ok := p.manager.PeerHosts[remotePeerID]; ok {
+		return nil
+	}
+
+	onTCP := p.onTCPMessage(remotePeerID)
+	onUDP := p.onUDPMessage(remotePeerID)
+	onDisconnect := func(host *redirect.FakeHost, forced bool) {
+		p.logger.Warn("Dial host disconnected", logging.PeerID(remotePeerID), "ip", host.AssignedIP, "forced", forced)
+		p.manager.StopHost(host)
+	}
+
+	// Dial into the local game client (127.0.0.1:6114/6113), like relay host does.
+	host, err := p.manager.StartGuest(ctx, remotePeerID, ip, 6114, 6113, onTCP, onUDP, onDisconnect)
+	if err != nil {
+		return fmt.Errorf("start dial host for %s: %w", remotePeerID, err)
+	}
+	p.logger.Info("Started dial host for peer", logging.PeerID(remotePeerID), "ip", host.AssignedIP)
 	return nil
 }
 
