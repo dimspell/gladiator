@@ -55,10 +55,13 @@ func main() {
 		UserId:   meUserId,
 		Username: meName,
 	}
-	iceServers := []webrtc.ICEServer{
-		{URLs: []string{"stun:stun.l.google.com:19302"}},
+
+	p2pProxy := &p2p.ProxyP2P{
+		ICEServers: []webrtc.ICEServer{
+			{URLs: []string{"stun:stun.l.google.com:19302"}},
+		},
 	}
-	px := p2p.NewPeerToPeer(session, gm, iceServers, nil)
+	px := p2pProxy.Create(session, gm).(*p2p.PeerToPeer)
 
 	if err := session.ConnectOverWebsocket(ctx, user2, fmt.Sprintf("ws://%s/lobby", consoleUri)); err != nil {
 		slog.Error("failed to connect over websocket", logging.Error(err))

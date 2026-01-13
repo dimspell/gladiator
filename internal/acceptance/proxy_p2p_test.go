@@ -24,7 +24,7 @@ import (
 )
 
 func TestE2E_P2P(t *testing.T) {
-	t.Skip("Fails with the panic")
+	t.Skip("Requires loopback aliases (127.0.0.X) - see README troubleshooting")
 
 	logger.SetColoredLogger(os.Stderr, slog.LevelDebug, false)
 
@@ -56,12 +56,13 @@ func TestE2E_P2P(t *testing.T) {
 
 	// go cs.RoomService.Run(ctx)
 
-	// Remove the HTTP schema prefix
-	cs.ConsoleBindAddr = ts.URL[len("http://"):]
+	// Extract host:port from test server URL and set console address
+	consoleHostPort := ts.URL[len("http://"):]
+	cs.ConsoleBindAddr = consoleHostPort
 
 	// proxy1.NewRedirect = redirectFunc
-	bd1 := backend.NewBackend("", cs.ConsoleBindAddr, proxy)
-	bd1.SignalServerURL = "ws://" + cs.ConsoleBindAddr + "/lobby"
+	bd1 := backend.NewBackend("", ts.URL, proxy)
+	bd1.SignalServerURL = "ws://" + consoleHostPort + "/lobby"
 
 	conn1 := &mockConn{}
 	session1 := bd1.SessionManager.Add(conn1)
@@ -132,8 +133,8 @@ func TestE2E_P2P(t *testing.T) {
 	assert.Equal(t, byte(v1.ClassType_Archer), room.Players[1].Character.ClassType)
 
 	// Other user
-	bd2 := backend.NewBackend("", cs.ConsoleBindAddr, proxy)
-	bd2.SignalServerURL = "ws://" + cs.ConsoleBindAddr + "/lobby"
+	bd2 := backend.NewBackend("", ts.URL, proxy)
+	bd2.SignalServerURL = "ws://" + consoleHostPort + "/lobby"
 
 	conn2 := &mockConn{}
 	session2 := bd2.SessionManager.Add(conn2)
