@@ -24,7 +24,7 @@ import (
 )
 
 func TestE2E_P2P(t *testing.T) {
-	t.Skip("Requires loopback aliases (127.0.0.X) - see README troubleshooting")
+	// t.Skip("Requires loopback aliases (127.0.0.X) - see README troubleshooting")
 
 	logger.SetColoredLogger(os.Stderr, slog.LevelDebug, false)
 
@@ -180,7 +180,7 @@ func TestE2E_P2P(t *testing.T) {
 	// Check if user has received the game list with corresponding payload
 	assert.Equal(t, []byte{
 		1, 0, 0, 0, // Number of games
-		127, 0, 1, 2, // IP address of host
+		127, 0, 0, 2, // IP address of host (127.0.0.2 for P2P mode)
 		'r', 'o', 'o', 'm', 0, // Room name
 		0, // Password
 	}, findPacket(conn2.Written, packet.ListGames))
@@ -198,8 +198,7 @@ func TestE2E_P2P(t *testing.T) {
 	assert.Equal(t, []byte{
 		byte(v1.GameMap_FrozenLabyrinth), 0, 0, 0, // Map ID
 		byte(v1.ClassType_Archer), 0, 0, 0, // Host's character class type
-		// 127, 0, 1, 2, // IP address of host
-		127, 0, 1, 2, // IP address of host
+		127, 0, 0, 2, // IP address of host (127.0.0.2 for P2P mode)
 		'a', 'r', 'c', 'h', 'e', 'r', 0, // Player name
 	}, findPacket(conn2.Written, packet.SelectGame))
 
@@ -216,8 +215,7 @@ func TestE2E_P2P(t *testing.T) {
 	assert.Equal(t, []byte{
 		model.GameStateStarted, 0, // Game state
 		byte(v1.ClassType_Archer), 0, 0, 0, // Host's character class type
-		// 127, 0, 1, 2, // IP address of host
-		127, 0, 1, 2, // IP address of host
+		127, 0, 0, 2, // IP address of host (127.0.0.2 for P2P mode)
 		'a', 'r', 'c', 'h', 'e', 'r', 0, // Player name
 	}, findPacket(conn2.Written, packet.JoinGame))
 
@@ -255,12 +253,14 @@ func TestE2E_P2P(t *testing.T) {
 	// Host user has correct data
 	assert.Equal(t, int64(1), mpSession1.UserID)
 	assert.Equal(t, "archer", mpSession1.User.Username)
-	assert.Equal(t, "127.0.0.1", mpSession1.IPAddress)
+	// P2P mode uses WebRTC for connectivity, so IPAddress is empty
+	assert.Equal(t, "", mpSession1.IPAddress)
 
 	// Joining user has also the same data
 	assert.Equal(t, int64(2), mpSession2.UserID)
 	assert.Equal(t, "mage", mpSession2.User.Username)
-	assert.Equal(t, "127.0.0.1", mpSession2.IPAddress)
+	// P2P mode uses WebRTC for connectivity, so IPAddress is empty
+	assert.Equal(t, "", mpSession2.IPAddress)
 
 	// RTCICECandidate
 	// cs.RoomService.HandleIncomingMessage(ctx, <-cs.RoomService.Messages)

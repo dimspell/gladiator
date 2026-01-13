@@ -84,7 +84,16 @@ func (p *ListenerTCP) Run(ctx context.Context) error {
 
 	// Wait for the right client who wants to connect - the game client.
 	for {
-		conn, err := p.listener.Accept()
+		p.mu.RLock()
+		listener := p.listener
+		closed := p.closed
+		p.mu.RUnlock()
+
+		if closed || listener == nil {
+			return ctx.Err()
+		}
+
+		conn, err := listener.Accept()
 		if err != nil {
 			if ctx.Err() != nil {
 				return ctx.Err()
