@@ -392,13 +392,13 @@ func helperStartGameServer(t testing.TB) {
 
 // p2pTestEnv contains the test environment for P2P tests.
 type p2pTestEnv struct {
-	t              *testing.T
-	ctx            context.Context
-	cancel         context.CancelFunc
-	console        *console.Console
-	testServer     *httptest.Server
+	t               *testing.T
+	ctx             context.Context
+	cancel          context.CancelFunc
+	console         *console.Console
+	testServer      *httptest.Server
 	consoleHostPort string
-	proxy          *p2p.ProxyP2P
+	proxy           *p2p.ProxyP2P
 }
 
 // p2pPlayer represents a player in the P2P test.
