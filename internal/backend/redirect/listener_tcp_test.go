@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net"
@@ -128,7 +129,10 @@ func TestListenerTCP_Close_Idempotent(t *testing.T) {
 func TestListenerTCP_handleHandshake_Valid(t *testing.T) {
 	mockConn := &mockTCPConn{readData: [][]byte{[]byte("##username")}}
 	listener := &ListenerTCP{logger: logger.NewDiscardLogger()}
-	err := listener.handleHandshake(mockConn)
+	err := listener.handleHandshake(mockConn, func(d []byte) error {
+		fmt.Println(string(d))
+		return nil
+	})
 	require.NoError(t, err)
 	require.Equal(t, mockConn, listener.conn)
 }
@@ -136,7 +140,9 @@ func TestListenerTCP_handleHandshake_Valid(t *testing.T) {
 func TestListenerTCP_handleHandshake_Invalid(t *testing.T) {
 	mockConn := &mockTCPConn{readData: [][]byte{[]byte("bad")}}
 	listener := &ListenerTCP{logger: logger.NewDiscardLogger()}
-	err := listener.handleHandshake(mockConn)
+	err := listener.handleHandshake(mockConn, func(d []byte) error {
+		return nil
+	})
 	require.Error(t, err)
 }
 

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
 	"sync"
 	"testing"
 	"time"
@@ -69,7 +68,7 @@ func (m *mockProxyFactory) NewListenerUDP(ip, port string, onReceive ReceiveFunc
 }
 
 func TestHostManager_IPAssignment(t *testing.T) {
-	hm := NewManager(net.IPv4(127, 0, 0, 1))
+	hm := NewManager()
 	ip1, err := hm.AssignIP("peer1")
 	if err != nil || ip1 == "" {
 		t.Fatalf("expected IP, got %v %v", ip1, err)
@@ -88,7 +87,7 @@ func TestHostManager_IPAssignment(t *testing.T) {
 func TestHostManager_StartHostAndGuest(t *testing.T) {
 	tcp := &mockRedirect{}
 	udp := &mockRedirect{}
-	hm := NewManager(net.IPv4(127, 0, 0, 1), WithProxyFactory(&mockProxyFactory{tcp, udp, false}))
+	hm := NewManager(WithProxyFactory(&mockProxyFactory{tcp, udp, false}))
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	ip1, _ := hm.AssignIP("peer1")
@@ -110,7 +109,7 @@ func TestHostManager_StartHostAndGuest(t *testing.T) {
 }
 
 func TestHostManager_CreateFakeHost_ErrorHandling(t *testing.T) {
-	hm := NewManager(net.IPv4(127, 0, 0, 1), WithProxyFactory(&mockProxyFactory{&mockRedirect{}, &mockRedirect{}, true}))
+	hm := NewManager(WithProxyFactory(&mockProxyFactory{&mockRedirect{}, &mockRedirect{}, true}))
 	ctx := context.Background()
 	ip, _ := hm.AssignIP("peer1")
 	_, err := hm.StartHost(ctx, "peer1", ip, 1234, 5678, func([]byte) error { return nil }, func([]byte) error { return nil }, nil)
@@ -121,7 +120,7 @@ func TestHostManager_CreateFakeHost_ErrorHandling(t *testing.T) {
 
 func TestHostManager_RemoveByIPAndRemoteID(t *testing.T) {
 	t.Skip("Failing - needs to be fixed")
-	hm := NewManager(net.IPv4(127, 0, 0, 1))
+	hm := NewManager()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 	ip, _ := hm.AssignIP("peer1")
@@ -151,7 +150,7 @@ func TestHostManager_RemoveByIPAndRemoteID(t *testing.T) {
 }
 
 func TestHostManager_StopHost_Idempotent(t *testing.T) {
-	hm := NewManager(net.IPv4(127, 0, 0, 1))
+	hm := NewManager()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	ip, _ := hm.AssignIP("peer1")
@@ -161,7 +160,7 @@ func TestHostManager_StopHost_Idempotent(t *testing.T) {
 }
 
 func TestHostManager_ConcurrentStopAndRemove(t *testing.T) {
-	hm := NewManager(net.IPv4(127, 0, 0, 1))
+	hm := NewManager()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	ip, _ := hm.AssignIP("peer1")
@@ -174,7 +173,7 @@ func TestHostManager_ConcurrentStopAndRemove(t *testing.T) {
 }
 
 func TestHostManager_DoubleAssignmentAndRemoval(t *testing.T) {
-	hm := NewManager(net.IPv4(127, 0, 0, 1))
+	hm := NewManager()
 	ip1, err := hm.AssignIP("peer1")
 	if err != nil {
 		t.Fatalf("AssignIP failed: %v", err)
@@ -197,7 +196,7 @@ func TestHostManager_DoubleAssignmentAndRemoval(t *testing.T) {
 }
 
 func TestHostManager_RemoveByRemoteID_Nonexistent(t *testing.T) {
-	hm := NewManager(net.IPv4(127, 0, 0, 1))
+	hm := NewManager()
 	removed := hm.RemoveByRemoteID("notfound")
 	if removed {
 		t.Errorf("expected false for nonexistent peer")
@@ -207,7 +206,7 @@ func TestHostManager_RemoveByRemoteID_Nonexistent(t *testing.T) {
 func TestHostManager_StopAll(t *testing.T) {
 	tcp := &mockRedirect{}
 	udp := &mockRedirect{}
-	hm := NewManager(net.IPv4(127, 0, 0, 1), WithProxyFactory(&mockProxyFactory{tcp, udp, false}))
+	hm := NewManager(WithProxyFactory(&mockProxyFactory{tcp, udp, false}))
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	ip1, _ := hm.AssignIP("peer1")
@@ -225,7 +224,7 @@ func TestHostManager_StopAll(t *testing.T) {
 
 func TestHostManager_CreateFakeHost_TCPFail(t *testing.T) {
 	failingFactory := &mockProxyFactory{tcp: &mockRedirect{}, udp: &mockRedirect{}, fail: true}
-	hm := NewManager(net.IPv4(127, 0, 0, 1), WithProxyFactory(failingFactory))
+	hm := NewManager(WithProxyFactory(failingFactory))
 	ctx := context.Background()
 	ip, _ := hm.AssignIP("peer1")
 	_, err := hm.StartHost(ctx, "peer1", ip, 1234, 5678, func([]byte) error { return nil }, func([]byte) error { return nil }, nil)
@@ -235,7 +234,7 @@ func TestHostManager_CreateFakeHost_TCPFail(t *testing.T) {
 }
 
 func TestHostManager_ConcurrentAssignAndRemove(t *testing.T) {
-	hm := NewManager(net.IPv4(127, 0, 0, 1))
+	hm := NewManager()
 	var wg sync.WaitGroup
 	for i := 0; i < 10; i++ {
 		peer := fmt.Sprintf("peer%d", i)
@@ -260,7 +259,7 @@ func TestHostManager_ConcurrentAssignAndRemove(t *testing.T) {
 
 func TestHostManager_HostGuestLifecycle(t *testing.T) {
 	t.Skip("Failing - needs to be fixed")
-	hm := NewManager(net.IPv4(127, 0, 0, 1))
+	hm := NewManager()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	ipHost, _ := hm.AssignIP("host")
@@ -281,7 +280,7 @@ func TestHostManager_HostGuestLifecycle(t *testing.T) {
 }
 
 func TestHostManager_RemoveByIP_Idempotent(t *testing.T) {
-	hm := NewManager(net.IPv4(127, 0, 0, 1))
+	hm := NewManager()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	ip, _ := hm.AssignIP("peer1")
@@ -291,7 +290,7 @@ func TestHostManager_RemoveByIP_Idempotent(t *testing.T) {
 }
 
 func TestHostManager_RemoveByRemoteID_Idempotent(t *testing.T) {
-	hm := NewManager(net.IPv4(127, 0, 0, 1))
+	hm := NewManager()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	ip, _ := hm.AssignIP("peer1")
@@ -303,7 +302,7 @@ func TestHostManager_RemoveByRemoteID_Idempotent(t *testing.T) {
 func TestHostManager_ProxiesClosedOnRemove(t *testing.T) {
 	tcp := &mockRedirect{}
 	udp := &mockRedirect{}
-	hm := NewManager(net.IPv4(127, 0, 0, 1), WithProxyFactory(&mockProxyFactory{tcp, udp, false}))
+	hm := NewManager(WithProxyFactory(&mockProxyFactory{tcp, udp, false}))
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	ip, _ := hm.AssignIP("peer1")

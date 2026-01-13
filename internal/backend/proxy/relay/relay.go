@@ -62,7 +62,7 @@ func NewRelay(config *ProxyRelay, client multiv1connect.GameServiceClient, sessi
 		logger:    slog.With(slog.String("proxy", "relay"), slog.String("sessionId", session.ID)),
 		selfID:    remoteID(session.UserID),
 		session:   session,
-		manager:   redirect.NewManager(ipPrefix.To4()),
+		manager:   redirect.NewManager(redirect.WithIPPrefix(ipPrefix.To4())),
 	}
 
 	return &Relay{

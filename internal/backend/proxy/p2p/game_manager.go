@@ -51,13 +51,10 @@ func (g *GameManager) CreatePeer(player wire.Player) (*Peer, error) {
 	isHost := g.Game.IsHost(player.UserID)
 	isCurrentUser := g.Game.IsHost(g.session.UserID)
 
-	peer, err := NewPeer(peerConnection, g.Game.IpRing, player.UserID, isCurrentUser, isHost)
+	peer, err := NewPeer(peerConnection, g.Game.HostManager, player.UserID, isCurrentUser, isHost)
 	if err != nil {
 		return nil, err
 	}
-
-	ch := make(chan struct{}, 1)
-	peer.Connected = ch
 
 	return peer, nil
 }

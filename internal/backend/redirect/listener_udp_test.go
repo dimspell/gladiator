@@ -41,7 +41,9 @@ func TestListenerUDP_handleHandshake_Valid(t *testing.T) {
 		remote:   &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 1234},
 	}
 	listener := &ListenerUDP{logger: logger.NewDiscardLogger()}
-	err := listener.handleHandshake(mockConn)
+	err := listener.handleHandshake(mockConn, func(p []byte) error {
+		return nil
+	})
 	require.NoError(t, err)
 	require.Equal(t, mockConn.remote, listener.remoteAddr)
 }
@@ -52,7 +54,9 @@ func TestListenerUDP_handleHandshake_Invalid(t *testing.T) {
 		remote:   &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 1234},
 	}
 	listener := &ListenerUDP{logger: logger.NewDiscardLogger()}
-	err := listener.handleHandshake(mockConn)
+	err := listener.handleHandshake(mockConn, func(p []byte) error {
+		return nil
+	})
 	require.Error(t, err)
 }
 

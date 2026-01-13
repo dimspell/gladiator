@@ -18,30 +18,147 @@ type Peer struct {
 	// UserID uniquely identifies the peer
 	UserID int64
 
-	// Addr contains network addressing information
-	Addr *redirect.Addressing
-
-	// Mode defines the operating mode of the peer
-	Mode redirect.Mode
+	Kind redirect.ProxyKind
+	Host bool
 
 	// Connection holds the WebRTC peer connection
 	Connection *webrtc.PeerConnection
-	Connected  chan struct{}
+	FakeHost   *redirect.FakeHost
 
-	PipeRouter *PipeRouter
+	// PipeRouter *PipeRouter
+}
+
+func (p *Peer) StartFakeHost(ctx context.Context, hostManager *redirect.HostManager) error {
+	// hostManager.StartHost(ctx, peerID, assignedIP, tcpPort, udpPort, onnReceive, onHostDisconenct)
+
+	return nil
+}
+
+type PipeRouter struct {
+	dc     DataChannel
+	done   func()
+	logger *slog.Logger
+
+	proxyTCP redirect.Redirect
+	proxyUDP redirect.Redirect
+}
+
+func NewPipeRouter(ctx context.Context, logger *slog.Logger, dc DataChannel, tcpProxy, udpProxy redirect.Redirect) *PipeRouter {
+	ctx, cancel := context.WithCancel(ctx)
+	pipe := &PipeRouter{
+		dc:       dc,
+		proxyTCP: tcpProxy,
+		proxyUDP: udpProxy,
+		done:     cancel,
+		logger:   logger,
+	}
+
+	g, gctx := errgroup.WithContext(ctx)
+
+	if tcpProxy != nil {
+		// tcpProxy.OnReceive = func(p []byte) error {
+		// 	_, err := pipe.WriteTCP(p)
+		// 	return err
+		// }
+
+		g.Go(func() error {
+			return tcpProxy.Run(gctx)
+		})
+	}
+	if udpProxy != nil {
+		// udpProxy.OnReceive = func(p []byte) error {
+		// 	_, err := pipe.WriteUDP(p)
+		// 	return err
+		// }
+
+		g.Go(func() error {
+			return udpProxy.Run(gctx)
+		})
+	}
+
+	go func() {
+		if err := g.Wait(); err != nil {
+			pipe.logger.Warn("Proxy failed", logging.Error(err))
+			cancel()
+
+			pipe.logger.Warn("Closing data-channel", "error", dc.Close())
+		}
+	}()
+
+	dc.OnOpen(func() {
+		pipe.logger.Debug("Opened WebRTC channel")
+	})
+
+	dc.OnError(func(err error) { pipe.logger.Warn("DataChannel error", logging.Error(err)) })
+	dc.OnClose(func() {
+		pipe.logger.Debug("Closing pipe")
+		pipe.Close()
+		cancel()
+	})
+
+	dc.OnMessage(func(msg webrtc.DataChannelMessage) {
+		switch msg.Data[0] {
+		case 'T':
+			if _, err := tcpProxy.Write(msg.Data[1:]); err != nil {
+				pipe.logger.Warn("Failed to write to proxy", logging.Error(err), "data", msg.Data)
+			}
+		case 'U':
+			if _, err := udpProxy.Write(msg.Data[1:]); err != nil {
+				pipe.logger.Warn("Failed to write to proxy", logging.Error(err), "data", msg.Data)
+			}
+		}
+	})
+
+	return pipe
+}
+
+func (pipe *PipeRouter) WriteUDP(p []byte) (int, error) {
+	return pipe.WriteToChannel(p, 'U')
+}
+
+func (pipe *PipeRouter) WriteTCP(p []byte) (int, error) {
+	return pipe.WriteToChannel(p, 'T')
+}
+
+func (pipe *PipeRouter) WriteToChannel(p []byte, proto byte) (int, error) {
+	payload := make([]byte, len(p)+1)
+	payload[0] = proto
+	copy(payload[1:], p)
+
+	if err := pipe.dc.Send(payload); err != nil {
+		return 0, err
+	}
+	return len(p), nil
+}
+
+// Close terminates the pipe router.
+func (pipe *PipeRouter) Close() error {
+	pipe.done()
+	return nil
 }
 
 // NewPeer initializes a new Peer.
-func NewPeer(connection *webrtc.PeerConnection, r *IpRing, userID int64, isCurrentUser, isHost bool) (*Peer, error) {
+func NewPeer(connection *webrtc.PeerConnection, manager *redirect.HostManager, userID int64, isCurrentUser, isHost bool) (*Peer, error) {
 	peer := &Peer{
 		UserID:     userID,
 		Connection: connection,
 	}
 
+	ip, err := manager.AssignIP(fmt.Sprintf("%d", userID))
+	if err != nil {
+		return nil, fmt.Errorf("failed to assign IP: %w", err)
+	}
+	portTCP := 6114
+	portUDP := 6113
+
 	switch {
 	case isCurrentUser && isHost:
-		peer.Addr = &redirect.Addressing{IP: net.IPv4(127, 0, 0, 1)}
-		peer.Mode = redirect.CurrentUserIsHost
+		// peer.Kind = redirect.Host // net.IPv4(127, 0, 0, 1)
+		peer.Host = true
+		peer.Kind = redirect.ProxyKind("not needed")
+
+		// peer.Addr = &redirect.Addressing{IP: net.IPv4(127, 0, 0, 1)}
+		// peer.Mode = redirect.CurrentUserIsHost
 	case isHost == true:
 		ip, portTCP, portUDP, err := r.NextAddr()
 		if err != nil {
@@ -170,109 +287,6 @@ func (p *Peer) Terminate() {
 			slog.Error("Failed to close the game pipe router", "userID", p.UserID, logging.Error(err))
 		}
 	}
-}
-
-type PipeRouter struct {
-	dc     DataChannel
-	done   func()
-	logger *slog.Logger
-
-	proxyTCP redirect.Redirect
-	proxyUDP redirect.Redirect
-}
-
-func NewPipeRouter(ctx context.Context, logger *slog.Logger, dc DataChannel, tcpProxy, udpProxy redirect.Redirect) *PipeRouter {
-	ctx, cancel := context.WithCancel(ctx)
-	pipe := &PipeRouter{
-		dc:       dc,
-		proxyTCP: tcpProxy,
-		proxyUDP: udpProxy,
-		done:     cancel,
-		logger:   logger,
-	}
-
-	g, gctx := errgroup.WithContext(ctx)
-
-	if tcpProxy != nil {
-		// tcpProxy.OnReceive = func(p []byte) error {
-		// 	_, err := pipe.WriteTCP(p)
-		// 	return err
-		// }
-
-		g.Go(func() error {
-			return tcpProxy.Run(gctx)
-		})
-	}
-	if udpProxy != nil {
-		// udpProxy.OnReceive = func(p []byte) error {
-		// 	_, err := pipe.WriteUDP(p)
-		// 	return err
-		// }
-
-		g.Go(func() error {
-			return udpProxy.Run(gctx)
-		})
-	}
-
-	go func() {
-		if err := g.Wait(); err != nil {
-			pipe.logger.Warn("Proxy failed", logging.Error(err))
-			cancel()
-
-			pipe.logger.Warn("Closing data-channel", "error", dc.Close())
-		}
-	}()
-
-	dc.OnOpen(func() {
-		pipe.logger.Debug("Opened WebRTC channel")
-	})
-
-	dc.OnError(func(err error) { pipe.logger.Warn("DataChannel error", logging.Error(err)) })
-	dc.OnClose(func() {
-		pipe.logger.Debug("Closing pipe")
-		pipe.Close()
-		cancel()
-	})
-
-	dc.OnMessage(func(msg webrtc.DataChannelMessage) {
-		switch msg.Data[0] {
-		case 'T':
-			if _, err := tcpProxy.Write(msg.Data[1:]); err != nil {
-				pipe.logger.Warn("Failed to write to proxy", logging.Error(err), "data", msg.Data)
-			}
-		case 'U':
-			if _, err := udpProxy.Write(msg.Data[1:]); err != nil {
-				pipe.logger.Warn("Failed to write to proxy", logging.Error(err), "data", msg.Data)
-			}
-		}
-	})
-
-	return pipe
-}
-
-func (pipe *PipeRouter) WriteUDP(p []byte) (int, error) {
-	return pipe.WriteToChannel(p, 'U')
-}
-
-func (pipe *PipeRouter) WriteTCP(p []byte) (int, error) {
-	return pipe.WriteToChannel(p, 'T')
-}
-
-func (pipe *PipeRouter) WriteToChannel(p []byte, proto byte) (int, error) {
-	payload := make([]byte, len(p)+1)
-	payload[0] = proto
-	copy(payload[1:], p)
-
-	if err := pipe.dc.Send(payload); err != nil {
-		return 0, err
-	}
-	return len(p), nil
-}
-
-// Close terminates the pipe router.
-func (pipe *PipeRouter) Close() error {
-	pipe.done()
-	return nil
 }
 
 // DataChannel defines required methods for WebRTC data channels.

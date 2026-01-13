@@ -68,9 +68,9 @@ type HostManager struct {
 }
 
 // NewManager creates a new HostManager with optional ProxyFactory, Logger, and Clock.
-func NewManager(ipPrefix net.IP, opts ...func(*HostManager)) *HostManager {
+func NewManager(opts ...func(*HostManager)) *HostManager {
 	hm := &HostManager{
-		IPPrefix:     ipPrefix,
+		IPPrefix:     net.IPv4(127, 0, 0, 1),
 		Hosts:        make(map[string]*FakeHost),
 		PeerHosts:    make(map[string]*FakeHost),
 		PeerIPs:      make(map[string]string),
@@ -87,6 +87,10 @@ func NewManager(ipPrefix net.IP, opts ...func(*HostManager)) *HostManager {
 // WithProxyFactory allows injection of a custom proxy creation logic for testing.
 func WithProxyFactory(factory ProxyFactory) func(*HostManager) {
 	return func(hm *HostManager) { hm.ProxyFactory = factory }
+}
+
+func WithIPPrefix(ipPrefix net.IP) func(*HostManager) {
+	return func(hm *HostManager) { hm.IPPrefix = ipPrefix }
 }
 
 // WithLogger allows injection of a custom logger for testing.

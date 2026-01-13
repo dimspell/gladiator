@@ -61,7 +61,7 @@ func NewPeerToPeer(session *bsession.Session, gameClient multiv1connect.GameServ
 		config:  config,
 	}
 
-	hostManager := redirect.NewManager(net.IPv4(127, 0, 0, 1), redirect.WithProxyFactory(proxyFactory))
+	hostManager := redirect.NewManager(redirect.WithProxyFactory(proxyFactory))
 
 	p := &PeerToPeer{
 		hostIPAddress:     net.IPv4(127, 0, 0, 2),
@@ -242,8 +242,10 @@ func (p *PeerToPeer) JoinGame(ctx context.Context, roomID string, password strin
 
 	peer := &Peer{
 		UserID: userID,
-		Addr:   &redirect.Addressing{IP: ip},
-		Mode:   redirect.None, // TODO: Get rid of the Mode field
+		Kind:   redirect.ProxyKind("not needed"),
+		Host:   false,
+		// Addr:   &redirect.Addressing{IP: ip},
+		// Mode:   redirect.None, // TODO: Get rid of the Mode field
 	}
 	p.GameManager.AddPeer(peer)
 
