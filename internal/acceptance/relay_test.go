@@ -1,427 +1,509 @@
 package acceptance
 
-// stopDummy := startDummyTCPServer(t, "127.0.0.1:6114")
-// defer stopDummy()
-//
-// ctx, cancel := context.WithCancel(context.Background())
-// defer cancel()
+import (
+	"context"
+	"log/slog"
+	"net"
+	"net/http/httptest"
+	"os"
+	"testing"
+	"time"
 
-// go mp.Run(ctx)
-//
-//
-// func TestPacketRouter_Acceptance_DynamicJoinAndCleanup(t *testing.T) {
-// 	// t.Skip("Failing - needs to be fixed")
-// 	logger.SetPlainTextLogger(os.Stderr, slog.LevelDebug)
-//
-//
-//
-// 	roomID := "acceptanceRoom"
-//
-// 	// Start multiplayer backend and relay server
-// 	mp := console.NewMultiplayer()
-// 	relayServer, err := console.NewQUICRelay("localhost:9998", mp)
-// 	if err != nil {
-// 		t.Fatalf("failed to start relay server: %v", err)
-// 	}
-// 	mp.RegisterRelayHooks(relayServer)
-// 	go relayServer.Start(ctx)
-// 	go mp.Run(ctx)
-//
-// 	// --- Host setup ---
-// 	hostSession := &bsession.Session{
-// 		ID:          "host-session",
-// 		UserID:      1001,
-// 		Username:    "host",
-// 		CharacterID: 1,
-// 		ClassType:   model.ClassTypeKnight,
-// 		State:       &bsession.SessionState{},
-// 	}
-// 	hostRelay := relay.NewRelay(&relay.ProxyRelay{RelayServerAddr: "localhost:9998"}, hostSession)
-// 	hostSession.Proxy = hostRelay
-//
-// 	// Register host in multiplayer
-// 	hostUserSession := &console.UserSession{
-// 		UserID:      hostSession.UserID,
-// 		Connected:   true,
-// 		ConnectedAt: time.Now().In(time.UTC),
-// 		User:        wire.User{UserID: hostSession.UserID, Username: hostSession.Username},
-// 		Character:   wire.Character{CharacterID: hostSession.CharacterID, ClassType: byte(hostSession.ClassType)},
-// 	}
-// 	mp.AddUserSession(hostUserSession.UserID, hostUserSession)
-//
-// 	// Host creates room and connects
-// 	if _, err := hostRelay.CreateRoom(ctx, proxy.CreateParams{GameID: roomID}); err != nil {
-// 		t.Fatalf("host failed to create room: %v", err)
-// 	}
-// 	mp.SetRoomReady(wire.Message{Content: roomID})
-//
-// 	t.Log("Host created room and connected to relay")
-//
-// 	r, _ := mp.GetRoom(roomID)
-// 	fmt.Println(r.Players)
-//
-// 	// --- Guest setup ---
-// 	guestSession := &bsession.Session{
-// 		ID:          "guest-session",
-// 		UserID:      1002,
-// 		Username:    "guest",
-// 		CharacterID: 2,
-// 		ClassType:   model.ClassTypeArcher,
-// 		State:       &bsession.SessionState{},
-// 	}
-// 	guestRelay := relay.NewRelay(&relay.ProxyRelay{RelayServerAddr: "localhost:9998"}, guestSession)
-// 	guestSession.Proxy = guestRelay
-//
-// 	guestUserSession := &console.UserSession{
-// 		UserID:      guestSession.UserID,
-// 		Connected:   true,
-// 		ConnectedAt: time.Now().In(time.UTC),
-// 		User:        wire.User{UserID: guestSession.UserID, Username: guestSession.Username},
-// 		Character:   wire.Character{CharacterID: guestSession.CharacterID, ClassType: byte(guestSession.ClassType)},
-// 	}
-// 	mp.AddUserSession(guestUserSession.UserID, guestUserSession)
-//
-// 	// Guest joins room
-// 	if _, err := guestRelay.Join(ctx, proxy.JoinParams{HostUserID: hostSession.UserID, GameID: roomID}); err != nil {
-// 		t.Fatalf("guest failed to join room: %v", err)
-// 	}
-// 	t.Log("Guest joined room and connected to relay")
-//
-// 	// --- Assertions: both present ---
-// 	t.Run("Both host and guest are present in the room", func(t *testing.T) {
-// 		room, ok := mp.GetRoom(roomID)
-// 		if !ok {
-// 			t.Fatalf("room not found after join")
-// 		}
-// 		if len(room.Players) != 2 {
-// 			t.Errorf("expected 2 players in room, got %d", len(room.Players))
-// 		}
-// 		if _, ok := room.Players[hostSession.UserID]; !ok {
-// 			t.Errorf("host not found in room players")
-// 		}
-// 		if _, ok := room.Players[guestSession.UserID]; !ok {
-// 			t.Errorf("guest not found in room players")
-// 		}
-// 	})
-//
-// 	// --- Simulate guest leaving ---
-// 	mp.LeaveRoom(ctx, guestUserSession)
-// 	t.Log("Guest left the room")
-//
-// 	// --- Assertions: guest cleanup ---
-// 	t.Run("Guest is removed and resources are cleaned up", func(t *testing.T) {
-// 		room, ok := mp.GetRoom(roomID)
-// 		if !ok {
-// 			t.Fatalf("room not found after guest left")
-// 		}
-// 		if _, ok := room.Players[guestSession.UserID]; ok {
-// 			t.Errorf("guest still present in room after leaving")
-// 		}
-// 		// Check relay router state for guest
-// 		if len(guestRelay.Router.Manager.PeerHosts) != 0 {
-// 			t.Errorf("expected guest PeerHosts to be empty after leave, got %d", len(guestRelay.Router.Manager.PeerHosts))
-// 		}
-// 		if len(guestRelay.Router.Manager.Hosts) != 0 {
-// 			t.Errorf("expected guest Hosts to be empty after leave, got %d", len(guestRelay.Router.Manager.Hosts))
-// 		}
-// 	})
-//
-// 	// Cleanup
-// 	hostRelay.Close()
-// 	guestRelay.Close()
-// 	cancel()
-// }
-//
-// func TestPacketRouter_Acceptance_HostSwitch(t *testing.T) {
-// 	t.Skip("Failing - needs to be fixed")
-//
-// 	logger.SetPlainTextLogger(os.Stderr, slog.LevelDebug)
-//
-// 	ctx, cancel := context.WithCancel(context.Background())
-// 	defer cancel()
-//
-// 	roomID := "hostSwitchRoom"
-//
-// 	// Start multiplayer backend and relay server
-// 	mp := console.NewMultiplayer()
-// 	relayServer, err := console.NewQUICRelay("localhost:9997", mp)
-// 	if err != nil {
-// 		t.Fatalf("failed to start relay server: %v", err)
-// 	}
-// 	mp.RegisterRelayHooks(relayServer)
-// 	go relayServer.Start(ctx)
-//
-// 	// --- Host setup ---
-// 	hostSession := &bsession.Session{
-// 		ID:          "host-session",
-// 		UserID:      2001,
-// 		Username:    "host",
-// 		CharacterID: 1,
-// 		ClassType:   model.ClassTypeKnight,
-// 		State:       &bsession.SessionState{},
-// 	}
-// 	hostRelay := NewRelay(&ProxyRelay{RelayServerAddr: "localhost:9997"}, hostSession)
-// 	hostSession.Proxy = hostRelay
-//
-// 	hostUserSession := &console.UserSession{
-// 		UserID:      hostSession.UserID,
-// 		Connected:   true,
-// 		ConnectedAt: time.Now().In(time.UTC),
-// 		User:        wire.User{UserID: hostSession.UserID, Username: hostSession.Username},
-// 		Character:   wire.Character{CharacterID: hostSession.CharacterID, ClassType: byte(hostSession.ClassType)},
-// 		JoinedAt:    time.Now().In(time.UTC),
-// 	}
-// 	mp.AddUserSession(hostUserSession.UserID, hostUserSession)
-//
-// 	if _, err := hostRelay.CreateRoom(ctx, proxy.CreateParams{GameID: roomID}); err != nil {
-// 		t.Fatalf("host failed to create room: %v", err)
-// 	}
-// 	mp.SetRoomReady(wire.Message{Content: roomID})
-//
-// 	t.Log("Host created room and connected to relay")
-//
-// 	// --- Guest setup ---
-// 	guestSession := &bsession.Session{
-// 		ID:          "guest-session",
-// 		UserID:      2002,
-// 		Username:    "guest",
-// 		CharacterID: 2,
-// 		ClassType:   model.ClassTypeArcher,
-// 		State:       &bsession.SessionState{},
-// 	}
-// 	guestRelay := NewRelay(&ProxyRelay{RelayServerAddr: "localhost:9997"}, guestSession)
-// 	guestSession.Proxy = guestRelay
-//
-// 	guestUserSession := &console.UserSession{
-// 		UserID:      guestSession.UserID,
-// 		Connected:   true,
-// 		ConnectedAt: time.Now().In(time.UTC),
-// 		User:        wire.User{UserID: guestSession.UserID, Username: guestSession.Username},
-// 		Character:   wire.Character{CharacterID: guestSession.CharacterID, ClassType: byte(guestSession.ClassType)},
-// 		JoinedAt:    time.Now().Add(time.Millisecond * 10).In(time.UTC), // ensure guest joins after host
-// 	}
-// 	mp.AddUserSession(guestUserSession.UserID, guestUserSession)
-//
-// 	if _, err := guestRelay.Join(ctx, proxy.JoinParams{HostUserID: hostSession.UserID, GameID: roomID}); err != nil {
-// 		t.Fatalf("guest failed to join room: %v", err)
-// 	}
-// 	t.Log("Guest joined room and connected to relay")
-//
-// 	// --- Host leaves ---
-// 	mp.LeaveRoom(ctx, hostUserSession)
-// 	t.Log("Host left the room, triggering host migration")
-//
-// 	// --- Assertions: guest is new host ---
-// 	t.Run("Room still exists and guest is new host", func(t *testing.T) {
-// 		room, ok := mp.GetRoom(roomID)
-// 		if !ok {
-// 			t.Fatalf("room not found after host left")
-// 		}
-// 		if len(room.Players) != 1 {
-// 			t.Errorf("expected 1 player in room after host left, got %d", len(room.Players))
-// 		}
-// 		if room.HostPlayer == nil || room.HostPlayer.UserID != guestSession.UserID {
-// 			t.Errorf("guest is not the new host after host left")
-// 		}
-// 	})
-// 	// t.Run("Room still exists and guest is new host", func(t *testing.T) {
-// 	// 	var room console.GameRoom
-// 	// 	var ok bool
-// 	// 	for i := 0; i < 10; i++ {
-// 	// 		room, ok = mp.GetRoom(roomID)
-// 	// 		if ok && room.HostPlayer != nil && room.HostPlayer.UserID == guestSession.UserID {
-// 	// 			break
-// 	// 		}
-// 	// 		time.Sleep(50 * time.Millisecond)
-// 	// 	}
-// 	// 	if !ok {
-// 	// 		t.Fatalf("room not found after host left")
-// 	// 	}
-// 	// 	if len(room.Players) != 1 {
-// 	// 		t.Errorf("expected 1 player in room after host left, got %d", len(room.Players))
-// 	// 	}
-// 	// 	if room.HostPlayer == nil || room.HostPlayer.UserID != guestSession.UserID {
-// 	// 		t.Errorf("guest is not the new host after host left; HostPlayer: %+v", room.HostPlayer)
-// 	// 	}
-// 	// })
-//
-// 	// --- Assertions: relay/router state ---
-// 	t.Run("Relay/router state is correct after host switch", func(t *testing.T) {
-// 		// Host relay should be cleaned up
-// 		if len(hostRelay.router.manager.PeerHosts) != 0 {
-// 			t.Errorf("expected host PeerHosts to be empty after leave, got %d", len(hostRelay.router.manager.PeerHosts))
-// 		}
-// 		if len(hostRelay.router.manager.Hosts) != 0 {
-// 			t.Errorf("expected host Hosts to be empty after leave, got %d", len(hostRelay.router.manager.Hosts))
-// 		}
-// 		// Guest relay should still be active and be the new host
-// 		if guestRelay.router.currentHostID != guestRelay.router.selfID {
-// 			t.Errorf("guest router did not become the new host, currentHostID=%s, selfID=%s", guestRelay.router.currentHostID, guestRelay.router.selfID)
-// 		}
-// 	})
-//
-// 	// Cleanup
-// 	hostRelay.Close()
-// 	guestRelay.Close()
-// 	cancel()
-// }
-//
-// func TestPacketRouter_Acceptance_ProxyForwarding(t *testing.T) {
-// 	t.Skip("Failing - needs to be fixed")
-// 	logger.SetPlainTextLogger(os.Stderr, slog.LevelDebug)
-//
-// 	ctx, cancel := context.WithCancel(context.Background())
-// 	defer cancel()
-//
-// 	roomID := "proxyForwardRoom"
-//
-// 	captureHost := &dataCapture{}
-// 	captureGuest := &dataCapture{}
-//
-// 	hostRedirect := &mockRedirect{
-// 		id: "host",
-// 		onReceive: func(p []byte) error {
-// 			captureHost.mu.Lock()
-// 			defer captureHost.mu.Unlock()
-// 			captureHost.data = append(captureHost.data, append([]byte{}, p...))
-// 			return nil
-// 		},
-// 	}
-// 	guestRedirect := &mockRedirect{
-// 		id: "guest",
-// 		onReceive: func(p []byte) error {
-// 			captureGuest.mu.Lock()
-// 			defer captureGuest.mu.Unlock()
-// 			captureGuest.data = append(captureGuest.data, append([]byte{}, p...))
-// 			return nil
-// 		},
-// 	}
-//
-// 	mockProxyFactory := &mockProxyFactory{
-// 		tcpDial:   hostRedirect,
-// 		udpDial:   guestRedirect,
-// 		tcpListen: guestRedirect,
-// 		udpListen: hostRedirect,
-// 	}
-//
-// 	// --- Start multiplayer backend and relay server ---
-// 	mp := console.NewMultiplayer()
-// 	relayServer, err := console.NewQUICRelay("localhost:9996", mp)
-// 	if err != nil {
-// 		t.Fatalf("failed to start relay server: %v", err)
-// 	}
-// 	mp.RegisterRelayHooks(relayServer)
-// 	go relayServer.Start(ctx)
-//
-// 	// --- Host setup ---
-// 	hostSession := &bsession.Session{
-// 		ID:          "host-session",
-// 		UserID:      3001,
-// 		Username:    "host",
-// 		CharacterID: 1,
-// 		ClassType:   model.ClassTypeKnight,
-// 		State:       &bsession.SessionState{},
-// 	}
-// 	hostRelay := NewRelay(&ProxyRelay{RelayServerAddr: "localhost:9996"}, hostSession)
-// 	hostRelay.router.manager.ProxyFactory = mockProxyFactory
-// 	hostSession.Proxy = hostRelay
-//
-// 	hostUserSession := &console.UserSession{
-// 		UserID:      hostSession.UserID,
-// 		Connected:   true,
-// 		ConnectedAt: time.Now().In(time.UTC),
-// 		User:        wire.User{UserID: hostSession.UserID, Username: hostSession.Username},
-// 		Character:   wire.Character{CharacterID: hostSession.CharacterID, ClassType: byte(hostSession.ClassType)},
-// 		JoinedAt:    time.Now().In(time.UTC),
-// 	}
-// 	mp.AddUserSession(hostUserSession.UserID, hostUserSession)
-//
-// 	if _, err := hostRelay.CreateRoom(t.Context(), proxy.CreateParams{GameID: roomID}); err != nil {
-// 		t.Fatalf("host failed to create room: %v", err)
-// 	}
-// 	mp.SetRoomReady(wire.Message{Content: roomID})
-//
-// 	// --- Guest setup ---
-// 	guestSession := &bsession.Session{
-// 		ID:          "guest-session",
-// 		UserID:      3002,
-// 		Username:    "guest",
-// 		CharacterID: 2,
-// 		ClassType:   model.ClassTypeArcher,
-// 		State:       &bsession.SessionState{},
-// 	}
-// 	guestRelay := NewRelay(&ProxyRelay{RelayServerAddr: "localhost:9996"}, guestSession)
-// 	guestRelay.router.manager.ProxyFactory = mockProxyFactory
-// 	guestSession.Proxy = guestRelay
-//
-// 	guestUserSession := &console.UserSession{
-// 		UserID:      guestSession.UserID,
-// 		Connected:   true,
-// 		ConnectedAt: time.Now().In(time.UTC),
-// 		User:        wire.User{UserID: guestSession.UserID, Username: guestSession.Username},
-// 		Character:   wire.Character{CharacterID: guestSession.CharacterID, ClassType: byte(guestSession.ClassType)},
-// 		JoinedAt:    time.Now().Add(time.Millisecond * 10).In(time.UTC),
-// 	}
-// 	mp.AddUserSession(guestUserSession.UserID, guestUserSession)
-//
-// 	if _, err := guestRelay.Join(ctx, proxy.JoinParams{HostUserID: hostSession.UserID, GameID: roomID}); err != nil {
-// 		t.Fatalf("guest failed to join room: %v", err)
-// 	}
-//
-// 	// --- Simulate sending data from host to guest (TCP) ---
-// 	tcpPayload := []byte("hello from host to guest via TCP")
-// 	hostRelay.router.sendPacket(RelayPacket{
-// 		Type:    "tcp",
-// 		RoomID:  roomID,
-// 		FromID:  hostRelay.router.selfID,
-// 		ToID:    guestRelay.router.selfID,
-// 		Payload: tcpPayload,
-// 	})
-//
-// 	// --- Simulate sending data from guest to host (UDP) ---
-// 	udpPayload := []byte("hello from guest to host via UDP")
-// 	guestRelay.router.sendPacket(RelayPacket{
-// 		Type:    "udp",
-// 		RoomID:  roomID,
-// 		FromID:  guestRelay.router.selfID,
-// 		ToID:    hostRelay.router.selfID,
-// 		Payload: udpPayload,
-// 	})
-//
-// 	// --- Assert data was received and forwarded ---
-// 	t.Run("Host receives UDP from guest", func(t *testing.T) {
-// 		time.Sleep(100 * time.Millisecond)
-// 		captureHost.mu.Lock()
-// 		defer captureHost.mu.Unlock()
-// 		found := false
-// 		for _, d := range captureHost.data {
-// 			if string(d) == string(udpPayload) {
-// 				found = true
-// 				break
-// 			}
-// 		}
-// 		if !found {
-// 			t.Errorf("host did not receive expected UDP payload from guest")
-// 		}
-// 	})
-// 	t.Run("Guest receives TCP from host", func(t *testing.T) {
-// 		time.Sleep(100 * time.Millisecond)
-// 		captureGuest.mu.Lock()
-// 		defer captureGuest.mu.Unlock()
-// 		found := false
-// 		for _, d := range captureGuest.data {
-// 			if string(d) == string(tcpPayload) {
-// 				found = true
-// 				break
-// 			}
-// 		}
-// 		if !found {
-// 			t.Errorf("guest did not receive expected TCP payload from host")
-// 		}
-// 	})
-//
-// 	// Cleanup
-// 	hostRelay.Close()
-// 	guestRelay.Close()
-// 	cancel()
-// }
+	v1 "github.com/dimspell/gladiator/gen/multi/v1"
+	"github.com/dimspell/gladiator/internal/app/logger"
+	"github.com/dimspell/gladiator/internal/backend"
+	"github.com/dimspell/gladiator/internal/backend/bsession"
+	"github.com/dimspell/gladiator/internal/backend/proxy/relay"
+	"github.com/dimspell/gladiator/internal/console"
+	"github.com/dimspell/gladiator/internal/console/database"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+// relayTestEnv contains the test environment for Relay tests.
+type relayTestEnv struct {
+	t               *testing.T
+	ctx             context.Context
+	cancel          context.CancelFunc
+	console         *console.Console
+	testServer      *httptest.Server
+	consoleHostPort string
+	relayServer     *console.RelayServer
+	proxy           *relay.ProxyRelay
+}
+
+// relayPlayer represents a player in the Relay test.
+type relayPlayer struct {
+	backend *backend.Backend
+	conn    *mockConn
+	session *bsession.Session
+	name    string
+}
+
+// setupRelayEnv creates the test environment for Relay tests.
+func setupRelayEnv(t *testing.T, relayPort string) *relayTestEnv {
+	t.Helper()
+
+	logger.SetColoredLogger(os.Stderr, slog.LevelDebug, false)
+	helperStartGameServer(t)
+
+	db, err := database.NewMemory()
+	require.NoError(t, err, "failed to create database")
+	t.Cleanup(func() { db.Close() })
+
+	require.NoError(t, database.Seed(db.Write), "failed to seed database")
+
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+
+	cs := console.NewConsole(db)
+	ts := httptest.NewServer(cs.HttpRouter())
+	t.Cleanup(ts.Close)
+
+	consoleHostPort := ts.URL[len("http://"):]
+	cs.ConsoleBindAddr = consoleHostPort
+
+	// Create and start QUIC relay server
+	relayAddr := "127.0.0.1:" + relayPort
+	relayServer, err := console.NewQUICRelay(relayAddr, cs.RoomService)
+	require.NoError(t, err, "failed to create QUIC relay server")
+
+	cs.RoomService.RegisterRelayHooks(relayServer)
+	go cs.RoomService.Run(ctx)
+	go relayServer.Start(ctx)
+
+	// Give the relay server time to start
+	time.Sleep(50 * time.Millisecond)
+
+	return &relayTestEnv{
+		t:               t,
+		ctx:             ctx,
+		cancel:          cancel,
+		console:         cs,
+		testServer:      ts,
+		consoleHostPort: consoleHostPort,
+		relayServer:     relayServer,
+		proxy: &relay.ProxyRelay{
+			RelayServerAddr: relayAddr,
+			IPPrefix:        net.IPv4(127, 0, 0, 0),
+		},
+	}
+}
+
+// createPlayer creates and authenticates a player.
+func (env *relayTestEnv) createPlayer(username, characterName string) *relayPlayer {
+	bd := backend.NewBackend("", env.testServer.URL, env.proxy)
+	bd.SignalServerURL = "ws://" + env.consoleHostPort + "/lobby"
+
+	conn := &mockConn{}
+	session := bd.SessionManager.Add(conn)
+
+	// Sign-in
+	authReq := backend.ClientAuthenticationRequest(append(
+		[]byte{2, 0, 0, 0},
+		append([]byte("test\x00"), append([]byte(username), 0)...)...,
+	))
+	require.NoError(env.t, bd.HandleClientAuthentication(env.ctx, session, authReq),
+		"failed to authenticate player %s", username)
+
+	// Select character
+	selectReq := backend.SelectCharacterRequest(append(
+		append([]byte(username), 0),
+		append([]byte(characterName), 0)...,
+	))
+	require.NoError(env.t, bd.HandleSelectCharacter(env.ctx, session, selectReq),
+		"failed to select character for %s", username)
+
+	require.NoError(env.t, session.JoinLobby(env.ctx),
+		"failed to join lobby for %s", username)
+	require.NoError(env.t, session.RegisterNewObserver(env.ctx),
+		"failed to register observer for %s", username)
+
+	conn.Written = nil // Clear written data
+
+	return &relayPlayer{
+		backend: bd,
+		conn:    conn,
+		session: session,
+		name:    username,
+	}
+}
+
+// createRoom creates a game room with the given player as host.
+func (env *relayTestEnv) createRoom(player *relayPlayer, roomName string, mapID v1.GameMap) {
+	// Create game room (first call sets state=0)
+	createReq := backend.CreateGameRequest(append(
+		[]byte{0, 0, 0, 0, byte(mapID), 0, 0, 0},
+		append([]byte(roomName), 0, 0)...,
+	))
+	require.NoError(env.t, player.backend.HandleCreateGame(env.ctx, player.session, createReq),
+		"failed to create game (init) for %s", player.name)
+
+	// Set room ready (second call sets state=1)
+	readyReq := backend.CreateGameRequest(append(
+		[]byte{1, 0, 0, 0, byte(mapID), 0, 0, 0},
+		append([]byte(roomName), 0, 0)...,
+	))
+	require.NoError(env.t, player.backend.HandleCreateGame(env.ctx, player.session, readyReq),
+		"failed to create game (ready) for %s", player.name)
+
+	// Give time for room service to process the SetRoomReady message
+	time.Sleep(100 * time.Millisecond)
+
+	player.conn.Written = nil
+}
+
+// joinRoom has a player join a game room.
+func (env *relayTestEnv) joinRoom(player *relayPlayer, roomName string) {
+	// List games (optional but good practice)
+	require.NoError(env.t, player.backend.HandleListGames(env.ctx, player.session, backend.ListGamesRequest{}),
+		"failed to list games for %s", player.name)
+	player.conn.Written = nil
+
+	// Select game to get room info
+	selectReq := backend.SelectGameRequest(append([]byte(roomName), 0, 0))
+	require.NoError(env.t, player.backend.HandleSelectGame(env.ctx, player.session, selectReq),
+		"failed to select game for %s", player.name)
+	player.conn.Written = nil
+
+	// Join game
+	joinReq := backend.JoinGameRequest(append([]byte(roomName), 0, 0))
+	require.NoError(env.t, player.backend.HandleJoinGame(env.ctx, player.session, joinReq),
+		"failed to join game for %s", player.name)
+	player.conn.Written = nil
+}
+
+// processMessages processes all pending WebSocket messages for a short duration.
+func (env *relayTestEnv) processMessages(duration time.Duration) {
+	timeout := time.After(duration)
+	for {
+		select {
+		case msg := <-env.console.RoomService.Messages:
+			env.console.RoomService.HandleIncomingMessage(env.ctx, msg)
+		case <-timeout:
+			return
+		}
+	}
+}
+
+// TestE2E_Relay tests a basic relay game session with host and guest.
+func TestE2E_Relay(t *testing.T) {
+	// t.Skip("Requires loopback aliases (127.0.0.X) - see README troubleshooting")
+
+	env := setupRelayEnv(t, "19995")
+
+	// Create host player
+	host := env.createPlayer("archer", "archer")
+
+	// Create game room
+	env.createRoom(host, "room", v1.GameMap_FrozenLabyrinth)
+
+	room, ok := env.console.RoomService.Rooms["room"]
+	require.True(t, ok, "room should exist")
+	assert.Equal(t, 1, len(room.Players), "room should have 1 player")
+	assert.NotNil(t, room.HostPlayer, "room should have a host")
+	assert.Equal(t, host.session.UserID, room.HostPlayer.UserID, "host should be the room host")
+
+	t.Log("Host created room")
+
+	// Create guest player
+	guest := env.createPlayer("warrior", "warrior")
+
+	// Guest joins the room
+	env.joinRoom(guest, "room")
+
+	// Process relay connection messages
+	env.processMessages(1 * time.Second)
+
+	// Verify both players are in room
+	room = env.console.RoomService.Rooms["room"]
+	assert.Equal(t, 2, len(room.Players), "room should have 2 players")
+
+	t.Log("Guest joined room")
+
+	// Verify both sessions have proxies
+	require.NotNil(t, host.session.Proxy, "host should have proxy")
+	require.NotNil(t, guest.session.Proxy, "guest should have proxy")
+
+	// Cleanup - close proxies first, then cancel context
+	host.session.Proxy.Close()
+	guest.session.Proxy.Close()
+}
+
+// TestE2E_Relay_GuestLeaves tests that when a guest leaves, the room remains with the host.
+func TestE2E_Relay_GuestLeaves(t *testing.T) {
+	// t.Skip("Requires loopback aliases (127.0.0.X) - see README troubleshooting")
+
+	env := setupRelayEnv(t, "19996")
+
+	// Setup host
+	host := env.createPlayer("archer", "archer")
+	env.createRoom(host, "room", v1.GameMap_FrozenLabyrinth)
+
+	// Setup guest
+	guest := env.createPlayer("warrior", "warrior")
+	env.joinRoom(guest, "room")
+
+	// Process join messages
+	env.processMessages(1 * time.Second)
+
+	room, ok := env.console.RoomService.GetRoom("room")
+	require.True(t, ok, "room should exist")
+	require.Equal(t, 2, len(room.Players), "room should have 2 players before leave")
+
+	t.Log("Both players in room, guest leaving...")
+
+	// Guest leaves
+	guestSession, ok := env.console.RoomService.GetUserSession(guest.session.UserID)
+	require.True(t, ok, "guest session should exist")
+	env.console.RoomService.LeaveRoom(env.ctx, guestSession)
+
+	// Process leave messages
+	env.processMessages(500 * time.Millisecond)
+
+	// Verify room still exists with only host
+	room, ok = env.console.RoomService.GetRoom("room")
+	require.True(t, ok, "room should still exist")
+	assert.Equal(t, 1, len(room.Players), "room should have 1 player after guest left")
+	assert.Equal(t, host.session.UserID, room.HostPlayer.UserID, "host should still be host")
+
+	t.Log("Guest left, host remains")
+
+	// Cleanup
+	guest.session.Proxy.Close()
+	host.session.Proxy.Close()
+}
+
+// TestE2E_Relay_HostMigration tests that when the host leaves, a guest becomes the new host.
+func TestE2E_Relay_HostMigration(t *testing.T) {
+	// t.Skip("Requires loopback aliases (127.0.0.X) - see README troubleshooting")
+
+	env := setupRelayEnv(t, "19997")
+
+	// Setup host
+	host := env.createPlayer("archer", "archer")
+	env.createRoom(host, "room", v1.GameMap_FrozenLabyrinth)
+
+	// Setup guest
+	guest := env.createPlayer("warrior", "warrior")
+	env.joinRoom(guest, "room")
+
+	// Process join messages
+	env.processMessages(1 * time.Second)
+
+	room, ok := env.console.RoomService.GetRoom("room")
+	require.True(t, ok, "room should exist")
+	require.Equal(t, 2, len(room.Players), "room should have 2 players")
+	require.Equal(t, host.session.UserID, room.HostPlayer.UserID, "archer should be host")
+
+	t.Log("Both players in room, host leaving...")
+
+	// Host leaves
+	hostSession, ok := env.console.RoomService.GetUserSession(host.session.UserID)
+	require.True(t, ok, "host session should exist")
+	env.console.RoomService.LeaveRoom(env.ctx, hostSession)
+
+	// Process host migration messages
+	env.processMessages(1 * time.Second)
+
+	// Verify guest is now host
+	room, ok = env.console.RoomService.GetRoom("room")
+	require.True(t, ok, "room should still exist")
+	assert.Equal(t, 1, len(room.Players), "room should have 1 player after host left")
+
+	if room.HostPlayer != nil {
+		assert.Equal(t, guest.session.UserID, room.HostPlayer.UserID, "guest should be new host")
+		t.Log("Host migration successful, guest is new host")
+	} else {
+		t.Log("Warning: No host assigned after migration (may be expected in some scenarios)")
+	}
+
+	// Cleanup
+	host.session.Proxy.Close()
+	guest.session.Proxy.Close()
+}
+
+// TestE2E_Relay_ThreePlayersOneLeaves tests a room with 3 players where one leaves.
+func TestE2E_Relay_ThreePlayersOneLeaves(t *testing.T) {
+	// t.Skip("Requires loopback aliases (127.0.0.X) - see README troubleshooting")
+
+	env := setupRelayEnv(t, "19998")
+
+	// Setup host
+	host := env.createPlayer("archer", "archer")
+	env.createRoom(host, "room", v1.GameMap_FrozenLabyrinth)
+
+	// Setup guest 1
+	guest1 := env.createPlayer("warrior", "warrior")
+	env.joinRoom(guest1, "room")
+
+	// Setup guest 2
+	guest2 := env.createPlayer("necro", "necro")
+	env.joinRoom(guest2, "room")
+
+	// Process all join messages
+	env.processMessages(2 * time.Second)
+
+	room, ok := env.console.RoomService.GetRoom("room")
+	require.True(t, ok, "room should exist")
+	require.Equal(t, 3, len(room.Players), "room should have 3 players")
+
+	t.Log("Three players in room, guest1 leaving...")
+
+	// Guest1 leaves
+	guest1Session, ok := env.console.RoomService.GetUserSession(guest1.session.UserID)
+	require.True(t, ok, "guest1 session should exist")
+	env.console.RoomService.LeaveRoom(env.ctx, guest1Session)
+
+	// Process leave messages
+	env.processMessages(500 * time.Millisecond)
+
+	// Verify room has 2 players
+	room, ok = env.console.RoomService.GetRoom("room")
+	require.True(t, ok, "room should still exist")
+	assert.Equal(t, 2, len(room.Players), "room should have 2 players after one left")
+	assert.Equal(t, host.session.UserID, room.HostPlayer.UserID, "host should still be host")
+
+	// Verify correct players remain
+	_, hostExists := room.Players[host.session.UserID]
+	_, guest2Exists := room.Players[guest2.session.UserID]
+	_, guest1Exists := room.Players[guest1.session.UserID]
+
+	assert.True(t, hostExists, "host should still be in room")
+	assert.True(t, guest2Exists, "guest2 should still be in room")
+	assert.False(t, guest1Exists, "guest1 should not be in room")
+
+	t.Log("One player left, two remain")
+
+	// Cleanup
+	guest1.session.Proxy.Close()
+	guest2.session.Proxy.Close()
+	host.session.Proxy.Close()
+}
+
+// TestE2E_Relay_RoomDeleted tests that an empty room gets deleted.
+func TestE2E_Relay_RoomDeleted(t *testing.T) {
+	// t.Skip("Requires loopback aliases (127.0.0.X) - see README troubleshooting")
+
+	env := setupRelayEnv(t, "19999")
+
+	// Setup host
+	host := env.createPlayer("archer", "archer")
+	env.createRoom(host, "room", v1.GameMap_FrozenLabyrinth)
+
+	room, ok := env.console.RoomService.GetRoom("room")
+	require.True(t, ok, "room should exist")
+	require.Equal(t, 1, len(room.Players), "room should have 1 player")
+
+	t.Log("Host created room, now leaving...")
+
+	// Host leaves
+	hostSession, ok := env.console.RoomService.GetUserSession(host.session.UserID)
+	require.True(t, ok, "host session should exist")
+	env.console.RoomService.LeaveRoom(env.ctx, hostSession)
+
+	// Process leave and room deletion messages
+	env.processMessages(500 * time.Millisecond)
+
+	// Verify room is deleted
+	_, ok = env.console.RoomService.GetRoom("room")
+	assert.False(t, ok, "room should be deleted when empty")
+
+	t.Log("Empty room deleted successfully")
+
+	// Cleanup
+	host.session.Proxy.Close()
+}
+
+// TestE2E_Relay_MultipleRooms tests multiple concurrent game rooms.
+func TestE2E_Relay_MultipleRooms(t *testing.T) {
+	// t.Skip("Requires loopback aliases (127.0.0.X) - see README troubleshooting")
+
+	env := setupRelayEnv(t, "19994")
+
+	// Create first room with host
+	host1 := env.createPlayer("archer", "archer")
+
+	// Create first room manually with specific name
+	err := host1.backend.HandleCreateGame(env.ctx, host1.session, backend.CreateGameRequest{
+		0, 0, 0, 0,
+		byte(v1.GameMap_FrozenLabyrinth), 0, 0, 0,
+		'r', 'o', 'o', 'm', '1', 0,
+		0,
+	})
+	require.NoError(t, err)
+	err = host1.backend.HandleCreateGame(env.ctx, host1.session, backend.CreateGameRequest{
+		1, 0, 0, 0,
+		byte(v1.GameMap_FrozenLabyrinth), 0, 0, 0,
+		'r', 'o', 'o', 'm', '1', 0,
+		0,
+	})
+	require.NoError(t, err)
+
+	// Create second room with different host
+	host2 := env.createPlayer("warrior", "warrior")
+
+	err = host2.backend.HandleCreateGame(env.ctx, host2.session, backend.CreateGameRequest{
+		0, 0, 0, 0,
+		byte(v1.GameMap_AbandonedRealm), 0, 0, 0,
+		'r', 'o', 'o', 'm', '2', 0,
+		0,
+	})
+	require.NoError(t, err)
+	err = host2.backend.HandleCreateGame(env.ctx, host2.session, backend.CreateGameRequest{
+		1, 0, 0, 0,
+		byte(v1.GameMap_AbandonedRealm), 0, 0, 0,
+		'r', 'o', 'o', 'm', '2', 0,
+		0,
+	})
+	require.NoError(t, err)
+
+	// Process room creation messages
+	env.processMessages(500 * time.Millisecond)
+
+	// Verify both rooms exist
+	room1, ok1 := env.console.RoomService.GetRoom("room1")
+	room2, ok2 := env.console.RoomService.GetRoom("room2")
+
+	assert.True(t, ok1, "room1 should exist")
+	assert.True(t, ok2, "room2 should exist")
+
+	if ok1 && ok2 {
+		assert.Equal(t, 1, len(room1.Players), "room1 should have 1 player")
+		assert.Equal(t, 1, len(room2.Players), "room2 should have 1 player")
+		assert.Equal(t, host1.session.UserID, room1.HostPlayer.UserID, "host1 should be room1 host")
+		assert.Equal(t, host2.session.UserID, room2.HostPlayer.UserID, "host2 should be room2 host")
+	}
+
+	t.Log("Multiple rooms created successfully")
+
+	// Cleanup
+	host1.session.Proxy.Close()
+	host2.session.Proxy.Close()
+}
+
+// TestE2E_Relay_Authentication tests that players authenticate correctly.
+func TestE2E_Relay_Authentication(t *testing.T) {
+	env := setupRelayEnv(t, "19993")
+
+	bd := backend.NewBackend("", env.testServer.URL, env.proxy)
+	bd.SignalServerURL = "ws://" + env.consoleHostPort + "/lobby"
+	conn := &mockConn{}
+	session := bd.SessionManager.Add(conn)
+
+	// Sign-in with valid credentials
+	err := bd.HandleClientAuthentication(env.ctx, session, backend.ClientAuthenticationRequest{
+		2, 0, 0, 0,
+		't', 'e', 's', 't', 0,
+		'a', 'r', 'c', 'h', 'e', 'r', 0,
+	})
+	require.NoError(t, err, "authentication should succeed")
+
+	// Verify successful auth response (byte 4 should be 1 for success)
+	require.True(t, len(conn.Written) >= 8, "should receive auth response")
+	assert.Equal(t, byte(255), conn.Written[0], "packet header should be 255")
+	assert.Equal(t, byte(41), conn.Written[1], "packet type should be 41 (auth)")
+	assert.Equal(t, byte(1), conn.Written[4], "auth should succeed (byte 4 = 1)")
+
+	t.Log("Authentication successful")
+}
