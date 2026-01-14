@@ -11,9 +11,9 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-var hmacKey = []byte("shared-secret-key")
+var hmacKey = []byte("shared-secret-key") //nolint:unused // may be used in future
 
-func sign(data []byte) []byte {
+func sign(data []byte) []byte { //nolint:unused // may be used in future
 	// mac := hmac.New(sha256.New, hmacKey)
 	// mac.Write(data)
 	// return append(mac.Sum(nil), data...)
@@ -55,7 +55,7 @@ var devCertPEM []byte
 //go:embed key.pem
 var devKeyPEM []byte
 
-func generateToken() (string, error) {
+func generateToken() (string, error) { //nolint:unused // may be used in future
 	b := make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {
 		return "", err
@@ -63,9 +63,9 @@ func generateToken() (string, error) {
 	return base64.URLEncoding.EncodeToString(b), nil
 }
 
-var jwtSecret = []byte("your-very-secret-key")
+var jwtSecret = []byte("your-very-secret-key") //nolint:unused // may be used in future
 
-func generateJWT(userID int64) (string, error) {
+func generateJWT(userID int64) (string, error) { //nolint:unused // may be used in future
 	claims := jwt.MapClaims{
 		"user_id": userID,
 		"exp":     time.Now().Add(24 * time.Hour).Unix(),
@@ -74,7 +74,7 @@ func generateJWT(userID int64) (string, error) {
 	return token.SignedString(jwtSecret)
 }
 
-func validateJWT(tokenString string) (int64, error) {
+func validateJWT(tokenString string) (int64, error) { //nolint:unused // may be used in future
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		return jwtSecret, nil
 	})

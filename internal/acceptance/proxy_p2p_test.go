@@ -348,13 +348,13 @@ func helperStartGameServer(t testing.TB) {
 						return
 					}
 					slog.Debug("message received", "msg", string(msg))
-					conn.Write([]byte{35, 35, 116, 101, 115, 116, 0})
+					_, _ = conn.Write([]byte{35, 35, 116, 101, 115, 116, 0})
 				}
 			}
 		}()
 
 		for {
-			conn.SetDeadline(time.Now().Add(10 * time.Second))
+			_ = conn.SetDeadline(time.Now().Add(10 * time.Second))
 
 			buf := make([]byte, 1024)
 			n, err := conn.Read(buf)
@@ -554,7 +554,7 @@ func TestE2E_P2P_HostMigration(t *testing.T) {
 	env.processMessages(3 * time.Second)
 
 	// Verify both players are in room
-	room, _ = env.console.RoomService.Rooms["testroom"]
+	room = env.console.RoomService.Rooms["testroom"]
 	require.Equal(t, 2, len(room.Players), "should have 2 players")
 
 	// Get the host's user session for LeaveRoom
@@ -594,7 +594,7 @@ func TestE2E_P2P_ThirdPlayerJoins(t *testing.T) {
 	// Process WebRTC signaling for first guest
 	env.processMessages(2 * time.Second)
 
-	room, _ := env.console.RoomService.Rooms["bigroom"]
+	room := env.console.RoomService.Rooms["bigroom"]
 	require.Equal(t, 2, len(room.Players), "should have 2 players after first guest joins")
 
 	// Second guest joins
@@ -697,7 +697,7 @@ func TestE2E_P2P_HostLeavesWithMultiplePlayers(t *testing.T) {
 	env.processMessages(3 * time.Second)
 
 	// Verify 3 players
-	room, _ := env.console.RoomService.Rooms["migroom"]
+	room := env.console.RoomService.Rooms["migroom"]
 	require.Equal(t, 3, len(room.Players), "should have 3 players")
 	require.Equal(t, host.session.UserID, room.HostPlayer.UserID)
 
@@ -745,7 +745,7 @@ func TestE2E_P2P_AllGuestsLeave(t *testing.T) {
 	env.processMessages(2 * time.Second)
 
 	// Verify 3 players
-	room, _ := env.console.RoomService.Rooms["emptyroom"]
+	room := env.console.RoomService.Rooms["emptyroom"]
 	require.Equal(t, 3, len(room.Players))
 
 	// Both guests leave

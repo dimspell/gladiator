@@ -174,7 +174,7 @@ func startTestUDPServer(t *testing.T, handler func(conn *net.UDPConn, addr *net.
 
 func TestDialUDP_SuccessAndClose(t *testing.T) {
 	addr, stop := startTestUDPServer(t, func(conn *net.UDPConn, addr *net.UDPAddr, data []byte) {
-		conn.WriteTo([]byte("pong"), addr)
+		_, _ = conn.WriteTo([]byte("pong"), addr)
 	})
 	defer stop()
 
@@ -185,7 +185,7 @@ func TestDialUDP_SuccessAndClose(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 4, n)
 	buf := make([]byte, 4)
-	dialer.conn.SetReadDeadline(time.Now().Add(time.Second))
+	_ = dialer.conn.SetReadDeadline(time.Now().Add(time.Second))
 	_, _, err = dialer.conn.ReadFromUDP(buf)
 	require.NoError(t, err)
 	require.Equal(t, "pong", string(buf))

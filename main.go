@@ -106,7 +106,7 @@ func NewApp(version, commit, buildDate string) {
 	// Cleanup function
 	app.After = func(_ context.Context, _ *cli.Command) error {
 		for _, closer := range closers {
-			closer()
+			_ = closer()
 		}
 		return nil
 	}

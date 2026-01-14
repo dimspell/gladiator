@@ -15,7 +15,7 @@ var ctxKeyStatus = &struct{}{}
 // withStatus sets a HTTP response status code hint into request context at any point
 // during the request life-cycle. Before the Responder sends its response header
 // it will check the StatusCtxKey
-func withStatus(r *http.Request, status int) {
+func withStatus(r *http.Request, status int) { //nolint:unused // may be used in future
 	*r = *r.WithContext(context.WithValue(r.Context(), ctxKeyStatus, status))
 }
 

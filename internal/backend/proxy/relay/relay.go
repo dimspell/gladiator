@@ -45,7 +45,7 @@ func (p *ProxyRelay) Create(session *bsession.Session, client multiv1connect.Gam
 }
 
 type Relay struct {
-	mu                sync.Mutex
+	mu                sync.Mutex //nolint:unused // reserved for future use
 	session           *bsession.Session
 	router            *PacketRouter
 	GameServiceClient multiv1connect.GameServiceClient

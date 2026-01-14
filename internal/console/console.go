@@ -270,7 +270,7 @@ func (c *Console) Handlers() (start GracefulFunc, shutdown GracefulFunc) {
 		slog.Info("Configured console server", "addr", c.ConsoleBindAddr)
 
 		go c.RoomService.Run(ctx)
-		go c.RelayService.Start(ctx)
+		go func() { _ = c.RelayService.Start(ctx) }()
 
 		// TODO: Move it elsewhere
 		// if c.Relay != nil && c.Relay.Server != nil {

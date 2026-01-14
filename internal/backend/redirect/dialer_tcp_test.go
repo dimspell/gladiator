@@ -50,7 +50,7 @@ func TestWriteAndRead(t *testing.T) {
 	addr, stop := startTestTCPServer(t, func(conn net.Conn) {
 		buf := make([]byte, 5)
 		n, _ := conn.Read(buf)
-		conn.Write([]byte("pong"))
+		_, _ = conn.Write([]byte("pong"))
 		require.Equal(t, "ping", string(buf[:n]))
 		conn.Close()
 	})
@@ -86,7 +86,7 @@ func TestRun_ContextCancel(t *testing.T) {
 
 func TestRun_OnReceiveError(t *testing.T) {
 	addr, stop := startTestTCPServer(t, func(conn net.Conn) {
-		conn.Write([]byte("data"))
+		_, _ = conn.Write([]byte("data"))
 		time.Sleep(100 * time.Millisecond)
 		conn.Close()
 	})

@@ -108,7 +108,7 @@ func main() {
 		_, _ = w.Write(doc)
 	})
 
-	addr := fmt.Sprintf("localhost:9991")
+	addr := "localhost:9991"
 	fmt.Println("Listening on", fmt.Sprintf("http://%s/", addr))
 	_ = http.ListenAndServe(addr, r)
 }

@@ -64,12 +64,10 @@ func (c *Controller) HostScreen(w fyne.Window, params *HostScreenInputParams) fy
 	switch params.HostType {
 	case HostDatabaseTypeSqlite:
 		comboGroup.SetSelected(databaseTypeText[HostDatabaseTypeSqlite])
-		break
 	default:
 		comboGroup.SetSelected(databaseTypeText[HostDatabaseTypeMemory])
 		pathLabel.Hide()
 		pathContainer.Hide()
-		break
 	}
 
 	ips, _ := listAllIPs()

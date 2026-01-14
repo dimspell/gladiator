@@ -170,7 +170,7 @@ func (p *ClientProxy) udpAsHost(ctx context.Context) error {
 			// 	log.Fatal(err)
 			// }
 
-			srcConn.WriteToUDP(buf[0:n], clientDest)
+			_, _ = srcConn.WriteToUDP(buf[0:n], clientDest)
 
 			// _, err = clientDestConn.Write(buf[0:n])
 			if err != nil {
@@ -201,5 +201,4 @@ func (p *ClientProxy) udpAsHost(ctx context.Context) error {
 		}
 		fmt.Println("(udp): (client): wrote to server", buf[0:n])
 	}
-	return nil
 }

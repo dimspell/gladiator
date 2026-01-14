@@ -20,7 +20,7 @@ func (b *Backend) HandleSelectChannel(ctx context.Context, session *bsession.Ses
 
 	if serverName == "DISPEL" && channelName == "DISPEL" {
 		for idx, user := range session.State.GetLobbyUsers() {
-			session.SendToGame(packet.ReceiveMessage, packet.AppendCharacterToLobby(user.Username, model.ClassType(user.ClassType), uint32(idx)))
+			_ = session.SendToGame(packet.ReceiveMessage, packet.AppendCharacterToLobby(user.Username, model.ClassType(user.ClassType), uint32(idx)))
 		}
 		// session.Send(ReceiveMessage, NewGlobalMessage("admin", "hello"))
 	}

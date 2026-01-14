@@ -12,7 +12,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-const backendIP = "127.0.1.28"
+const backendIP = "127.0.1.28" //nolint:unused // may be used for testing
 
 type Proxy struct {
 	TCPHost string

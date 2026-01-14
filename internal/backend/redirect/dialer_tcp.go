@@ -68,7 +68,7 @@ func (p *DialerTCP) Run(ctx context.Context) error {
 			return ctx.Err()
 		default:
 			clear(buf)
-			p.conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+			_ = p.conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 			n, err := p.conn.Read(buf)
 			if err != nil {
 				if err == io.EOF {

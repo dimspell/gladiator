@@ -45,7 +45,7 @@ func TestProxyLAN_CreatesAndJoinRoom(t *testing.T) {
 	// Remove the HTTP schema prefix
 	_ = console.WithConsoleAddr(ts.URL[len("http://"):], ts.URL)(cs)
 
-	bd1 := backend.NewBackend("", ts.URL, &direct.ProxyLAN{"198.51.100.1"})
+	bd1 := backend.NewBackend("", ts.URL, &direct.ProxyLAN{MyIPAddress: "198.51.100.1"})
 	bd1.SignalServerURL = "ws://" + cs.ConsoleBindAddr + "/lobby"
 	conn1 := &mockConn{}
 	session1 := bd1.SessionManager.Add(conn1)
@@ -121,7 +121,7 @@ func TestProxyLAN_CreatesAndJoinRoom(t *testing.T) {
 	})
 
 	// Other user
-	bd2 := backend.NewBackend("", ts.URL, &direct.ProxyLAN{"198.51.100.2"})
+	bd2 := backend.NewBackend("", ts.URL, &direct.ProxyLAN{MyIPAddress: "198.51.100.2"})
 	bd2.SignalServerURL = "ws://" + cs.ConsoleBindAddr + "/lobby"
 	conn2 := &mockConn{}
 	session2 := bd2.SessionManager.Add(conn2)

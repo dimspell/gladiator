@@ -83,18 +83,18 @@ type RelayMetrics interface {
 
 // Default implementation using the global metrics
 
-type defaultRelayMetrics struct{}
+type defaultRelayMetrics struct{} //nolint:unused // may be used in future
 
-func (defaultRelayMetrics) IncConnectedPeers() { metrics.ConnectedPeers.Inc() }
-func (defaultRelayMetrics) DecConnectedPeers() { metrics.ConnectedPeers.Dec() }
-func (defaultRelayMetrics) IncPacketIn()       { metrics.PacketIn.Inc() }
-func (defaultRelayMetrics) IncPacketOut()      { metrics.PacketOut.Inc() }
-func (defaultRelayMetrics) SetPeersInRoom(roomID string, n int) {
+func (defaultRelayMetrics) IncConnectedPeers() { metrics.ConnectedPeers.Inc() } //nolint:unused // may be used in future
+func (defaultRelayMetrics) DecConnectedPeers() { metrics.ConnectedPeers.Dec() } //nolint:unused // may be used in future
+func (defaultRelayMetrics) IncPacketIn() { metrics.PacketIn.Inc() } //nolint:unused // may be used in future
+func (defaultRelayMetrics) IncPacketOut() { metrics.PacketOut.Inc() } //nolint:unused // may be used in future
+func (defaultRelayMetrics) SetPeersInRoom(roomID string, n int) { //nolint:unused // may be used in future
 	metrics.PeersInRoom.WithLabelValues(roomID).Set(float64(n))
 }
-func (defaultRelayMetrics) IncActiveRooms() { metrics.ActiveRooms.Inc() }
-func (defaultRelayMetrics) DecActiveRooms() { metrics.ActiveRooms.Dec() }
-func (defaultRelayMetrics) DeletePeersInRoom(roomID string) {
+func (defaultRelayMetrics) IncActiveRooms() { metrics.ActiveRooms.Inc() } //nolint:unused // may be used in future
+func (defaultRelayMetrics) DecActiveRooms() { metrics.ActiveRooms.Dec() } //nolint:unused // may be used in future
+func (defaultRelayMetrics) DeletePeersInRoom(roomID string) { //nolint:unused // may be used in future
 	metrics.PeersInRoom.DeleteLabelValues(roomID)
 }
 
@@ -392,7 +392,7 @@ func (rs *RelayServer) leaveRoom(peerID, roomID string) {
 		return
 	}
 
-	leaver, _ := room.Peers[peerID]
+	leaver := room.Peers[peerID]
 	if leaver == nil {
 		return
 	}
@@ -423,7 +423,7 @@ func (rs *RelayServer) leaveRoom(peerID, roomID string) {
 	metrics.PeersInRoom.WithLabelValues(roomID).Set(float64(len(room.Peers)))
 }
 
-func (rs *RelayServer) cleanupPeers() {
+func (rs *RelayServer) cleanupPeers() { //nolint:unused // may be used in future
 	ticker := time.NewTicker(30 * time.Second)
 
 	for now := range ticker.C {
@@ -466,7 +466,7 @@ func (rs *RelayServer) sendTo(roomID, peerID string, pkt RelayPacket) {
 	rs.sendSigned(peer.Stream, pkt)
 }
 
-func (rs *RelayServer) broadcastFrom(roomID, fromID string, pkt RelayPacket) {
+func (rs *RelayServer) broadcastFrom(roomID, fromID string, pkt RelayPacket) { //nolint:unused // may be used in future
 	rs.mu.Lock()
 	defer rs.mu.Unlock()
 

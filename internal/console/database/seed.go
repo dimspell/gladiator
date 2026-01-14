@@ -146,7 +146,7 @@ func Seed(queries *Queries) error {
 		return err
 	}
 
-	queries.UpdateCharacterSpells(context.TODO(), UpdateCharacterSpellsParams{
+	_ = queries.UpdateCharacterSpells(context.TODO(), UpdateCharacterSpellsParams{
 		CharacterName: character.CharacterName,
 		Spells: sql.NullString{
 			String: "AQEBAQEBAQEBAQEBAQEBAgEBAQIBAQEBAQEBAQEBAQEBAQEBAQEBAQEAAA==",
@@ -202,7 +202,7 @@ func Seed(queries *Queries) error {
 		return err
 	}
 
-	queries.UpdateCharacterSpells(context.TODO(), UpdateCharacterSpellsParams{
+	_ = queries.UpdateCharacterSpells(context.TODO(), UpdateCharacterSpellsParams{
 		CharacterName: character2.CharacterName,
 		Spells: sql.NullString{
 			String: "AgICAgECAgEBAQIBAQIBAQIBAQEBAQECAQIBAQEBAQEBAQEBAQEBAQEAAA==",

@@ -34,7 +34,7 @@ func TestBackend_HandleListGames(t *testing.T) {
 			name         string
 			proxyFactory ProxyFactory
 		}{
-			{"lan", &direct.ProxyLAN{"127.0.100.1"}},
+			{"lan", &direct.ProxyLAN{MyIPAddress: "127.0.100.1"}},
 			{"relay", &relay.ProxyRelay{RelayServerAddr: "127.0.0.1:9999"}},
 		}
 
@@ -70,7 +70,7 @@ func TestBackend_HandleListGames(t *testing.T) {
 			proxyFactory ProxyFactory
 			expectedIP   []byte
 		}{
-			{"lan", &direct.ProxyLAN{"127.0.100.1"}, []byte{127, 0, 21, 37}},
+			{"lan", &direct.ProxyLAN{MyIPAddress: "127.0.100.1"}, []byte{127, 0, 21, 37}},
 			{"relay", &relay.ProxyRelay{RelayServerAddr: "127.0.0.1:9999"}, []byte{127, 0, 0, 2}},
 		}
 		for _, tc := range tt {
@@ -119,7 +119,7 @@ func TestBackend_HandleListGames(t *testing.T) {
 		}{
 			{
 				name:                 "lan",
-				proxyFactory:         &direct.ProxyLAN{"127.0.100.1"},
+				proxyFactory:         &direct.ProxyLAN{MyIPAddress: "127.0.100.1"},
 				expectedIPFirstGame:  []byte{127, 0, 21, 37},
 				expectedIPSecondGame: []byte{127, 0, 13, 37},
 			},

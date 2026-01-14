@@ -211,8 +211,8 @@ func TestHostManager_StopAll(t *testing.T) {
 	defer cancel()
 	ip1, _ := hm.AssignIP("peer1")
 	ip2, _ := hm.AssignIP("peer2")
-	hm.StartHost(ctx, "peer1", ip1, 1234, 5678, func([]byte) error { return nil }, func([]byte) error { return nil }, nil)
-	hm.StartHost(ctx, "peer2", ip2, 1234, 5678, func([]byte) error { return nil }, func([]byte) error { return nil }, nil)
+	_, _ = hm.StartHost(ctx, "peer1", ip1, 1234, 5678, func([]byte) error { return nil }, func([]byte) error { return nil }, nil)
+	_, _ = hm.StartHost(ctx, "peer2", ip2, 1234, 5678, func([]byte) error { return nil }, func([]byte) error { return nil }, nil)
 	hm.StopAll()
 	if len(hm.Hosts) != 0 || len(hm.PeerHosts) != 0 || len(hm.PeerIPs) != 0 || len(hm.IPToPeerID) != 0 {
 		t.Errorf("expected all maps to be empty after StopAll")
@@ -264,8 +264,8 @@ func TestHostManager_HostGuestLifecycle(t *testing.T) {
 	defer cancel()
 	ipHost, _ := hm.AssignIP("host")
 	ipGuest, _ := hm.AssignIP("guest")
-	hm.StartHost(ctx, "host", ipHost, 1234, 5678, func([]byte) error { return nil }, func([]byte) error { return nil }, nil)
-	hm.StartGuest(ctx, "guest", ipGuest, 1234, 5678, func([]byte) error { return nil }, func([]byte) error { return nil }, nil)
+	_, _ = hm.StartHost(ctx, "host", ipHost, 1234, 5678, func([]byte) error { return nil }, func([]byte) error { return nil }, nil)
+	_, _ = hm.StartGuest(ctx, "guest", ipGuest, 1234, 5678, func([]byte) error { return nil }, func([]byte) error { return nil }, nil)
 	hm.RemoveByRemoteID("host")
 	if _, ok := hm.GetPeerHost("host"); ok {
 		t.Errorf("host should be removed")
@@ -284,7 +284,7 @@ func TestHostManager_RemoveByIP_Idempotent(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	ip, _ := hm.AssignIP("peer1")
-	hm.StartHost(ctx, "peer1", ip, 1234, 5678, func([]byte) error { return nil }, func([]byte) error { return nil }, nil)
+	_, _ = hm.StartHost(ctx, "peer1", ip, 1234, 5678, func([]byte) error { return nil }, func([]byte) error { return nil }, nil)
 	hm.RemoveByIP(ip[:len(ip)-1])
 	hm.RemoveByIP(ip[:len(ip)-1]) // Should not panic
 }
@@ -294,7 +294,7 @@ func TestHostManager_RemoveByRemoteID_Idempotent(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	ip, _ := hm.AssignIP("peer1")
-	hm.StartHost(ctx, "peer1", ip, 1234, 5678, func([]byte) error { return nil }, func([]byte) error { return nil }, nil)
+	_, _ = hm.StartHost(ctx, "peer1", ip, 1234, 5678, func([]byte) error { return nil }, func([]byte) error { return nil }, nil)
 	hm.RemoveByRemoteID("peer1")
 	hm.RemoveByRemoteID("peer1") // Should not panic
 }
@@ -306,7 +306,7 @@ func TestHostManager_ProxiesClosedOnRemove(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	ip, _ := hm.AssignIP("peer1")
-	hm.StartHost(ctx, "peer1", ip, 1234, 5678, func([]byte) error { return nil }, func([]byte) error { return nil }, nil)
+	_, _ = hm.StartHost(ctx, "peer1", ip, 1234, 5678, func([]byte) error { return nil }, func([]byte) error { return nil }, nil)
 	hm.RemoveByRemoteID("peer1")
 	if !tcp.closeCalled || !udp.closeCalled {
 		t.Errorf("expected proxies to be closed on RemoveByRemoteID")

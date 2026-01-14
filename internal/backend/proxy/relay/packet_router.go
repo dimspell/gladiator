@@ -288,7 +288,7 @@ func (r *PacketRouter) connect(ctx context.Context, roomID string) error {
 }
 
 // keepAliveHost periodically sends ping packets to the relay server to keep the connection alive.
-func (r *PacketRouter) keepAliveHost(ctx context.Context) {
+func (r *PacketRouter) keepAliveHost(ctx context.Context) { //nolint:unused // may be used in future
 	r.mu.Lock()
 	if r.pingTicker != nil {
 		r.pingTicker.Stop()

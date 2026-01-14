@@ -84,7 +84,7 @@ func (c *Controller) SinglePlayerScreen(w fyne.Window, initial *SinglePlayerScre
 	backendRunningCheck := widget.NewLabelWithData(backendRunningLabel)
 	backendRunningCheck.Alignment = fyne.TextAlignCenter
 	backendStart := widget.NewButtonWithIcon("Start backend", theme.MediaPlayIcon(), func() {
-		if err := c.StartBackend("http://"+consoleAddr, &direct.ProxyLAN{"127.0.0.1"}); err != nil {
+		if err := c.StartBackend("http://"+consoleAddr, &direct.ProxyLAN{MyIPAddress: "127.0.0.1"}); err != nil {
 			dialog.ShowError(err, w)
 			return
 		}
@@ -111,12 +111,12 @@ func (c *Controller) SinglePlayerScreen(w fyne.Window, initial *SinglePlayerScre
 		if _, isRunning := c.backendProbe.Status(); isRunning {
 			backendStart.Disable()
 			backendStop.Enable()
-			backendRunningLabel.Set("Backend: Running")
+			_ = backendRunningLabel.Set("Backend: Running")
 			backendRunningCheck.TextStyle = fyne.TextStyle{Bold: true}
 		} else {
 			backendStart.Enable()
 			backendStop.Disable()
-			backendRunningLabel.Set("Backend: Not Running")
+			_ = backendRunningLabel.Set("Backend: Not Running")
 			backendRunningCheck.TextStyle = fyne.TextStyle{Bold: false}
 		}
 	}))
@@ -126,13 +126,13 @@ func (c *Controller) SinglePlayerScreen(w fyne.Window, initial *SinglePlayerScre
 			consoleStart.Disable()
 			consoleStop.Enable()
 			createUser.Enable()
-			consoleRunningLabel.Set("Console: Running")
+			_ = consoleRunningLabel.Set("Console: Running")
 			consoleRunningCheck.TextStyle = fyne.TextStyle{Bold: true}
 		} else {
 			consoleStart.Enable()
 			consoleStop.Disable()
 			createUser.Disable()
-			consoleRunningLabel.Set("Console: Not Running")
+			_ = consoleRunningLabel.Set("Console: Not Running")
 			consoleRunningCheck.TextStyle = fyne.TextStyle{Bold: false}
 		}
 	}))
@@ -215,7 +215,7 @@ func renderRegistryPatchContainer(w fyne.Window) fyne.CanvasObject {
 		if registryValue == "" {
 			registryValue = "<unknown>"
 		}
-		registryValueBinding.Set(fmt.Sprintf("Value: %q", registryValue))
+		_ = registryValueBinding.Set(fmt.Sprintf("Value: %q", registryValue))
 	}
 
 	registryValue, _ := registrypatch.ReadServer()

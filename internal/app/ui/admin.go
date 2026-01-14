@@ -106,10 +106,8 @@ func (c *Controller) AdminScreen(w fyne.Window, params *AdminScreenInputParams, 
 			switch id {
 			case 0:
 				scrollPane.Add(wrapConsoleRunning(configurationView))
-				break
 			case 1:
 				scrollPane.Add(wrapConsoleRunning(actionView))
-				break
 			}
 		}
 
@@ -157,13 +155,13 @@ func (c *Controller) AdminScreen(w fyne.Window, params *AdminScreenInputParams, 
 			// consoleStart.Disable()
 			// consoleStop.Enable()
 			// createUser.Enable()
-			consoleRunningLabel.Set("Console: Running")
+			_ = consoleRunningLabel.Set("Console: Running")
 			consoleRunningCheck.TextStyle = fyne.TextStyle{Bold: true}
 		} else {
 			// consoleStart.Enable()
 			// consoleStop.Disable()
 			// createUser.Disable()
-			consoleRunningLabel.Set("Console: Not Running")
+			_ = consoleRunningLabel.Set("Console: Not Running")
 			consoleRunningCheck.TextStyle = fyne.TextStyle{Bold: false}
 		}
 	}))

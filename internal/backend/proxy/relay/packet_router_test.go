@@ -42,7 +42,7 @@ func startDummyTCPServer(t *testing.T, addr string) (stop func()) {
 			go func(c net.Conn) {
 				defer c.Close()
 				// Optionally, read/write to c here if needed
-				io.Copy(io.Discard, c)
+				_, _ = io.Copy(io.Discard, c)
 			}(conn)
 		}
 	}()
@@ -236,7 +236,7 @@ func TestPacketRouter_ErrorPath_FailedConnection(t *testing.T) {
 	}
 }
 
-func createSession(mp *console.RoomService, userID int64) (*bsession.Session, *Relay, *console.UserSession) {
+func createSession(mp *console.RoomService, userID int64) (*bsession.Session, *Relay, *console.UserSession) { //nolint:unused // helper for skipped tests
 	username := fmt.Sprintf("player%d", userID)
 	classType := byte(userID - 1)
 
@@ -262,64 +262,64 @@ func createSession(mp *console.RoomService, userID int64) (*bsession.Session, *R
 
 // --- Mocks ---
 
-type dataCapture struct {
+type dataCapture struct { //nolint:unused // used in skipped tests
 	mu   sync.Mutex
 	data [][]byte
 }
 
-type mockRedirect struct {
+type mockRedirect struct { //nolint:unused // used in skipped tests
 	id        string
 	onReceive redirect.ReceiveFunc
 	onWrite   func([]byte) error
 	closed    bool
 }
 
-func (m *mockRedirect) SetOnReceive(handler redirect.ReceiveFunc) {
+func (m *mockRedirect) SetOnReceive(handler redirect.ReceiveFunc) { //nolint:unused // used in skipped tests
 	m.onReceive = handler
 }
 
-func (m *mockRedirect) SetOnWrite(handler func([]byte) error) {
+func (m *mockRedirect) SetOnWrite(handler func([]byte) error) { //nolint:unused // used in skipped tests
 	m.onWrite = handler
 }
 
-func (m *mockRedirect) Run(ctx context.Context) error {
+func (m *mockRedirect) Run(ctx context.Context) error { //nolint:unused // used in skipped tests
 	<-ctx.Done()
 	return nil
 }
 
-func (m *mockRedirect) Write(p []byte) (n int, err error) {
+func (m *mockRedirect) Write(p []byte) (n int, err error) { //nolint:unused // used in skipped tests
 	if m.onWrite != nil {
 		_ = m.onWrite(p)
 	}
 	return len(p), nil
 }
 
-func (m *mockRedirect) Close() error {
+func (m *mockRedirect) Close() error { //nolint:unused // used in skipped tests
 	m.closed = true
 	return nil
 }
 
-func (m *mockRedirect) Alive(_ time.Time, _ time.Duration) bool {
+func (m *mockRedirect) Alive(_ time.Time, _ time.Duration) bool { //nolint:unused // used in skipped tests
 	return true
 }
 
-type mockProxyFactory struct {
+type mockProxyFactory struct { //nolint:unused // used in skipped tests
 	tcpDial, udpDial, tcpListen, udpListen *mockRedirect
 }
 
-func (m *mockProxyFactory) NewDialTCP(ip, port string, onReceive redirect.ReceiveFunc) (redirect.Redirect, error) {
+func (m *mockProxyFactory) NewDialTCP(ip, port string, onReceive redirect.ReceiveFunc) (redirect.Redirect, error) { //nolint:unused // used in skipped tests
 	m.tcpDial.SetOnReceive(onReceive)
 	return m.tcpDial, nil
 }
-func (m *mockProxyFactory) NewDialUDP(ip, port string, onReceive redirect.ReceiveFunc) (redirect.Redirect, error) {
+func (m *mockProxyFactory) NewDialUDP(ip, port string, onReceive redirect.ReceiveFunc) (redirect.Redirect, error) { //nolint:unused // used in skipped tests
 	m.udpDial.SetOnReceive(onReceive)
 	return m.udpDial, nil
 }
-func (m *mockProxyFactory) NewListenerTCP(ip, port string, onReceive redirect.ReceiveFunc) (redirect.Redirect, error) {
+func (m *mockProxyFactory) NewListenerTCP(ip, port string, onReceive redirect.ReceiveFunc) (redirect.Redirect, error) { //nolint:unused // used in skipped tests
 	m.tcpListen.SetOnReceive(onReceive)
 	return m.tcpListen, nil
 }
-func (m *mockProxyFactory) NewListenerUDP(ip, port string, onReceive redirect.ReceiveFunc) (redirect.Redirect, error) {
+func (m *mockProxyFactory) NewListenerUDP(ip, port string, onReceive redirect.ReceiveFunc) (redirect.Redirect, error) { //nolint:unused // used in skipped tests
 	m.udpListen.SetOnReceive(onReceive)
 	return m.udpListen, nil
 }

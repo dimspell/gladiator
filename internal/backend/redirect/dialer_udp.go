@@ -91,7 +91,7 @@ func (p *DialerUDP) Run(ctx context.Context) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
-			dialerConn.SetReadDeadline(time.Now().Add(10 * time.Second))
+			_ = dialerConn.SetReadDeadline(time.Now().Add(10 * time.Second))
 			n, _, err := dialerConn.ReadFromUDP(buf)
 			if err != nil {
 				var ne net.Error

@@ -158,8 +158,7 @@ func (s *Session) ConnectOverWebsocket(ctx context.Context, user *multiv1.User, 
 
 	go func(ctx context.Context, ws *websocket.Conn) {
 		<-ctx.Done()
-		ws.CloseNow()
-		return
+		_ = ws.CloseNow()
 	}(ctx, ws)
 	return nil
 }

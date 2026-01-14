@@ -41,7 +41,6 @@ func TurnCommand() *cli.Command {
 		})
 
 		select {}
-		return nil
 	}
 
 	return cmd

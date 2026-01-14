@@ -91,7 +91,7 @@ func TestLeaveRoomAndHostMigration(t *testing.T) {
 	mp.AddUserSession(sess1.UserID, sess1)
 	mp.AddUserSession(sess2.UserID, sess2)
 	room, _ := mp.CreateRoom(sess1.UserID, "room1", "", 0, "127.0.0.1")
-	mp.JoinRoom("room1", sess2.UserID, "127.0.0.2")
+	_, _ = mp.JoinRoom("room1", sess2.UserID, "127.0.0.2")
 
 	// Host leaves, guest should become host
 	mp.LeaveRoom(context.Background(), sess1)
