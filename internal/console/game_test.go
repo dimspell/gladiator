@@ -313,7 +313,6 @@ func TestGameServiceServer_DuplicateRoom(t *testing.T) {
 }
 
 func TestGameServiceServer_JoinTwice(t *testing.T) {
-	t.Skip("Failing - needs to be fixed")
 	g := &GameService{RoomService: NewRoomService()}
 	g.RoomService.AddUserSession(1, NewUserSession(1, nil))
 	g.RoomService.AddUserSession(2, NewUserSession(2, nil))

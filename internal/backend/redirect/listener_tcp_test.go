@@ -415,7 +415,7 @@ func TestListenerTCP_Alive(t *testing.T) {
 // ---- Acceptance Tests ----
 
 func TestListenerTCP_Acceptance(t *testing.T) {
-	t.Skip("Failing - needs to be fixed")
+	// t.Skip("Failing - needs to be fixed")
 	var received []string
 	done := make(chan struct{})
 

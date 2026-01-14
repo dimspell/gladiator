@@ -119,7 +119,6 @@ func TestHostManager_CreateFakeHost_ErrorHandling(t *testing.T) {
 }
 
 func TestHostManager_RemoveByIPAndRemoteID(t *testing.T) {
-	t.Skip("Failing - needs to be fixed")
 	hm := NewManager()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
@@ -258,7 +257,6 @@ func TestHostManager_ConcurrentAssignAndRemove(t *testing.T) {
 }
 
 func TestHostManager_HostGuestLifecycle(t *testing.T) {
-	t.Skip("Failing - needs to be fixed")
 	hm := NewManager()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

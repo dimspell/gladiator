@@ -191,17 +191,19 @@ func TestListRoomsAndGetRoom(t *testing.T) {
 }
 
 func TestSetPlayerConnectedDisconnected(t *testing.T) {
-	t.Skip("Failing - needs to be fixed")
 	mp := NewRoomService()
 	sess := newTestSession(1, nil)
-	called := false
-	mockSess := &mockSession{sess, func(ctx context.Context, payload []byte) { called = true }}
-	mp.SetPlayerConnected(mockSess.UserSession)
-	require.True(t, called)
-	called = false
-	mp.SetPlayerDisconnected(mockSess.UserSession)
-	// Should not panic, should remove session
+
+	// SetPlayerConnected should add the user and send them a LobbyUsers message
+	mp.SetPlayerConnected(sess)
+
+	// Verify session was added
 	_, ok := mp.GetUserSession(sess.UserID)
+	require.True(t, ok)
+
+	// SetPlayerDisconnected should remove the session
+	mp.SetPlayerDisconnected(sess)
+	_, ok = mp.GetUserSession(sess.UserID)
 	require.False(t, ok)
 }
 

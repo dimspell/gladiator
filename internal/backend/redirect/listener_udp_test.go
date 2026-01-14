@@ -95,7 +95,7 @@ func TestListenerUDP_handleConnection_UnknownSource(t *testing.T) {
 // --- Acceptance tests ---
 
 func TestListenerUDP_Acceptance(t *testing.T) {
-	t.Skip("Failing - needs to be fixed")
+	// t.Skip("Failing - needs to be fixed")
 	var received []string
 	done := make(chan struct{})
 
