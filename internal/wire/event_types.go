@@ -19,6 +19,7 @@ const (
 	RTCOffer
 	RTCAnswer
 	RTCICECandidate
+	Libp2pAddresses
 )
 
 func (e EventType) String() string {
@@ -53,6 +54,8 @@ func (e EventType) String() string {
 		return "RTCAnswer"
 	case RTCICECandidate:
 		return "RTCICECandidate"
+	case Libp2pAddresses:
+		return "Libp2pAddresses"
 	default:
 		return "Unknown"
 	}
