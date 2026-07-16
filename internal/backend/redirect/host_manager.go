@@ -413,6 +413,35 @@ func (hm *HostManager) GetPeerHost(peerID string) (*FakeHost, bool) {
 	return host, ok
 }
 
+// GetPeerIP returns the assigned loopback IP for a remoteID.
+func (hm *HostManager) GetPeerIP(remoteID string) (string, bool) {
+	hm.mu.Lock()
+	defer hm.mu.Unlock()
+	ip, ok := hm.PeerIPs[remoteID]
+	return ip, ok
+}
+
+// ForEachPeerHost iterates over all peer hosts under the lock. Returning false
+// from fn stops iteration early.
+func (hm *HostManager) ForEachPeerHost(fn func(peerID string, host *FakeHost) bool) {
+	hm.mu.Lock()
+	defer hm.mu.Unlock()
+	for id, host := range hm.PeerHosts {
+		if !fn(id, host) {
+			break
+		}
+	}
+}
+
+// Len returns the number of IP-keyed hosts, peer-keyed hosts, and assigned
+// peer IPs, all read atomically under the lock.
+func (hm *HostManager) Len() (hosts, peerHosts, peerIPs int) {
+	hm.mu.Lock()
+	defer hm.mu.Unlock()
+	hosts, peerHosts, peerIPs = len(hm.Hosts), len(hm.PeerHosts), len(hm.PeerIPs)
+	return
+}
+
 // ProxyFactory allows injection of custom proxy creation logic for testing.
 type ProxyFactory interface {
 	NewDialTCP(ip, port string, onReceive ReceiveFunc) (Redirect, error)

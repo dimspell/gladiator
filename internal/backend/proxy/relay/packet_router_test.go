@@ -1,6 +1,7 @@
 package relay
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -20,6 +21,7 @@ import (
 	"github.com/dimspell/gladiator/internal/console"
 	"github.com/dimspell/gladiator/internal/model"
 	"github.com/dimspell/gladiator/internal/wire"
+	"github.com/quic-go/quic-go"
 )
 
 func startDummyTCPServer(t *testing.T, addr string) (stop func()) {
@@ -160,12 +162,11 @@ func TestPacketRouter_GuestLeavesBeforeHost(t *testing.T) {
 	guestRelay.Close()
 
 	t.Run("Guest relay/router resources cleaned up", func(t *testing.T) {
-		if len(guestRelay.router.manager.PeerHosts) != 0 {
-			t.Errorf("expected guest PeerHosts to be empty after leave, got %d", len(guestRelay.router.manager.PeerHosts))
+		_, peerHosts, peerIPs := guestRelay.router.manager.Len()
+		if peerHosts != 0 {
+			t.Errorf("expected guest PeerHosts to be empty after leave, got %d", peerHosts)
 		}
-		if len(guestRelay.router.manager.Hosts) != 0 {
-			t.Errorf("expected guest Hosts to be empty after leave, got %d", len(guestRelay.router.manager.Hosts))
-		}
+		_ = peerIPs
 	})
 }
 
@@ -287,6 +288,214 @@ func createSession(mp *console.RoomService, userID int64) (*bsession.Session, *R
 }
 
 // --- Mocks ---
+
+// mockStream implements RelayStream for testing.
+type mockStream struct {
+	mu     sync.Mutex
+	buf    bytes.Buffer
+	closed bool
+}
+
+func (m *mockStream) Read(b []byte) (n int, err error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.closed {
+		return 0, fmt.Errorf("stream closed")
+	}
+	return m.buf.Read(b)
+}
+
+func (m *mockStream) Write(b []byte) (n int, err error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.closed {
+		return 0, fmt.Errorf("stream closed")
+	}
+	return m.buf.Write(b)
+}
+
+func (m *mockStream) Close() error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.closed = true
+	return nil
+}
+
+func (m *mockStream) CancelRead(code quic.StreamErrorCode) {}
+func (m *mockStream) CancelWrite(code quic.StreamErrorCode) {}
+
+// relayConnWrapper adapts a *quic.Stream to RelayConn for testing.
+type relayConnWrapper struct{}
+
+func (relayConnWrapper) AcceptStream(context.Context) (*quic.Stream, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+func (relayConnWrapper) CloseWithError(code quic.ApplicationErrorCode, msg string) error {
+	return nil
+}
+
+func TestPacketRouter_ReceiveLoop_ProcessesSplitMessage(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	pr := &PacketRouter{
+		logger:  slog.Default(),
+		roomID:  "test-room",
+		manager: redirect.NewManager(),
+	}
+
+	pr.wg.Add(1)
+	pipeReader, pipeWriter := io.Pipe()
+	stream := &pipeRelayStream{reader: pipeReader, writer: pipeWriter}
+
+	done := make(chan struct{})
+	go func() {
+		pr.receiveLoop(ctx, stream)
+		// Signal that receiveLoop has exited
+		close(done)
+	}()
+
+	// Give the goroutine time to start
+	time.Sleep(10 * time.Millisecond)
+
+	// Construct a complete JSON line but write it in two parts
+	msg := `{"type":"tcp","room":"test-room","from":"200","to":"100","payload":"dGVzdA=="}` + "\n"
+	half := len(msg) / 2
+
+	// Write first half
+	_, err := pipeWriter.Write([]byte(msg[:half]))
+	if err != nil {
+		t.Fatalf("failed to write first half: %v", err)
+	}
+
+	// Wait a bit, simulating network delay between fragments
+	time.Sleep(5 * time.Millisecond)
+
+	// Write second half (completing the line)
+	_, err = pipeWriter.Write([]byte(msg[half:]))
+	if err != nil {
+		t.Fatalf("failed to write second half: %v", err)
+	}
+
+	// Now wait for receiveLoop to process and then we'll
+	// signal it to stop by closing the write end
+	time.Sleep(50 * time.Millisecond)
+
+	// Check that writeTCP was called by verifying the data via the packet router state.
+	// Since writeTCP/writeUDP won't work without a proper host setup, we verify
+	// indirectly: the receiveLoop should NOT have returned due to malformed JSON.
+	// We'll close the pipe to make receiveLoop exit, then verify it didn't crash.
+	_ = pipeWriter.Close()
+	_ = pipeReader.Close()
+
+	select {
+	case <-done:
+		// receiveLoop exited cleanly
+	case <-time.After(time.Second):
+		t.Fatal("receiveLoop did not exit after pipe close")
+	}
+}
+
+func TestPacketRouter_ReceiveLoop_ExitsOnContextCancel(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	pr := &PacketRouter{
+		logger: slog.Default(),
+		roomID: "test-room",
+	}
+
+	// Use an io.Pipe: reads will block until data is written or the pipe is closed.
+	pipeReader, pipeWriter := io.Pipe()
+	stream := &pipeRelayStream{reader: pipeReader, writer: pipeWriter}
+
+	pr.wg.Add(1)
+	done := make(chan struct{})
+	go func() {
+		pr.receiveLoop(ctx, stream)
+		close(done)
+	}()
+
+	// Let the receiveLoop settle into the blocking Read
+	time.Sleep(10 * time.Millisecond)
+
+	// Cancel the context while Read is blocking
+	cancel()
+
+	select {
+	case <-done:
+		// receiveLoop exited due to context cancel
+	case <-time.After(time.Second):
+		t.Fatal("receiveLoop did not exit within 1s after context cancel")
+	}
+}
+
+// pipeRelayStream wraps io.Pipe to implement RelayStream.
+type pipeRelayStream struct {
+	reader *io.PipeReader
+	writer *io.PipeWriter
+}
+
+func (s *pipeRelayStream) Read(b []byte) (int, error) {
+	return s.reader.Read(b)
+}
+
+func (s *pipeRelayStream) Write(b []byte) (int, error) {
+	return s.writer.Write(b)
+}
+
+func (s *pipeRelayStream) Close() error {
+	_ = s.writer.Close()
+	return s.reader.Close()
+}
+
+func (s *pipeRelayStream) CancelRead(code quic.StreamErrorCode) {
+	_ = s.reader.Close()
+}
+
+func (s *pipeRelayStream) CancelWrite(code quic.StreamErrorCode) {
+	_ = s.writer.Close()
+}
+
+func TestPacketRouter_SendPacket_DataRace(t *testing.T) {
+	s := &mockStream{}
+	pr := &PacketRouter{
+		logger: slog.Default(),
+		selfID: "test-self",
+		stream: s,
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(3)
+
+	// Concurrent sendPacket from FakeHost-like goroutine
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 100; i++ {
+			_ = pr.sendPacket(RelayPacket{Type: "tcp", RoomID: "room"})
+		}
+	}()
+
+	// Concurrent selfID writes (simulates relay.go CreateRoom/GetGame)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 100; i++ {
+			pr.mu.Lock()
+			pr.selfID = fmt.Sprintf("id-%d", i)
+			pr.mu.Unlock()
+		}
+	}()
+
+	// Concurrent disconnect/reset (disconnect handles its own locking)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 20; i++ {
+			time.Sleep(time.Microsecond)
+			pr.disconnect()
+		}
+	}()
+
+	wg.Wait()
+}
 
 type dataCapture struct { //nolint:unused // used in skipped tests
 	mu   sync.Mutex

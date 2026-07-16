@@ -81,26 +81,33 @@ func peerID(userID int64) string { return fmt.Sprintf("%d", userID) }
 // Reset cleans up all resources and resets the proxy state.
 func (p *PeerToPeer) Reset() {
 	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	// Close all peer connections
+	peers := make([]*Peer, 0, len(p.peers))
 	for id, peer := range p.peers {
-		peer.Close()
+		peers = append(peers, peer)
 		delete(p.peers, id)
 	}
 
 	p.manager.StopAll()
 	p.roomID = ""
 	p.currentHostID = ""
+	p.mu.Unlock()
+
+	// Close peer connections outside the lock: peer.Close() can synchronously
+	// fire OnConnectionStateChange which re-acquires p.mu.
+	for _, peer := range peers {
+		peer.Close()
+	}
 }
 
 func (p *PeerToPeer) CreateRoom(ctx context.Context, params proxy.CreateParams) error {
 	p.Reset()
 
 	roomID := params.GameID
+	p.mu.Lock()
 	p.roomID = roomID
 	p.selfID = peerID(p.session.UserID)
 	p.currentHostID = p.selfID
+	p.mu.Unlock()
 
 	_, err := p.gameClient.CreateGame(ctx, connect.NewRequest(&multiv1.CreateGameRequest{
 		GameName:      params.GameID,
@@ -166,10 +173,14 @@ func (p *PeerToPeer) GetGame(ctx context.Context, roomID string) (*model.LobbyRo
 		return nil, nil, fmt.Errorf("could not find the host player: %w", err)
 	}
 
+	p.mu.Lock()
+	selfID := p.selfID
+	p.mu.Unlock()
+
 	var lobbyPlayers []model.LobbyPlayer
 	for _, player := range respGame.Msg.Players {
 		pid := peerID(player.UserId)
-		if pid == p.selfID {
+		if pid == selfID {
 			continue
 		}
 
@@ -185,9 +196,11 @@ func (p *PeerToPeer) GetGame(ctx context.Context, roomID string) (*model.LobbyRo
 		})
 	}
 
+	p.mu.Lock()
 	p.selfID = peerID(p.session.UserID)
 	p.roomID = roomID
 	p.currentHostID = peerID(hostPlayer.UserID)
+	p.mu.Unlock()
 
 	lobbyRoom := &model.LobbyRoom{
 		Name:          respGame.Msg.Game.Name,
@@ -220,6 +233,10 @@ func (p *PeerToPeer) JoinGame(ctx context.Context, roomID string, password strin
 	}
 	hostID := peerID(hostPlayer.UserID)
 
+	p.mu.Lock()
+	currentHostID := p.currentHostID
+	p.mu.Unlock()
+
 	var lobbyPlayers []model.LobbyPlayer
 	for _, player := range respJoin.Msg.GetPlayers() {
 		if player.UserId == p.session.UserID {
@@ -227,7 +244,7 @@ func (p *PeerToPeer) JoinGame(ctx context.Context, roomID string, password strin
 		}
 
 		pid := peerID(player.UserId)
-		ipAddress, ok := p.manager.PeerIPs[pid]
+		ipAddress, ok := p.manager.GetPeerIP(pid)
 		if !ok {
 			return nil, fmt.Errorf("not found the IP for a peer with ID %s", pid)
 		}
@@ -239,7 +256,7 @@ func (p *PeerToPeer) JoinGame(ctx context.Context, roomID string, password strin
 		p.logger.Debug("Starting fake host for", logging.PeerID(pid), "host", pid == hostID)
 
 		var tcpPort int
-		if pid == p.currentHostID {
+		if pid == currentHostID {
 			tcpPort = 6114
 		}
 
@@ -359,7 +376,13 @@ func decodeAndHandle[T any](
 
 func (p *PeerToPeer) handleJoinRoom(ctx context.Context, player wire.Player) error {
 	pid := peerID(player.UserID)
-	if pid == p.selfID {
+
+	p.mu.Lock()
+	selfID := p.selfID
+	currentHostID := p.currentHostID
+	p.mu.Unlock()
+
+	if pid == selfID {
 		return nil
 	}
 
@@ -367,7 +390,7 @@ func (p *PeerToPeer) handleJoinRoom(ctx context.Context, player wire.Player) err
 
 	// Mirror relay host behavior: if we are the current host, dial into the local game server
 	// and forward packets to this joining peer.
-	if p.currentHostID == p.selfID {
+	if currentHostID == selfID {
 		if err := p.ensureDialHostForPeer(ctx, pid); err != nil {
 			return err
 		}
@@ -383,7 +406,12 @@ func (p *PeerToPeer) handleJoinRoom(ctx context.Context, player wire.Player) err
 
 func (p *PeerToPeer) handleLeaveRoom(ctx context.Context, player wire.Player) error {
 	pid := peerID(player.UserID)
-	if p.selfID == pid {
+
+	p.mu.Lock()
+	selfID := p.selfID
+	p.mu.Unlock()
+
+	if selfID == pid {
 		return nil
 	}
 
@@ -416,7 +444,11 @@ func (p *PeerToPeer) handleRTCOffer(ctx context.Context, payload []byte) error {
 	}
 
 	// Check if this offer is for us
-	if msg.To != p.selfID {
+	p.mu.Lock()
+	selfID := p.selfID
+	p.mu.Unlock()
+
+	if msg.To != selfID {
 		return nil
 	}
 
@@ -470,7 +502,11 @@ func (p *PeerToPeer) handleRTCAnswer(ctx context.Context, payload []byte) error 
 	}
 
 	// Check if this answer is for us
-	if msg.To != p.selfID {
+	p.mu.Lock()
+	selfID := p.selfID
+	p.mu.Unlock()
+
+	if msg.To != selfID {
 		return nil
 	}
 
@@ -504,7 +540,11 @@ func (p *PeerToPeer) handleRTCCandidate(ctx context.Context, payload []byte) err
 	}
 
 	// Check if this candidate is for us
-	if msg.To != p.selfID {
+	p.mu.Lock()
+	selfID := p.selfID
+	p.mu.Unlock()
+
+	if msg.To != selfID {
 		return nil
 	}
 
@@ -616,7 +656,7 @@ func (p *PeerToPeer) ensureDialHostForPeer(ctx context.Context, remotePeerID str
 	}
 
 	// If already created, no-op.
-	if _, ok := p.manager.PeerHosts[remotePeerID]; ok {
+	if _, ok := p.manager.GetPeerHost(remotePeerID); ok {
 		return nil
 	}
 
@@ -655,7 +695,7 @@ func (p *PeerToPeer) setupDataChannel(peer *Peer, dc *webrtc.DataChannel) {
 			return
 		}
 
-		host, ok := p.manager.PeerHosts[peer.peerID]
+		host, ok := p.manager.GetPeerHost(peer.peerID)
 		if !ok {
 			peer.logger.Warn("No fake host for peer")
 			return

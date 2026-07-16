@@ -1,7 +1,7 @@
 package relay
 
 import (
-	"bytes"
+	"bufio"
 	"context"
 	"crypto/tls"
 	"encoding/json"
@@ -30,6 +30,21 @@ type RelayStream interface {
 	Close() error
 }
 
+// deadlineStream wraps a RelayStream to apply a read deadline before each Read,
+// preventing a silent remote peer from blocking the scanner goroutine forever.
+type deadlineStream struct {
+	stream  RelayStream
+	timeout time.Duration
+}
+
+func (d *deadlineStream) Read(b []byte) (int, error) {
+	// If the underlying stream supports SetReadDeadline, use it.
+	if s, ok := d.stream.(interface{ SetReadDeadline(time.Time) error }); ok {
+		_ = s.SetReadDeadline(time.Now().Add(d.timeout))
+	}
+	return d.stream.Read(b)
+}
+
 // RelayConn abstracts a QUIC connection for accepting streams and closing with an error.
 type RelayConn interface {
 	AcceptStream(context.Context) (*quic.Stream, error)
@@ -51,26 +66,46 @@ type PacketRouter struct {
 	relayConn     RelayConn
 	stream        RelayStream
 	pingTicker    *time.Ticker
+	wg            sync.WaitGroup
 }
 
 // Reset cleans up all resources, closes connections, stops hosts, and resets the router state.
 func (r *PacketRouter) Reset() {
 	r.mu.Lock()
-	defer r.mu.Unlock()
-
 	if r.pingTicker != nil {
 		r.pingTicker.Stop()
 	}
 
-	r.disconnect()
+	r.disconnectLocked()
 
 	r.manager.StopAll()
 	r.roomID = ""
 	r.currentHostID = ""
+	r.mu.Unlock()
+
+	// Wait for receiveLoop to finish (stream is closed, so Read should return quickly)
+	waitCh := make(chan struct{})
+	go func() {
+		r.wg.Wait()
+		close(waitCh)
+	}()
+	select {
+	case <-waitCh:
+	case <-time.After(5 * time.Second):
+		r.logger.Warn("timed out waiting for receiveLoop to exit")
+	}
 }
 
-// disconnect closes the current stream and relay connection, if any.
+// disconnect acquires the lock and closes the current stream/connection.
 func (r *PacketRouter) disconnect() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.disconnectLocked()
+}
+
+// disconnectLocked closes the current stream/connection without acquiring the lock.
+// Caller must hold r.mu.
+func (r *PacketRouter) disconnectLocked() {
 	if r.stream != nil {
 		r.stream.CancelRead(0xDEAD)
 		r.stream.CancelWrite(0xDEAD)
@@ -120,7 +155,12 @@ func (r *PacketRouter) handleJoinRoom(ctx context.Context, player wire.Player) e
 
 func (r *PacketRouter) handleLeaveRoom(ctx context.Context, player wire.Player) error {
 	peerID := remoteID(player.UserID)
-	if r.selfID == peerID {
+
+	r.mu.Lock()
+	selfID := r.selfID
+	r.mu.Unlock()
+
+	if selfID == peerID {
 		return nil
 	}
 
@@ -134,11 +174,11 @@ func (r *PacketRouter) handleHostMigration(ctx context.Context, player wire.Play
 
 	r.mu.Lock()
 	r.currentHostID = newHostID
+	roomID := r.roomID
+	selfID := r.selfID
 	r.mu.Unlock()
 
-	roomID := r.roomID
-
-	if newHostID == r.selfID {
+	if newHostID == selfID {
 		// I became a host!
 
 		payload := packet.NewHostSwitch(false, net.IPv4(127, 0, 0, 1))
@@ -150,10 +190,11 @@ func (r *PacketRouter) handleHostMigration(ctx context.Context, player wire.Play
 		// Shutdown the previous proxies and save {[peerID: IPv4]} parameters to
 		// reuse them.
 		rebindHosts := make(map[string]string)
-		for peerID, host := range r.manager.PeerHosts {
+		r.manager.ForEachPeerHost(func(peerID string, host *redirect.FakeHost) bool {
 			rebindHosts[peerID] = host.AssignedIP
 			r.manager.StopHost(host)
-		}
+			return true
+		})
 
 		// Recreate the proxies to the new host
 		for peerID, ip := range rebindHosts {
@@ -194,63 +235,62 @@ func (r *PacketRouter) handleHostMigration(ctx context.Context, player wire.Play
 		return nil
 	}
 
-	// TODO: Wait for completion and register
-	time.Sleep(3 * time.Second)
+	// Non-self host migration: defer the delayed work to avoid blocking the event loop
+	go func() {
+		select {
+		case <-time.After(3 * time.Second):
+			// Someone else became a host
+			host, ok := r.manager.GetPeerHost(newHostID)
+			if !ok {
+				r.logger.Warn("peer not found, nothing to migrate", logging.PeerID(newHostID))
+				return
+			}
+			r.manager.StopHost(host)
 
-	// Someone else became a host
-	host, ok := r.manager.PeerHosts[newHostID]
-	if !ok {
-		r.logger.Warn("peer not found, nothing to migrate", logging.PeerID(newHostID))
-		return nil
-	}
-	r.manager.StopHost(host)
+			onTCPMessage := func(p []byte) error {
+				return r.sendPacket(RelayPacket{
+					Type:    "tcp",
+					RoomID:  roomID,
+					ToID:    newHostID,
+					Payload: p,
+				})
+			}
+			onUDPMessage := func(p []byte) error {
+				return r.sendPacket(RelayPacket{
+					Type:    "udp",
+					RoomID:  roomID,
+					ToID:    newHostID,
+					Payload: p,
+				})
+			}
 
-	onTCPMessage := func(p []byte) error {
-		return r.sendPacket(RelayPacket{
-			Type:    "tcp",
-			RoomID:  roomID,
-			ToID:    newHostID,
-			Payload: p,
-		})
-	}
-	onUDPMessage := func(p []byte) error {
-		return r.sendPacket(RelayPacket{
-			Type:    "udp",
-			RoomID:  roomID,
-			ToID:    newHostID,
-			Payload: p,
-		})
-	}
+			onHostDisconnected := func(host *redirect.FakeHost, forced bool) {
+				slog.Warn("Host went offline", logging.PeerID(newHostID), "ip", host.AssignedIP, "forced", forced)
+				r.stop(host)
+				if forced {
+					r.disconnect()
+					r.Reset()
+				}
+			}
+			host, err := r.manager.StartHost(context.Background(), newHostID, host.AssignedIP, 6114, 6113, onTCPMessage, onUDPMessage, onHostDisconnected)
+			if err != nil {
+				r.logger.Warn("failed to start host", logging.Error(err), logging.PeerID(newHostID))
+				return
+			}
 
-	onHostDisconnected := func(host *redirect.FakeHost, forced bool) {
-		slog.Warn("Host went offline", logging.PeerID(newHostID), "ip", host.AssignedIP, "forced", forced)
-		r.stop(host)
-		if forced {
-			r.disconnect()
-			r.Reset()
+			payload := packet.NewHostSwitch(true, net.ParseIP(host.AssignedIP))
+			if err := r.session.SendToGame(packet.HostMigration, payload); err != nil {
+				r.logger.Error("failed to send host migration packet", logging.Error(err))
+			}
+		case <-ctx.Done():
 		}
-	}
-	var err error
-	host, err = r.manager.StartHost(ctx, newHostID, host.AssignedIP, 6114, 6113, onTCPMessage, onUDPMessage, onHostDisconnected)
-	if err != nil {
-		r.logger.Warn("failed to start host", logging.Error(err), logging.PeerID(newHostID))
-		return nil
-	}
-
-	payload := packet.NewHostSwitch(true, net.ParseIP(host.AssignedIP))
-	if err := r.session.SendToGame(packet.HostMigration, payload); err != nil {
-		r.logger.Error("failed to send host migration packet", logging.Error(err))
-		return fmt.Errorf("failed to send host migration packet: %w", err)
-	}
+	}()
 
 	return nil
 }
 
 // connect establishes a new QUIC connection and stream to the relay server for the given room.
 func (r *PacketRouter) connect(ctx context.Context, roomID string) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
 	tlsConf := &tls.Config{
 		InsecureSkipVerify: true,
 		NextProtos:         []string{"game-relay"},
@@ -262,19 +302,30 @@ func (r *PacketRouter) connect(ctx context.Context, roomID string) error {
 	if err != nil {
 		return fmt.Errorf("quic dial failed: %w", err)
 	}
-	r.relayConn = conn
 
 	stream, err := conn.OpenStreamSync(ctx)
 	if err != nil {
+		_ = conn.CloseWithError(0xDEAD, "failed to open stream")
 		return fmt.Errorf("quic open stream failed: %w", err)
 	}
-	r.stream = stream
 
-	// Send "join" packet
+	r.mu.Lock()
+	r.relayConn = conn
+	r.stream = stream
+	r.mu.Unlock()
+
+	// Send "join" packet (lock released, sendPacket handles its own locking)
 	if err := r.sendPacket(RelayPacket{
 		Type:   "join",
 		RoomID: roomID,
 	}); err != nil {
+		// Clean up on failure
+		_ = stream.Close()
+		_ = conn.CloseWithError(0xDEAD, "send join failed")
+		r.mu.Lock()
+		r.relayConn = nil
+		r.stream = nil
+		r.mu.Unlock()
 		return fmt.Errorf("send join packet failed: %w", err)
 	}
 
@@ -282,6 +333,7 @@ func (r *PacketRouter) connect(ctx context.Context, roomID string) error {
 	time.Sleep(100 * time.Millisecond)
 
 	// Start receiver
+	r.wg.Add(1)
 	go r.receiveLoop(ctx, stream)
 
 	return nil
@@ -341,6 +393,9 @@ type RelayPacket struct {
 
 // sendPacket marshals and sends a RelayPacket over the current stream.
 func (r *PacketRouter) sendPacket(pkt RelayPacket) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	if r.stream == nil {
 		return fmt.Errorf("stream is nil")
 	}
@@ -363,48 +418,73 @@ func (r *PacketRouter) sendPacket(pkt RelayPacket) error {
 }
 
 // receiveLoop continuously reads packets from the relay stream and dispatches them for handling.
-func (r *PacketRouter) receiveLoop(ctx context.Context, stream *quic.Stream) {
-	buf := make([]byte, 4096)
+func (r *PacketRouter) receiveLoop(ctx context.Context, stream RelayStream) {
+	defer r.wg.Done()
+
+	r.mu.Lock()
+	roomID := r.roomID
+	r.mu.Unlock()
+
+	type readResult struct {
+		data []byte
+		err  error
+	}
+	resultCh := make(chan readResult, 1)
+
+	// Dedicated read goroutine so Read can be interrupted via ctx.Done().
+	// Uses bufio.Scanner to handle messages split across TCP/QUIC reads.
+	// Wrap with a read deadline so a silent connection doesn't orphan the goroutine.
+	go func() {
+		deadlineReader := &deadlineStream{stream: stream, timeout: 30 * time.Second}
+		scanner := bufio.NewScanner(deadlineReader)
+		scanner.Buffer(make([]byte, 64*1024), 64*1024)
+		for scanner.Scan() {
+			line := make([]byte, len(scanner.Bytes()))
+			copy(line, scanner.Bytes())
+			resultCh <- readResult{data: line}
+		}
+		if err := scanner.Err(); err != nil {
+			resultCh <- readResult{err: err}
+		} else {
+			resultCh <- readResult{err: io.EOF}
+		}
+	}()
+
 	for {
 		select {
 		case <-ctx.Done():
+			stream.CancelRead(0)
 			return
-		default:
-			n, err := stream.Read(buf)
-			if err != nil {
-				r.logger.Error("received error while reading packet", logging.Error(err), logging.RoomID(r.roomID))
+		case res := <-resultCh:
+			if res.err != nil {
+				if res.err != io.EOF {
+					r.logger.Error("received error while reading packet", logging.Error(res.err), logging.RoomID(roomID))
+				}
 				return
 			}
-			data := buf[:n]
 
-			d := json.NewDecoder(bytes.NewReader(data))
-			for {
-				var pkt RelayPacket
-				if err := d.Decode(&pkt); err != nil {
-					if err == io.EOF {
-						break
-					}
-					r.logger.Warn("failed to unmarshal packet", logging.Error(err))
-					r.logger.Debug("invalid packet", slog.Any("data", data))
-					continue
-				}
+			var pkt RelayPacket
+			if err := json.Unmarshal(res.data, &pkt); err != nil {
+				r.logger.Warn("failed to unmarshal packet", logging.Error(err))
+				r.logger.Debug("invalid packet", slog.String("data", string(res.data)))
+				continue
+			}
 
-				switch pkt.Type {
-				case "join":
-					r.dynamicJoin(ctx, pkt.RoomID, pkt.FromID)
+			switch pkt.Type {
+			case "join":
+				r.dynamicJoin(ctx, pkt.RoomID, pkt.FromID)
 
-				case "tcp":
-					r.writeTCP(pkt.FromID, pkt)
+			case "tcp":
+				r.writeTCP(pkt.FromID, pkt)
 
-				case "udp":
-					r.writeUDP(pkt.FromID, pkt)
+			case "udp":
+				r.writeUDP(pkt.FromID, pkt)
 
-				case "leave":
-					r.leaveRoom(pkt.FromID)
+			case "leave":
+				r.leaveRoom(pkt.FromID)
 
-				default:
-					r.logger.Debug("Unhandled relay packet", slog.Any("packet", pkt))
-				}
+			default:
+				r.logger.Debug("Unhandled relay packet", slog.Any("packet", pkt))
 			}
 		}
 	}
@@ -419,12 +499,17 @@ func (r *PacketRouter) dynamicJoin(ctx context.Context, roomID string, peerID st
 		r.logger.Warn("failed to assign IP for the peer", logging.Error(err), logging.PeerID(peerID))
 		return
 	}
+	r.mu.Lock()
+	selfID := r.selfID
+	currentHostID := r.currentHostID
+	r.mu.Unlock()
+
 	var (
 		tcpPort      int
 		onTCPMessage func(p []byte) error = nil
 		onUDPMessage                      = r.onUDPMessage(roomID, peerID)
 	)
-	if r.selfID == r.currentHostID {
+	if selfID == currentHostID {
 		tcpPort, onTCPMessage = 6114, r.onTCPMessage(roomID, peerID)
 	}
 
@@ -467,7 +552,7 @@ func (r *PacketRouter) onUDPMessage(roomID string, peerID string) func(p []byte)
 func (r *PacketRouter) writeTCP(peerID string, pkt RelayPacket) {
 	slog.Debug("[TCP] Remote => GameClient", "data", pkt.Payload, logging.PeerID(peerID))
 
-	host, ok := r.manager.PeerHosts[peerID]
+	host, ok := r.manager.GetPeerHost(peerID)
 	if !ok {
 		r.logger.Warn("peer not found, nothing to write", logging.PeerID(peerID))
 		return
@@ -482,7 +567,7 @@ func (r *PacketRouter) writeTCP(peerID string, pkt RelayPacket) {
 func (r *PacketRouter) writeUDP(peerID string, pkt RelayPacket) {
 	slog.Debug("[UDP] Remote => GameClient", "data", pkt.Payload, logging.PeerID(peerID))
 
-	host, ok := r.manager.PeerHosts[peerID]
+	host, ok := r.manager.GetPeerHost(peerID)
 	if !ok {
 		r.logger.Warn("peer not found, nothing to write", logging.PeerID(peerID))
 		return

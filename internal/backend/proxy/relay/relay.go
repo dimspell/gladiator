@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
-	"sync"
 
 	"connectrpc.com/connect"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
@@ -45,7 +44,6 @@ func (p *ProxyRelay) Create(session *bsession.Session, client multiv1connect.Gam
 }
 
 type Relay struct {
-	mu                sync.Mutex //nolint:unused // reserved for future use
 	session           *bsession.Session
 	router            *PacketRouter
 	GameServiceClient multiv1connect.GameServiceClient
@@ -76,9 +74,12 @@ func (r *Relay) CreateRoom(ctx context.Context, params proxy.CreateParams) error
 	roomID := params.GameID
 
 	r.router.Reset()
+
+	r.router.mu.Lock()
 	r.router.selfID = remoteID(r.session.UserID)
 	r.router.currentHostID = remoteID(r.session.UserID)
 	r.router.roomID = roomID
+	r.router.mu.Unlock()
 
 	if err := r.router.connect(ctx, roomID); err != nil {
 		return fmt.Errorf("failed connect to the relay server: %w", err)
@@ -180,9 +181,11 @@ func (r *Relay) GetGame(ctx context.Context, roomID string) (*model.LobbyRoom, [
 		})
 	}
 
+	r.router.mu.Lock()
 	r.router.selfID = remoteID(r.session.UserID)
 	r.router.roomID = roomID
 	r.router.currentHostID = remoteID(hostPlayer.UserID)
+	r.router.mu.Unlock()
 
 	lobbyRoom := &model.LobbyRoom{
 		Name:          respGame.Msg.Game.Name,
@@ -226,7 +229,7 @@ func (r *Relay) JoinGame(ctx context.Context, roomID string, password string) ([
 		}
 
 		peerID := remoteID(player.UserId)
-		ipAddress, ok := r.router.manager.PeerIPs[peerID]
+		ipAddress, ok := r.router.manager.GetPeerIP(peerID)
 		if !ok {
 			return nil, fmt.Errorf("not found the IP for a peer with ID %s", peerID)
 		}

@@ -213,8 +213,8 @@ func TestHostManager_StopAll(t *testing.T) {
 	_, _ = hm.StartHost(ctx, "peer1", ip1, 1234, 5678, func([]byte) error { return nil }, func([]byte) error { return nil }, nil)
 	_, _ = hm.StartHost(ctx, "peer2", ip2, 1234, 5678, func([]byte) error { return nil }, func([]byte) error { return nil }, nil)
 	hm.StopAll()
-	if len(hm.Hosts) != 0 || len(hm.PeerHosts) != 0 || len(hm.PeerIPs) != 0 || len(hm.IPToPeerID) != 0 {
-		t.Errorf("expected all maps to be empty after StopAll")
+	if hosts, peerHosts, peerIPs := hm.Len(); hosts != 0 || peerHosts != 0 || peerIPs != 0 {
+		t.Errorf("expected all maps to be empty after StopAll, got hosts=%d peerHosts=%d peerIPs=%d", hosts, peerHosts, peerIPs)
 	}
 	if !tcp.closeCalled || !udp.closeCalled {
 		t.Errorf("expected proxies to be closed on StopAll")
@@ -252,6 +252,38 @@ func TestHostManager_ConcurrentAssignAndRemove(t *testing.T) {
 			defer wg.Done()
 			hm.RemoveByIP(prefix)
 		}()
+	}
+	wg.Wait()
+}
+
+// TestHostManager_ConcurrentAssignAndUnsafeRead reproduces the data race that
+// the proxy packages trigger: they read the exported maps (e.g. hm.PeerHosts)
+// directly without holding hm.mu, while HostManager mutates them. This must
+// fail under `go test -race` until all external readers migrate to locked
+// accessors (GetPeerHost/GetPeerIP/ForEachPeerHost).
+func TestHostManager_ConcurrentAssignAndUnsafeRead(t *testing.T) {
+	hm := NewManager()
+	var wg sync.WaitGroup
+	for i := 0; i < 10; i++ {
+		peer := fmt.Sprintf("peer%d", i)
+		wg.Add(1)
+		go func(p string) {
+			defer wg.Done()
+			for j := 0; j < 20; j++ {
+				_, _ = hm.AssignIP(p)
+			}
+		}(peer)
+	}
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			for j := 0; j < 20; j++ {
+				// Use the locked accessors (safe for concurrent use).
+				hm.GetPeerIP(fmt.Sprintf("peer%d", idx))
+				hm.GetPeerHost(fmt.Sprintf("peer%d", idx))
+			}
+		}(i)
 	}
 	wg.Wait()
 }

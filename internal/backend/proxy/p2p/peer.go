@@ -45,14 +45,21 @@ func (p *Peer) Send(payload []byte) error {
 func (p *Peer) setDataChannel(dc *webrtc.DataChannel) {
 	p.mu.Lock()
 	p.dataChannel = dc
+	queued := p.outboundQueue
+	p.outboundQueue = nil
 	p.mu.Unlock()
 
-	dc.OnOpen(func() {
-		p.mu.Lock()
-		queued := p.outboundQueue
-		p.outboundQueue = nil
-		p.mu.Unlock()
+	if dc.ReadyState() == webrtc.DataChannelStateOpen {
+		for _, payload := range queued {
+			if err := dc.Send(payload); err != nil {
+				p.logger.Warn("Failed flushing queued payload", logging.Error(err))
+				return
+			}
+		}
+		return
+	}
 
+	dc.OnOpen(func() {
 		for _, payload := range queued {
 			if err := dc.Send(payload); err != nil {
 				p.logger.Warn("Failed flushing queued payload", logging.Error(err))

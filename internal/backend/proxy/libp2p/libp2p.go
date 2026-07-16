@@ -12,6 +12,7 @@ import (
 	"log/slog"
 	"net"
 	"sync"
+	"time"
 
 	"connectrpc.com/connect"
 	libp2p "github.com/libp2p/go-libp2p"
@@ -69,6 +70,18 @@ type Libp2pProxy struct {
 
 	// peers maps peerID string → open stream to that peer.
 	peers map[string]*peerStream
+
+	// wg tracks receiveFromPeer goroutines so Close / reset can wait for them.
+	wg sync.WaitGroup
+
+	// readTimeout is the per-iteration read deadline on peer streams.  If a
+	// remote peer silently drops the connection, the read will time out and
+	// the receive goroutine will exit cleanly instead of leaking.
+	readTimeout time.Duration
+
+	// peerIDToUserID maps libp2p peer IDs → game user ID strings so that
+	// handleIncomingStream can store inbound streams under the game user ID.
+	peerIDToUserID map[string]string
 }
 
 // peerStream wraps a single libp2p stream that carries both TCP and UDP frames.
@@ -114,13 +127,15 @@ func newLibp2pProxy(config *ProxyLibp2p, gameClient multiv1connect.GameServiceCl
 	}
 
 	return &Libp2pProxy{
-		session:    session,
-		logger:     slog.With(slog.String("proxy", "libp2p"), slog.String("sessionId", session.ID)),
-		gameClient: gameClient,
-		manager:    redirect.NewManager(redirect.WithIPPrefix(ipPrefix.To4())),
-		selfID:     peerIDStr(session.UserID),
-		ipPrefix:   ipPrefix,
-		peers:      make(map[string]*peerStream),
+		session:        session,
+		logger:         slog.With(slog.String("proxy", "libp2p"), slog.String("sessionId", session.ID)),
+		gameClient:     gameClient,
+		manager:        redirect.NewManager(redirect.WithIPPrefix(ipPrefix.To4())),
+		selfID:         peerIDStr(session.UserID),
+		ipPrefix:       ipPrefix,
+		peers:          make(map[string]*peerStream),
+		readTimeout:    30 * time.Second,
+		peerIDToUserID: make(map[string]string),
 	}
 }
 
@@ -171,22 +186,38 @@ func (p *Libp2pProxy) startHost(ctx context.Context, listenAddrs []string) error
 
 // reset tears down the libp2p host, all peer streams and the redirect manager.
 func (p *Libp2pProxy) reset() {
+	// Close all peer streams under the lock so that blocked reads error out.
 	p.mu.Lock()
-	defer p.mu.Unlock()
-
 	for id, ps := range p.peers {
 		ps.close()
 		delete(p.peers, id)
 	}
+	p.mu.Unlock()
 
+	// Wait for receiveFromPeer goroutines to finish (with a timeout guard).
+	// The stream resets above should cause their reads to error out, letting
+	// them return and call wg.Done().  We must NOT hold p.mu here because the
+	// goroutines' defers need to acquire it to clean up the peers map.
+	doneCh := make(chan struct{})
+	go func() {
+		p.wg.Wait()
+		close(doneCh)
+	}()
+	select {
+	case <-doneCh:
+	case <-time.After(10 * time.Second):
+		p.logger.Warn("Timed out waiting for receiveFromPeer goroutines")
+	}
+
+	p.mu.Lock()
 	if p.h != nil {
 		_ = p.h.Close()
 		p.h = nil
 	}
-
 	p.manager.StopAll()
 	p.roomID = ""
 	p.currentHostID = ""
+	p.mu.Unlock()
 }
 
 // ─── ProxyClient interface ────────────────────────────────────────────────────
@@ -194,9 +225,11 @@ func (p *Libp2pProxy) reset() {
 func (p *Libp2pProxy) CreateRoom(ctx context.Context, params proxy.CreateParams) error {
 	p.reset()
 
+	p.mu.Lock()
 	p.roomID = params.GameID
 	p.selfID = peerIDStr(p.session.UserID)
 	p.currentHostID = p.selfID
+	p.mu.Unlock()
 
 	if err := p.startHost(ctx, nil); err != nil {
 		return fmt.Errorf("start libp2p host: %w", err)
@@ -267,7 +300,10 @@ func (p *Libp2pProxy) GetGame(ctx context.Context, roomID string) (*model.LobbyR
 	var lobbyPlayers []model.LobbyPlayer
 	for _, player := range respGame.Msg.Players {
 		pid := peerIDStr(player.UserId)
-		if pid == p.selfID {
+		p.mu.Lock()
+		selfID := p.selfID
+		p.mu.Unlock()
+		if pid == selfID {
 			continue
 		}
 
@@ -283,9 +319,11 @@ func (p *Libp2pProxy) GetGame(ctx context.Context, roomID string) (*model.LobbyR
 		})
 	}
 
+	p.mu.Lock()
 	p.selfID = peerIDStr(p.session.UserID)
 	p.roomID = roomID
 	p.currentHostID = peerIDStr(hostPlayer.UserID)
+	p.mu.Unlock()
 
 	lobbyRoom := &model.LobbyRoom{
 		Name:          respGame.Msg.Game.Name,
@@ -329,7 +367,7 @@ func (p *Libp2pProxy) JoinGame(ctx context.Context, roomID string, password stri
 		}
 
 		pid := peerIDStr(player.UserId)
-		ipAddress, ok := p.manager.PeerIPs[pid]
+		ipAddress, ok := p.manager.GetPeerIP(pid)
 		if !ok {
 			return nil, fmt.Errorf("not found the IP for a peer with ID %s", pid)
 		}
@@ -341,7 +379,10 @@ func (p *Libp2pProxy) JoinGame(ctx context.Context, roomID string, password stri
 		p.logger.Debug("Starting fake host for", logging.PeerID(pid), "host", pid == hostID)
 
 		var tcpPort int
-		if pid == p.currentHostID {
+		p.mu.Lock()
+		currentHostID := p.currentHostID
+		p.mu.Unlock()
+		if pid == currentHostID {
 			tcpPort = 6114
 		}
 
@@ -400,13 +441,17 @@ func (p *Libp2pProxy) Handle(ctx context.Context, payload []byte) error {
 
 func (p *Libp2pProxy) handleJoinRoom(ctx context.Context, player wire.Player) error {
 	pid := peerIDStr(player.UserID)
-	if pid == p.selfID {
+	p.mu.Lock()
+	selfID := p.selfID
+	currentHostID := p.currentHostID
+	p.mu.Unlock()
+	if pid == selfID {
 		return nil
 	}
 	p.logger.Info("New player joining", logging.PeerID(pid))
 
 	// If we are the host, ensure we dial into the game server for this peer.
-	if p.currentHostID == p.selfID {
+	if currentHostID == selfID {
 		if err := p.ensureDialHostForPeer(ctx, pid); err != nil {
 			return err
 		}
@@ -416,7 +461,10 @@ func (p *Libp2pProxy) handleJoinRoom(ctx context.Context, player wire.Player) er
 
 func (p *Libp2pProxy) handleLeaveRoom(_ context.Context, player wire.Player) error {
 	pid := peerIDStr(player.UserID)
-	if p.selfID == pid {
+	p.mu.Lock()
+	selfID := p.selfID
+	p.mu.Unlock()
+	if selfID == pid {
 		return nil
 	}
 
@@ -444,7 +492,10 @@ func (p *Libp2pProxy) handleHostMigration(_ context.Context, newHost wire.Player
 // list.  We connect to it and open a game stream.
 func (p *Libp2pProxy) handleLibp2pAddresses(ctx context.Context, info wire.Libp2pPeerInfo) error {
 	fromID := peerIDStr(info.CreatorID)
-	if fromID == p.selfID {
+	p.mu.Lock()
+	selfID := p.selfID
+	p.mu.Unlock()
+	if fromID == selfID {
 		return nil // ignore our own broadcast
 	}
 	if p.h == nil {
@@ -491,10 +542,23 @@ func (p *Libp2pProxy) handleLibp2pAddresses(ctx context.Context, info wire.Libp2
 	}
 
 	ps := &peerStream{peerID: fromID, stream: stream}
+
 	p.mu.Lock()
+	// Re-check under the lock: another goroutine may have connected and
+	// inserted an entry for the same peer while we were dialing.
+	if _, exists := p.peers[fromID]; exists {
+		p.mu.Unlock()
+		ps.close() // close our redundant stream; the other one is live
+		p.logger.Debug("TOCTOU avoided: peer already connected", logging.PeerID(fromID))
+		return nil
+	}
 	p.peers[fromID] = ps
+	// Record the libp2p peer ID → game user ID mapping so that
+	// handleIncomingStream can store inbound streams under the game user ID.
+	p.peerIDToUserID[addrInfo.ID.String()] = fromID
 	p.mu.Unlock()
 
+	p.wg.Add(1)
 	go p.receiveFromPeer(ps)
 	p.logger.Info("libp2p stream opened (outbound)", logging.PeerID(fromID))
 	return nil
@@ -506,19 +570,26 @@ func (p *Libp2pProxy) handleLibp2pAddresses(ctx context.Context, info wire.Libp2
 // a remote peer opens a new stream.
 func (p *Libp2pProxy) handleIncomingStream(stream network.Stream) {
 	remotePeer := stream.Conn().RemotePeer()
-	// We use the libp2p peer ID as the key – the signalling layer maps that to
-	// the game user ID via the address exchange in handleLibp2pAddresses.
-	// For now we store it by the libp2p peer ID string; a later lookup via
-	// the address book would map this to the int64 user ID if needed.
-	pid := remotePeer.String()
+	libp2pID := remotePeer.String()
+
+	// Resolve the libp2p peer ID to a game user ID via the mapping that was
+	// populated by handleLibp2pAddresses.  If the mapping is absent we fall
+	// back to the libp2p ID string so the connection is not completely lost.
+	p.mu.Lock()
+	userID, ok := p.peerIDToUserID[libp2pID]
+	if !ok {
+		userID = libp2pID
+		p.logger.Warn("Inbound stream from unknown peer – no game user ID mapping",
+			"libp2pID", libp2pID)
+	}
+	pid := userID
 
 	ps := &peerStream{peerID: pid, stream: stream}
-
-	p.mu.Lock()
 	p.peers[pid] = ps
 	p.mu.Unlock()
 
-	p.logger.Info("libp2p stream opened (inbound)", "remotePeer", pid)
+	p.logger.Info("libp2p stream opened (inbound)", "remotePeer", libp2pID, "userID", pid)
+	p.wg.Add(1)
 	go p.receiveFromPeer(ps)
 }
 
@@ -537,10 +608,17 @@ func (p *Libp2pProxy) receiveFromPeer(ps *peerStream) {
 		p.mu.Lock()
 		delete(p.peers, ps.peerID)
 		p.mu.Unlock()
+		p.wg.Done()
 	}()
 
 	lenBuf := make([]byte, 4)
 	for {
+		// Set a read deadline so a silent remote peer does not orphan this
+		// goroutine forever.
+		if err := ps.stream.SetReadDeadline(time.Now().Add(p.readTimeout)); err != nil {
+			p.logger.Debug("stream SetReadDeadline error", logging.PeerID(ps.peerID), logging.Error(err))
+		}
+
 		if _, err := readFull(ps.stream, lenBuf); err != nil {
 			p.logger.Debug("stream read error (length)", logging.PeerID(ps.peerID), logging.Error(err))
 			return
@@ -560,9 +638,7 @@ func (p *Libp2pProxy) receiveFromPeer(ps *peerStream) {
 			continue
 		}
 
-		p.mu.Lock()
-		host, ok := p.manager.PeerHosts[ps.peerID]
-		p.mu.Unlock()
+		host, ok := p.manager.GetPeerHost(ps.peerID)
 
 		if !ok {
 			p.logger.Warn("No fake host for peer", logging.PeerID(ps.peerID))
@@ -644,7 +720,7 @@ func (p *Libp2pProxy) ensureDialHostForPeer(ctx context.Context, pid string) err
 	if err != nil {
 		return fmt.Errorf("assign ip for peer %s: %w", pid, err)
 	}
-	if _, ok := p.manager.PeerHosts[pid]; ok {
+	if _, ok := p.manager.GetPeerHost(pid); ok {
 		return nil
 	}
 

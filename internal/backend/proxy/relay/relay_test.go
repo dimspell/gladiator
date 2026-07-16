@@ -194,7 +194,7 @@ func TestPacketRouter_HandleLeaveRoom_OtherPeer(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify IP was assigned
-	_, exists := relay.router.manager.PeerIPs["200"]
+	_, exists := relay.router.manager.GetPeerIP("200")
 	require.True(t, exists, "IP should be assigned")
 
 	// Create leave room message for other peer
@@ -212,9 +212,40 @@ func TestPacketRouter_HandleLeaveRoom_OtherPeer(t *testing.T) {
 	// RemoveByRemoteID is called, but since there's no host started,
 	// only the PeerHosts entry would be removed (which doesn't exist)
 	// The PeerIPs entry remains - this is expected behavior
-	_, stillExists := relay.router.manager.PeerIPs["200"]
+	_, stillExists := relay.router.manager.GetPeerIP("200")
 	assert.True(t, stillExists, "IP remains if no host was started")
 	_ = ip
+}
+
+func TestPacketRouter_HandleHostMigration_NonSelf_NonBlocking(t *testing.T) {
+	session := &bsession.Session{
+		ID:     "test-session",
+		UserID: 100,
+	}
+
+	relay := NewRelay(&ProxyRelay{RelayServerAddr: "localhost:9999"}, newMockGameServiceClient(), session)
+	relay.router.currentHostID = "100"
+	relay.router.roomID = "test-room"
+
+	// New host is 200 (not us)
+	msg := wire.Message{
+		Type: wire.HostMigration,
+		Content: wire.Player{
+			UserID: 200,
+		},
+	}
+	payload := wire.Compose(wire.HostMigration, msg)
+
+	start := time.Now()
+	err := relay.Handle(context.Background(), payload)
+	elapsed := time.Since(start)
+
+	assert.NoError(t, err)
+	assert.Less(t, elapsed, 100*time.Millisecond,
+		"Handle should not block for 3s when host migration is for another peer")
+
+	// Verify currentHostID was still updated synchronously
+	assert.Equal(t, "200", relay.router.currentHostID)
 }
 
 func TestPacketRouter_HandleHostMigration(t *testing.T) {

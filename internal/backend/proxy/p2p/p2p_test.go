@@ -216,6 +216,47 @@ func TestPeerToPeer_Reset(t *testing.T) {
 	assert.Empty(t, p2p.peers)
 }
 
+func TestPeerToPeer_Reset_NoDeadlock(t *testing.T) {
+	session := &bsession.Session{ID: "test-session", UserID: 100}
+	p2p := NewPeerToPeer(&ProxyP2P{}, newMockGameServiceClient(), session)
+
+	// Create a real peer connection - its Close() will fire OnConnectionStateChange synchronously.
+	pc, err := webrtc.NewPeerConnection(webrtc.Configuration{})
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = pc.Close() })
+
+	// Register OnConnectionStateChange that acquires p2p.mu (same pattern as createPeerConnection
+	// does on Disconnected/Failed, but we trigger on any state for reliable test coverage).
+	pc.OnConnectionStateChange(func(state webrtc.PeerConnectionState) {
+		p2p.mu.Lock()
+		delete(p2p.peers, "200")
+		p2p.mu.Unlock()
+	})
+
+	peer := &Peer{
+		peerID:     "200",
+		connection: pc,
+		logger:     slog.Default(),
+	}
+
+	p2p.mu.Lock()
+	p2p.peers["200"] = peer
+	p2p.mu.Unlock()
+
+	done := make(chan struct{})
+	go func() {
+		p2p.Reset()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		// OK - no deadlock
+	case <-time.After(5 * time.Second):
+		t.Fatal("Reset() deadlocked - timed out after 5s")
+	}
+}
+
 func TestPeerToPeer_Close(t *testing.T) {
 	session := &bsession.Session{
 		ID:     "test-session",
@@ -499,9 +540,6 @@ func TestPeerToPeer_HandleRTCCandidate_WrongRecipient(t *testing.T) {
 // --- Peer setDataChannel and queue flushing ---
 
 func TestPeer_SetDataChannel_FlushQueue(t *testing.T) {
-	sent := make([][]byte, 0)
-	var mu sync.Mutex
-
 	// Create a mock data channel
 	pc, err := webrtc.NewPeerConnection(webrtc.Configuration{})
 	require.NoError(t, err)
@@ -516,17 +554,15 @@ func TestPeer_SetDataChannel_FlushQueue(t *testing.T) {
 		outboundQueue: [][]byte{[]byte("msg1"), []byte("msg2")},
 	}
 
-	// Note: In real scenario, OnOpen would fire after ICE negotiation.
-	// Here we just test the setDataChannel logic sets up the callback.
 	peer.setDataChannel(dc)
 
-	// Simulate OnOpen by waiting briefly
-	// (In actual WebRTC, this requires full negotiation)
-	time.Sleep(50 * time.Millisecond)
-
-	mu.Lock()
-	_ = sent
-	mu.Unlock()
+	// The queue must be drained: either directly (if channel already open)
+	// or via OnOpen callback. Wait for the outbound queue to become empty.
+	require.Eventually(t, func() bool {
+		peer.mu.Lock()
+		defer peer.mu.Unlock()
+		return peer.outboundQueue == nil
+	}, 2*time.Second, 10*time.Millisecond, "outbound queue was not drained after setDataChannel")
 }
 
 // --- Mock GameServiceClient ---
