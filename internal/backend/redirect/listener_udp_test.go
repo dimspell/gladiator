@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net"
+	"strings"
 	"testing"
 	"time"
 
@@ -112,11 +113,9 @@ func TestListenerUDP_Acceptance(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
+	runErr := make(chan error, 1)
 	go func() {
-		err := listener.Run(ctx)
-		if err != nil && !errors.Is(err, context.Canceled) {
-			t.Errorf("ListenerUDP.Run error: %v", err)
-		}
+		runErr <- listener.Run(ctx)
 	}()
 
 	// Simulate a client sending handshake and payload
@@ -141,4 +140,16 @@ func TestListenerUDP_Acceptance(t *testing.T) {
 	}
 
 	_ = listener.Close()
+
+	// Wait for Run to finish and verify it returned no unexpected error.
+	// Closing the listener mid-connection causes Run to return a
+	// "closed connection" error, which is expected here.
+	select {
+	case err := <-runErr:
+		if err != nil && !errors.Is(err, context.Canceled) && !strings.Contains(err.Error(), "closed the connection") {
+			t.Errorf("ListenerUDP.Run error: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for listener.Run to exit")
+	}
 }

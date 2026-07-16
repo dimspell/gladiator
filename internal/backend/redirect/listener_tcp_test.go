@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"net"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -19,6 +20,7 @@ import (
 // ---- MOCK IMPLEMENTATIONS ----
 
 type mockConn struct {
+	mu          sync.Mutex
 	readData    []byte
 	writeBuffer bytes.Buffer
 	readErr     error
@@ -28,6 +30,8 @@ type mockConn struct {
 }
 
 func (m *mockConn) Read(b []byte) (int, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	if m.closed {
 		return 0, io.EOF
 	}
@@ -39,6 +43,8 @@ func (m *mockConn) Read(b []byte) (int, error) {
 }
 
 func (m *mockConn) Write(b []byte) (int, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	if m.writeErr != nil {
 		return 0, m.writeErr
 	}
@@ -46,11 +52,15 @@ func (m *mockConn) Write(b []byte) (int, error) {
 }
 
 func (m *mockConn) Close() error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.closed = true
 	return nil
 }
 
 func (m *mockConn) SetReadDeadline(t time.Time) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.setDeadline = true
 	return nil
 }
@@ -432,9 +442,9 @@ func TestListenerTCP_Acceptance(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
+	runErr := make(chan error, 1)
 	go func() {
-		err := listener.Run(ctx)
-		require.NoError(t, err)
+		runErr <- listener.Run(ctx)
 	}()
 
 	// Simulate a client dialing and sending handshake + payload
@@ -459,4 +469,16 @@ func TestListenerTCP_Acceptance(t *testing.T) {
 	}
 
 	_ = listener.Close()
+
+	// Wait for Run to finish and verify it returned no unexpected error.
+	// Closing the listener mid-connection causes Run to return a
+	// "closed connection" error, which is expected here.
+	select {
+	case err := <-runErr:
+		if err != nil && !strings.Contains(err.Error(), "closed the connection") {
+			require.NoError(t, err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for listener.Run to exit")
+	}
 }
