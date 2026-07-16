@@ -1,0 +1,20 @@
+services:
+  gladiator:
+    build: .
+    ports:
+      - "2137:2137"
+      - "9999:9999/udp"
+    volumes:
+      - gladiator_data:/data
+    environment:
+      - CONSOLE_ADDR=0.0.0.0:2137
+      - CONSOLE_PUBLIC_ADDR=http://localhost:2137
+      - RELAY_ADDR=0.0.0.0:9999
+      - RELAY_PUBLIC_ADDR=localhost:9999
+      - DATABASE_TYPE=sqlite
+      - SQLITE_PATH=/data/gladiator-db.sqlite
+      - LOG_LEVEL=debug
+      - LOG_FORMAT=text
+
+volumes:
+  gladiator_data:
