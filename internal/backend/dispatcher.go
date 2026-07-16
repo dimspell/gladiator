@@ -3,6 +3,7 @@ package backend
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 
@@ -14,8 +15,7 @@ func (b *Backend) handshake(conn net.Conn) (*bsession.Session, error) {
 	// Ping (single byte - [0x01])
 	{
 		buf := make([]byte, 1)
-		_, err := conn.Read(buf)
-		if err != nil {
+		if _, err := io.ReadFull(conn, buf); err != nil {
 			return nil, fmt.Errorf("error reading: %s", err)
 		}
 
@@ -29,13 +29,12 @@ func (b *Backend) handshake(conn net.Conn) (*bsession.Session, error) {
 	// Command 255 30 aka 0x1eff
 	{
 		buf := make([]byte, 64)
-		n, err := conn.Read(buf)
-		if err != nil {
+		if _, err := io.ReadFull(conn, buf); err != nil {
 			return nil, fmt.Errorf("error reading: %s", err)
 		}
 
 		// Reply with 255 30 aka 0x1eff
-		if err := b.HandleClientHostAndUsername(session, buf[4:n]); err != nil {
+		if err := b.HandleClientHostAndUsername(session, buf[4:]); err != nil {
 			return nil, err
 		}
 	}
@@ -43,11 +42,10 @@ func (b *Backend) handshake(conn net.Conn) (*bsession.Session, error) {
 	// Command 255 6 aka 0x06ff
 	{
 		buf := make([]byte, 24)
-		n, err := conn.Read(buf)
-		if err != nil {
+		if _, err := io.ReadFull(conn, buf); err != nil {
 			return nil, fmt.Errorf("error reading: %s", err)
 		}
-		if err := b.HandleAuthorizationHandshake(session, buf[4:n]); err != nil {
+		if err := b.HandleAuthorizationHandshake(session, buf[4:]); err != nil {
 			return nil, err
 		}
 	}

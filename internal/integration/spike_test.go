@@ -41,21 +41,6 @@ func findRepoRoot(t *testing.T) string {
 	return ""
 }
 
-// runMockClient executes the mock client inside the given backend container
-// (sharing its network namespace) and returns its combined output.
-func runMockClient(t *testing.T, ctx context.Context, c testcontainers.Container, args ...string) string {
-	t.Helper()
-	cmd := append([]string{"/mockclient"}, args...)
-	code, reader, err := c.Exec(ctx, cmd)
-	if err != nil {
-		dumpLogs(t, ctx, c, "mockclient")
-		t.Fatalf("exec mockclient: %v", err)
-	}
-	out, _ := io.ReadAll(reader)
-	t.Logf("mockclient exit=%d: %s", code, string(out))
-	return string(out)
-}
-
 // dumpLogs prints a container's logs to the test log.
 func dumpLogs(t *testing.T, ctx context.Context, c testcontainers.Container, label string) {
 	t.Helper()
@@ -146,9 +131,10 @@ func TestSpike(t *testing.T) {
 	dumpLogs(t, ctx, backendC, "backend-startup")
 
 	// --- Mock client executed inside the backend container ---
-	out := runMockClient(t, ctx, backendC)
-	if !strings.Contains(out, "INTEGRATION_OK") {
-		t.Fatalf("mock client did not report INTEGRATION_OK; output:\n%s", out)
+	out, code := runMockClient(t, ctx, backendC, map[string]string{}, 30*time.Second)
+	if code != 0 || !strings.Contains(out, "INTEGRATION_OK") {
+		dumpLogs(t, ctx, backendC, "mockclient")
+		t.Fatalf("mock client did not report INTEGRATION_OK (code=%d); output:\n%s", code, out)
 	}
 
 	// Sanity: console metadata is reachable from the host too.
