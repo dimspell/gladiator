@@ -116,8 +116,8 @@ func NewTCPRedirect(joinType Mode, addr *Addressing) (Redirect, error) {
 		logger.Info("Creating TCP and UDP listeners on custom ports")
 		return NewListenerTCP(addr.IP.To4().String(), addr.TCPPort, nil)
 	case OtherUserHasJoined:
-		logger.Info("Creating UDP listener only on a custom port")
-		return NewListenerUDP(addr.IP.To4().String(), addr.UDPPort, nil)
+		logger.Info("Creating TCP listener only on a custom port")
+		return NewListenerTCP(addr.IP.To4().String(), addr.TCPPort, nil)
 	default:
 		return &Noop{}, nil
 	}
