@@ -4,7 +4,7 @@ This is a **work-in-progress** project. The instructions below reflect defaults 
 
 ## Prerequisites
 
-- **Go**: see `go.mod` (`go 1.24.x`)
+- **Go**: see `go.mod` (`go 1.26.x`)
 - Optional tools (only if you work on proto/db codegen):
   - `buf` (protobuf generation)
   - `sqlc` (SQL -> Go)
@@ -63,4 +63,3 @@ Troubleshooting notes live in the root `README.md`:
 - **Windows**: HNS restart may fix “forbidden by access permissions” socket errors.
 - **Linux/macOS**: you may need to alias `127.0.0.X` on loopback for relay testing.
 - **Linux**: QUIC UDP buffer size warnings can require `sysctl` changes.
-

@@ -22,7 +22,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.24"
+          go-version: "1.26"
           cache: 'true'
 
       - name: Compile binary
@@ -42,7 +42,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.24"
+          go-version: "1.26"
 
       - name: Run multi-docker integration tests
         # Docker is pre-installed on GitHub-hosted runners.
@@ -61,7 +61,7 @@ jobs:
         id: setup-go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.24"
+          go-version: "1.26"
 
       - name: Get build data
         run: |
@@ -91,7 +91,7 @@ jobs:
             -ldflags="main.version=${BUILD_VERSION}" \
             -ldflags="main.commit=${BUILD_REVISION}" \
             -ldflags="main.date=${BUILD_TIME}" \
-            -env="GOTOOLCHAIN=go1.24.4" \
+            -env="GOTOOLCHAIN=go1.26" \
             -tags=gui
 
       - name: Extract packaged app
@@ -106,7 +106,7 @@ jobs:
         with:
           name: windows-build
           path: |
-            dist/Gladiator.exe 
+            dist/Gladiator.exe
 
       - name: Release
         uses: softprops/action-gh-release@v2
@@ -132,7 +132,7 @@ jobs:
         id: setup-go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.24"
+          go-version: "1.26"
 
       - name: Get build data
         run: |
