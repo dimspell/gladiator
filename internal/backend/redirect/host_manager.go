@@ -8,7 +8,6 @@ import (
 	"log/slog"
 	"net"
 	"strconv"
-	"strings"
 	"sync"
 
 	"github.com/dimspell/gladiator/internal/app/logger"
@@ -340,12 +339,12 @@ func (hm *HostManager) SetHost(ip, peerID string, host *FakeHost) {
 	hm.PeerHosts[peerID] = host
 }
 
-func (hm *HostManager) RemoveByIP(ipAddrOrPrefix string) {
+func (hm *HostManager) RemoveByIP(ipAddr string) {
 	hm.mu.Lock()
 	defer hm.mu.Unlock()
 
 	for ipAddress, host := range hm.Hosts {
-		if strings.HasPrefix(ipAddress, ipAddrOrPrefix) {
+		if ipAddress == ipAddr {
 			hm.stopHostLocked(host)
 		}
 	}

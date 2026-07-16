@@ -145,9 +145,9 @@ func TestHostManager_RemoveByIPAndRemoteID(t *testing.T) {
 	if _, ok := hm.GetHostByIP(ip); !ok {
 		t.Fatalf("host not found by IP")
 	}
-	hm.RemoveByIP(ip[:len(ip)-1]) // Remove by prefix
+	hm.RemoveByIP(ip) // Remove by exact IP
 	if _, ok := hm.GetHostByIP(ip); ok {
-		t.Errorf("host should be removed by prefix")
+		t.Errorf("host should be removed by exact IP")
 	}
 	ip2, _ := hm.AssignIP("peer2")
 	if _, err := hm.StartHost(ctx, "peer2", ip2, 1234, 5678, func([]byte) error { return nil }, func([]byte) error { return nil }, nil); err != nil {
@@ -182,7 +182,7 @@ func TestHostManager_ConcurrentStopAndRemove(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(2)
 	go func() { defer wg.Done(); hm.StopHost(host) }()
-	go func() { defer wg.Done(); hm.RemoveByIP(ip[:len(ip)-1]) }()
+	go func() { defer wg.Done(); hm.RemoveByIP(ip) }()
 	wg.Wait()
 }
 
@@ -260,12 +260,13 @@ func TestHostManager_ConcurrentAssignAndRemove(t *testing.T) {
 			}
 		}(peer)
 	}
+	// Concurrently remove a specific assigned IP (exact match, not prefix).
+	targetIP, _ := hm.AssignIP("peer0")
 	for i := 0; i < 10; i++ {
-		prefix := "127.0.0."
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			hm.RemoveByIP(prefix)
+			hm.RemoveByIP(targetIP)
 		}()
 	}
 	wg.Wait()
@@ -330,8 +331,29 @@ func TestHostManager_RemoveByIP_Idempotent(t *testing.T) {
 	defer cancel()
 	ip, _ := hm.AssignIP("peer1")
 	_, _ = hm.StartHost(ctx, "peer1", ip, 1234, 5678, func([]byte) error { return nil }, func([]byte) error { return nil }, nil)
-	hm.RemoveByIP(ip[:len(ip)-1])
-	hm.RemoveByIP(ip[:len(ip)-1]) // Should not panic
+	hm.RemoveByIP(ip)
+	hm.RemoveByIP(ip) // Should not panic
+}
+
+func TestHostManager_RemoveByIP_ExactMatchPreservesNeighbors(t *testing.T) {
+	hm := NewTestManager()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	ip1, _ := hm.AssignIP("peer1")
+	ip2, _ := hm.AssignIP("peer2")
+	_, _ = hm.StartHost(ctx, "peer1", ip1, 1234, 5678, func([]byte) error { return nil }, func([]byte) error { return nil }, nil)
+	_, _ = hm.StartHost(ctx, "peer2", ip2, 1234, 5678, func([]byte) error { return nil }, func([]byte) error { return nil }, nil)
+
+	// Removing peer1 by its exact IP must NOT remove peer2 (which would happen
+	// with a prefix match like "127.0.0.1" matching "127.0.0.10").
+	hm.RemoveByIP(ip1)
+	if _, ok := hm.GetHostByIP(ip1); ok {
+		t.Errorf("peer1 host should be removed")
+	}
+	if _, ok := hm.GetHostByIP(ip2); !ok {
+		t.Errorf("peer2 host should be preserved (neighbor not wiped)")
+	}
 }
 
 func TestHostManager_RemoveByRemoteID_Idempotent(t *testing.T) {
