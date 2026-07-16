@@ -39,6 +39,12 @@ func ConsoleCommand(version string) *cli.Command {
 				Sources: cli.NewValueSourceChain(cli.EnvVar("RELAY_PUBLIC_ADDR")),
 			},
 			&cli.StringFlag{
+				Name:    "run-mode",
+				Value:   "",
+				Usage:   "Explicitly advertise the run mode (lan, relay-beta, webrtc-beta, libp2p-beta, single); overrides the relay-addr default",
+				Sources: cli.NewValueSourceChain(cli.EnvVar("RUN_MODE")),
+			},
+			&cli.StringFlag{
 				Name:    "database-type",
 				Value:   "memory",
 				Usage:   "Database type (memory, sqlite)",

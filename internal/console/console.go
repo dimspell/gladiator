@@ -118,6 +118,15 @@ func WithRelayAddr(bindAddr, publicAddr string) Option {
 	}
 }
 
+// WithRunMode explicitly sets the console's advertised run mode (e.g. for the
+// backend's mode check). It overrides the relay-addr default when provided.
+func WithRunMode(mode model.RunMode) Option {
+	return func(c *Console) error {
+		c.RunMode = mode
+		return nil
+	}
+}
+
 func WithVersion(version string) Option {
 	return func(c *Console) error {
 		c.Version = version

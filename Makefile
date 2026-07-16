@@ -24,6 +24,9 @@ serve:
 test:
 	go test -v --race ./...
 
+test-integraiton:
+	go test -tags=integration -run TestSpike -v -timeout 300s -count=1 ./internal/integration/...
+
 lint:
 	go tool golangci-lint run ./...
 
