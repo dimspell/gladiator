@@ -88,9 +88,8 @@ func TestListenerUDP_handleConnection_UnknownSource(t *testing.T) {
 		return nil
 	})
 	require.Error(t, err) // Should error on EOF
-	// Note: Packets from unknown sources are still processed (logged with warning but not dropped)
-	// This allows for scenarios where remote address changes during connection
-	require.Contains(t, received, "payload")
+	// Packets from an unknown source must be dropped (not forwarded to onReceive).
+	require.NotContains(t, received, "payload")
 }
 
 // --- Acceptance tests ---

@@ -146,10 +146,11 @@ func (p *ListenerUDP) handleConnection(ctx context.Context, conn UDPConn, onRece
 				return fmt.Errorf("listen-udp: read error: %w", err)
 			}
 
-			// Ignore packets from other sources
-			if !remoteAddr.IP.Equal(p.remoteAddr.IP) || remoteAddr.Port != p.remoteAddr.Port {
+			// Drop packets from a source other than the handshake-recorded peer.
+			// This prevents local processes from spoofing packets into the game stream.
+			if p.remoteAddr == nil || !remoteAddr.IP.Equal(p.remoteAddr.IP) || remoteAddr.Port != p.remoteAddr.Port {
 				p.logger.Warn("Received packet from an unknown source", "data", buf[:n], "remoteAddr", remoteAddr, "length", n)
-				//continue
+				continue
 			}
 
 			p.lastActive = time.Now()
