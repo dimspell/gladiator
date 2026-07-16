@@ -128,9 +128,10 @@ func (hm *HostManager) AssignIP(remoteID string) (string, error) {
 		return ip, nil
 	}
 
-	// Try from 127.0.0.2-127.0.0.254
+	// Try from 127.0.0.2-127.0.0.254 (or the equivalent range under a custom prefix)
 	for i := 2; i < 255; i++ {
-		ip := net.IPv4(127, 0, hm.IPPrefix[2], byte(i)).To4()
+		base := hm.IPPrefix.To4()
+		ip := net.IPv4(base[0], base[1], base[2], byte(i)).To4()
 		ipAddr := ip.String()
 		if _, ok := hm.IPToPeerID[ipAddr]; !ok {
 			hm.PeerIPs[remoteID] = ipAddr

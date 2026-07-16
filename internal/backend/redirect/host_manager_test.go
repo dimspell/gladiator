@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -81,6 +83,19 @@ func TestHostManager_IPAssignment(t *testing.T) {
 	ip1b, _ := hm.AssignIP("peer1")
 	if ip1b != ip1 {
 		t.Errorf("expected same IP for same peer")
+	}
+}
+
+func TestHostManager_IPAssignment_HonorsIPPrefix(t *testing.T) {
+	hm := NewManager(WithIPPrefix(net.IPv4(10, 0, 0, 0)))
+	ip, err := hm.AssignIP("peer1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// The assigned IP must derive from the configured prefix (10.0.0.x),
+	// not the hardcoded 127.0.0.x default.
+	if !strings.HasPrefix(ip, "10.0.0.") {
+		t.Fatalf("expected IP under 10.0.0.0/24, got %s", ip)
 	}
 }
 
