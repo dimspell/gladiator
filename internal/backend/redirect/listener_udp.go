@@ -92,14 +92,27 @@ func (p *ListenerUDP) handleHandshake(conn UDPConn, onReceive ReceiveFunc) error
 		return fmt.Errorf("someone is already connected")
 	}
 
-	buf := make([]byte, 4)
+	buf := make([]byte, 64)
 	_ = conn.SetReadDeadline(time.Now().Add(5 * time.Second))
-	n, remoteAddr, err := conn.ReadFromUDP(buf)
-	if err != nil {
-		return err
+
+	// Read until we have at least the 4-byte magic, or the read fails.
+	var n int
+	var remoteAddr *net.UDPAddr
+	for {
+		readN, addr, err := conn.ReadFromUDP(buf[n:])
+		if err != nil {
+			return err
+		}
+		if remoteAddr == nil {
+			remoteAddr = addr
+		}
+		n += readN
+		if n >= 4 {
+			break
+		}
 	}
 
-	if !bytes.Equal(buf[:n], []byte{26, 0, 2, 0}) {
+	if !bytes.Equal(buf[:4], []byte{26, 0, 2, 0}) {
 		return fmt.Errorf("invalid first packet, got: %v", buf[:n])
 	}
 

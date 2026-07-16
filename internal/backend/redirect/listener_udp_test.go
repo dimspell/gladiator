@@ -61,6 +61,24 @@ func TestListenerUDP_handleHandshake_Invalid(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestListenerUDP_handleHandshake_Oversized(t *testing.T) {
+	// Handshake packet larger than the 4-byte magic must still be recognized
+	// (the magic is the first 4 bytes) and forwarded whole.
+	mockConn := &mockUDPConn{
+		readData: [][]byte{{26, 0, 2, 0, 9, 9}},
+		remote:   &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 1234},
+	}
+	listener := &ListenerUDP{logger: logger.NewDiscardLogger()}
+	var got []byte
+	err := listener.handleHandshake(mockConn, func(p []byte) error {
+		got = append(got, p...)
+		return nil
+	})
+	require.NoError(t, err)
+	require.Equal(t, mockConn.remote, listener.remoteAddr)
+	require.Equal(t, []byte{26, 0, 2, 0, 9, 9}, got)
+}
+
 func TestListenerUDP_handleConnection_Valid(t *testing.T) {
 	mockConn := &mockUDPConn{
 		readData: [][]byte{{26, 0, 2, 0}, []byte("payload")},
