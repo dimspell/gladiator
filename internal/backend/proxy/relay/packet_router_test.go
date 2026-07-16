@@ -88,6 +88,10 @@ func TestPacketRouter_GuestLeavesBeforeHost(t *testing.T) {
 		State:       &bsession.SessionState{},
 	}
 	hostRelay := NewRelay(&ProxyRelay{RelayServerAddr: "localhost:9995"}, gameClient, hostSession)
+	hostRelay.router.manager = redirect.NewManager(
+		redirect.WithProxyFactory(&redirect.InMemoryProxyFactory{}),
+		redirect.WithDisabledLogger(),
+	)
 	hostSession.Proxy = hostRelay
 
 	hostUserSession := &console.UserSession{
@@ -114,6 +118,10 @@ func TestPacketRouter_GuestLeavesBeforeHost(t *testing.T) {
 		State:       &bsession.SessionState{},
 	}
 	guestRelay := NewRelay(&ProxyRelay{RelayServerAddr: "localhost:9995"}, gameClient, guestSession)
+	guestRelay.router.manager = redirect.NewManager(
+		redirect.WithProxyFactory(&redirect.InMemoryProxyFactory{}),
+		redirect.WithDisabledLogger(),
+	)
 	guestSession.Proxy = guestRelay
 
 	guestUserSession := &console.UserSession{
@@ -339,9 +347,12 @@ func TestPacketRouter_ReceiveLoop_ProcessesSplitMessage(t *testing.T) {
 	defer cancel()
 
 	pr := &PacketRouter{
-		logger:  slog.Default(),
-		roomID:  "test-room",
-		manager: redirect.NewManager(),
+		logger: slog.Default(),
+		roomID: "test-room",
+		manager: redirect.NewManager(
+			redirect.WithProxyFactory(&redirect.InMemoryProxyFactory{}),
+			redirect.WithDisabledLogger(),
+		),
 	}
 
 	pr.wg.Add(1)

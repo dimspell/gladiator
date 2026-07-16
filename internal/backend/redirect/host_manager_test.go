@@ -119,7 +119,7 @@ func TestHostManager_CreateFakeHost_ErrorHandling(t *testing.T) {
 }
 
 func TestHostManager_RemoveByIPAndRemoteID(t *testing.T) {
-	hm := NewManager()
+	hm := NewTestManager()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 	ip, _ := hm.AssignIP("peer1")
@@ -149,7 +149,7 @@ func TestHostManager_RemoveByIPAndRemoteID(t *testing.T) {
 }
 
 func TestHostManager_StopHost_Idempotent(t *testing.T) {
-	hm := NewManager()
+	hm := NewTestManager()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	ip, _ := hm.AssignIP("peer1")
@@ -159,7 +159,7 @@ func TestHostManager_StopHost_Idempotent(t *testing.T) {
 }
 
 func TestHostManager_ConcurrentStopAndRemove(t *testing.T) {
-	hm := NewManager()
+	hm := NewTestManager()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	ip, _ := hm.AssignIP("peer1")
@@ -289,7 +289,7 @@ func TestHostManager_ConcurrentAssignAndUnsafeRead(t *testing.T) {
 }
 
 func TestHostManager_HostGuestLifecycle(t *testing.T) {
-	hm := NewManager()
+	hm := NewTestManager()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	ipHost, _ := hm.AssignIP("host")
@@ -310,7 +310,7 @@ func TestHostManager_HostGuestLifecycle(t *testing.T) {
 }
 
 func TestHostManager_RemoveByIP_Idempotent(t *testing.T) {
-	hm := NewManager()
+	hm := NewTestManager()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	ip, _ := hm.AssignIP("peer1")
@@ -320,7 +320,7 @@ func TestHostManager_RemoveByIP_Idempotent(t *testing.T) {
 }
 
 func TestHostManager_RemoveByRemoteID_Idempotent(t *testing.T) {
-	hm := NewManager()
+	hm := NewTestManager()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	ip, _ := hm.AssignIP("peer1")

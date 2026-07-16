@@ -51,9 +51,16 @@ func (mp *RoomService) Reset() {
 		}
 		return true
 	})
+
+	mp.sessionMutex.Lock()
 	clear(mp.sessions)
+	mp.sessionMutex.Unlock()
+
 	close(mp.Messages)
+
+	mp.roomsMutex.Lock()
 	clear(mp.Rooms)
+	mp.roomsMutex.Unlock()
 }
 
 func (mp *RoomService) Run(ctx context.Context) {
@@ -239,7 +246,7 @@ func (mp *RoomService) CreateRoom(hostUserID int64, gameID string, password stri
 	hostSession, found := mp.GetUserSession(hostUserID)
 	if !found {
 		metrics.MultiplayerErrors.WithLabelValues("create_room_no_user").Inc()
-		return nil, fmt.Errorf("user session not found %q", hostUserID)
+		return nil, fmt.Errorf("user session not found %d", hostUserID)
 	}
 
 	if _, exist := mp.Rooms[gameID]; exist {

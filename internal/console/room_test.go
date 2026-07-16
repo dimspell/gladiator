@@ -2,6 +2,8 @@ package console
 
 import (
 	"context"
+	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -65,6 +67,72 @@ func TestAddGetDeleteUserSession(t *testing.T) {
 	mp.DeleteUserSession(sess.UserID)
 	_, ok = mp.GetUserSession(sess.UserID)
 	require.False(t, ok)
+}
+
+// TestRoomService_Reset_NoRace verifies that Reset() does not race with
+// concurrent readers of rooms/sessions maps. It starts Run, spawns readers,
+// cancels the context to trigger Reset, and relies on -race to flag any
+// unsynchronized access. Regression guard for the pre-existing race in Reset().
+func TestRoomService_Reset_NoRace(t *testing.T) {
+	mp := NewRoomService()
+
+	// Populate some sessions and rooms.
+	for i := int64(1); i <= 10; i++ {
+		mp.AddUserSession(i, newTestSession(i, nil))
+		_, _ = mp.CreateRoom(i, fmt.Sprintf("room-%d", i), "", 0, "127.0.0.1")
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	go mp.Run(ctx)
+
+	var wg sync.WaitGroup
+
+	// Reader 1: repeatedly list rooms
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
+			_ = mp.ListRooms()
+		}
+	}()
+
+	// Reader 2: repeatedly look up sessions
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := int64(1); ; i = (i % 10) + 1 {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
+			mp.GetUserSession(i)
+		}
+	}()
+
+	// Reader 3: repeatedly get known rooms
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := 1; ; i = (i % 10) + 1 {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
+			mp.GetRoom(fmt.Sprintf("room-%d", i))
+		}
+	}()
+
+	// Let readers warm up, then cancel to trigger Reset.
+	time.Sleep(5 * time.Millisecond)
+	cancel()
+	wg.Wait()
 }
 
 func TestCreateRoomAndJoinRoom(t *testing.T) {
