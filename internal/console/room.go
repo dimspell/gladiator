@@ -630,9 +630,22 @@ func (mp *RoomService) RegisterRelayHooks(relay *RelayServer) {
 	}
 }
 
-// Stub handler methods (implement as needed)
+// HandleRelayJoin is invoked by the relay server when a peer connects and
+// joins a relay room. It announces the new peer to the other players in the
+// game room so their game clients start exchanging packets through the relay.
+// The relay routes by peer ID to the per-peer fake host on each machine, so
+// the announced IP is not used for routing on the relay path.
 func (mp *RoomService) HandleRelayJoin(eventType, peerID, roomID string) {
-	// TODO: Implement join event handling
+	userID, err := strconv.ParseInt(peerID, 10, 64)
+	if err != nil {
+		return
+	}
+	room, found := mp.GetRoom(roomID)
+	if !found {
+		slog.Debug("HandleRelayJoin: room not found", logging.RoomID(roomID), logging.PeerID(peerID))
+		return
+	}
+	mp.AnnounceJoin(room, userID)
 }
 
 func (mp *RoomService) HandleRelayLeave(eventType, peerID, roomID string) {
@@ -647,6 +660,9 @@ func (mp *RoomService) HandleRelayLeave(eventType, peerID, roomID string) {
 	mp.LeaveRoom(context.Background(), sess)
 }
 
+// HandleRelayDelete is invoked when a relay room becomes empty. The console
+// room is already torn down by LeaveRoom on the last leave; this is a safe
+// idempotent cleanup in case the relay room outlives the last peer leave.
 func (mp *RoomService) HandleRelayDelete(eventType, peerID, roomID string) {
-	// TODO: Implement delete event handling
+	mp.DestroyRoom(roomID)
 }
