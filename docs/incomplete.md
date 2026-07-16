@@ -21,7 +21,6 @@ This repository is **not finished**. This page is intentionally blunt about what
 ## Proxy implementations
 
 - **`proxy/p2p`** (WebRTC P2P mode): Mostly implemented but `JoinGame` still needs complete WebRTC signaling flow. See TODO in `p2p.go`.
-- **`proxy/webrtc`**: Stub package with unimplemented methods that panic. This appears to be a partially started alternative to `proxy/p2p`.
 - **`proxy/relay`**: Relay mode for clients behind strict NAT.
 - **`proxy/direct`** (LAN mode): Works for local network scenarios.
 
