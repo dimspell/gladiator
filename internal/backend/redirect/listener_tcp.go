@@ -136,7 +136,9 @@ func (p *ListenerTCP) handleHandshake(conn TCPConn, onReceive ReceiveFunc) error
 		return fmt.Errorf("invalid first packet, got: %s", string(msg))
 	}
 
-	if err := onReceive(msg); err != nil {
+	data := make([]byte, len(msg))
+	copy(data, msg)
+	if err := onReceive(data); err != nil {
 		return fmt.Errorf("failed to forward data: %w", err)
 	}
 
@@ -171,7 +173,9 @@ func (p *ListenerTCP) handleConnection(ctx context.Context, conn TCPConn, onRece
 
 			p.logger.Debug("Received packet from the game client", "data", msg)
 
-			if err := onReceive(msg); err != nil {
+			data := make([]byte, len(msg))
+			copy(data, msg)
+			if err := onReceive(data); err != nil {
 				p.logger.Warn("Failed to write data", logging.Error(err))
 				return fmt.Errorf("failed to write to data channel: %w", err)
 			}

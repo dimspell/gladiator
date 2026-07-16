@@ -105,7 +105,9 @@ func (p *DialerUDP) Run(ctx context.Context) error {
 
 			p.lastActive = time.Now()
 
-			if err := p.OnReceive(buf[:n]); err != nil {
+			data := make([]byte, n)
+			copy(data, buf[:n])
+			if err := p.OnReceive(data); err != nil {
 				return fmt.Errorf("dial-udp: failed to handle data received from game client: %w", err)
 			}
 		}

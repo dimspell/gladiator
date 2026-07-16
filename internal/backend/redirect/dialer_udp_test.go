@@ -134,6 +134,27 @@ func TestDialerUDP_Run_HandlerPanic(t *testing.T) {
 	_ = dialer.Run(context.Background())
 }
 
+func TestDialerUDP_Run_SliceNotAliased(t *testing.T) {
+	// Two distinct messages of different lengths exercise the shared read buffer.
+	mock := &mockUDPConn{readData: [][]byte{[]byte("first-message"), []byte("second")}}
+	dialer := &DialerUDP{conn: mock, logger: logger.NewDiscardLogger()}
+
+	var stored [][]byte
+	dialer.OnReceive = func(p []byte) error {
+		// Store the slice WITHOUT copying — if OnReceive receives an aliased
+		// slice into the shared buffer, later reads would corrupt earlier ones.
+		stored = append(stored, p)
+		return nil
+	}
+
+	// Run until EOF (mock returns EOF after the two messages).
+	_ = dialer.Run(context.Background())
+
+	require.Len(t, stored, 2)
+	require.Equal(t, "first-message", string(stored[0]))
+	require.Equal(t, "second", string(stored[1]))
+}
+
 func TestDialerUDP_Run_Timeout(t *testing.T) {
 	mock := &mockUDPConn{}
 	dialer := &DialerUDP{conn: mock, logger: logger.NewDiscardLogger(), OnReceive: func(p []byte) error { return nil }}

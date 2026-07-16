@@ -86,7 +86,9 @@ func (p *DialerTCP) Run(ctx context.Context) error {
 
 			p.lastActive = time.Now()
 
-			if err := p.OnReceive(buf[:n]); err != nil {
+			data := make([]byte, n)
+			copy(data, buf[:n])
+			if err := p.OnReceive(data); err != nil {
 				return fmt.Errorf("tcp-dial: failed to handle data received from the game client to: %w", err)
 			}
 		}
