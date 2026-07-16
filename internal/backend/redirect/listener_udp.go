@@ -192,14 +192,10 @@ func (p *ListenerUDP) Close() error {
 		return nil
 	}
 
-	if p.conn != nil {
-		err := p.conn.Close()
-		p.conn = nil
-		return err
-	}
-
+	err := p.conn.Close()
+	p.conn = nil
 	p.logger.Info("UDP listener closed")
-	return nil
+	return err
 }
 
 // Alive reports whether the UDP listener is alive based on the last activity time and a timeout.
