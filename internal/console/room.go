@@ -505,6 +505,8 @@ func (mp *RoomService) HandleJoinLobby(ctx context.Context, session *UserSession
 
 // SetPlayerConnected notifies the user has connected to the lobby.
 func (mp *RoomService) SetPlayerConnected(session *UserSession) {
+	session.OnWriteError = func() { mp.SetPlayerDisconnected(session) }
+
 	players := mp.listSessions()
 	mp.AddUserSession(session.UserID, session)
 
@@ -530,12 +532,20 @@ func (mp *RoomService) SetPlayerConnected(session *UserSession) {
 
 // SetPlayerDisconnected notifies the user has left the lobby.
 func (mp *RoomService) SetPlayerDisconnected(session *UserSession) {
+	// Guard against double teardown: the OnWriteError goroutine and the
+	// HandleSession defer can both reach here for the same session.
+	if !session.disconnected.CompareAndSwap(false, true) {
+		slog.Debug("Session already disconnected", "user", session.UserID)
+		return
+	}
+
 	slog.Info("Closing player connection", "user", session.UserID)
 
 	// Close the websocket connection
 	if err := session.WebSocket.CloseNow(); err != nil {
 		slog.Debug("Could not close the connection", "user", session.UserID, logging.Error(err))
 	}
+	session.WebSocket = nil
 
 	// Kick the user from the game room (if any)
 	mp.LeaveRoom(context.Background(), session)

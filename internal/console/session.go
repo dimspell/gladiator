@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"sync/atomic"
 	"time"
 
 	"github.com/coder/websocket"
@@ -24,6 +25,20 @@ type UserSession struct {
 
 	User      wire.User
 	Character wire.Character
+
+	// OnWriteError is invoked at most once when a websocket write fails, so the
+	// owner can tear down the dead session. It runs asynchronously to avoid
+	// re-entering locks held by the caller (e.g. forEachSession / LeaveRoom).
+	OnWriteError func()
+
+	// disconnecting guards OnWriteError so a single failed session triggers
+	// cleanup exactly once, even across concurrent Send calls.
+	disconnecting atomic.Bool
+
+	// disconnected marks that teardown has already run (or is running), so
+	// SetPlayerDisconnected is a no-op on a second call (e.g. from both the
+	// OnWriteError goroutine and the HandleSession defer).
+	disconnected atomic.Bool
 }
 
 func NewUserSession(id int64, conn ConnReadWriter) *UserSession {
@@ -35,10 +50,11 @@ func NewUserSession(id int64, conn ConnReadWriter) *UserSession {
 }
 
 func (us *UserSession) ReadNext(ctx context.Context) ([]byte, error) {
-	if us.WebSocket == nil {
+	conn := us.WebSocket
+	if conn == nil {
 		return nil, fmt.Errorf("not connected")
 	}
-	_, payload, err := us.WebSocket.Read(ctx)
+	_, payload, err := conn.Read(ctx)
 	if err != nil {
 		// TODO: Make the log more clear that the user has disconnected
 		slog.Warn("Could not read the message", logging.Error(err), "closeError", websocket.CloseStatus(err))
@@ -48,7 +64,8 @@ func (us *UserSession) ReadNext(ctx context.Context) ([]byte, error) {
 }
 
 func (us *UserSession) Send(ctx context.Context, payload []byte) {
-	if us.WebSocket == nil {
+	conn := us.WebSocket
+	if conn == nil {
 		slog.Debug("not connected", "userId", us.UserID)
 		metrics.FailedMessageSends.WithLabelValues(fmt.Sprintf("%d", us.UserID), "not_connected").Inc()
 		return
@@ -59,10 +76,14 @@ func (us *UserSession) Send(ctx context.Context, payload []byte) {
 		return
 	}
 
-	if err := wire.Write(ctx, us.WebSocket, payload); err != nil {
+	if err := wire.Write(ctx, conn, payload); err != nil {
 		slog.Warn("Could not send a WS message", "to", us.UserID, logging.Error(err))
 		metrics.FailedMessageSends.WithLabelValues(fmt.Sprintf("%d", us.UserID), "write_error").Inc()
-		// TODO: There is no logic to disconnect and remove the failing session
+		// The socket is dead; tear down the session. Run asynchronously so we
+		// don't re-enter locks the caller may hold (forEachSession / LeaveRoom).
+		if us.disconnecting.CompareAndSwap(false, true) && us.OnWriteError != nil {
+			go us.OnWriteError()
+		}
 	} else {
 		metrics.MessagesSentPerPlayer.WithLabelValues(fmt.Sprintf("%d", us.UserID)).Inc()
 	}

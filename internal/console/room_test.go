@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -313,4 +314,63 @@ func TestHandleRelayLeaveRemovesUser(t *testing.T) {
 	mp.HandleRelayLeave("leave", "1", "room1")
 	_, found := room.Players[1]
 	require.False(t, found)
+}
+
+// TestSendWriteErrorTearsDownSession verifies that a failed websocket write
+// triggers the OnWriteError callback (wired like SetPlayerConnected does) and
+// that the dead session is removed from the session map. Regression test for
+// the silent-drop TODO in UserSession.Send.
+func TestSendWriteErrorTearsDownSession(t *testing.T) {
+	mp := NewRoomService()
+	sess := newTestSession(1, nil)
+	// Mirror SetPlayerConnected's wiring of the teardown callback.
+	sess.OnWriteError = func() { mp.SetPlayerDisconnected(sess) }
+	mp.AddUserSession(sess.UserID, sess)
+
+	// Make the socket write fail.
+	sess.WebSocket = &mockWsConn{
+		writeFunc: func(ctx context.Context, messageType websocket.MessageType, payload []byte) error {
+			return fmt.Errorf("connection reset")
+		},
+	}
+
+	sess.Send(context.Background(), []byte{byte(wire.LobbyUsers), 1, 2, 3})
+
+	// The teardown runs in a goroutine; wait for it to complete.
+	require.Eventually(t, func() bool {
+		_, ok := mp.GetUserSession(1)
+		return !ok
+	}, time.Second, 10*time.Millisecond, "dead session should be removed after a write error")
+
+	// And the session must not be re-added.
+	_, ok := mp.GetUserSession(1)
+	require.False(t, ok, "dead session should be removed after a write error")
+	require.Nil(t, sess.WebSocket, "WebSocket should be nil after teardown")
+}
+
+// TestSendWriteErrorFiresOnce ensures concurrent failed sends trigger the
+// teardown callback exactly once (guarded by the atomic disconnecting flag).
+func TestSendWriteErrorFiresOnce(t *testing.T) {
+	var calls atomic.Int64
+	sess := newTestSession(1, nil)
+	sess.OnWriteError = func() { calls.Add(1) }
+	sess.WebSocket = &mockWsConn{
+		writeFunc: func(ctx context.Context, messageType websocket.MessageType, payload []byte) error {
+			return fmt.Errorf("boom")
+		},
+	}
+
+	var wg sync.WaitGroup
+	for i := 0; i < 8; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			sess.Send(context.Background(), []byte{byte(wire.LobbyUsers), 1})
+		}()
+	}
+	wg.Wait()
+
+	require.Eventually(t, func() bool {
+		return calls.Load() == 1
+	}, time.Second, 10*time.Millisecond, "OnWriteError must fire exactly once")
 }
