@@ -31,14 +31,9 @@ type UserSession struct {
 	// re-entering locks held by the caller (e.g. forEachSession / LeaveRoom).
 	OnWriteError func()
 
-	// disconnecting guards OnWriteError so a single failed session triggers
-	// cleanup exactly once, even across concurrent Send calls.
-	disconnecting atomic.Bool
-
-	// disconnected marks that teardown has already run (or is running), so
-	// SetPlayerDisconnected is a no-op on a second call (e.g. from both the
-	// OnWriteError goroutine and the HandleSession defer).
-	disconnected atomic.Bool
+	// state is the explicit lifecycle state of the session. See session_state.go.
+	// StateConnecting (0) is the zero value, so no explicit init is required.
+	state atomic.Int32
 }
 
 func NewUserSession(id int64, conn ConnReadWriter) *UserSession {
@@ -81,7 +76,9 @@ func (us *UserSession) Send(ctx context.Context, payload []byte) {
 		metrics.FailedMessageSends.WithLabelValues(fmt.Sprintf("%d", us.UserID), "write_error").Inc()
 		// The socket is dead; tear down the session. Run asynchronously so we
 		// don't re-enter locks the caller may hold (forEachSession / LeaveRoom).
-		if us.disconnecting.CompareAndSwap(false, true) && us.OnWriteError != nil {
+		// Transition(StateDisconnecting) wins the CAS exactly once, so only one
+		// goroutine is spawned even under concurrent failed sends.
+		if us.Transition(StateDisconnecting) && us.OnWriteError != nil {
 			go us.OnWriteError()
 		}
 	} else {

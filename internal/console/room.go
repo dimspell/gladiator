@@ -277,6 +277,7 @@ func (mp *RoomService) CreateRoom(hostUserID int64, gameID string, password stri
 	metrics.MultiplayerActiveRooms.Inc()
 	metrics.MultiplayerTotalRoomsCreated.Inc()
 	metrics.PlayersPerRoom.WithLabelValues(gameID).Set(float64(len(room.Players)))
+	hostSession.Transition(StateInRoom)
 	return room, nil
 }
 
@@ -330,6 +331,7 @@ func (mp *RoomService) JoinRoom(roomId string, userId int64, ipAddr string) (Gam
 	room.Players[userId] = joiningPlayer
 	metrics.RoomJoins.Inc()
 	metrics.PlayersPerRoom.WithLabelValues(roomId).Set(float64(len(room.Players)))
+	joiningPlayer.Transition(StateInRoom)
 	return *room, nil
 }
 
@@ -393,6 +395,7 @@ func (mp *RoomService) LeaveRoom(ctx context.Context, session *UserSession) {
 	}
 
 	// mp.Relay.Server.switchHost(roomID, peerID)
+	session.Transition(StateInLobby)
 }
 
 // GetNextHost returns the next host of the game room.
@@ -480,6 +483,7 @@ func (mp *RoomService) HandleHello(ctx context.Context, session *UserSession) er
 	session.User = m.Content
 
 	session.Send(ctx, []byte{byte(wire.Welcome)})
+	session.Transition(StateAuthenticating)
 	return nil
 }
 
@@ -509,6 +513,7 @@ func (mp *RoomService) SetPlayerConnected(session *UserSession) {
 
 	players := mp.listSessions()
 	mp.AddUserSession(session.UserID, session)
+	session.Transition(StateInLobby)
 
 	ctx, cancel := context.WithTimeout(context.TODO(), time.Second*3)
 	defer cancel()
@@ -532,9 +537,10 @@ func (mp *RoomService) SetPlayerConnected(session *UserSession) {
 
 // SetPlayerDisconnected notifies the user has left the lobby.
 func (mp *RoomService) SetPlayerDisconnected(session *UserSession) {
-	// Guard against double teardown: the OnWriteError goroutine and the
-	// HandleSession defer can both reach here for the same session.
-	if !session.disconnected.CompareAndSwap(false, true) {
+	// Exactly-once guard: Transition(StateDisconnected) wins the CAS from any
+	// state, so concurrent callers (the OnWriteError goroutine and the
+	// HandleSession defer) only run the teardown body once.
+	if !session.Transition(StateDisconnected) {
 		slog.Debug("Session already disconnected", "user", session.UserID)
 		return
 	}

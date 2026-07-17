@@ -346,10 +346,11 @@ func TestSendWriteErrorTearsDownSession(t *testing.T) {
 	_, ok := mp.GetUserSession(1)
 	require.False(t, ok, "dead session should be removed after a write error")
 	require.Nil(t, sess.WebSocket, "WebSocket should be nil after teardown")
+	require.Equal(t, StateDisconnected, sess.State(), "session should end disconnected")
 }
 
 // TestSendWriteErrorFiresOnce ensures concurrent failed sends trigger the
-// teardown callback exactly once (guarded by the atomic disconnecting flag).
+// teardown callback exactly once (guarded by the FSM Disconnecting transition).
 func TestSendWriteErrorFiresOnce(t *testing.T) {
 	var calls atomic.Int64
 	sess := newTestSession(1, nil)
@@ -373,4 +374,76 @@ func TestSendWriteErrorFiresOnce(t *testing.T) {
 	require.Eventually(t, func() bool {
 		return calls.Load() == 1
 	}, time.Second, 10*time.Millisecond, "OnWriteError must fire exactly once")
+	require.Equal(t, StateDisconnecting, sess.State(), "session should be in disconnecting state after write error")
+}
+
+// TestSessionStateZeroValue verifies a zero-value (or NewUserSession) session
+// starts in StateConnecting, so implicit initialization is correct.
+func TestSessionStateZeroValue(t *testing.T) {
+	var zero UserSession
+	require.Equal(t, StateConnecting, zero.State())
+
+	created := NewUserSession(7, &mockWsConn{})
+	require.Equal(t, StateConnecting, created.State())
+}
+
+// TestSessionTransitionTable walks the documented allowed-transitions table and
+// asserts each valid transition succeeds and the state updates.
+func TestSessionTransitionTable(t *testing.T) {
+	cases := []struct {
+		name string
+		from SessionState
+		to   SessionState
+	}{
+		{"connecting->authenticating", StateConnecting, StateAuthenticating},
+		{"authenticating->in_lobby", StateAuthenticating, StateInLobby},
+		{"in_lobby->in_room", StateInLobby, StateInRoom},
+		{"in_room->in_lobby", StateInRoom, StateInLobby},
+		{"in_lobby->disconnecting", StateInLobby, StateDisconnecting},
+		{"in_room->disconnecting", StateInRoom, StateDisconnecting},
+		{"connecting->disconnecting", StateConnecting, StateDisconnecting},
+		{"disconnecting->disconnected", StateDisconnecting, StateDisconnected},
+		{"connecting->disconnected", StateConnecting, StateDisconnected},
+		{"authenticating->disconnected", StateAuthenticating, StateDisconnected},
+		{"in_room->disconnected", StateInRoom, StateDisconnected},
+		{"any->disconnected", StateInLobby, StateDisconnected},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			s := &UserSession{state: atomic.Int32{}}
+			s.state.Store(int32(tc.from))
+			require.True(t, s.Transition(tc.to), "transition %s should succeed", tc.name)
+			require.Equal(t, tc.to, s.State())
+		})
+	}
+}
+
+// TestSessionTransitionTerminal verifies that once Disconnected, no further
+// transition is accepted (exactly-once teardown guarantee).
+func TestSessionTransitionTerminal(t *testing.T) {
+	s := &UserSession{state: atomic.Int32{}}
+	s.state.Store(int32(StateDisconnected))
+
+	require.False(t, s.Transition(StateInLobby), "terminal state must reject transitions")
+	require.False(t, s.Transition(StateDisconnected), "terminal state must reject re-entry")
+	require.Equal(t, StateDisconnected, s.State())
+}
+
+// TestSetPlayerDisconnectedIdempotent verifies the FSM guard makes teardown a
+// no-op on a second call (mirrors the OnWriteError goroutine + HandleSession
+// defer race).
+func TestSetPlayerDisconnectedIdempotent(t *testing.T) {
+	mp := NewRoomService()
+	sess := newTestSession(1, nil)
+	sess.OnWriteError = func() { mp.SetPlayerDisconnected(sess) }
+	mp.AddUserSession(sess.UserID, sess)
+
+	mp.SetPlayerDisconnected(sess)
+	require.Equal(t, StateDisconnected, sess.State())
+
+	// Second call must be a no-op (no panic, state unchanged).
+	require.NotPanics(t, func() { mp.SetPlayerDisconnected(sess) })
+	require.Equal(t, StateDisconnected, sess.State())
+	_, ok := mp.GetUserSession(1)
+	require.False(t, ok)
 }
