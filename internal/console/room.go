@@ -20,6 +20,10 @@ import (
 type RoomService struct {
 	done context.CancelFunc
 
+	// Liveness detection for lobby WebSocket connections.
+	PingInterval time.Duration // how often to send a ping (e.g. 30s)
+	PingTimeout  time.Duration // max wait for a pong before declaring dead (e.g. 10s)
+
 	// Presence in a lobby
 	sessionMutex sync.RWMutex
 	sessions     map[int64]*UserSession
@@ -35,9 +39,11 @@ type RoomService struct {
 
 func NewRoomService() *RoomService {
 	mp := &RoomService{
-		sessions: make(map[int64]*UserSession),
-		Rooms:    make(map[string]*GameRoom),
-		Messages: make(chan wire.Message),
+		sessions:     make(map[int64]*UserSession),
+		Rooms:        make(map[string]*GameRoom),
+		Messages:     make(chan wire.Message),
+		PingInterval: 30 * time.Second,
+		PingTimeout:  10 * time.Second,
 	}
 	return mp
 }
@@ -129,6 +135,11 @@ func (mp *RoomService) HandleSession(ctx context.Context, session *UserSession) 
 	metrics.ActiveSessions.Inc()
 	metrics.TotalSessions.Inc()
 
+	// Liveness: ping the socket periodically. A failed ping means the peer is
+	// dead; tear it down via the same FSM-guarded path as a read error.
+	// Detection latency is at most PingInterval + PingTimeout (~40s).
+	go mp.pingLoop(ctx, session)
+
 	// Remove the player
 	defer func() {
 		mp.SetPlayerDisconnected(session)
@@ -177,6 +188,38 @@ func (mp *RoomService) HandleSession(ctx context.Context, session *UserSession) 
 		}
 		metrics.MessagesReceived.WithLabelValues(m.Type.String()).Inc()
 		mp.Messages <- m
+	}
+}
+
+// pingLoop periodically pings the session's WebSocket to detect silently-dead
+// peers. It returns when the session context is cancelled or a ping fails (in
+// which case it triggers teardown). The WebSocket is read into a local copy to
+// avoid a nil-deref if SetPlayerDisconnected runs concurrently.
+func (mp *RoomService) pingLoop(ctx context.Context, session *UserSession) {
+	ticker := time.NewTicker(mp.PingInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if ctx.Err() != nil {
+				return
+			}
+			conn := session.WebSocket
+			if conn == nil {
+				return
+			}
+			pingCtx, cancel := context.WithTimeout(ctx, mp.PingTimeout)
+			err := conn.Ping(pingCtx)
+			cancel()
+			if err != nil {
+				slog.Debug("Liveness ping failed", "user", session.UserID, logging.Error(err))
+				mp.SetPlayerDisconnected(session)
+				return
+			}
+		}
 	}
 }
 

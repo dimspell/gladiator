@@ -18,6 +18,7 @@ func (m *mockConn) Read(ctx context.Context) (websocket.MessageType, []byte, err
 	return websocket.MessageText, []byte{}, nil
 }
 func (m *mockConn) Write(ctx context.Context, typ websocket.MessageType, p []byte) error { return nil }
+func (m *mockConn) Ping(ctx context.Context) error                                       { return nil }
 func (m *mockConn) CloseNow() error                                                      { return nil }
 
 func TestGameServiceServer_CreateGame(t *testing.T) {

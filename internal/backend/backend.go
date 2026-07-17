@@ -137,6 +137,14 @@ func (b *Backend) handleClient(conn net.Conn) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	// Enable TCP keepalive so silently-dead game clients (e.g. crashed host,
+	// dropped network without a FIN) are detected at the OS level. The read
+	// deadline in handleCommands provides the application-level timeout.
+	if tcpConn, ok := conn.(*net.TCPConn); ok {
+		_ = tcpConn.SetKeepAlive(true)
+		_ = tcpConn.SetKeepAlivePeriod(30 * time.Second)
+	}
+
 	session, err := b.handshake(conn)
 	if err != nil {
 		if err2 := conn.Close(); err2 != nil {

@@ -104,5 +104,8 @@ var _ ConnReadWriter = (*websocket.Conn)(nil)
 type ConnReadWriter interface {
 	Read(ctx context.Context) (websocket.MessageType, []byte, error)
 	Write(ctx context.Context, typ websocket.MessageType, p []byte) error
+	// Ping sends a WebSocket ping and blocks until a pong is received or the
+	// context expires. Used by the liveness ticker to detect dead sockets.
+	Ping(ctx context.Context) error
 	CloseNow() error
 }

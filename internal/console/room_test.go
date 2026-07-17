@@ -27,6 +27,7 @@ func (m *mockSession) Send(ctx context.Context, payload []byte) {
 
 type mockWsConn struct {
 	writeFunc func(ctx context.Context, messageType websocket.MessageType, payload []byte) error
+	pingFunc  func(ctx context.Context) error
 }
 
 func (m *mockWsConn) Read(ctx context.Context) (websocket.MessageType, []byte, error) {
@@ -35,6 +36,12 @@ func (m *mockWsConn) Read(ctx context.Context) (websocket.MessageType, []byte, e
 func (m *mockWsConn) Write(ctx context.Context, messageType websocket.MessageType, payload []byte) error {
 	if m.writeFunc != nil {
 		return m.writeFunc(ctx, messageType, payload)
+	}
+	return nil
+}
+func (m *mockWsConn) Ping(ctx context.Context) error {
+	if m.pingFunc != nil {
+		return m.pingFunc(ctx)
 	}
 	return nil
 }
@@ -429,21 +436,48 @@ func TestSessionTransitionTerminal(t *testing.T) {
 	require.Equal(t, StateDisconnected, s.State())
 }
 
-// TestSetPlayerDisconnectedIdempotent verifies the FSM guard makes teardown a
-// no-op on a second call (mirrors the OnWriteError goroutine + HandleSession
-// defer race).
-func TestSetPlayerDisconnectedIdempotent(t *testing.T) {
+// TestPingLoopTearsDownOnFailure verifies that the liveness ping ticker detects
+// a dead socket (Ping error) and triggers the FSM-guarded teardown. Regression
+// guard for silent-drop detection (Feature A).
+func TestPingLoopTearsDownOnFailure(t *testing.T) {
 	mp := NewRoomService()
+	mp.PingInterval = time.Millisecond * 10
+	mp.PingTimeout = time.Millisecond * 10
+
 	sess := newTestSession(1, nil)
-	sess.OnWriteError = func() { mp.SetPlayerDisconnected(sess) }
+	sess.WebSocket = &mockWsConn{
+		pingFunc: func(ctx context.Context) error {
+			return fmt.Errorf("pong timeout")
+		},
+	}
 	mp.AddUserSession(sess.UserID, sess)
 
-	mp.SetPlayerDisconnected(sess)
-	require.Equal(t, StateDisconnected, sess.State())
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go mp.pingLoop(ctx, sess)
 
-	// Second call must be a no-op (no panic, state unchanged).
-	require.NotPanics(t, func() { mp.SetPlayerDisconnected(sess) })
+	require.Eventually(t, func() bool {
+		_, ok := mp.GetUserSession(1)
+		return !ok
+	}, time.Second, 10*time.Millisecond, "ping failure should tear down the session")
 	require.Equal(t, StateDisconnected, sess.State())
+}
+
+// TestPingLoopStopsOnContextCancel verifies the ticker exits cleanly (without
+// tearing down a healthy session) when the session context is cancelled.
+func TestPingLoopStopsOnContextCancel(t *testing.T) {
+	mp := NewRoomService()
+	mp.PingInterval = time.Millisecond * 10
+
+	sess := newTestSession(1, nil)
+	mp.AddUserSession(sess.UserID, sess)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // already cancelled
+	mp.pingLoop(ctx, sess)
+
+	// Session must remain connected (no teardown on clean cancel).
 	_, ok := mp.GetUserSession(1)
-	require.False(t, ok)
+	require.True(t, ok, "session must not be torn down on context cancel")
+	require.Equal(t, StateConnecting, sess.State())
 }
