@@ -27,9 +27,11 @@ const (
 	// must be the container's own Docker IP (so the peer can reach it), but
 	// that IP is only known after the container starts. We pin static IPs on
 	// a fixed subnet so the value is known before start.
-	subnet   = "172.28.0.0/16"
-	hostIP   = "172.28.0.20"
-	guestIP  = "172.28.0.21"
+	subnet    = "172.28.0.0/16"
+	hostIP    = "172.28.0.20"
+	guestIP   = "172.28.0.21"
+	guest2IP  = "172.28.0.22"
+	guest3IP  = "172.28.0.23"
 )
 
 // newNetwork creates a user-defined bridge network with a fixed subnet so we

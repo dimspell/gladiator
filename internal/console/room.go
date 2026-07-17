@@ -326,6 +326,9 @@ func (mp *RoomService) CreateRoom(hostUserID int64, gameID string, password stri
 
 // DestroyRoom deletes an existing game room.
 func (mp *RoomService) DestroyRoom(roomId string) {
+	mp.roomsMutex.Lock()
+	defer mp.roomsMutex.Unlock()
+
 	room, ok := mp.Rooms[roomId]
 	if ok {
 		lifetime := time.Since(room.CreatedAt).Seconds()

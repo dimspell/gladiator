@@ -105,3 +105,104 @@ func TestRelayGameExchange(t *testing.T) {
 		t.Fatalf("host mock client failed (code=%d):\n%s", hostCode, hostOut)
 	}
 }
+
+// TestRelay4PlayerGameExchange proves a 4-player session (host + 3 guests
+// simultaneously in the room) can exchange game packets (UDP :6113 + TCP
+// :6114) over the relay-beta proxy. All guests join in parallel so the
+// room holds 4 players; the host accepts connections from all of them
+// through the QUIC relay server.
+func TestRelay4PlayerGameExchange(t *testing.T) {
+	if os.Getenv("SKIP_DOCKER") != "" {
+		t.Skip("SKIP_DOCKER set")
+	}
+	ctx := context.Background()
+	repoRoot := findRepoRoot(t)
+	fd := testcontainers.FromDockerfile{
+		Context:    repoRoot,
+		Dockerfile: "Dockerfile.integration",
+		KeepImage:  true,
+	}
+
+	netName := "gladiator-relay4p-" + strings.ToLower(t.Name())
+	net := newNetwork(t, ctx, netName)
+
+	consoleC, consoleName := startConsole(t, ctx, net, fd, "relay-beta", true)
+	_ = consoleC
+
+	backendHost := startBackend(t, ctx, net, fd, consoleName, "relay-beta", hostIP, true)
+	backendG1   := startBackend(t, ctx, net, fd, consoleName, "relay-beta", guestIP, true)
+	backendG2   := startBackend(t, ctx, net, fd, consoleName, "relay-beta", guest2IP, true)
+	backendG3   := startBackend(t, ctx, net, fd, consoleName, "relay-beta", guest3IP, true)
+
+	hostEnv := map[string]string{
+		"ROLE":            "host",
+		"USERNAME":        "archer",
+		"ROOM":            "room",
+		"MY_IP":           "127.0.0.1",
+		"PEER_IP":         "127.0.0.2",
+		"RELAY_MODE":      "1",
+		"BACKEND_ADDR":    "127.0.0.1:" + backendPort,
+		"MOCK_NUM_PLAYERS": "4",
+	}
+	guestEnv := func(name string) map[string]string {
+		return map[string]string{
+			"ROLE":         "guest",
+			"USERNAME":     name,
+			"ROOM":         "room",
+			"MY_IP":        "127.0.0.1",
+			"PEER_IP":      "127.0.0.2",
+			"RELAY_MODE":   "1",
+			"BACKEND_ADDR": "127.0.0.1:" + backendPort,
+		}
+	}
+
+	var hostWg sync.WaitGroup
+	var hostOut string
+	var hostCode int
+	hostWg.Add(1)
+	go func() {
+		defer hostWg.Done()
+		hostOut, hostCode = runMockClient(t, ctx, backendHost, hostEnv, 120*time.Second)
+	}()
+	time.Sleep(5 * time.Second)
+
+	// All guests join the room and exchange in parallel so they are
+	// simultaneously connected to the host through the relay.
+	var guestWg sync.WaitGroup
+	type gres struct {
+		name string
+		out  string
+		code int
+	}
+	results := make(chan gres, 3)
+	guests := []struct {
+		b    testcontainers.Container
+		name string
+	}{
+		{backendG1, "mage"},
+		{backendG2, "warrior"},
+		{backendG3, "necro"},
+	}
+	for _, g := range guests {
+		guestWg.Add(1)
+		g := g
+		go func() {
+			defer guestWg.Done()
+			out, code := runMockClient(t, ctx, g.b, guestEnv(g.name), 90*time.Second)
+			results <- gres{g.name, out, code}
+		}()
+	}
+	guestWg.Wait()
+	close(results)
+
+	for r := range results {
+		require.Equalf(t, 0, r.code, "guest %s mock client failed (code=%d):\n%s", r.name, r.code, r.out)
+		require.Containsf(t, r.out, "GAME_PACKET_OK", "guest %s did not exchange ok:\n%s", r.name, r.out)
+		require.Containsf(t, r.out, "GAME_PACKET_EXCHANGED_UDP", "guest %s UDP failed:\n%s", r.name, r.out)
+		require.Containsf(t, r.out, "GAME_PACKET_EXCHANGED_TCP", "guest %s TCP failed:\n%s", r.name, r.out)
+	}
+	hostWg.Wait()
+
+	require.Equal(t, 0, hostCode, "host mock client failed (code=%d):\n%s", hostCode, hostOut)
+	require.Contains(t, hostOut, "GAME_PACKET_OK")
+}

@@ -7,7 +7,6 @@ require (
 	fyne.io/fyne/v2 v2.8.0
 	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/coder/websocket v1.8.15
-	github.com/docker/docker v28.3.3+incompatible
 	github.com/fxamacker/cbor/v2 v2.9.2
 	github.com/go-chi/chi/v5 v5.3.1
 	github.com/golang-jwt/jwt/v5 v5.3.1
@@ -18,6 +17,7 @@ require (
 	github.com/lmittmann/tint v1.2.0
 	github.com/mattn/go-colorable v0.1.15
 	github.com/mattn/go-isatty v0.0.23
+	github.com/moby/moby/api v1.54.2
 	github.com/multiformats/go-multiaddr v0.16.1
 	github.com/pion/randutil v0.1.0
 	github.com/pion/stun/v2 v2.0.0
@@ -207,7 +207,6 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/moby/go-archive v0.2.0 // indirect
-	github.com/moby/moby/api v1.54.2 // indirect
 	github.com/moby/moby/client v0.4.0 // indirect
 	github.com/moby/patternmatcher v0.6.1 // indirect
 	github.com/moby/sys/sequential v0.6.0 // indirect
