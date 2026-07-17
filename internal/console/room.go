@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/coder/websocket"
@@ -18,7 +19,8 @@ import (
 
 // RoomService is a control plane for the lobby, presence and the matchmaking.
 type RoomService struct {
-	done context.CancelFunc
+	shutdown atomic.Bool
+	done     context.CancelFunc
 
 	// Liveness detection for lobby WebSocket connections.
 	PingInterval time.Duration // how often to send a ping (e.g. 30s)
@@ -51,6 +53,8 @@ func NewRoomService() *RoomService {
 func (mp *RoomService) Stop() { mp.done() }
 
 func (mp *RoomService) Reset() {
+	mp.shutdown.Store(true)
+
 	mp.forEachSession(func(userSession *UserSession) bool {
 		if userSession.WebSocket != nil {
 			_ = userSession.WebSocket.CloseNow()
@@ -324,11 +328,8 @@ func (mp *RoomService) CreateRoom(hostUserID int64, gameID string, password stri
 	return room, nil
 }
 
-// DestroyRoom deletes an existing game room.
-func (mp *RoomService) DestroyRoom(roomId string) {
-	mp.roomsMutex.Lock()
-	defer mp.roomsMutex.Unlock()
-
+// destroyRoomLocked deletes a room. Caller must hold roomsMutex.
+func (mp *RoomService) destroyRoomLocked(roomId string) {
 	room, ok := mp.Rooms[roomId]
 	if ok {
 		lifetime := time.Since(room.CreatedAt).Seconds()
@@ -337,6 +338,13 @@ func (mp *RoomService) DestroyRoom(roomId string) {
 	}
 	delete(mp.Rooms, roomId)
 	metrics.MultiplayerActiveRooms.Dec()
+}
+
+// DestroyRoom deletes an existing game room.
+func (mp *RoomService) DestroyRoom(roomId string) {
+	mp.roomsMutex.Lock()
+	defer mp.roomsMutex.Unlock()
+	mp.destroyRoomLocked(roomId)
 }
 
 // JoinRoom adds a player to an existing game room.
@@ -400,7 +408,7 @@ func (mp *RoomService) LeaveRoom(ctx context.Context, session *UserSession) {
 
 	if len(room.Players) == 0 {
 		// There is nobody in the room, so we can destroy it
-		mp.DestroyRoom(room.ID)
+		mp.destroyRoomLocked(room.ID)
 		return
 	}
 
@@ -726,5 +734,8 @@ func (mp *RoomService) HandleRelayLeave(eventType, peerID, roomID string) {
 // room is already torn down by LeaveRoom on the last leave; this is a safe
 // idempotent cleanup in case the relay room outlives the last peer leave.
 func (mp *RoomService) HandleRelayDelete(eventType, peerID, roomID string) {
+	if mp.shutdown.Load() {
+		return
+	}
 	mp.DestroyRoom(roomID)
 }

@@ -9,6 +9,9 @@ import (
 	"testing"
 	"time"
 
+	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/h2c"
+
 	v1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/internal/app/logger"
 	"github.com/dimspell/gladiator/internal/backend"
@@ -57,7 +60,7 @@ func setupRelayEnv(t *testing.T, relayPort string) *relayTestEnv {
 	t.Cleanup(cancel)
 
 	cs := console.NewConsole(db)
-	ts := httptest.NewServer(cs.HttpRouter())
+	ts := httptest.NewServer(h2c.NewHandler(cs.HttpRouter(), &http2.Server{}))
 	t.Cleanup(ts.Close)
 
 	consoleHostPort := ts.URL[len("http://"):]
