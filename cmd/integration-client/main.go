@@ -61,12 +61,19 @@ func run() error {
 	role := env("ROLE", "guest") // "host" or "guest"
 	username := env("USERNAME", "tester")
 	room := env("ROOM", "room")
+	relayMode := env("RELAY_MODE", "") != ""
 	myIP := env("MY_IP", "127.0.0.1")
 	peerIP := env("PEER_IP", "")
 	timeout := 60 * time.Second
 	if v := env("TIMEOUT_SECONDS", ""); v != "" {
 		if sec, err := strconv.Atoi(v); err == nil {
 			timeout = time.Duration(sec) * time.Second
+		}
+	}
+
+	if relayMode {
+		if myIP == "127.0.0.1" && peerIP == "" {
+			peerIP = "127.0.0.2"
 		}
 	}
 
@@ -125,9 +132,29 @@ func run() error {
 		return fmt.Errorf("unknown ROLE %q", role)
 	}
 
-	if err := exchange(myIP, peerIP, role, timeout); err != nil {
+	if relayMode && role == "guest" {
+		// The guest needs to wait for the backend to finish processing
+		// the join opcode and create the fake-host listener (StartHost)
+		// on 127.0.0.2:6113/6114 before dialing it. Without this delay
+		// the dial is refused. The host starts exchange immediately so
+		// its own TCP listener (for StartGuest) is up in time.
+		time.Sleep(3 * time.Second)
+	}
+
+	if err := exchange(myIP, peerIP, role, timeout, relayMode); err != nil {
 		return fmt.Errorf("game exchange: %w", err)
 	}
+
+	if relayMode && role == "host" {
+		// The host must stay alive briefly after exchange completes to
+		// allow the TCP reply to propagate through: DialTCP handleConnection
+		// reads the reply from the accepted conn asynchronously and sends
+		// it via the relay stream. If we exit immediately, the session TCP
+		// connection closes, the relay sends "leave" to the guest, and the
+		// guest's ListenerTCP is cleaned up before the reply arrives.
+		time.Sleep(500 * time.Millisecond)
+	}
+
 	return nil
 }
 
@@ -223,9 +250,12 @@ func createGamePayload(state uint32, room string) []byte {
 }
 
 // exchange performs a bidirectional UDP + TCP game-packet exchange with the peer.
-// Host listens on MY_IP; guest sends to PEER_IP. The host learns the guest's
-// address from the incoming handshake source and replies on it.
-func exchange(myIP, peerIP, role string, timeout time.Duration) error {
+// For LAN proxy (relay=false): host listens on MY_IP and replies to the incoming
+// source address; guest sends to PEER_IP and reads the host's reply.
+// For relay proxy (relay=true): both sides send to PEER_IP and read from their
+// own listener on MY_IP (UDP is symmetric; TCP keeps the asymmetric
+// listen+reply pattern which works through the relay).
+func exchange(myIP, peerIP, role string, timeout time.Duration, relay bool) error {
 	type result struct {
 		proto string
 		err   error
@@ -234,12 +264,12 @@ func exchange(myIP, peerIP, role string, timeout time.Duration) error {
 
 	// UDP
 	go func() {
-		err := exchangeUDP(myIP, peerIP, role, timeout)
+		err := exchangeUDP(myIP, peerIP, role, timeout, relay)
 		results <- result{"udp", err}
 	}()
 	// TCP
 	go func() {
-		err := exchangeTCP(myIP, peerIP, role, timeout)
+		err := exchangeTCP(myIP, peerIP, role, timeout, relay)
 		results <- result{"tcp", err}
 	}()
 
@@ -258,10 +288,70 @@ func exchange(myIP, peerIP, role string, timeout time.Duration) error {
 	return firstErr
 }
 
-func exchangeUDP(myIP, peerIP, role string, timeout time.Duration) error {
+func exchangeUDP(myIP, peerIP, role string, timeout time.Duration, relay bool) error {
 	payload := []byte("udp-game-packet-from-" + role)
 	deadline := time.Now().Add(timeout)
 	magic := []byte(handshakeMagic)
+
+	if relay && role == "guest" {
+		// Relay mode guest: bind to myIP:6113, send magic+payload to
+		// peerIP:6113 (the local backend's ListenerUDP), then read the
+		// host's reply from the same socket.
+		pc, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.ParseIP(myIP), Port: 6113})
+		if err != nil {
+			return fmt.Errorf("listen udp: %w", err)
+		}
+		defer pc.Close()
+		pc.SetReadDeadline(deadline)
+
+		msg := append(append([]byte{}, magic...), payload...)
+		peerAddr := &net.UDPAddr{IP: net.ParseIP(peerIP), Port: 6113}
+		if _, err := pc.WriteTo(msg, peerAddr); err != nil {
+			return fmt.Errorf("write: %w", err)
+		}
+
+		buf := make([]byte, 1024)
+		n, _, err := pc.ReadFromUDP(buf)
+		if err != nil {
+			return fmt.Errorf("read from listener: %w", err)
+		}
+		if string(buf[:n]) != "udp-reply-from-host" {
+			return fmt.Errorf("unexpected udp reply: %q", string(buf[:n]))
+		}
+		return nil
+	}
+
+	if relay && role == "host" {
+		// Relay mode host: bind to myIP:6113, read guest's magic+payload
+		// (delivered via writeUDP → StartGuest's DialUDP), reply with
+		// "udp-reply-from-host" to the source address (StartGuest's
+		// DialUDP ephemeral addr, which forwards the reply through the
+		// relay back to the guest).
+		pc, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.ParseIP(myIP), Port: 6113})
+		if err != nil {
+			return fmt.Errorf("listen udp: %w", err)
+		}
+		defer pc.Close()
+		pc.SetReadDeadline(deadline)
+
+		buf := make([]byte, 1024)
+		n, remote, err := pc.ReadFromUDP(buf)
+		if err != nil {
+			return fmt.Errorf("read from listener: %w", err)
+		}
+		got := buf[:n]
+		if !bytes.HasPrefix(got, magic) {
+			return fmt.Errorf("unexpected udp handshake: %q", string(got))
+		}
+		if len(got) <= len(magic) {
+			return fmt.Errorf("empty udp payload: %q", string(got))
+		}
+		reply := []byte("udp-reply-from-host")
+		if _, err := pc.WriteToUDP(reply, remote); err != nil {
+			return fmt.Errorf("write reply: %w", err)
+		}
+		return nil
+	}
 
 	if role == "host" {
 		pc, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.ParseIP(myIP), Port: 6113})
@@ -292,7 +382,7 @@ func exchangeUDP(myIP, peerIP, role string, timeout time.Duration) error {
 		return nil
 	}
 
-	// guest
+	// guest (LAN)
 	remote, err := net.ResolveUDPAddr("udp", net.JoinHostPort(peerIP, gamePortUDP))
 	if err != nil {
 		return fmt.Errorf("resolve peer: %w", err)
@@ -320,10 +410,54 @@ func exchangeUDP(myIP, peerIP, role string, timeout time.Duration) error {
 	return nil
 }
 
-func exchangeTCP(myIP, peerIP, role string, timeout time.Duration) error {
+func exchangeTCP(myIP, peerIP, role string, timeout time.Duration, relay bool) error {
 	payload := []byte("tcp-game-packet-from-" + role)
 	deadline := time.Now().Add(timeout)
 	magic := []byte(handshakeMagic)
+
+	if relay && role == "guest" {
+		// Relay mode guest: dial peerIP:6114 (the local backend's
+		// ListenerTCP). Send ##ident (required by handleHandshake), then
+		// magic+payload, then read the host's reply.
+		//
+		// Try to read the host's ##ident first (it was forwarded via relay
+		// when the host connected to its backend), but don't fail if it
+		// doesn't arrive (it may have been lost if the host connected
+		// before this side's ListenerTCP.conn was set).
+		c, err := net.DialTimeout("tcp", net.JoinHostPort(peerIP, gamePortTCP), 10*time.Second)
+		if err != nil {
+			return fmt.Errorf("dial backend: %w", err)
+		}
+		defer c.Close()
+		c.SetDeadline(deadline)
+
+		if _, err := c.Write([]byte("##guest\x00")); err != nil {
+			return fmt.Errorf("write ident: %w", err)
+		}
+
+		// Consume host's ##ident if it arrives quickly
+		c.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
+		identBuf := make([]byte, 64)
+		if n, err := c.Read(identBuf); err == nil && n > 0 && identBuf[0] == '#' {
+			// Consumed host's ident.
+		}
+		c.SetReadDeadline(deadline)
+
+		msg := append(append([]byte{}, magic...), payload...)
+		if _, err := c.Write(msg); err != nil {
+			return fmt.Errorf("write: %w", err)
+		}
+
+		buf := make([]byte, 1024)
+		n, err := c.Read(buf)
+		if err != nil {
+			return fmt.Errorf("read reply: %w", err)
+		}
+		if string(buf[:n]) != "tcp-reply-from-host" {
+			return fmt.Errorf("unexpected tcp reply: %q", string(buf[:n]))
+		}
+		return nil
+	}
 
 	if role == "host" {
 		ln, err := net.Listen("tcp", net.JoinHostPort(myIP, gamePortTCP))
@@ -338,6 +472,22 @@ func exchangeTCP(myIP, peerIP, role string, timeout time.Duration) error {
 		}
 		defer c.Close()
 		c.SetReadDeadline(deadline)
+
+		if relay {
+			// Relay mode host: the accepted connection is from the
+			// backend's StartGuest (dial to 127.0.0.1:6114). The guest
+			// sends ##ident first as part of the game-client handshake
+			// (required by ListenerTCP.handleHandshake). This is
+			// forwarded through the relay and written to our accepted
+			// connection here. Read and discard it before the real
+			// game data.
+			identBuf := make([]byte, 64)
+			if _, err := c.Read(identBuf); err != nil {
+				return fmt.Errorf("read ident: %w", err)
+			}
+			c.SetReadDeadline(deadline)
+		}
+
 		buf := make([]byte, 1024)
 		n, err := c.Read(buf)
 		if err != nil {
@@ -354,10 +504,23 @@ func exchangeTCP(myIP, peerIP, role string, timeout time.Duration) error {
 		if _, err := c.Write([]byte("tcp-reply-from-host")); err != nil {
 			return fmt.Errorf("write reply: %w", err)
 		}
+
+		if relay {
+			// Keep the accepted connection open briefly so DialTCP's
+			// handleConnection goroutine can read the reply (from our
+			// Write above) and send it through the relay stream before
+			// the host exits and closes the session connection.
+			time.Sleep(500 * time.Millisecond)
+		}
 		return nil
 	}
 
-	// guest
+	if relay {
+		// Should not reach here: relay + guest is handled above, relay +
+		// host is handled above. This is the LAN-only guest path.
+	}
+
+	// guest (LAN)
 	c, err := net.DialTimeout("tcp", net.JoinHostPort(peerIP, gamePortTCP), 10*time.Second)
 	if err != nil {
 		return fmt.Errorf("dial peer: %w", err)
