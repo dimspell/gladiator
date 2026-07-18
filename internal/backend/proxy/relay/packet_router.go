@@ -2,8 +2,6 @@ package relay
 
 import (
 	"context"
-	"crypto/tls"
-	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -59,12 +57,10 @@ type PacketRouter struct {
 	manager   *redirect.HostManager
 	session   *bsession.Session
 	selfID    string
-	relayAddr string
+	transport PeerTransport
 
 	roomID        string
 	currentHostID string
-	relayConn     RelayConn
-	stream        RelayStream
 	pingTicker    *time.Ticker
 	wg            sync.WaitGroup
 }
@@ -103,16 +99,11 @@ func (r *PacketRouter) disconnect() {
 	r.disconnectLocked()
 }
 
-// disconnectLocked closes the current stream/connection without acquiring the lock.
+// disconnectLocked closes the current transport without acquiring the lock.
 // Caller must hold r.mu.
 func (r *PacketRouter) disconnectLocked() {
-	if r.stream != nil {
-		r.stream.CancelRead(0xDEAD)
-		r.stream.CancelWrite(0xDEAD)
-		_ = r.stream.Close()
-	}
-	if r.relayConn != nil {
-		_ = r.relayConn.CloseWithError(0xDEAD, "done")
+	if r.transport != nil {
+		_ = r.transport.Close()
 	}
 }
 
@@ -289,53 +280,15 @@ func (r *PacketRouter) handleHostMigration(ctx context.Context, player wire.Play
 	return nil
 }
 
-// connect establishes a new QUIC connection and stream to the relay server for the given room.
+// connect joins the relay infrastructure for the given room via the injected
+// PeerTransport and starts the receive loop.
 func (r *PacketRouter) connect(ctx context.Context, roomID string) error {
-	tlsConf := &tls.Config{
-		InsecureSkipVerify: true,
-		NextProtos:         []string{"game-relay"},
-	}
-	conn, err := quic.DialAddr(ctx, r.relayAddr, tlsConf, &quic.Config{
-		MaxIdleTimeout:  30 * time.Second,
-		KeepAlivePeriod: 15 * time.Second,
-	})
-	if err != nil {
-		return fmt.Errorf("quic dial failed: %w", err)
+	if err := r.transport.Join(ctx, roomID); err != nil {
+		return fmt.Errorf("failed to join relay: %w", err)
 	}
 
-	stream, err := conn.OpenStreamSync(ctx)
-	if err != nil {
-		_ = conn.CloseWithError(0xDEAD, "failed to open stream")
-		return fmt.Errorf("quic open stream failed: %w", err)
-	}
-
-	r.mu.Lock()
-	r.relayConn = conn
-	r.stream = stream
-	r.mu.Unlock()
-
-	// Send "join" packet (lock released, sendPacket handles its own locking)
-	if err := r.sendPacket(RelayPacket{
-		Type:   "join",
-		RoomID: roomID,
-	}); err != nil {
-		// Clean up on failure
-		_ = stream.Close()
-		_ = conn.CloseWithError(0xDEAD, "send join failed")
-		r.mu.Lock()
-		r.relayConn = nil
-		r.stream = nil
-		r.mu.Unlock()
-		return fmt.Errorf("send join packet failed: %w", err)
-	}
-
-	// Make sure the QUIC send the only packet, not joined with others.
-	time.Sleep(100 * time.Millisecond)
-
-	// Start receiver
 	r.wg.Add(1)
-	go r.receiveLoop(ctx, stream)
-
+	go r.receiveLoop(ctx)
 	return nil
 }
 
@@ -388,93 +341,65 @@ func (r *PacketRouter) stop(host *redirect.FakeHost) {
 // rest of this package can keep using the unqualified name.
 type RelayPacket = types.RelayPacket
 
-// sendPacket marshals and sends a RelayPacket over the current stream.
+// sendPacket marshals and sends a RelayPacket over the transport.
 func (r *PacketRouter) sendPacket(pkt RelayPacket) error {
+	// Always associate who is sending the packet.
 	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	if r.stream == nil {
-		return fmt.Errorf("stream is nil")
-	}
-
-	// Always associate who sending the packet
 	pkt.FromID = r.selfID
-
-	data, err := json.Marshal(pkt)
-	if err != nil {
-		return fmt.Errorf("marshal packet failed: %w", err)
-	}
-
-	if err := types.WriteFramed(r.stream, data); err != nil {
-		return fmt.Errorf("write packet failed: %w", err)
-	}
-	return nil
-}
-
-// receiveLoop continuously reads packets from the relay stream and dispatches them for handling.
-func (r *PacketRouter) receiveLoop(ctx context.Context, stream RelayStream) {
-	defer r.wg.Done()
-
-	r.mu.Lock()
-	roomID := r.roomID
 	r.mu.Unlock()
 
-	type readResult struct {
-		data []byte
-		err  error
+	kind := KindTCP
+	switch pkt.Type {
+	case "udp":
+		kind = KindUDP
+	case "tcp":
+		kind = KindTCP
+	case "ping":
+		kind = KindPing
+	default:
+		return fmt.Errorf("unsupported relay packet type %q", pkt.Type)
 	}
-	resultCh := make(chan readResult, 1)
 
-	// Dedicated read goroutine so Read can be interrupted via ctx.Done().
-	go func() {
-		deadlineReader := &deadlineStream{stream: stream, timeout: 30 * time.Second}
-		for {
-			data, err := types.ReadFramed(deadlineReader)
-			if err != nil {
-				resultCh <- readResult{err: err}
-				return
-			}
-			resultCh <- readResult{data: data}
-		}
-	}()
+	return r.transport.Send(context.Background(), TransportPacket{
+		ToID:   pkt.ToID,
+		RoomID: pkt.RoomID,
+		Kind:   kind,
+		Data:   pkt.Payload,
+	})
+}
+
+// receiveLoop continuously reads packets from the transport and dispatches
+// them. It runs until the transport closes or ctx is cancelled.
+func (r *PacketRouter) receiveLoop(ctx context.Context) {
+	defer r.wg.Done()
 
 	for {
-		select {
-		case <-ctx.Done():
-			stream.CancelRead(0)
+		pkt, err := r.transport.Recv(ctx)
+		if err != nil {
+			if err != io.EOF && err != context.Canceled {
+				r.logger.Error("transport recv error", logging.Error(err))
+			}
 			return
-		case res := <-resultCh:
-			if res.err != nil {
-				if res.err != io.EOF {
-					r.logger.Error("received error while reading packet", logging.Error(res.err), logging.RoomID(roomID))
-				}
-				return
-			}
-
-			var pkt RelayPacket
-			if err := json.Unmarshal(res.data, &pkt); err != nil {
-				r.logger.Warn("failed to unmarshal packet", logging.Error(err))
-				r.logger.Debug("invalid packet", slog.String("data", string(res.data)))
-				continue
-			}
-
-			switch pkt.Type {
-			case "join":
-				r.dynamicJoin(ctx, pkt.RoomID, pkt.FromID)
-
-			case "tcp":
-				r.writeTCP(pkt.FromID, pkt)
-
-			case "udp":
-				r.writeUDP(pkt.FromID, pkt)
-
-			case "leave":
-				r.leaveRoom(pkt.FromID)
-
-			default:
-				r.logger.Debug("Unhandled relay packet", slog.Any("packet", pkt))
-			}
 		}
+		r.onTransportPacket(pkt)
+	}
+}
+
+// onTransportPacket dispatches a transport-agnostic packet to the appropriate
+// handler. This is the single dispatch path shared by every PeerTransport
+// (relay/QUIC, WebRTC, or in-memory).
+func (r *PacketRouter) onTransportPacket(pkt TransportPacket) {
+	switch pkt.Kind {
+	case KindJoin:
+		r.dynamicJoin(context.Background(), pkt.RoomID, pkt.FromID)
+	case KindTCP:
+		r.writeTCP(pkt.FromID, pkt.Data)
+	case KindUDP:
+		r.writeUDP(pkt.FromID, pkt.Data)
+	case KindLeave:
+		r.leaveRoom(pkt.FromID)
+	case KindPing:
+		// keep-alive; nothing to forward to the game client
 	}
 }
 
@@ -533,31 +458,31 @@ func (r *PacketRouter) onUDPMessage(roomID string, peerID string) func(p []byte)
 	}
 }
 
-// writeTCP writes a TCP packet to the local game client for the given peer.
-func (r *PacketRouter) writeTCP(peerID string, pkt RelayPacket) {
-	slog.Debug("[TCP] Remote => GameClient", "data", pkt.Payload, logging.PeerID(peerID))
+// writeTCP writes a TCP payload to the local game client for the given peer.
+func (r *PacketRouter) writeTCP(peerID string, payload []byte) {
+	slog.Debug("[TCP] Remote => GameClient", "data", payload, logging.PeerID(peerID))
 
 	host, ok := r.manager.GetPeerHost(peerID)
 	if !ok {
 		r.logger.Warn("peer not found, nothing to write", logging.PeerID(peerID))
 		return
 	}
-	if _, err := host.ProxyTCP.Write(pkt.Payload); err != nil {
+	if _, err := host.ProxyTCP.Write(payload); err != nil {
 		r.logger.Warn("failed to write packet", logging.Error(err))
 		return
 	}
 }
 
-// writeUDP writes a UDP packet to the local game client for the given peer.
-func (r *PacketRouter) writeUDP(peerID string, pkt RelayPacket) {
-	slog.Debug("[UDP] Remote => GameClient", "data", pkt.Payload, logging.PeerID(peerID))
+// writeUDP writes a UDP payload to the local game client for the given peer.
+func (r *PacketRouter) writeUDP(peerID string, payload []byte) {
+	slog.Debug("[UDP] Remote => GameClient", "data", payload, logging.PeerID(peerID))
 
 	host, ok := r.manager.GetPeerHost(peerID)
 	if !ok {
 		r.logger.Warn("peer not found, nothing to write", logging.PeerID(peerID))
 		return
 	}
-	if _, err := host.ProxyUDP.Write(pkt.Payload); err != nil {
+	if _, err := host.ProxyUDP.Write(payload); err != nil {
 		r.logger.Warn("failed to write packet", logging.Error(err))
 		return
 	}

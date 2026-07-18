@@ -2,7 +2,6 @@ package console
 
 import (
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -28,7 +27,7 @@ type RelayStream interface {
 }
 
 type RelayConn interface {
-	AcceptStream(context.Context) (*quic.Stream, error)
+	AcceptStream(context.Context) (RelayStream, error)
 	CloseWithError(code quic.ApplicationErrorCode, msg string) error
 	RemoteAddr() net.Addr
 }
@@ -37,6 +36,13 @@ type RelayConn interface {
 // It is defined in the shared relay/types package and aliased here so the
 // rest of this package can keep using the unqualified name.
 type RelayPacket = types.RelayPacket
+
+// UserSessionProvider is the minimal subset of the multiplayer service that
+// the relay server depends on. It decouples RelayServer from the concrete
+// *RoomService so the relay can be tested (and later run) in isolation.
+type UserSessionProvider interface {
+	GetUserSession(id int64) (*UserSession, bool)
+}
 
 type PeerConn struct {
 	// ID is a peer identifier.
@@ -104,13 +110,13 @@ type RelayEventHook func(eventType, peerID, roomID string)
 // Extend RelayServer struct
 
 type RelayServer struct {
-	listener      *quic.Listener
+	listener      RelayListener
 	mu            sync.Mutex
 	rooms         map[string]*Room  // keyed by roomID
 	peerToRoomIDs map[string]string // key: peerID, value: roomID
 	logger        *slog.Logger
 
-	Multiplayer *RoomService
+	Multiplayer UserSessionProvider
 
 	verifyFunc func([]byte) ([]byte, bool) // Injected for testability
 
@@ -143,23 +149,8 @@ func WithEventHooks(join, leave, delete RelayEventHook) RelayServerOption {
 	}
 }
 
-func NewQUICRelay(addr string, multiplayer *RoomService, opts ...RelayServerOption) (*RelayServer, error) {
-	tlsConf := &tls.Config{
-		InsecureSkipVerify: true,
-		NextProtos:         []string{"game-relay"},
-		Certificates:       []tls.Certificate{generateSelfSigned()},
-	}
-
-	listener, err := quic.ListenAddr(addr, tlsConf, &quic.Config{
-		MaxIdleTimeout:  30 * time.Second,
-		KeepAlivePeriod: 15 * time.Second,
-	})
-	if err != nil {
-		return nil, err
-	}
-
+func NewQUICRelay(addr string, multiplayer UserSessionProvider, opts ...RelayServerOption) (*RelayServer, error) {
 	rs := &RelayServer{
-		listener:      listener,
 		rooms:         make(map[string]*Room),
 		peerToRoomIDs: make(map[string]string),
 		logger:        slog.With(slog.String("component", "relay")),
@@ -169,6 +160,15 @@ func NewQUICRelay(addr string, multiplayer *RoomService, opts ...RelayServerOpti
 	for _, opt := range opts {
 		opt(rs)
 	}
+
+	if rs.listener == nil {
+		listener, err := newQUICListener(addr)
+		if err != nil {
+			return nil, err
+		}
+		rs.listener = listener
+	}
+
 	return rs, nil
 }
 

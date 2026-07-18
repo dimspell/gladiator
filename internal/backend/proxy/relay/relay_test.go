@@ -54,7 +54,7 @@ func TestProxyRelay_Create(t *testing.T) {
 	relay, ok := proxyClient.(*Relay)
 	require.True(t, ok)
 	assert.Equal(t, "123", relay.router.selfID)
-	assert.Equal(t, "localhost:9999", relay.router.relayAddr)
+	assert.NotNil(t, relay.router.transport)
 }
 
 // --- Relay tests ---
@@ -77,7 +77,7 @@ func TestNewRelay(t *testing.T) {
 	assert.Equal(t, session, relay.session)
 	assert.NotNil(t, relay.router)
 	assert.Equal(t, "456", relay.router.selfID)
-	assert.Equal(t, "relay.example.com:8080", relay.router.relayAddr)
+	assert.NotNil(t, relay.router.transport)
 }
 
 func TestNewRelay_DefaultIPPrefix(t *testing.T) {

@@ -17,7 +17,6 @@ import (
 	"github.com/dimspell/gladiator/internal/app/logger"
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/proxy"
-	"github.com/dimspell/gladiator/internal/backend/proxy/relay/types"
 	"github.com/dimspell/gladiator/internal/backend/redirect"
 	"github.com/dimspell/gladiator/internal/console"
 	"github.com/dimspell/gladiator/internal/model"
@@ -343,78 +342,150 @@ func (relayConnWrapper) CloseWithError(code quic.ApplicationErrorCode, msg strin
 	return nil
 }
 
-func TestPacketRouter_ReceiveLoop_ProcessesSplitMessage(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+// mockTransport is an in-test PeerTransport that buffers sent packets and lets
+// the test push packets into the receive channel.
+type mockTransport struct {
+	mu       sync.Mutex
+	recvCh   chan TransportPacket
+	closed   bool
+	joinRoom string
+	joinErr  error
+	sendErr  error
+	sent     []TransportPacket
+}
+
+func newMockTransport() *mockTransport {
+	return &mockTransport{recvCh: make(chan TransportPacket, 16)}
+}
+
+func (m *mockTransport) Join(ctx context.Context, roomID string) error {
+	m.mu.Lock()
+	m.joinRoom = roomID
+	m.mu.Unlock()
+	return m.joinErr
+}
+
+func (m *mockTransport) Send(ctx context.Context, pkt TransportPacket) error {
+	m.mu.Lock()
+	m.sent = append(m.sent, pkt)
+	m.mu.Unlock()
+	return m.sendErr
+}
+
+func (m *mockTransport) Recv(ctx context.Context) (TransportPacket, error) {
+	select {
+	case <-ctx.Done():
+		return TransportPacket{}, ctx.Err()
+	case pkt, ok := <-m.recvCh:
+		if !ok {
+			return TransportPacket{}, io.EOF
+		}
+		return pkt, nil
+	}
+}
+
+func (m *mockTransport) Leave(ctx context.Context) error { return nil }
+
+func (m *mockTransport) Close() error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.closed {
+		return nil
+	}
+	m.closed = true
+	close(m.recvCh)
+	return nil
+}
+
+// captureRedirect is a redirect.Redirect that records everything written to it.
+// Run blocks forever so the FakeHost stays alive (the cleanup goroutine waits
+// on g.Wait() which waits on Run). Close is a no-op because StopAll cleans up
+// the PeerHosts/Hosts maps directly and the blocked goroutines exit when the
+// test process finishes.
+type captureRedirect struct {
+	mu     sync.Mutex
+	buf    bytes.Buffer
+	closed bool
+}
+
+func (c *captureRedirect) Run(ctx context.Context) error         { select {} }
+func (c *captureRedirect) Alive(time.Time, time.Duration) bool  { return true }
+func (c *captureRedirect) Write(p []byte) (int, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.buf.Write(p)
+}
+func (c *captureRedirect) Close() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.closed = true
+	return nil
+}
+func (c *captureRedirect) Bytes() []byte {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return append([]byte(nil), c.buf.Bytes()...)
+}
+
+// captureFactory returns the same captureRedirect for every proxy so tests can
+// observe what PacketRouter writes to a peer's ProxyTCP/ProxyUDP.
+type captureFactory struct {
+	shared *captureRedirect
+}
+
+func (f *captureFactory) NewDialTCP(ip, port string, onReceive redirect.ReceiveFunc) (redirect.Redirect, error) {
+	return f.shared, nil
+}
+func (f *captureFactory) NewDialUDP(ip, port string, onReceive redirect.ReceiveFunc) (redirect.Redirect, error) {
+	return f.shared, nil
+}
+func (f *captureFactory) NewListenerTCP(ip, port string, onReceive redirect.ReceiveFunc) (redirect.Redirect, error) {
+	return f.shared, nil
+}
+func (f *captureFactory) NewListenerUDP(ip, port string, onReceive redirect.ReceiveFunc) (redirect.Redirect, error) {
+	return f.shared, nil
+}
+
+func TestPacketRouter_ReceiveLoop_DispatchesTCP(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	cap := &captureRedirect{}
+	factory := &captureFactory{shared: cap}
 
 	pr := &PacketRouter{
 		logger: slog.Default(),
 		roomID: "test-room",
 		manager: redirect.NewManager(
-			redirect.WithProxyFactory(&redirect.InMemoryProxyFactory{}),
+			redirect.WithProxyFactory(factory),
 			redirect.WithDisabledLogger(),
 		),
+		transport: newMockTransport(),
 	}
 
-	pr.wg.Add(1)
-	pipeReader, pipeWriter := io.Pipe()
-	stream := &pipeRelayStream{reader: pipeReader, writer: pipeWriter}
+	// Act as the host so dynamicJoin provisions a guest host for peer 200.
+	pr.mu.Lock()
+	pr.selfID = "100"
+	pr.currentHostID = "100"
+	pr.mu.Unlock()
 
-	done := make(chan struct{})
-	go func() {
-		pr.receiveLoop(ctx, stream)
-		// Signal that receiveLoop has exited
-		close(done)
-	}()
+	pr.dynamicJoin(ctx, "test-room", "200")
 
-	// Give the goroutine time to start
-	time.Sleep(10 * time.Millisecond)
-
-	// Construct a complete JSON message and frame it
-	msg := []byte(`{"type":"tcp","room":"test-room","from":"200","to":"100","payload":"dGVzdA=="}`)
-
-	// Use types.WriteFramed to get the framed bytes, then split the wire
-	// representation across two writes to verify that ReadFramed (via
-	// io.ReadFull) handles partial reads correctly.
-	var buf bytes.Buffer
-	if err := types.WriteFramed(&buf, msg); err != nil {
-		t.Fatalf("failed to frame message: %v", err)
-	}
-	framed := buf.Bytes()
-
-	half := len(framed) / 2
-
-	// Write first half of the framed message
-	_, err := pipeWriter.Write(framed[:half])
-	if err != nil {
-		t.Fatalf("failed to write first half: %v", err)
+	host, ok := pr.manager.GetPeerHost("200")
+	if !ok || host.ProxyTCP == nil {
+		t.Fatalf("peer 200 not registered after dynamicJoin (ok=%v, proxyTCP=%v)", ok, host)
 	}
 
-	// Wait a bit, simulating network delay between fragments
-	time.Sleep(5 * time.Millisecond)
+	// Drive the dispatch path synchronously (receiveLoop just calls this).
+	pr.onTransportPacket(TransportPacket{
+		FromID: "200",
+		RoomID: "test-room",
+		Kind:   KindTCP,
+		Data:   []byte("hello"),
+	})
 
-	// Write second half (completing the frame)
-	_, err = pipeWriter.Write(framed[half:])
-	if err != nil {
-		t.Fatalf("failed to write second half: %v", err)
-	}
-
-	// Now wait for receiveLoop to process and then we'll
-	// signal it to stop by closing the write end
-	time.Sleep(50 * time.Millisecond)
-
-	// Check that receiveLoop processed the message without error.
-	// Since writeTCP/writeUDP won't work without a proper host setup, we verify
-	// indirectly: the receiveLoop should NOT have returned due to malformed JSON.
-	// We'll close the pipe to make receiveLoop exit, then verify it didn't crash.
-	_ = pipeWriter.Close()
-	_ = pipeReader.Close()
-
-	select {
-	case <-done:
-		// receiveLoop exited cleanly
-	case <-time.After(time.Second):
-		t.Fatal("receiveLoop did not exit after pipe close")
+	if got := string(cap.Bytes()); got != "hello" {
+		t.Fatalf("TCP payload not delivered to peer, got %q", got)
 	}
 }
 
@@ -422,25 +493,22 @@ func TestPacketRouter_ReceiveLoop_ExitsOnContextCancel(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	pr := &PacketRouter{
-		logger: slog.Default(),
-		roomID: "test-room",
+		logger:    slog.Default(),
+		roomID:    "test-room",
+		transport: newMockTransport(),
 	}
-
-	// Use an io.Pipe: reads will block until data is written or the pipe is closed.
-	pipeReader, pipeWriter := io.Pipe()
-	stream := &pipeRelayStream{reader: pipeReader, writer: pipeWriter}
 
 	pr.wg.Add(1)
 	done := make(chan struct{})
 	go func() {
-		pr.receiveLoop(ctx, stream)
+		pr.receiveLoop(ctx)
 		close(done)
 	}()
 
-	// Let the receiveLoop settle into the blocking Read
+	// Let the receiveLoop settle into the blocking Recv
 	time.Sleep(10 * time.Millisecond)
 
-	// Cancel the context while Read is blocking
+	// Cancel the context while Recv is blocking
 	cancel()
 
 	select {
@@ -451,39 +519,12 @@ func TestPacketRouter_ReceiveLoop_ExitsOnContextCancel(t *testing.T) {
 	}
 }
 
-// pipeRelayStream wraps io.Pipe to implement RelayStream.
-type pipeRelayStream struct {
-	reader *io.PipeReader
-	writer *io.PipeWriter
-}
-
-func (s *pipeRelayStream) Read(b []byte) (int, error) {
-	return s.reader.Read(b)
-}
-
-func (s *pipeRelayStream) Write(b []byte) (int, error) {
-	return s.writer.Write(b)
-}
-
-func (s *pipeRelayStream) Close() error {
-	_ = s.writer.Close()
-	return s.reader.Close()
-}
-
-func (s *pipeRelayStream) CancelRead(code quic.StreamErrorCode) {
-	_ = s.reader.Close()
-}
-
-func (s *pipeRelayStream) CancelWrite(code quic.StreamErrorCode) {
-	_ = s.writer.Close()
-}
-
 func TestPacketRouter_SendPacket_DataRace(t *testing.T) {
-	s := &mockStream{}
+	mt := newMockTransport()
 	pr := &PacketRouter{
-		logger: slog.Default(),
-		selfID: "test-self",
-		stream: s,
+		logger:    slog.Default(),
+		selfID:    "test-self",
+		transport: mt,
 	}
 
 	var wg sync.WaitGroup
@@ -517,6 +558,13 @@ func TestPacketRouter_SendPacket_DataRace(t *testing.T) {
 	}()
 
 	wg.Wait()
+
+	mt.mu.Lock()
+	sent := len(mt.sent)
+	mt.mu.Unlock()
+	if sent != 100 {
+		t.Errorf("expected 100 sent packets, got %d", sent)
+	}
 }
 
 type dataCapture struct { //nolint:unused // used in skipped tests

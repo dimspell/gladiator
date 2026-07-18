@@ -25,8 +25,17 @@ type ProxyRelay struct {
 	// Proxies []*Relay
 
 	// RelayServerAddr is the address (IP:port) of the remote relay server to
-	// which the proxy will forward all client traffic.
+	// which the proxy will forward all client traffic. Used only when Transport
+	// is nil (production path builds a QUIC RelayTransport from it).
 	RelayServerAddr string
+
+	// Transport, when set, is the PeerTransport used to reach the relay. Tests
+	// inject an in-memory transport here; production leaves it nil.
+	Transport PeerTransport
+
+	// ManagerOptions are applied when creating the HostManager. Tests use this
+	// to inject a capture ProxyFactory instead of real proxy listeners.
+	ManagerOptions []func(*redirect.HostManager)
 
 	IPPrefix net.IP
 }
@@ -55,12 +64,19 @@ func NewRelay(config *ProxyRelay, client multiv1connect.GameServiceClient, sessi
 		ipPrefix = net.IPv4(127, 0, 0, 0)
 	}
 
+	var transport PeerTransport
+	if config.Transport != nil {
+		transport = config.Transport
+	} else {
+		transport = NewRelayTransport(config.RelayServerAddr, remoteID(session.UserID))
+	}
+
 	router := &PacketRouter{
-		relayAddr: config.RelayServerAddr,
 		logger:    slog.With(slog.String("proxy", "relay"), slog.String("sessionId", session.ID)),
 		selfID:    remoteID(session.UserID),
 		session:   session,
-		manager:   redirect.NewManager(redirect.WithIPPrefix(ipPrefix.To4())),
+		manager:   redirect.NewManager(append([]func(*redirect.HostManager){redirect.WithIPPrefix(ipPrefix.To4())}, config.ManagerOptions...)...),
+		transport: transport,
 	}
 
 	return &Relay{
