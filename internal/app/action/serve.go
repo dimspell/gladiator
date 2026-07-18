@@ -64,7 +64,7 @@ func ServeCommand(version string) *cli.Command {
 			&cli.StringFlag{
 				Name:    "run-mode",
 				Value:   "",
-				Usage:   "Explicitly advertise the run mode (lan, relay-beta, webrtc-beta, libp2p-beta, single); overrides the relay-addr default",
+				Usage:   "Explicitly advertise the run mode (lan, relay-beta, webrtc-beta, single); overrides the relay-addr default",
 				Sources: cli.NewValueSourceChain(cli.EnvVar("RUN_MODE")),
 			},
 			&cli.StringFlag{

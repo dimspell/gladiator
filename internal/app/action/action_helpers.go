@@ -91,7 +91,7 @@ func selectConsoleOptions(c *cli.Command, version string) ([]console.Option, err
 
 	if runMode := c.String("run-mode"); runMode != "" {
 		if !isValidRunMode(runMode) {
-			return nil, fmt.Errorf("unknown run-mode: %q (valid: lan, relay-beta, webrtc-beta, libp2p-beta, single)", runMode)
+			return nil, fmt.Errorf("unknown run-mode: %q (valid: lan, relay-beta, webrtc-beta, single)", runMode)
 		}
 		options = append(options, console.WithRunMode(model.RunMode(runMode)))
 	}
@@ -103,7 +103,7 @@ func selectConsoleOptions(c *cli.Command, version string) ([]console.Option, err
 func isValidRunMode(s string) bool {
 	switch model.RunMode(s) {
 	case model.RunModeSinglePlayer, model.RunModeLAN, model.RunModeRelay,
-		model.RunModeWebRTC, model.RunModeLibp2p:
+		model.RunModeWebRTC:
 		return true
 	}
 	return false

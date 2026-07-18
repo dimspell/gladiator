@@ -17,6 +17,7 @@ import (
 	"github.com/dimspell/gladiator/internal/app/logger"
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/proxy"
+	"github.com/dimspell/gladiator/internal/backend/proxy/relay/types"
 	"github.com/dimspell/gladiator/internal/backend/redirect"
 	"github.com/dimspell/gladiator/internal/console"
 	"github.com/dimspell/gladiator/internal/model"
@@ -369,12 +370,22 @@ func TestPacketRouter_ReceiveLoop_ProcessesSplitMessage(t *testing.T) {
 	// Give the goroutine time to start
 	time.Sleep(10 * time.Millisecond)
 
-	// Construct a complete JSON line but write it in two parts
-	msg := `{"type":"tcp","room":"test-room","from":"200","to":"100","payload":"dGVzdA=="}` + "\n"
-	half := len(msg) / 2
+	// Construct a complete JSON message and frame it
+	msg := []byte(`{"type":"tcp","room":"test-room","from":"200","to":"100","payload":"dGVzdA=="}`)
 
-	// Write first half
-	_, err := pipeWriter.Write([]byte(msg[:half]))
+	// Use types.WriteFramed to get the framed bytes, then split the wire
+	// representation across two writes to verify that ReadFramed (via
+	// io.ReadFull) handles partial reads correctly.
+	var buf bytes.Buffer
+	if err := types.WriteFramed(&buf, msg); err != nil {
+		t.Fatalf("failed to frame message: %v", err)
+	}
+	framed := buf.Bytes()
+
+	half := len(framed) / 2
+
+	// Write first half of the framed message
+	_, err := pipeWriter.Write(framed[:half])
 	if err != nil {
 		t.Fatalf("failed to write first half: %v", err)
 	}
@@ -382,8 +393,8 @@ func TestPacketRouter_ReceiveLoop_ProcessesSplitMessage(t *testing.T) {
 	// Wait a bit, simulating network delay between fragments
 	time.Sleep(5 * time.Millisecond)
 
-	// Write second half (completing the line)
-	_, err = pipeWriter.Write([]byte(msg[half:]))
+	// Write second half (completing the frame)
+	_, err = pipeWriter.Write(framed[half:])
 	if err != nil {
 		t.Fatalf("failed to write second half: %v", err)
 	}
@@ -392,7 +403,7 @@ func TestPacketRouter_ReceiveLoop_ProcessesSplitMessage(t *testing.T) {
 	// signal it to stop by closing the write end
 	time.Sleep(50 * time.Millisecond)
 
-	// Check that writeTCP was called by verifying the data via the packet router state.
+	// Check that receiveLoop processed the message without error.
 	// Since writeTCP/writeUDP won't work without a proper host setup, we verify
 	// indirectly: the receiveLoop should NOT have returned due to malformed JSON.
 	// We'll close the pipe to make receiveLoop exit, then verify it didn't crash.

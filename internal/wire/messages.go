@@ -36,11 +36,6 @@ type Offer struct {
 	Offer       webrtc.SessionDescription `json:"offer"`
 }
 
-type Libp2pPeerInfo struct {
-	CreatorID int64    `json:"creatorID"`
-	Addresses []string `json:"addresses"` // Multiaddresses including PeerID
-}
-
 type User struct {
 	UserID   int64  `json:"userID"`
 	Username string `json:"username"`

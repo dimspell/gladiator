@@ -489,14 +489,42 @@ func exchangeTCP(myIP, peerIP, role string, timeout time.Duration, relay bool, n
 				// sends ##ident first as part of the game-client handshake
 				// (required by ListenerTCP.handleHandshake). This is
 				// forwarded through the relay and written to our accepted
-				// connection here. Read and discard it before the real
-				// game data.
+				// connection here.
+				//
+				// TCP coalescing: the relay proxy may write ident and
+				// magic+payload as two separate TCP writes, but the kernel
+				// can coalesce them into one TCP segment. Search for the
+				// magic bytes in the ident buffer; if found, process the
+				// payload inline.
 				identBuf := make([]byte, 64)
-				if _, err := c.Read(identBuf); err != nil {
+				n, err := c.Read(identBuf)
+				if err != nil {
 					c.Close()
 					return fmt.Errorf("guest %d: read ident: %w", i+1, err)
 				}
 				c.SetReadDeadline(deadline)
+
+				if idx := bytes.Index(identBuf[:n], magic); idx >= 0 {
+					// Payload arrived coalesced with ident — process inline.
+					got := identBuf[idx:n]
+					if !bytes.HasPrefix(got, magic) {
+						c.Close()
+						return fmt.Errorf("guest %d: unexpected tcp handshake: %q", i+1, string(got))
+					}
+					if len(got) <= len(magic) {
+						c.Close()
+						return fmt.Errorf("guest %d: empty tcp payload: %q", i+1, string(got))
+					}
+					c.SetWriteDeadline(deadline)
+					if _, err := c.Write([]byte("tcp-reply-from-host")); err != nil {
+						c.Close()
+						return fmt.Errorf("guest %d: write reply: %w", i+1, err)
+					}
+					time.Sleep(200 * time.Millisecond)
+					c.Close()
+					continue
+				}
+				// Not coalesced — fall through to the outer payload read.
 			}
 
 			buf := make([]byte, 1024)

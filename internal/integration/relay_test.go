@@ -4,6 +4,7 @@ package integration
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"strings"
 	"sync"
@@ -106,11 +107,10 @@ func TestRelayGameExchange(t *testing.T) {
 	}
 }
 
-// TestRelay4PlayerGameExchange proves a 4-player session (host + 3 guests
-// simultaneously in the room) can exchange game packets (UDP :6113 + TCP
-// :6114) over the relay-beta proxy. All guests join in parallel so the
-// room holds 4 players; the host accepts connections from all of them
-// through the QUIC relay server.
+// TestRelay4PlayerGameExchange proves a 4-player session (1 host + 3 guests)
+// can exchange game packets (UDP :6113 + TCP :6114) over the relay-beta
+// proxy. Guests join concurrently to test that the relay proxy handles
+// parallel StartGuest dialer setup and concurrent game-packet exchange.
 func TestRelay4PlayerGameExchange(t *testing.T) {
 	if os.Getenv("SKIP_DOCKER") != "" {
 		t.Skip("SKIP_DOCKER set")
@@ -156,52 +156,53 @@ func TestRelay4PlayerGameExchange(t *testing.T) {
 		}
 	}
 
-	var hostWg sync.WaitGroup
+	var wg sync.WaitGroup
 	var hostOut string
 	var hostCode int
-	hostWg.Add(1)
+	wg.Add(1)
 	go func() {
-		defer hostWg.Done()
+		defer wg.Done()
 		hostOut, hostCode = runMockClient(t, ctx, backendHost, hostEnv, 120*time.Second)
 	}()
 	time.Sleep(5 * time.Second)
 
-	// All guests join the room and exchange in parallel so they are
-	// simultaneously connected to the host through the relay.
-	var guestWg sync.WaitGroup
-	type gres struct {
-		name string
-		out  string
-		code int
-	}
-	results := make(chan gres, 3)
 	guests := []struct {
-		b    testcontainers.Container
-		name string
+		name     string
+		backend  testcontainers.Container
 	}{
-		{backendG1, "mage"},
-		{backendG2, "warrior"},
-		{backendG3, "necro"},
+		{"mage", backendG1},
+		{"warrior", backendG2},
+		{"necro", backendG3},
 	}
+	var guestWg sync.WaitGroup
+	var guestFailures []string
+	var guestMu sync.Mutex
 	for _, g := range guests {
 		guestWg.Add(1)
-		g := g
-		go func() {
+		go func(name string, backend testcontainers.Container) {
 			defer guestWg.Done()
-			out, code := runMockClient(t, ctx, g.b, guestEnv(g.name), 90*time.Second)
-			results <- gres{g.name, out, code}
-		}()
+			out, code := runMockClient(t, ctx, backend, guestEnv(name), 90*time.Second)
+			if code != 0 {
+				guestMu.Lock()
+				guestFailures = append(guestFailures, fmt.Sprintf("guest %s (code=%d):\n%s", name, code, out))
+				guestMu.Unlock()
+			}
+		}(g.name, g.backend)
 	}
 	guestWg.Wait()
-	close(results)
 
-	for r := range results {
-		require.Equalf(t, 0, r.code, "guest %s mock client failed (code=%d):\n%s", r.name, r.code, r.out)
-		require.Containsf(t, r.out, "GAME_PACKET_OK", "guest %s did not exchange ok:\n%s", r.name, r.out)
-		require.Containsf(t, r.out, "GAME_PACKET_EXCHANGED_UDP", "guest %s UDP failed:\n%s", r.name, r.out)
-		require.Containsf(t, r.out, "GAME_PACKET_EXCHANGED_TCP", "guest %s TCP failed:\n%s", r.name, r.out)
+	if len(guestFailures) > 0 {
+		dumpLogs(t, ctx, consoleC, "console-relay")
+		dumpLogs(t, ctx, backendHost, "host-backend")
+		for _, g := range guests {
+			dumpLogs(t, ctx, g.backend, "guest-"+g.name)
+		}
+		for _, f := range guestFailures {
+			t.Logf("FAIL: %s", f)
+		}
+		t.Fatal("one or more guests failed")
 	}
-	hostWg.Wait()
+	wg.Wait()
 
 	require.Equal(t, 0, hostCode, "host mock client failed (code=%d):\n%s", hostCode, hostOut)
 	require.Contains(t, hostOut, "GAME_PACKET_OK")

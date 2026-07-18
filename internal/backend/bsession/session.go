@@ -285,11 +285,3 @@ func (s *Session) SendRTCAnswer(ctx context.Context, answer webrtc.SessionDescri
 	}, recipientId)
 }
 
-// SendLibp2pAddresses broadcasts this node's libp2p multiaddresses to all peers
-// through the WebSocket signaling channel.
-func (s *Session) SendLibp2pAddresses(ctx context.Context, addrs []string) error {
-	return s.SendEvent(ctx, wire.Libp2pAddresses, wire.Libp2pPeerInfo{
-		CreatorID: s.UserID,
-		Addresses: addrs,
-	})
-}

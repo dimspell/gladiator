@@ -1,7 +1,6 @@
 package relay
 
 import (
-	"bufio"
 	"context"
 	"crypto/tls"
 	"encoding/json"
@@ -16,6 +15,7 @@ import (
 	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/packet"
+	"github.com/dimspell/gladiator/internal/backend/proxy/relay/types"
 	"github.com/dimspell/gladiator/internal/backend/redirect"
 	"github.com/dimspell/gladiator/internal/wire"
 	"github.com/quic-go/quic-go"
@@ -383,13 +383,10 @@ func (r *PacketRouter) stop(host *redirect.FakeHost) {
 	r.manager.StopHost(host)
 }
 
-type RelayPacket struct {
-	Type    string `json:"type"` // "join", "leave", "tcp", "udp"
-	RoomID  string `json:"room"`
-	FromID  string `json:"from"`
-	ToID    string `json:"to,omitempty"`
-	Payload []byte `json:"payload"`
-}
+// RelayPacket is the wire message exchanged with the relay server.
+// It is defined in the shared relay/types package and aliased here so the
+// rest of this package can keep using the unqualified name.
+type RelayPacket = types.RelayPacket
 
 // sendPacket marshals and sends a RelayPacket over the current stream.
 func (r *PacketRouter) sendPacket(pkt RelayPacket) error {
@@ -408,10 +405,7 @@ func (r *PacketRouter) sendPacket(pkt RelayPacket) error {
 		return fmt.Errorf("marshal packet failed: %w", err)
 	}
 
-	data = append(data, '\n')
-
-	_, err = r.stream.Write(data)
-	if err != nil {
+	if err := types.WriteFramed(r.stream, data); err != nil {
 		return fmt.Errorf("write packet failed: %w", err)
 	}
 	return nil
@@ -432,21 +426,15 @@ func (r *PacketRouter) receiveLoop(ctx context.Context, stream RelayStream) {
 	resultCh := make(chan readResult, 1)
 
 	// Dedicated read goroutine so Read can be interrupted via ctx.Done().
-	// Uses bufio.Scanner to handle messages split across TCP/QUIC reads.
-	// Wrap with a read deadline so a silent connection doesn't orphan the goroutine.
 	go func() {
 		deadlineReader := &deadlineStream{stream: stream, timeout: 30 * time.Second}
-		scanner := bufio.NewScanner(deadlineReader)
-		scanner.Buffer(make([]byte, 64*1024), 64*1024)
-		for scanner.Scan() {
-			line := make([]byte, len(scanner.Bytes()))
-			copy(line, scanner.Bytes())
-			resultCh <- readResult{data: line}
-		}
-		if err := scanner.Err(); err != nil {
-			resultCh <- readResult{err: err}
-		} else {
-			resultCh <- readResult{err: io.EOF}
+		for {
+			data, err := types.ReadFramed(deadlineReader)
+			if err != nil {
+				resultCh <- readResult{err: err}
+				return
+			}
+			resultCh <- readResult{data: data}
 		}
 	}()
 
@@ -492,33 +480,30 @@ func (r *PacketRouter) receiveLoop(ctx context.Context, stream RelayStream) {
 
 // dynamicJoin handles a new peer dynamically joining the room and sets up the necessary hosts.
 func (r *PacketRouter) dynamicJoin(ctx context.Context, roomID string, peerID string) {
-	// TODO: There is no probe for checking if it exist?
-
-	ip, err := r.manager.AssignIP(peerID)
-	if err != nil {
-		r.logger.Warn("failed to assign IP for the peer", logging.Error(err), logging.PeerID(peerID))
-		return
-	}
 	r.mu.Lock()
 	selfID := r.selfID
 	currentHostID := r.currentHostID
 	r.mu.Unlock()
 
-	var (
-		tcpPort      int
-		onTCPMessage func(p []byte) error = nil
-		onUDPMessage                      = r.onUDPMessage(roomID, peerID)
-	)
+	// Only the host needs to create StartGuest dialers to forward
+	// game-client data to the new peer. Non-host peers already have
+	// a receive-side FakeHost from the initial JoinGame/StartHost path.
 	if selfID == currentHostID {
-		tcpPort, onTCPMessage = 6114, r.onTCPMessage(roomID, peerID)
-	}
+		ip, err := r.manager.AssignIP(peerID)
+		if err != nil {
+			r.logger.Warn("failed to assign IP for the peer", logging.Error(err), logging.PeerID(peerID))
+			return
+		}
 
-	host, err := r.manager.StartGuest(ctx, peerID, ip, tcpPort, 6113, onTCPMessage, onUDPMessage, r.onFakeHostDisconnect(peerID, ip))
-	if err != nil {
-		r.logger.Warn("failed to start dial host", logging.Error(err), logging.PeerID(peerID))
-		return
+		host, err := r.manager.StartGuest(ctx, peerID, ip, 6114, 6113,
+			r.onTCPMessage(roomID, peerID), r.onUDPMessage(roomID, peerID),
+			r.onFakeHostDisconnect(peerID, ip))
+		if err != nil {
+			r.logger.Warn("failed to start dial host", logging.Error(err), logging.PeerID(peerID))
+			return
+		}
+		r.manager.SetHost(ip, peerID, host)
 	}
-	r.manager.SetHost(ip, peerID, host)
 }
 
 // leaveRoom removes a peer from the room and cleans up its resources.

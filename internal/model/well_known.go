@@ -18,7 +18,6 @@ const (
 	RunModeLAN          RunMode = "lan"
 	RunModeRelay        RunMode = "relay-beta"
 	RunModeWebRTC       RunMode = "webrtc-beta"
-	RunModeLibp2p       RunMode = "libp2p-beta"
 )
 
 func (m RunMode) String() string { return string(m) }

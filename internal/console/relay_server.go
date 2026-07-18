@@ -1,7 +1,6 @@
 package console
 
 import (
-	"bytes"
 	"context"
 	"crypto/tls"
 	"encoding/json"
@@ -16,6 +15,7 @@ import (
 	"time"
 
 	"github.com/dimspell/gladiator/internal/app/logger/logging"
+	"github.com/dimspell/gladiator/internal/backend/proxy/relay/types"
 	"github.com/dimspell/gladiator/internal/metrics"
 	"github.com/quic-go/quic-go"
 )
@@ -33,13 +33,10 @@ type RelayConn interface {
 	RemoteAddr() net.Addr
 }
 
-type RelayPacket struct {
-	Type    string `json:"type"` // "join", "leave", ...
-	RoomID  string `json:"room"`
-	FromID  string `json:"from"`
-	ToID    string `json:"to,omitempty"`
-	Payload []byte `json:"payload"`
-}
+// RelayPacket is the wire message exchanged with backend proxies.
+// It is defined in the shared relay/types package and aliased here so the
+// rest of this package can keep using the unqualified name.
+type RelayPacket = types.RelayPacket
 
 type PeerConn struct {
 	// ID is a peer identifier.
@@ -59,6 +56,8 @@ type PeerConn struct {
 	LastSeen time.Time
 
 	Session *UserSession
+
+	writeMu sync.Mutex
 }
 
 type Room struct {
@@ -224,20 +223,18 @@ func (rs *RelayServer) closeStream(conn RelayConn, stream RelayStream) {
 }
 
 func (rs *RelayServer) handshake(stream RelayStream) (string, string, error) {
-	// Initial handshake: receive signed join a packet
-	buf := make([]byte, 128)
-	n, err := stream.Read(buf)
+	data, err := types.ReadFramed(stream)
 	if err != nil {
 		return "", "", fmt.Errorf("error reading stream: %w", err)
 	}
 
-	data, ok := rs.verifyFunc(buf[:n])
+	payload, ok := rs.verifyFunc(data)
 	if !ok {
 		return "", "", fmt.Errorf("signature failed from client")
 	}
 
 	var pkt RelayPacket
-	if err := json.Unmarshal(data, &pkt); err != nil {
+	if err := json.Unmarshal(payload, &pkt); err != nil {
 		return "", "", fmt.Errorf("error unmarshaling packet: %w", err)
 	}
 	if pkt.Type != "join" {
@@ -283,7 +280,7 @@ func (rs *RelayServer) joinRoom(roomID, peerID string, conn RelayConn, stream Re
 			continue
 		}
 
-		rs.sendSigned(peer.Stream, RelayPacket{
+		rs.sendSigned(peer, RelayPacket{
 			Type:    "join",
 			RoomID:  roomID,
 			FromID:  peerID,
@@ -305,10 +302,8 @@ func (rs *RelayServer) relayLoop(roomID, peerID string, peer *PeerConn) {
 	metrics.ConnectedPeers.Inc()
 	defer metrics.ConnectedPeers.Dec()
 
-	buf := make([]byte, 4096)
-
 	for {
-		n, err := peer.Stream.Read(buf)
+		raw, err := types.ReadFramed(peer.Stream)
 		if err == io.EOF {
 			break
 		}
@@ -322,10 +317,9 @@ func (rs *RelayServer) relayLoop(roomID, peerID string, peer *PeerConn) {
 			break
 		}
 
-		metrics.BytesReceived.Add(float64(n))
+		metrics.BytesReceived.Add(float64(len(raw) + 4)) // +4 for length-prefix header
 
-		start := time.Now()
-		data, ok := rs.verifyFunc(buf[:n]) // Use injected verifyFunc
+		data, ok := rs.verifyFunc(raw)
 		if !ok {
 			rs.logger.Warn("signature check failed when reading", logging.PeerID(peerID))
 			metrics.PacketsDropped.Inc()
@@ -334,27 +328,15 @@ func (rs *RelayServer) relayLoop(roomID, peerID string, peer *PeerConn) {
 
 		peer.LastSeen = time.Now()
 
-		d := json.NewDecoder(bytes.NewReader(data))
-		for {
-			var pkt RelayPacket
-			if err := d.Decode(&pkt); err != nil {
-				if err == io.EOF {
-					// TODO: Maybe clear(buf) is needed?
-					break
-				}
-				rs.logger.Warn("relay packet unmarshal error", logging.Error(err), logging.PeerID(peerID))
-				metrics.RelayErrors.WithLabelValues("unmarshal").Inc()
-				break
-			}
-			metrics.PacketIn.Inc()
-
-			// if pkt.Type != "ping" {
-			rs.logger.Debug("[RELAY]", "payload", pkt.Payload, "from", pkt.FromID, "to", pkt.ToID, "type", pkt.Type)
-			// }
-
-			rs.handlePacket(pkt, peer)
-			metrics.PacketLatency.Observe(time.Since(start).Seconds())
+		var pkt RelayPacket
+		if err := json.Unmarshal(data, &pkt); err != nil {
+			rs.logger.Warn("relay packet unmarshal error", logging.Error(err), logging.PeerID(peerID))
+			metrics.RelayErrors.WithLabelValues("unmarshal").Inc()
+			continue
 		}
+		metrics.PacketIn.Inc()
+		rs.logger.Debug("[RELAY]", "payload", pkt.Payload, "from", pkt.FromID, "to", pkt.ToID, "type", pkt.Type)
+		rs.handlePacket(pkt, peer)
 	}
 
 	rs.logger.Info("disconnected from relay", logging.PeerID(peerID))
@@ -463,7 +445,7 @@ func (rs *RelayServer) sendTo(roomID, peerID string, pkt RelayPacket) {
 		return
 	}
 
-	rs.sendSigned(peer.Stream, pkt)
+	rs.sendSigned(peer, pkt)
 }
 
 func (rs *RelayServer) broadcastFrom(roomID, fromID string, pkt RelayPacket) { //nolint:unused // may be used in future
@@ -479,23 +461,25 @@ func (rs *RelayServer) broadcastFrom(roomID, fromID string, pkt RelayPacket) { /
 		if id == fromID {
 			continue
 		}
-		rs.sendSigned(peer.Stream, pkt)
+		rs.sendSigned(peer, pkt)
 	}
 }
 
-func (rs *RelayServer) sendSigned(stream RelayStream, pkt RelayPacket) {
+func (rs *RelayServer) sendSigned(peer *PeerConn, pkt RelayPacket) {
+	peer.writeMu.Lock()
+	defer peer.writeMu.Unlock()
+
 	data, err := json.Marshal(pkt)
 	if err != nil {
 		rs.logger.Error("json marshal failed", logging.Error(err))
 		metrics.RelayErrors.WithLabelValues("marshal").Inc()
+		return
 	}
-	// packet := sign(data)
-	data = append(data, '\n')
-	if _, err := stream.Write(data); err != nil {
+	if err := types.WriteFramed(peer.Stream, data); err != nil {
 		rs.logger.Error("could not write the msg", logging.Error(err))
 		metrics.RelayErrors.WithLabelValues("write").Inc()
 		return
 	}
 	metrics.PacketOut.Inc()
-	metrics.BytesSent.Add(float64(len(data)))
+	metrics.BytesSent.Add(float64(len(data) + 4)) // +4 for length-prefix header
 }
