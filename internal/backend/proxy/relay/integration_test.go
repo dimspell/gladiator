@@ -14,6 +14,7 @@ import (
 	"github.com/dimspell/gladiator/internal/app/logger"
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/proxy"
+	"github.com/dimspell/gladiator/internal/backend/proxy/transport"
 	"github.com/dimspell/gladiator/internal/backend/redirect"
 	"github.com/dimspell/gladiator/internal/console"
 	"github.com/dimspell/gladiator/internal/model"
@@ -29,7 +30,7 @@ type clusterPlayer struct {
 	session    *bsession.Session
 	userSession *console.UserSession
 	relay      *Relay
-	cap         *captureRedirect
+	cap         *transport.CaptureRedirect
 }
 
 func newClusterPlayer(t *testing.T, mp *console.RoomService, client *console.GameService, userID int64, username string, capture bool) *clusterPlayer {
@@ -53,11 +54,11 @@ func newClusterPlayer(t *testing.T, mp *console.RoomService, client *console.Gam
 
 	var relay *Relay
 	if capture {
-		cap := &captureRedirect{}
+		cap := &transport.CaptureRedirect{}
 		relay = NewRelay(&ProxyRelay{
 			RelayServerAddr: integrationRelayAddr,
 			ManagerOptions: []func(*redirect.HostManager){
-				redirect.WithProxyFactory(&captureFactory{shared: cap}),
+				redirect.WithProxyFactory(&transport.CaptureFactory{Shared: cap}),
 				redirect.WithDisabledLogger(),
 			},
 		}, client, session)
@@ -131,7 +132,7 @@ func TestCluster(t *testing.T) {
 	assert.Equal(t, host.session.UserID, room.HostPlayer.UserID, "host should be the host")
 
 	// 2) Message exchange: host -> guest1 is relayed through the server.
-	require.NoError(t, host.relay.router.sendPacket(RelayPacket{
+	require.NoError(t, host.relay.router.SendPacket(transport.RelayPacket{
 		Type:    "tcp",
 		RoomID:  roomID,
 		ToID:    remoteID(guests[0].session.UserID),

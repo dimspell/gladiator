@@ -177,7 +177,8 @@ func TestNewPeerToPeer(t *testing.T) {
 	assert.Equal(t, session, p2p.session)
 	assert.Equal(t, "456", p2p.selfID)
 	assert.NotNil(t, p2p.peers)
-	assert.NotNil(t, p2p.manager)
+	assert.NotNil(t, p2p.router)
+	assert.NotNil(t, p2p.p2pTransport)
 }
 
 func TestNewPeerToPeer_DefaultIPPrefix(t *testing.T) {
@@ -192,7 +193,7 @@ func TestNewPeerToPeer_DefaultIPPrefix(t *testing.T) {
 	p2p := NewPeerToPeer(config, client, session)
 
 	// Should use default 127.0.0.0
-	assert.NotNil(t, p2p.manager)
+	assert.NotNil(t, p2p.router)
 }
 
 func TestPeerToPeer_Reset(t *testing.T) {
@@ -374,82 +375,6 @@ func TestPeerToPeer_HandleHostMigration(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Equal(t, "200", p2p.currentHostID)
-}
-
-// --- Message handler callback tests ---
-
-func TestPeerToPeer_OnTCPMessage_NoPeer(t *testing.T) {
-	session := &bsession.Session{
-		ID:     "test-session",
-		UserID: 100,
-	}
-
-	p2p := NewPeerToPeer(&ProxyP2P{}, newMockGameServiceClient(), session)
-
-	handler := p2p.onTCPMessage("unknown")
-	err := handler([]byte("test"))
-
-	// Should not error, just buffer/drop
-	assert.NoError(t, err)
-}
-
-func TestPeerToPeer_OnUDPMessage_NoPeer(t *testing.T) {
-	session := &bsession.Session{
-		ID:     "test-session",
-		UserID: 100,
-	}
-
-	p2p := NewPeerToPeer(&ProxyP2P{}, newMockGameServiceClient(), session)
-
-	handler := p2p.onUDPMessage("unknown")
-	err := handler([]byte("test"))
-
-	// Should not error, just buffer/drop
-	assert.NoError(t, err)
-}
-
-func TestPeerToPeer_OnTCPMessage_WithPeer(t *testing.T) {
-	session := &bsession.Session{
-		ID:     "test-session",
-		UserID: 100,
-	}
-
-	p2p := NewPeerToPeer(&ProxyP2P{}, newMockGameServiceClient(), session)
-
-	// Add a peer without datachannel (will queue)
-	peer := &Peer{peerID: "200", logger: slog.Default()}
-	p2p.peers["200"] = peer
-
-	handler := p2p.onTCPMessage("200")
-	err := handler([]byte("test"))
-
-	assert.NoError(t, err)
-	// Should be queued with 'T' prefix
-	require.Len(t, peer.outboundQueue, 1)
-	assert.Equal(t, byte('T'), peer.outboundQueue[0][0])
-	assert.Equal(t, []byte("test"), peer.outboundQueue[0][1:])
-}
-
-func TestPeerToPeer_OnUDPMessage_WithPeer(t *testing.T) {
-	session := &bsession.Session{
-		ID:     "test-session",
-		UserID: 100,
-	}
-
-	p2p := NewPeerToPeer(&ProxyP2P{}, newMockGameServiceClient(), session)
-
-	// Add a peer without datachannel (will queue)
-	peer := &Peer{peerID: "200", logger: slog.Default()}
-	p2p.peers["200"] = peer
-
-	handler := p2p.onUDPMessage("200")
-	err := handler([]byte("test"))
-
-	assert.NoError(t, err)
-	// Should be queued with 'U' prefix
-	require.Len(t, peer.outboundQueue, 1)
-	assert.Equal(t, byte('U'), peer.outboundQueue[0][0])
-	assert.Equal(t, []byte("test"), peer.outboundQueue[0][1:])
 }
 
 // --- RTC signaling tests (with mock payloads) ---

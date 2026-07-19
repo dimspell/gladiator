@@ -14,6 +14,7 @@ import (
 	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/proxy"
+	"github.com/dimspell/gladiator/internal/backend/proxy/transport"
 	"github.com/dimspell/gladiator/internal/backend/redirect"
 	"github.com/dimspell/gladiator/internal/model"
 	"github.com/dimspell/gladiator/internal/wire"
@@ -42,7 +43,8 @@ type PeerToPeer struct {
 	logger        *slog.Logger
 	webrtcConfig  webrtc.Configuration
 	gameClient    multiv1connect.GameServiceClient
-	manager       *redirect.HostManager
+	router        *transport.PacketRouter
+	p2pTransport  *webrtcTransport
 	selfID        string
 	roomID        string
 	currentHostID string
@@ -68,10 +70,30 @@ func NewPeerToPeer(config *ProxyP2P, client multiv1connect.GameServiceClient, se
 		logger:       slog.With(slog.String("proxy", "p2p"), slog.String("sessionId", session.ID)),
 		webrtcConfig: webrtcConfig,
 		gameClient:   client,
-		manager:      redirect.NewManager(redirect.WithIPPrefix(ipPrefix.To4())),
 		selfID:       peerID(session.UserID),
 		peers:        make(map[string]*Peer),
 	}
+
+	// webrtcTransport multiplexes every WebRTC peer through the PacketRouter's
+	// single Send/Recv surface. Its lookup reads p.peers under p.mu.
+	p2pTransport := &webrtcTransport{
+		logger: p.logger,
+		lookup: func(peerID string) (*Peer, bool) {
+			p.mu.Lock()
+			peer, ok := p.peers[peerID]
+			p.mu.Unlock()
+			return peer, ok
+		},
+		recvCh: make(chan transport.TransportPacket, 256),
+	}
+	p.p2pTransport = p2pTransport
+	p.router = transport.NewPacketRouter(
+		p.logger,
+		p.selfID,
+		session,
+		redirect.NewManager(redirect.WithIPPrefix(ipPrefix.To4())),
+		p2pTransport,
+	)
 
 	return p
 }
@@ -87,7 +109,7 @@ func (p *PeerToPeer) Reset() {
 		delete(p.peers, id)
 	}
 
-	p.manager.StopAll()
+	p.router.Reset()
 	p.roomID = ""
 	p.currentHostID = ""
 	p.mu.Unlock()
@@ -108,6 +130,11 @@ func (p *PeerToPeer) CreateRoom(ctx context.Context, params proxy.CreateParams) 
 	p.selfID = peerID(p.session.UserID)
 	p.currentHostID = p.selfID
 	p.mu.Unlock()
+
+	p.router.SetRoomState(roomID, p.selfID, p.selfID)
+	if err := p.router.Connect(ctx, roomID); err != nil {
+		return fmt.Errorf("failed to connect p2p transport: %w", err)
+	}
 
 	_, err := p.gameClient.CreateGame(ctx, connect.NewRequest(&multiv1.CreateGameRequest{
 		GameName:      params.GameID,
@@ -184,7 +211,7 @@ func (p *PeerToPeer) GetGame(ctx context.Context, roomID string) (*model.LobbyRo
 			continue
 		}
 
-		ip, err := p.manager.AssignIP(pid)
+		ip, err := p.router.Manager().AssignIP(pid)
 		if err != nil {
 			return nil, nil, fmt.Errorf("could not assign ip: %w", err)
 		}
@@ -201,6 +228,8 @@ func (p *PeerToPeer) GetGame(ctx context.Context, roomID string) (*model.LobbyRo
 	p.roomID = roomID
 	p.currentHostID = peerID(hostPlayer.UserID)
 	p.mu.Unlock()
+
+	p.router.SetRoomState(roomID, p.selfID, p.currentHostID)
 
 	lobbyRoom := &model.LobbyRoom{
 		Name:          respGame.Msg.Game.Name,
@@ -237,6 +266,10 @@ func (p *PeerToPeer) JoinGame(ctx context.Context, roomID string, password strin
 	currentHostID := p.currentHostID
 	p.mu.Unlock()
 
+	if err := p.router.Connect(ctx, roomID); err != nil {
+		return nil, fmt.Errorf("failed to connect p2p transport: %w", err)
+	}
+
 	var lobbyPlayers []model.LobbyPlayer
 	for _, player := range respJoin.Msg.GetPlayers() {
 		if player.UserId == p.session.UserID {
@@ -244,7 +277,7 @@ func (p *PeerToPeer) JoinGame(ctx context.Context, roomID string, password strin
 		}
 
 		pid := peerID(player.UserId)
-		ipAddress, ok := p.manager.GetPeerIP(pid)
+		ipAddress, ok := p.router.Manager().GetPeerIP(pid)
 		if !ok {
 			return nil, fmt.Errorf("not found the IP for a peer with ID %s", pid)
 		}
@@ -260,18 +293,18 @@ func (p *PeerToPeer) JoinGame(ctx context.Context, roomID string, password strin
 			tcpPort = 6114
 		}
 
-		onTCPMessage := p.onTCPMessage(pid)
-		onUDPMessage := p.onUDPMessage(pid)
+		onTCPMessage := p.router.OnTCPMessage(roomID, pid)
+		onUDPMessage := p.router.OnUDPMessage(roomID, pid)
 		onHostDisconnected := func(host *redirect.FakeHost, forced bool) {
 			p.logger.Warn("Host went offline", logging.PeerID(pid), "ip", host.AssignedIP, "forced", forced)
 			if forced {
 				p.Reset()
 			} else {
-				p.manager.StopHost(host)
+				p.router.Manager().StopHost(host)
 			}
 		}
 
-		_, err := p.manager.StartHost(ctx, pid, ipAddress, tcpPort, 6113, onTCPMessage, onUDPMessage, onHostDisconnected)
+		_, err := p.router.Manager().StartHost(ctx, pid, ipAddress, tcpPort, 6113, onTCPMessage, onUDPMessage, onHostDisconnected)
 		if err != nil {
 			return nil, err
 		}
@@ -284,48 +317,6 @@ func (p *PeerToPeer) JoinGame(ctx context.Context, roomID string, password strin
 	}
 
 	return lobbyPlayers, nil
-}
-
-// onTCPMessage returns a handler for sending TCP packets to a peer via WebRTC.
-func (p *PeerToPeer) onTCPMessage(peerID string) func(data []byte) error {
-	return func(data []byte) error {
-		p.mu.Lock()
-		peer, ok := p.peers[peerID]
-		p.mu.Unlock()
-
-		if !ok {
-			p.logger.Debug("No peer for outbound TCP packet", logging.PeerID(peerID))
-			return nil
-		}
-
-		// Prefix with 'T' for TCP
-		payload := make([]byte, len(data)+1)
-		payload[0] = 'T'
-		copy(payload[1:], data)
-
-		return peer.Send(payload)
-	}
-}
-
-// onUDPMessage returns a handler for sending UDP packets to a peer via WebRTC.
-func (p *PeerToPeer) onUDPMessage(peerID string) func(data []byte) error {
-	return func(data []byte) error {
-		p.mu.Lock()
-		peer, ok := p.peers[peerID]
-		p.mu.Unlock()
-
-		if !ok {
-			p.logger.Debug("No peer for outbound UDP packet", logging.PeerID(peerID))
-			return nil
-		}
-
-		// Prefix with 'U' for UDP
-		payload := make([]byte, len(data)+1)
-		payload[0] = 'U'
-		copy(payload[1:], data)
-
-		return peer.Send(payload)
-	}
 }
 
 // Close closes the connection for a session.
@@ -389,11 +380,10 @@ func (p *PeerToPeer) handleJoinRoom(ctx context.Context, player wire.Player) err
 	p.logger.Info("New player joining", logging.PeerID(pid))
 
 	// Mirror relay host behavior: if we are the current host, dial into the local game server
-	// and forward packets to this joining peer.
+	// and forward packets to this joining peer. DynamicJoin reuses the PacketRouter's
+	// dispatch engine (StartGuest + OnTCPMessage/OnUDPMessage) instead of a bespoke path.
 	if currentHostID == selfID {
-		if err := p.ensureDialHostForPeer(ctx, pid); err != nil {
-			return err
-		}
+		p.router.DynamicJoin(ctx, p.roomID, pid)
 	}
 
 	// Create WebRTC peer connection for the new player
@@ -422,7 +412,7 @@ func (p *PeerToPeer) handleLeaveRoom(ctx context.Context, player wire.Player) er
 	}
 	p.mu.Unlock()
 
-	p.manager.RemoveByRemoteID(pid)
+	p.router.Manager().RemoveByRemoteID(pid)
 	return nil
 }
 
@@ -432,6 +422,8 @@ func (p *PeerToPeer) handleHostMigration(ctx context.Context, newHost wire.Playe
 	p.mu.Lock()
 	p.currentHostID = newHostID
 	p.mu.Unlock()
+
+	p.router.SetCurrentHostID(newHostID)
 
 	p.logger.Info("Host migration", "newHost", newHostID)
 	return nil
@@ -649,34 +641,10 @@ func (p *PeerToPeer) createPeerConnection(ctx context.Context, remotePeerID stri
 	return nil
 }
 
-func (p *PeerToPeer) ensureDialHostForPeer(ctx context.Context, remotePeerID string) error {
-	ip, err := p.manager.AssignIP(remotePeerID)
-	if err != nil {
-		return fmt.Errorf("assign ip for peer %s: %w", remotePeerID, err)
-	}
-
-	// If already created, no-op.
-	if _, ok := p.manager.GetPeerHost(remotePeerID); ok {
-		return nil
-	}
-
-	onTCP := p.onTCPMessage(remotePeerID)
-	onUDP := p.onUDPMessage(remotePeerID)
-	onDisconnect := func(host *redirect.FakeHost, forced bool) {
-		p.logger.Warn("Dial host disconnected", logging.PeerID(remotePeerID), "ip", host.AssignedIP, "forced", forced)
-		p.manager.StopHost(host)
-	}
-
-	// Dial into the local game client (127.0.0.1:6114/6113), like relay host does.
-	host, err := p.manager.StartGuest(ctx, remotePeerID, ip, 6114, 6113, onTCP, onUDP, onDisconnect)
-	if err != nil {
-		return fmt.Errorf("start dial host for %s: %w", remotePeerID, err)
-	}
-	p.logger.Info("Started dial host for peer", logging.PeerID(remotePeerID), "ip", host.AssignedIP)
-	return nil
-}
-
 // setupDataChannel configures data channel callbacks for receiving packets.
+// Inbound messages are tagged with the sender's peer ID and pushed into the
+// webrtcTransport, where the PacketRouter dispatch loop routes them to the
+// matching FakeHost's ProxyTCP/ProxyUDP (mirroring relay's onTransportPacket).
 func (p *PeerToPeer) setupDataChannel(peer *Peer, dc *webrtc.DataChannel) {
 	dc.OnOpen(func() {
 		peer.logger.Debug("Data channel opened")
@@ -695,26 +663,17 @@ func (p *PeerToPeer) setupDataChannel(peer *Peer, dc *webrtc.DataChannel) {
 			return
 		}
 
-		host, ok := p.manager.GetPeerHost(peer.peerID)
-		if !ok {
-			peer.logger.Warn("No fake host for peer")
+		var kind transport.PacketKind
+		switch msg.Data[0] {
+		case 'T':
+			kind = transport.KindTCP
+		case 'U':
+			kind = transport.KindUDP
+		default:
 			return
 		}
 
-		switch msg.Data[0] {
-		case 'T':
-			if host.ProxyTCP != nil {
-				if _, err := host.ProxyTCP.Write(msg.Data[1:]); err != nil {
-					peer.logger.Warn("Failed to write TCP data", logging.Error(err))
-				}
-			}
-		case 'U':
-			if host.ProxyUDP != nil {
-				if _, err := host.ProxyUDP.Write(msg.Data[1:]); err != nil {
-					peer.logger.Warn("Failed to write UDP data", logging.Error(err))
-				}
-			}
-		}
+		p.p2pTransport.deliver(peer.peerID, kind, msg.Data[1:])
 	})
 }
 

@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"sync"
+
+	"github.com/dimspell/gladiator/internal/backend/proxy/transport"
 )
 
 // InMemoryHub routes TransportPackets between InMemoryTransport instances that
@@ -41,7 +43,7 @@ func (h *InMemoryHub) unregister(t *InMemoryTransport) {
 	}
 }
 
-func (h *InMemoryHub) deliver(pkt TransportPacket) error {
+func (h *InMemoryHub) deliver(pkt transport.TransportPacket) error {
 	h.mu.Lock()
 	t, ok := h.byRoomPeer[pkt.RoomID][pkt.ToID]
 	h.mu.Unlock()
@@ -61,7 +63,7 @@ type InMemoryTransport struct {
 	roomID string
 
 	mu     sync.Mutex
-	recvCh chan TransportPacket
+	recvCh chan transport.TransportPacket
 	done   chan struct{}
 	once   sync.Once
 }
@@ -70,14 +72,14 @@ func NewInMemoryTransport(hub *InMemoryHub, selfID string) *InMemoryTransport {
 	return &InMemoryTransport{
 		hub:    hub,
 		selfID: selfID,
-		recvCh: make(chan TransportPacket, 64),
+		recvCh: make(chan transport.TransportPacket, 64),
 		done:   make(chan struct{}),
 	}
 }
 
 func (t *InMemoryTransport) Join(ctx context.Context, roomID string) error {
 	t.mu.Lock()
-	t.recvCh = make(chan TransportPacket, 64)
+	t.recvCh = make(chan transport.TransportPacket, 64)
 	t.done = make(chan struct{})
 	t.roomID = roomID
 	t.mu.Unlock()
@@ -85,23 +87,23 @@ func (t *InMemoryTransport) Join(ctx context.Context, roomID string) error {
 	return nil
 }
 
-func (t *InMemoryTransport) Send(ctx context.Context, pkt TransportPacket) error {
+func (t *InMemoryTransport) Send(ctx context.Context, pkt transport.TransportPacket) error {
 	return t.hub.deliver(pkt)
 }
 
-func (t *InMemoryTransport) Recv(ctx context.Context) (TransportPacket, error) {
+func (t *InMemoryTransport) Recv(ctx context.Context) (transport.TransportPacket, error) {
 	t.mu.Lock()
 	done := t.done
 	recvCh := t.recvCh
 	t.mu.Unlock()
 	select {
 	case <-ctx.Done():
-		return TransportPacket{}, ctx.Err()
+		return transport.TransportPacket{}, ctx.Err()
 	case <-done:
-		return TransportPacket{}, io.EOF
+		return transport.TransportPacket{}, io.EOF
 	case pkt, ok := <-recvCh:
 		if !ok {
-			return TransportPacket{}, io.EOF
+		return transport.TransportPacket{}, io.EOF
 		}
 		return pkt, nil
 	}

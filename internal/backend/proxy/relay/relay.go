@@ -13,6 +13,7 @@ import (
 	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/proxy"
+	tport "github.com/dimspell/gladiator/internal/backend/proxy/transport"
 	"github.com/dimspell/gladiator/internal/backend/redirect"
 	"github.com/dimspell/gladiator/internal/model"
 )
@@ -31,7 +32,7 @@ type ProxyRelay struct {
 
 	// Transport, when set, is the PeerTransport used to reach the relay. Tests
 	// inject an in-memory transport here; production leaves it nil.
-	Transport PeerTransport
+	Transport tport.PeerTransport
 
 	// ManagerOptions are applied when creating the HostManager. Tests use this
 	// to inject a capture ProxyFactory instead of real proxy listeners.
@@ -54,7 +55,7 @@ func (p *ProxyRelay) Create(session *bsession.Session, client multiv1connect.Gam
 
 type Relay struct {
 	session           *bsession.Session
-	router            *PacketRouter
+	router            *tport.PacketRouter
 	GameServiceClient multiv1connect.GameServiceClient
 }
 
@@ -64,20 +65,20 @@ func NewRelay(config *ProxyRelay, client multiv1connect.GameServiceClient, sessi
 		ipPrefix = net.IPv4(127, 0, 0, 0)
 	}
 
-	var transport PeerTransport
+	var transport tport.PeerTransport
 	if config.Transport != nil {
 		transport = config.Transport
 	} else {
 		transport = NewRelayTransport(config.RelayServerAddr, remoteID(session.UserID))
 	}
 
-	router := &PacketRouter{
-		logger:    slog.With(slog.String("proxy", "relay"), slog.String("sessionId", session.ID)),
-		selfID:    remoteID(session.UserID),
-		session:   session,
-		manager:   redirect.NewManager(append([]func(*redirect.HostManager){redirect.WithIPPrefix(ipPrefix.To4())}, config.ManagerOptions...)...),
-		transport: transport,
-	}
+	router := tport.NewPacketRouter(
+		slog.With(slog.String("proxy", "relay"), slog.String("sessionId", session.ID)),
+			remoteID(session.UserID),
+		session,
+		redirect.NewManager(append([]func(*redirect.HostManager){redirect.WithIPPrefix(ipPrefix.To4())}, config.ManagerOptions...)...),
+		transport,
+	)
 
 	return &Relay{
 		session:           session,
@@ -91,13 +92,9 @@ func (r *Relay) CreateRoom(ctx context.Context, params proxy.CreateParams) error
 
 	r.router.Reset()
 
-	r.router.mu.Lock()
-	r.router.selfID = remoteID(r.session.UserID)
-	r.router.currentHostID = remoteID(r.session.UserID)
-	r.router.roomID = roomID
-	r.router.mu.Unlock()
+	r.router.SetRoomState(roomID, remoteID(r.session.UserID), remoteID(r.session.UserID))
 
-	if err := r.router.connect(ctx, roomID); err != nil {
+	if err := r.router.Connect(ctx, roomID); err != nil {
 		return fmt.Errorf("failed connect to the relay server: %w", err)
 	}
 
@@ -181,11 +178,11 @@ func (r *Relay) GetGame(ctx context.Context, roomID string) (*model.LobbyRoom, [
 	var lobbyPlayers []model.LobbyPlayer
 	for _, player := range respGame.Msg.Players {
 		peerID := remoteID(player.UserId)
-		if peerID == r.router.selfID {
+		if peerID == r.router.SelfID() {
 			continue
 		}
 
-		ip, err := r.router.manager.AssignIP(peerID)
+		ip, err := r.router.Manager().AssignIP(peerID)
 		if err != nil {
 			return nil, nil, fmt.Errorf("could not assign ip: %w", err)
 		}
@@ -197,11 +194,7 @@ func (r *Relay) GetGame(ctx context.Context, roomID string) (*model.LobbyRoom, [
 		})
 	}
 
-	r.router.mu.Lock()
-	r.router.selfID = remoteID(r.session.UserID)
-	r.router.roomID = roomID
-	r.router.currentHostID = remoteID(hostPlayer.UserID)
-	r.router.mu.Unlock()
+	r.router.SetRoomState(roomID, remoteID(r.session.UserID), remoteID(hostPlayer.UserID))
 
 	lobbyRoom := &model.LobbyRoom{
 		Name:          respGame.Msg.Game.Name,
@@ -219,7 +212,7 @@ func (r *Relay) JoinGame(ctx context.Context, roomID string, password string) ([
 		return nil, fmt.Errorf("could not get game room: %w", err)
 	}
 
-	if err := r.router.connect(ctx, roomID); err != nil {
+	if err := r.router.Connect(ctx, roomID); err != nil {
 		return nil, fmt.Errorf("failed connect to the relay server: %w", err)
 	}
 
@@ -245,7 +238,7 @@ func (r *Relay) JoinGame(ctx context.Context, roomID string, password string) ([
 		}
 
 		peerID := remoteID(player.UserId)
-		ipAddress, ok := r.router.manager.GetPeerIP(peerID)
+		ipAddress, ok := r.router.Manager().GetPeerIP(peerID)
 		if !ok {
 			return nil, fmt.Errorf("not found the IP for a peer with ID %s", peerID)
 		}
@@ -254,25 +247,25 @@ func (r *Relay) JoinGame(ctx context.Context, roomID string, password string) ([
 			return nil, fmt.Errorf("invalid IP %s", ipAddress)
 		}
 
-		r.router.logger.Debug("Starting fake host for", logging.PeerID(peerID), "host", peerID == hostID)
+		r.router.Logger().Debug("Starting fake host for", logging.PeerID(peerID), "host", peerID == hostID)
 
 		var tcpPort int
-		if peerID == r.router.currentHostID {
+		if peerID == r.router.CurrentHostID() {
 			tcpPort = 6114
 		}
-		onTCPMessage := r.router.onTCPMessage(roomID, peerID)
-		onUDPMessage := r.router.onUDPMessage(roomID, peerID)
+		onTCPMessage := r.router.OnTCPMessage(roomID, peerID)
+		onUDPMessage := r.router.OnUDPMessage(roomID, peerID)
 		onHostDisconnected := func(host *redirect.FakeHost, forced bool) {
 			slog.Warn("Host went offline", logging.PeerID(peerID), "ip", host.AssignedIP, "forced", forced)
 			if forced {
-				r.router.disconnect()
+				r.router.Disconnect()
 				r.router.Reset()
 			} else {
-				r.router.stop(host)
+				r.router.Stop(host)
 			}
 		}
 
-		_, err := r.router.manager.StartHost(ctx, peerID, ipAddress, tcpPort, 6113, onTCPMessage, onUDPMessage, onHostDisconnected)
+		_, err := r.router.Manager().StartHost(ctx, peerID, ipAddress, tcpPort, 6113, onTCPMessage, onUDPMessage, onHostDisconnected)
 		if err != nil {
 			return nil, err
 		}

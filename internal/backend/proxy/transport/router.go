@@ -1,4 +1,4 @@
-package relay
+package transport
 
 import (
 	"context"
@@ -13,44 +13,13 @@ import (
 	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/packet"
-	"github.com/dimspell/gladiator/internal/backend/proxy/relay/types"
 	"github.com/dimspell/gladiator/internal/backend/redirect"
 	"github.com/dimspell/gladiator/internal/wire"
-	"github.com/quic-go/quic-go"
 )
 
-// RelayStream abstracts a QUIC stream for reading and writing relay packets.
-type RelayStream interface {
-	io.Reader
-	io.Writer
-	CancelRead(code quic.StreamErrorCode)
-	CancelWrite(code quic.StreamErrorCode)
-	Close() error
-}
-
-// deadlineStream wraps a RelayStream to apply a read deadline before each Read,
-// preventing a silent remote peer from blocking the scanner goroutine forever.
-type deadlineStream struct {
-	stream  RelayStream
-	timeout time.Duration
-}
-
-func (d *deadlineStream) Read(b []byte) (int, error) {
-	// If the underlying stream supports SetReadDeadline, use it.
-	if s, ok := d.stream.(interface{ SetReadDeadline(time.Time) error }); ok {
-		_ = s.SetReadDeadline(time.Now().Add(d.timeout))
-	}
-	return d.stream.Read(b)
-}
-
-// RelayConn abstracts a QUIC connection for accepting streams and closing with an error.
-type RelayConn interface {
-	AcceptStream(context.Context) (*quic.Stream, error)
-	CloseWithError(code quic.ApplicationErrorCode, msg string) error
-}
-
-// PacketRouter manages the routing of packets between the local game client and the remote relay server.
-// It handles connection management, host migration, and packet forwarding.
+// PacketRouter manages the routing of packets between the local game client and the
+// remote peer network (relay or WebRTC). It depends only on the PeerTransport
+// port, so the same dispatch logic serves every proxy mode.
 type PacketRouter struct {
 	mu        sync.Mutex
 	logger    *slog.Logger
@@ -63,6 +32,88 @@ type PacketRouter struct {
 	currentHostID string
 	pingTicker    *time.Ticker
 	wg            sync.WaitGroup
+}
+
+// NewPacketRouter constructs a PacketRouter. The manager and transport are
+// injected so callers (relay, WebRTC) control lifecycle and test seams.
+func NewPacketRouter(
+	logger *slog.Logger,
+	selfID string,
+	session *bsession.Session,
+	manager *redirect.HostManager,
+	transport PeerTransport,
+) *PacketRouter {
+	return &PacketRouter{
+		logger:    logger,
+		selfID:    selfID,
+		session:   session,
+		manager:   manager,
+		transport: transport,
+	}
+}
+
+// Manager returns the underlying HostManager.
+func (r *PacketRouter) Manager() *redirect.HostManager { return r.manager }
+
+// SetManager replaces the HostManager (used by tests to inject a capture factory).
+func (r *PacketRouter) SetManager(m *redirect.HostManager) { r.manager = m }
+
+// Logger returns the router's logger.
+func (r *PacketRouter) Logger() *slog.Logger { return r.logger }
+
+// Transport returns the configured PeerTransport.
+func (r *PacketRouter) Transport() PeerTransport { return r.transport }
+
+// SelfID returns the local peer ID.
+func (r *PacketRouter) SelfID() string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.selfID
+}
+
+// SetSelfID sets the local peer ID.
+func (r *PacketRouter) SetSelfID(v string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.selfID = v
+}
+
+// CurrentHostID returns the current host peer ID.
+func (r *PacketRouter) CurrentHostID() string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.currentHostID
+}
+
+// SetCurrentHostID sets the current host peer ID.
+func (r *PacketRouter) SetCurrentHostID(v string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.currentHostID = v
+}
+
+// RoomID returns the active room ID.
+func (r *PacketRouter) RoomID() string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.roomID
+}
+
+// SetRoomID sets the active room ID.
+func (r *PacketRouter) SetRoomID(v string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.roomID = v
+}
+
+// SetRoomState atomically records the room, self, and host IDs. It replaces the
+// manual mutex locking that callers previously did inline.
+func (r *PacketRouter) SetRoomState(roomID, selfID, hostID string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.roomID = roomID
+	r.selfID = selfID
+	r.currentHostID = hostID
 }
 
 // Reset cleans up all resources, closes connections, stops hosts, and resets the router state.
@@ -92,8 +143,8 @@ func (r *PacketRouter) Reset() {
 	}
 }
 
-// disconnect acquires the lock and closes the current stream/connection.
-func (r *PacketRouter) disconnect() {
+// Disconnect closes the current transport without acquiring the lock.
+func (r *PacketRouter) Disconnect() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.disconnectLocked()
@@ -160,7 +211,6 @@ func (r *PacketRouter) handleLeaveRoom(ctx context.Context, player wire.Player) 
 }
 
 func (r *PacketRouter) handleHostMigration(ctx context.Context, player wire.Player) error {
-	// oldHostID := r.currentHostID
 	newHostID := strconv.Itoa(int(player.UserID))
 
 	r.mu.Lock()
@@ -190,7 +240,7 @@ func (r *PacketRouter) handleHostMigration(ctx context.Context, player wire.Play
 		// Recreate the proxies to the new host
 		for peerID, ip := range rebindHosts {
 			onUDPMessage := func(p []byte) error {
-				return r.sendPacket(RelayPacket{
+				return r.SendPacket(RelayPacket{
 					Type:    "udp",
 					RoomID:  roomID,
 					ToID:    peerID,
@@ -198,7 +248,7 @@ func (r *PacketRouter) handleHostMigration(ctx context.Context, player wire.Play
 				})
 			}
 			onTCPMessage := func(p []byte) error {
-				return r.sendPacket(RelayPacket{
+				return r.SendPacket(RelayPacket{
 					Type:    "tcp",
 					RoomID:  roomID,
 					ToID:    peerID,
@@ -207,9 +257,9 @@ func (r *PacketRouter) handleHostMigration(ctx context.Context, player wire.Play
 			}
 			onHostDisconnected := func(host *redirect.FakeHost, forced bool) {
 				slog.Warn("Host went offline", logging.PeerID(peerID), "ip", host.AssignedIP, "forced", forced)
-				r.stop(host)
+				r.Stop(host)
 				if forced {
-					r.disconnect()
+					r.Disconnect()
 					r.Reset()
 				}
 			}
@@ -239,7 +289,7 @@ func (r *PacketRouter) handleHostMigration(ctx context.Context, player wire.Play
 			r.manager.StopHost(host)
 
 			onTCPMessage := func(p []byte) error {
-				return r.sendPacket(RelayPacket{
+				return r.SendPacket(RelayPacket{
 					Type:    "tcp",
 					RoomID:  roomID,
 					ToID:    newHostID,
@@ -247,7 +297,7 @@ func (r *PacketRouter) handleHostMigration(ctx context.Context, player wire.Play
 				})
 			}
 			onUDPMessage := func(p []byte) error {
-				return r.sendPacket(RelayPacket{
+				return r.SendPacket(RelayPacket{
 					Type:    "udp",
 					RoomID:  roomID,
 					ToID:    newHostID,
@@ -257,9 +307,9 @@ func (r *PacketRouter) handleHostMigration(ctx context.Context, player wire.Play
 
 			onHostDisconnected := func(host *redirect.FakeHost, forced bool) {
 				slog.Warn("Host went offline", logging.PeerID(newHostID), "ip", host.AssignedIP, "forced", forced)
-				r.stop(host)
+				r.Stop(host)
 				if forced {
-					r.disconnect()
+					r.Disconnect()
 					r.Reset()
 				}
 			}
@@ -280,9 +330,9 @@ func (r *PacketRouter) handleHostMigration(ctx context.Context, player wire.Play
 	return nil
 }
 
-// connect joins the relay infrastructure for the given room via the injected
+// Connect joins the relay infrastructure for the given room via the injected
 // PeerTransport and starts the receive loop.
-func (r *PacketRouter) connect(ctx context.Context, roomID string) error {
+func (r *PacketRouter) Connect(ctx context.Context, roomID string) error {
 	if err := r.transport.Join(ctx, roomID); err != nil {
 		return fmt.Errorf("failed to join relay: %w", err)
 	}
@@ -318,7 +368,7 @@ func (r *PacketRouter) keepAliveHost(ctx context.Context) { //nolint:unused // m
 
 				// Send a packet to the relay server to keep it announced, when
 				// playing alone
-				if err := r.sendPacket(RelayPacket{Type: "ping"}); err != nil {
+				if err := r.SendPacket(RelayPacket{Type: "ping"}); err != nil {
 					r.logger.Error("failed to send ping packet", logging.Error(err))
 					r.Reset()
 					return
@@ -328,21 +378,16 @@ func (r *PacketRouter) keepAliveHost(ctx context.Context) { //nolint:unused // m
 	}(r.pingTicker)
 }
 
-// stop stops and cleans up the given fake host.
-func (r *PacketRouter) stop(host *redirect.FakeHost) {
+// Stop stops and cleans up the given fake host.
+func (r *PacketRouter) Stop(host *redirect.FakeHost) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	r.manager.StopHost(host)
 }
 
-// RelayPacket is the wire message exchanged with the relay server.
-// It is defined in the shared relay/types package and aliased here so the
-// rest of this package can keep using the unqualified name.
-type RelayPacket = types.RelayPacket
-
-// sendPacket marshals and sends a RelayPacket over the transport.
-func (r *PacketRouter) sendPacket(pkt RelayPacket) error {
+// SendPacket marshals and sends a RelayPacket over the transport.
+func (r *PacketRouter) SendPacket(pkt RelayPacket) error {
 	// Always associate who is sending the packet.
 	r.mu.Lock()
 	pkt.FromID = r.selfID
@@ -391,7 +436,7 @@ func (r *PacketRouter) receiveLoop(ctx context.Context) {
 func (r *PacketRouter) onTransportPacket(pkt TransportPacket) {
 	switch pkt.Kind {
 	case KindJoin:
-		r.dynamicJoin(context.Background(), pkt.RoomID, pkt.FromID)
+		r.DynamicJoin(context.Background(), pkt.RoomID, pkt.FromID)
 	case KindTCP:
 		r.writeTCP(pkt.FromID, pkt.Data)
 	case KindUDP:
@@ -403,8 +448,11 @@ func (r *PacketRouter) onTransportPacket(pkt TransportPacket) {
 	}
 }
 
-// dynamicJoin handles a new peer dynamically joining the room and sets up the necessary hosts.
-func (r *PacketRouter) dynamicJoin(ctx context.Context, roomID string, peerID string) {
+// DynamicJoin handles a new peer dynamically joining the room and sets up the
+// necessary dial host (StartGuest) so the local game client can exchange traffic
+// with that peer. It is exported so proxy modes that learn about new peers through
+// signaling (WebRTC) rather than an inbound transport packet can trigger it.
+func (r *PacketRouter) DynamicJoin(ctx context.Context, roomID string, peerID string) {
 	r.mu.Lock()
 	selfID := r.selfID
 	currentHostID := r.currentHostID
@@ -421,7 +469,7 @@ func (r *PacketRouter) dynamicJoin(ctx context.Context, roomID string, peerID st
 		}
 
 		host, err := r.manager.StartGuest(ctx, peerID, ip, 6114, 6113,
-			r.onTCPMessage(roomID, peerID), r.onUDPMessage(roomID, peerID),
+			r.OnTCPMessage(roomID, peerID), r.OnUDPMessage(roomID, peerID),
 			r.onFakeHostDisconnect(peerID, ip))
 		if err != nil {
 			r.logger.Warn("failed to start dial host", logging.Error(err), logging.PeerID(peerID))
@@ -440,21 +488,21 @@ func (r *PacketRouter) leaveRoom(peerID string) {
 func (r *PacketRouter) onFakeHostDisconnect(peerID string, ip string) func(host *redirect.FakeHost, forced bool) {
 	return func(host *redirect.FakeHost, forced bool) {
 		slog.Warn("Host went offline", logging.PeerID(peerID), "ip", ip, "forced", forced)
-		r.stop(host)
+		r.Stop(host)
 	}
 }
 
-// onTCPMessage returns a handler for sending TCP packets to a peer via the relay.
-func (r *PacketRouter) onTCPMessage(roomID string, peerID string) func(p []byte) error {
+// OnTCPMessage returns a handler for sending TCP packets to a peer via the transport.
+func (r *PacketRouter) OnTCPMessage(roomID string, peerID string) func(p []byte) error {
 	return func(p []byte) error {
-		return r.sendPacket(RelayPacket{Type: "tcp", RoomID: roomID, ToID: peerID, Payload: p})
+		return r.SendPacket(RelayPacket{Type: "tcp", RoomID: roomID, ToID: peerID, Payload: p})
 	}
 }
 
-// onUDPMessage returns a handler for sending UDP packets to a peer via the relay.
-func (r *PacketRouter) onUDPMessage(roomID string, peerID string) func(p []byte) error {
+// OnUDPMessage returns a handler for sending UDP packets to a peer via the transport.
+func (r *PacketRouter) OnUDPMessage(roomID string, peerID string) func(p []byte) error {
 	return func(p []byte) error {
-		return r.sendPacket(RelayPacket{Type: "udp", RoomID: roomID, ToID: peerID, Payload: p})
+		return r.SendPacket(RelayPacket{Type: "udp", RoomID: roomID, ToID: peerID, Payload: p})
 	}
 }
 
@@ -487,3 +535,6 @@ func (r *PacketRouter) writeUDP(peerID string, payload []byte) {
 		return
 	}
 }
+
+// remoteID converts a user/session ID into the peer ID string used on the wire.
+func remoteID(i int64) string { return fmt.Sprintf("%d", i) }

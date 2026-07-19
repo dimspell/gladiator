@@ -53,8 +53,8 @@ func TestProxyRelay_Create(t *testing.T) {
 	assert.NotNil(t, proxyClient)
 	relay, ok := proxyClient.(*Relay)
 	require.True(t, ok)
-	assert.Equal(t, "123", relay.router.selfID)
-	assert.NotNil(t, relay.router.transport)
+	assert.Equal(t, "123", relay.router.SelfID())
+	assert.NotNil(t, relay.router.Transport())
 }
 
 // --- Relay tests ---
@@ -76,8 +76,8 @@ func TestNewRelay(t *testing.T) {
 	assert.NotNil(t, relay)
 	assert.Equal(t, session, relay.session)
 	assert.NotNil(t, relay.router)
-	assert.Equal(t, "456", relay.router.selfID)
-	assert.NotNil(t, relay.router.transport)
+	assert.Equal(t, "456", relay.router.SelfID())
+	assert.NotNil(t, relay.router.Transport())
 }
 
 func TestNewRelay_DefaultIPPrefix(t *testing.T) {
@@ -94,7 +94,7 @@ func TestNewRelay_DefaultIPPrefix(t *testing.T) {
 	client := newMockGameServiceClient()
 	relay := NewRelay(config, client, session)
 
-	assert.NotNil(t, relay.router.manager)
+	assert.NotNil(t, relay.router.Manager())
 }
 
 func TestRelay_Close(t *testing.T) {
@@ -104,13 +104,13 @@ func TestRelay_Close(t *testing.T) {
 	}
 
 	relay := NewRelay(&ProxyRelay{RelayServerAddr: "localhost:9999"}, newMockGameServiceClient(), session)
-	relay.router.roomID = "test-room"
-	relay.router.currentHostID = "123"
+	relay.router.SetRoomID("test-room")
+	relay.router.SetCurrentHostID("123")
 
 	relay.Close()
 
-	assert.Empty(t, relay.router.roomID)
-	assert.Empty(t, relay.router.currentHostID)
+	assert.Empty(t, relay.router.RoomID())
+	assert.Empty(t, relay.router.CurrentHostID())
 }
 
 func TestRelay_Close_Idempotent(t *testing.T) {
@@ -136,13 +136,13 @@ func TestPacketRouter_Reset(t *testing.T) {
 	}
 
 	relay := NewRelay(&ProxyRelay{RelayServerAddr: "localhost:9999"}, newMockGameServiceClient(), session)
-	relay.router.roomID = "test-room"
-	relay.router.currentHostID = "123"
+	relay.router.SetRoomID("test-room")
+	relay.router.SetCurrentHostID("123")
 
 	relay.router.Reset()
 
-	assert.Empty(t, relay.router.roomID)
-	assert.Empty(t, relay.router.currentHostID)
+	assert.Empty(t, relay.router.RoomID())
+	assert.Empty(t, relay.router.CurrentHostID())
 }
 
 // --- Handle tests ---
@@ -190,11 +190,11 @@ func TestPacketRouter_HandleLeaveRoom_OtherPeer(t *testing.T) {
 	relay := NewRelay(&ProxyRelay{RelayServerAddr: "localhost:9999"}, newMockGameServiceClient(), session)
 
 	// Assign IP to peer so it exists in manager
-	ip, err := relay.router.manager.AssignIP("200")
+	ip, err := relay.router.Manager().AssignIP("200")
 	require.NoError(t, err)
 
 	// Verify IP was assigned
-	_, exists := relay.router.manager.GetPeerIP("200")
+	_, exists := relay.router.Manager().GetPeerIP("200")
 	require.True(t, exists, "IP should be assigned")
 
 	// Create leave room message for other peer
@@ -212,7 +212,7 @@ func TestPacketRouter_HandleLeaveRoom_OtherPeer(t *testing.T) {
 	// RemoveByRemoteID is called, but since there's no host started,
 	// only the PeerHosts entry would be removed (which doesn't exist)
 	// The PeerIPs entry remains - this is expected behavior
-	_, stillExists := relay.router.manager.GetPeerIP("200")
+	_, stillExists := relay.router.Manager().GetPeerIP("200")
 	assert.True(t, stillExists, "IP remains if no host was started")
 	_ = ip
 }
@@ -224,8 +224,8 @@ func TestPacketRouter_HandleHostMigration_NonSelf_NonBlocking(t *testing.T) {
 	}
 
 	relay := NewRelay(&ProxyRelay{RelayServerAddr: "localhost:9999"}, newMockGameServiceClient(), session)
-	relay.router.currentHostID = "100"
-	relay.router.roomID = "test-room"
+	relay.router.SetCurrentHostID("100")
+	relay.router.SetRoomID("test-room")
 
 	// New host is 200 (not us)
 	msg := wire.Message{
@@ -245,7 +245,7 @@ func TestPacketRouter_HandleHostMigration_NonSelf_NonBlocking(t *testing.T) {
 		"Handle should not block for 3s when host migration is for another peer")
 
 	// Verify currentHostID was still updated synchronously
-	assert.Equal(t, "200", relay.router.currentHostID)
+	assert.Equal(t, "200", relay.router.CurrentHostID())
 }
 
 func TestPacketRouter_HandleHostMigration(t *testing.T) {
@@ -256,8 +256,8 @@ func TestPacketRouter_HandleHostMigration(t *testing.T) {
 	}
 
 	relay := NewRelay(&ProxyRelay{RelayServerAddr: "localhost:9999"}, newMockGameServiceClient(), session)
-	relay.router.currentHostID = "100"
-	relay.router.roomID = "test-room"
+	relay.router.SetCurrentHostID("100")
+	relay.router.SetRoomID("test-room")
 
 	// New host is 200 (not us, so we shouldn't send HostMigration packet)
 	msg := wire.Message{
@@ -271,7 +271,7 @@ func TestPacketRouter_HandleHostMigration(t *testing.T) {
 	err := relay.Handle(context.Background(), payload)
 	assert.NoError(t, err)
 
-	assert.Equal(t, "200", relay.router.currentHostID)
+	assert.Equal(t, "200", relay.router.CurrentHostID())
 }
 
 func TestPacketRouter_HandleJoinRoom(t *testing.T) {
@@ -346,9 +346,9 @@ func TestPacketRouter_OnTCPMessage_NoStream(t *testing.T) {
 	}
 
 	relay := NewRelay(&ProxyRelay{RelayServerAddr: "localhost:9999"}, newMockGameServiceClient(), session)
-	relay.router.roomID = "test-room"
+	relay.router.SetRoomID("test-room")
 
-	handler := relay.router.onTCPMessage("test-room", "200")
+	handler := relay.router.OnTCPMessage("test-room", "200")
 
 	// Without a stream, should return an error
 	err := handler([]byte("test"))
@@ -363,9 +363,9 @@ func TestPacketRouter_OnUDPMessage_NoStream(t *testing.T) {
 	}
 
 	relay := NewRelay(&ProxyRelay{RelayServerAddr: "localhost:9999"}, newMockGameServiceClient(), session)
-	relay.router.roomID = "test-room"
+	relay.router.SetRoomID("test-room")
 
-	handler := relay.router.onUDPMessage("test-room", "200")
+	handler := relay.router.OnUDPMessage("test-room", "200")
 
 	// Without a stream, should return an error
 	err := handler([]byte("test"))

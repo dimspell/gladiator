@@ -10,52 +10,37 @@ import (
 	"time"
 
 	"github.com/dimspell/gladiator/internal/backend/proxy/relay/types"
+	"github.com/dimspell/gladiator/internal/backend/proxy/transport"
 	"github.com/quic-go/quic-go"
 )
 
-// PacketKind classifies the payload of a TransportPacket independent of the
-// underlying transport (relay/QUIC, WebRTC, or an in-memory test double).
-type PacketKind int
-
-const (
-	KindJoin PacketKind = iota
-	KindTCP
-	KindUDP
-	KindLeave
-	KindPing
-)
-
-// TransportPacket is the transport-agnostic unit delivered between two peers.
-// Adapters (e.g. RelayTransport) translate their wire format into this shape so
-// the PacketRouter dispatch logic never depends on QUIC or on the RelayPacket
-// envelope.
-type TransportPacket struct {
-	FromID string
-	ToID   string
-	RoomID string
-	Kind   PacketKind
-	Data   []byte
-}
-
-// PeerTransport is the hexagon's outer port on the peer-network side. The
-// PacketRouter depends only on this interface, so the relay (QUIC), WebRTC, or
-// an in-memory test double can be swapped without touching the dispatch logic.
-type PeerTransport interface {
-	// Join connects to the relay infrastructure and announces presence in roomID.
-	Join(ctx context.Context, roomID string) error
-	// Send delivers a packet to the peer identified by pkt.ToID.
-	Send(ctx context.Context, pkt TransportPacket) error
-	// Recv blocks until a packet arrives or ctx is done/cancelled.
-	Recv(ctx context.Context) (TransportPacket, error)
-	// Leave notifies the infrastructure this peer is departing.
-	Leave(ctx context.Context) error
-	// Close tears down the transport.
+// RelayStream abstracts a QUIC stream for reading and writing relay packets.
+type RelayStream interface {
+	io.Reader
+	io.Writer
+	CancelRead(code quic.StreamErrorCode)
+	CancelWrite(code quic.StreamErrorCode)
 	Close() error
 }
 
-// RelayTransport is the QUIC/relay implementation of PeerTransport. It owns the
+// deadlineStream wraps a RelayStream to apply a read deadline before each Read,
+// preventing a silent remote peer from blocking the scanner goroutine forever.
+type deadlineStream struct {
+	stream  RelayStream
+	timeout time.Duration
+}
+
+func (d *deadlineStream) Read(b []byte) (int, error) {
+	// If the underlying stream supports SetReadDeadline, use it.
+	if s, ok := d.stream.(interface{ SetReadDeadline(time.Time) error }); ok {
+		_ = s.SetReadDeadline(time.Now().Add(d.timeout))
+	}
+	return d.stream.Read(b)
+}
+
+// RelayTransport is the QUIC/relay implementation of transport.PeerTransport. It owns the
 // dial, the single bidirectional stream, and the framed read/write loop, and
-// translates RelayPacket <-> TransportPacket.
+// translates transport.RelayPacket <-> transport.TransportPacket.
 type RelayTransport struct {
 	addr   string
 	selfID string
@@ -64,14 +49,16 @@ type RelayTransport struct {
 	conn   *quic.Conn
 	stream RelayStream
 
-	recvCh chan TransportPacket
+	recvCh chan transport.TransportPacket
 }
+
+var _ transport.PeerTransport = (*RelayTransport)(nil)
 
 func NewRelayTransport(addr, selfID string) *RelayTransport {
 	return &RelayTransport{
 		addr:   addr,
 		selfID: selfID,
-		recvCh: make(chan TransportPacket, 64),
+		recvCh: make(chan transport.TransportPacket, 64),
 	}
 }
 
@@ -96,10 +83,10 @@ func (t *RelayTransport) Join(ctx context.Context, roomID string) error {
 	t.mu.Lock()
 	t.conn = conn
 	t.stream = stream
-	t.recvCh = make(chan TransportPacket, 64)
+	t.recvCh = make(chan transport.TransportPacket, 64)
 	t.mu.Unlock()
 
-	if err := t.write(RelayPacket{Type: "join", RoomID: roomID, FromID: t.selfID}); err != nil {
+	if err := t.write(transport.RelayPacket{Type: "join", RoomID: roomID, FromID: t.selfID}); err != nil {
 		_ = stream.Close()
 		_ = conn.CloseWithError(0xDEAD, "send join failed")
 		return fmt.Errorf("send join packet failed: %w", err)
@@ -120,26 +107,26 @@ func (t *RelayTransport) readLoop(stream RelayStream) {
 		if err != nil {
 			return
 		}
-		var rp RelayPacket
+		var rp transport.RelayPacket
 		if err := json.Unmarshal(data, &rp); err != nil {
 			continue
 		}
-		var kind PacketKind
+		var kind transport.PacketKind
 		switch rp.Type {
 		case "join":
-			kind = KindJoin
+			kind = transport.KindJoin
 		case "tcp":
-			kind = KindTCP
+			kind = transport.KindTCP
 		case "udp":
-			kind = KindUDP
+			kind = transport.KindUDP
 		case "leave":
-			kind = KindLeave
+			kind = transport.KindLeave
 		case "ping":
-			kind = KindPing
+			kind = transport.KindPing
 		default:
 			continue
 		}
-		t.recvCh <- TransportPacket{
+		t.recvCh <- transport.TransportPacket{
 			FromID: rp.FromID,
 			ToID:   rp.ToID,
 			RoomID: rp.RoomID,
@@ -149,26 +136,26 @@ func (t *RelayTransport) readLoop(stream RelayStream) {
 	}
 }
 
-func (t *RelayTransport) Recv(ctx context.Context) (TransportPacket, error) {
+func (t *RelayTransport) Recv(ctx context.Context) (transport.TransportPacket, error) {
 	select {
 	case <-ctx.Done():
-		return TransportPacket{}, ctx.Err()
+		return transport.TransportPacket{}, ctx.Err()
 	case pkt, ok := <-t.recvCh:
 		if !ok {
-			return TransportPacket{}, io.EOF
+			return transport.TransportPacket{}, io.EOF
 		}
 		return pkt, nil
 	}
 }
 
-func (t *RelayTransport) Send(ctx context.Context, pkt TransportPacket) error {
-	rp := RelayPacket{RoomID: pkt.RoomID, ToID: pkt.ToID, FromID: t.selfID}
+func (t *RelayTransport) Send(ctx context.Context, pkt transport.TransportPacket) error {
+	rp := transport.RelayPacket{RoomID: pkt.RoomID, ToID: pkt.ToID, FromID: t.selfID}
 	switch pkt.Kind {
-	case KindTCP:
+	case transport.KindTCP:
 		rp.Type = "tcp"
-	case KindUDP:
+	case transport.KindUDP:
 		rp.Type = "udp"
-	case KindPing:
+	case transport.KindPing:
 		rp.Type = "ping"
 	default:
 		return fmt.Errorf("unsupported send kind %v", pkt.Kind)
@@ -177,7 +164,7 @@ func (t *RelayTransport) Send(ctx context.Context, pkt TransportPacket) error {
 	return t.write(rp)
 }
 
-func (t *RelayTransport) write(rp RelayPacket) error {
+func (t *RelayTransport) write(rp transport.RelayPacket) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	if t.stream == nil {
@@ -194,7 +181,7 @@ func (t *RelayTransport) write(rp RelayPacket) error {
 }
 
 func (t *RelayTransport) Leave(ctx context.Context) error {
-	return t.write(RelayPacket{Type: "leave", FromID: t.selfID})
+	return t.write(transport.RelayPacket{Type: "leave", FromID: t.selfID})
 }
 
 func (t *RelayTransport) Close() error {
