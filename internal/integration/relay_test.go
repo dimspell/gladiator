@@ -93,6 +93,7 @@ func TestRelayGameExchange(t *testing.T) {
 	wg.Wait()
 
 	if guestCode != 0 || !strings.Contains(guestOut, "GAME_PACKET_OK") {
+		dumpLogs(t, ctx, consoleC, "console-relay")
 		dumpLogs(t, ctx, backendB, "guest-backend")
 		dumpLogs(t, ctx, backendA, "host-backend")
 		t.Logf("HOST mock client output (code=%d):\n%s", hostCode, hostOut)
@@ -102,6 +103,7 @@ func TestRelayGameExchange(t *testing.T) {
 	require.Contains(t, guestOut, "GAME_PACKET_EXCHANGED_TCP")
 
 	if hostCode != 0 || !strings.Contains(hostOut, "GAME_PACKET_OK") {
+		dumpLogs(t, ctx, consoleC, "console-relay")
 		dumpLogs(t, ctx, backendA, "host-backend")
 		t.Fatalf("host mock client failed (code=%d):\n%s", hostCode, hostOut)
 	}
@@ -279,6 +281,7 @@ func TestRelayFullLifecycleWithMigration(t *testing.T) {
 		"PEER_IPS":     "127.0.0.2",
 		"RELAY_MODE":   "1",
 		"BACKEND_ADDR": "127.0.0.1:" + backendPort,
+		"LEAVE_AFTER":  "95",
 	}
 	guestDEnv := map[string]string{
 		"ROLE":         "guest",
@@ -288,6 +291,7 @@ func TestRelayFullLifecycleWithMigration(t *testing.T) {
 		"PEER_IPS":     "127.0.0.2",
 		"RELAY_MODE":   "1",
 		"BACKEND_ADDR": "127.0.0.1:" + backendPort,
+		"LEAVE_AFTER":  "95",
 	}
 
 	var (
@@ -330,6 +334,7 @@ func TestRelayFullLifecycleWithMigration(t *testing.T) {
 	}
 	require.Contains(t, guestBOut, "GAME_PACKET_EXCHANGED_UDP", "B exchanged UDP before leaving")
 	require.Contains(t, guestBOut, "GAME_PACKET_EXCHANGED_TCP", "B exchanged TCP before leaving")
+	require.NotContains(t, guestBOut, "HOST_MIGRATION", "B left before host migration should not see migration event")
 
 	// Let the leave propagate through the relay.
 	time.Sleep(5 * time.Second)
@@ -340,6 +345,8 @@ func TestRelayFullLifecycleWithMigration(t *testing.T) {
 	wg.Wait()
 	require.Equal(t, 0, hostCode, "host A (archer) failed:\n%s", hostOut)
 	require.Contains(t, hostOut, "GAME_PACKET_OK", "host A should have exchanged before leaving")
+	require.Contains(t, hostOut, "GAME_PACKET_EXCHANGED_UDP", "host A should have exchanged UDP")
+	require.Contains(t, hostOut, "GAME_PACKET_EXCHANGED_TCP", "host A should have exchanged TCP")
 
 	// Sleep for migration to propagate to survivors.
 	time.Sleep(5 * time.Second)
@@ -376,14 +383,13 @@ func TestRelayFullLifecycleWithMigration(t *testing.T) {
 		failures = append(failures, "D did not exchange TCP")
 	}
 
-	// Host migration must be reported by at least one survivor.
-	cMig := strings.Contains(guestCOut, "HOST_MIGRATION_TO") ||
-		strings.Contains(guestCOut, "HOST_MIGRATION_SELF")
-	dMig := strings.Contains(guestDOut, "HOST_MIGRATION_TO") ||
-		strings.Contains(guestDOut, "HOST_MIGRATION_SELF")
-	if !cMig && !dMig {
-		failures = append(failures,
-			"neither C nor D reported host migration (HOST_MIGRATION_TO or HOST_MIGRATION_SELF)")
+	// Host migration: C becomes the new host (HOST_MIGRATION_SELF),
+	// D is notified of the new host (HOST_MIGRATION_TO=<ip>).
+	if !strings.Contains(guestCOut, "HOST_MIGRATION_SELF") {
+		failures = append(failures, "C (warrior) should see HOST_MIGRATION_SELF (promoted to host)")
+	}
+	if !strings.Contains(guestDOut, "HOST_MIGRATION_TO") {
+		failures = append(failures, "D (necro) should see HOST_MIGRATION_TO (notified of new host)")
 	}
 
 	if len(failures) > 0 {

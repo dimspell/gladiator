@@ -8,52 +8,28 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/dimspell/gladiator/internal/backend/proxy/relay/types"
 	"github.com/golang-jwt/jwt/v5"
 )
 
-var hmacKey = []byte("shared-secret-key") //nolint:unused // may be used in future
-
 func sign(data []byte) []byte { //nolint:unused // may be used in future
-	// mac := hmac.New(sha256.New, hmacKey)
-	// mac.Write(data)
-	// return append(mac.Sum(nil), data...)
-	return data
+	return types.SignHMAC(data, types.HMACKey())
 }
 
 func verifyRelayPacket(packet []byte) ([]byte, bool) {
-	return packet, true
-	// if len(packet) < 32 {
-	//	return nil, false
-	// }
-	// sig := packet[:32]
-	// data := packet[32:]
-	//
-	// mac := hmac.New(sha256.New, hmacKey)
-	// mac.Write(data)
-	// expected := mac.Sum(nil)
-	// if hmac.Equal(sig, expected) {
-	//	return data, true
-	// }
-	// return nil, false
+	return types.VerifyHMAC(packet, types.HMACKey())
 }
 
-func generateSelfSigned() tls.Certificate {
-	// For development only. Replace with proper TLS cert in production.
+func generateSelfSigned() tls.Certificate { //nolint:unused // may be used in future
 	cert, _ := tls.X509KeyPair(devCertPEM, devKeyPEM)
 	return cert
 }
 
-// Dev-only TLS cert
-//
-// You can generate real self-signed certs using:
-//
-// 	openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes
-
 //go:embed cert.pem
-var devCertPEM []byte
+var devCertPEM []byte //nolint:unused // may be used in future
 
 //go:embed key.pem
-var devKeyPEM []byte
+var devKeyPEM []byte //nolint:unused // may be used in future
 
 func generateToken() (string, error) { //nolint:unused // may be used in future
 	b := make([]byte, 32)

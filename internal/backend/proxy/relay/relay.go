@@ -72,13 +72,21 @@ func NewRelay(config *ProxyRelay, client multiv1connect.GameServiceClient, sessi
 		transport = NewRelayTransport(config.RelayServerAddr, remoteID(session.UserID))
 	}
 
+	manager := redirect.NewManager(append([]func(*redirect.HostManager){redirect.WithIPPrefix(ipPrefix.To4())}, config.ManagerOptions...)...)
+
 	router := tport.NewPacketRouter(
 		slog.With(slog.String("proxy", "relay"), slog.String("sessionId", session.ID)),
 		remoteID(session.UserID),
 		session,
-		redirect.NewManager(append([]func(*redirect.HostManager){redirect.WithIPPrefix(ipPrefix.To4())}, config.ManagerOptions...)...),
+		manager,
 		transport,
 	)
+
+	// Only the current host may open guest dialers toward other peers. This
+	// makes the "StartGuest only when host" rule authoritative inside the
+	// redirect layer so no caller can bypass it (defends against the §8.1
+	// pain point 5 noise/IP-conflict class of bug).
+	manager.IsHost = func() bool { return router.SelfID() == router.CurrentHostID() }
 
 	return &Relay{
 		session:           session,
@@ -92,11 +100,19 @@ func (r *Relay) CreateRoom(ctx context.Context, params proxy.CreateParams) error
 
 	r.router.Reset()
 
-	r.router.SetRoomState(roomID, remoteID(r.session.UserID), remoteID(r.session.UserID))
+	selfID := remoteID(r.session.UserID)
+	r.router.SetSelfID(selfID)
+	if rt, ok := r.router.Transport().(*RelayTransport); ok {
+		rt.SetSelfID(selfID)
+	}
+
+	r.router.SetRoomState(roomID, selfID, selfID)
 
 	if err := r.router.Connect(ctx, roomID); err != nil {
 		return fmt.Errorf("failed connect to the relay server: %w", err)
 	}
+
+	r.router.StartHostPing()
 
 	_, err := r.GameServiceClient.CreateGame(ctx, connect.NewRequest(&multiv1.CreateGameRequest{
 		GameName:      params.GameID,
@@ -199,6 +215,12 @@ func (r *Relay) JoinGame(ctx context.Context, roomID string, password string) ([
 		return nil, fmt.Errorf("could not get game room: %w", err)
 	}
 
+	selfID := remoteID(r.session.UserID)
+	r.router.SetSelfID(selfID)
+	if rt, ok := r.router.Transport().(*RelayTransport); ok {
+		rt.SetSelfID(selfID)
+	}
+
 	if err := r.router.Connect(ctx, roomID); err != nil {
 		return nil, fmt.Errorf("failed connect to the relay server: %w", err)
 	}
@@ -227,7 +249,15 @@ func (r *Relay) JoinGame(ctx context.Context, roomID string, password string) ([
 		peerID := remoteID(player.UserId)
 		ipAddress, ok := r.router.Manager().GetPeerIP(peerID)
 		if !ok {
-			return nil, fmt.Errorf("not found the IP for a peer with ID %s", peerID)
+			ipAddress = player.IpAddress
+		}
+		if ipAddress == "" {
+			var err error
+			ipAddress, err = r.router.Manager().AssignIP(peerID)
+			if err != nil {
+				slog.Warn("Could not assign IP for peer", logging.PeerID(peerID), logging.Error(err))
+				continue
+			}
 		}
 		ipv4 := net.ParseIP(ipAddress).To4()
 		if ipv4 == nil {

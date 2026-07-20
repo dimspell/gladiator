@@ -450,7 +450,7 @@ func TestListenerTCP_Acceptance(t *testing.T) {
 	// Simulate a client dialing and sending handshake + payload
 	conn, err := net.Dial("tcp", addr)
 	require.NoError(t, err)
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	// Send handshake
 	_, err = conn.Write([]byte("##username"))

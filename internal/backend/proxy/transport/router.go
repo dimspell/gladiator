@@ -17,6 +17,9 @@ import (
 	"github.com/dimspell/gladiator/internal/wire"
 )
 
+// DefaultHostPingInterval is how often the host sends a keepalive ping.
+const DefaultHostPingInterval = 15 * time.Second
+
 // PacketRouter manages the routing of packets between the local game client and the
 // remote peer network (relay or WebRTC). It depends only on the PeerTransport
 // port, so the same dispatch logic serves every proxy mode.
@@ -28,14 +31,23 @@ type PacketRouter struct {
 	selfID    string
 	transport PeerTransport
 
-	roomID        string
-	currentHostID string
-	pingTicker    *time.Ticker
-	wg            sync.WaitGroup
+	roomID            string
+	currentHostID     string
+	pingTicker        *time.Ticker
+	hostPingInterval  time.Duration
+	wg                sync.WaitGroup
 
 	// loopCancel cancels the receive loop's context. The loop is owned by the
 	// router (not the caller's context) so it survives request-scoped contexts.
 	loopCancel context.CancelFunc
+
+	// keepAliveCancel cancels the keep-alive ping goroutine. It is created when
+	// Connect is called (all peers send pings) and cancelled in Reset.
+	keepAliveCancel context.CancelFunc
+
+	// hostPingCancel cancels the host ping goroutine's context. Created when
+	// StartHostPing is called and cancelled in Reset.
+	hostPingCancel context.CancelFunc
 }
 
 // NewPacketRouter constructs a PacketRouter. The manager and transport are
@@ -48,11 +60,12 @@ func NewPacketRouter(
 	transport PeerTransport,
 ) *PacketRouter {
 	return &PacketRouter{
-		logger:    logger,
-		selfID:    selfID,
-		session:   session,
-		manager:   manager,
-		transport: transport,
+		logger:           logger,
+		selfID:           selfID,
+		session:          session,
+		manager:          manager,
+		transport:        transport,
+		hostPingInterval: DefaultHostPingInterval,
 	}
 }
 
@@ -123,16 +136,24 @@ func (r *PacketRouter) SetRoomState(roomID, selfID, hostID string) {
 // Reset cleans up all resources, closes connections, stops hosts, and resets the router state.
 func (r *PacketRouter) Reset() {
 	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	if r.pingTicker != nil {
 		r.pingTicker.Stop()
+	}
+	r.stopKeepAliveLocked()
+	if r.hostPingCancel != nil {
+		r.hostPingCancel()
+		r.hostPingCancel = nil
 	}
 
 	r.disconnectLocked()
 
-	r.manager.StopAll()
+	if r.manager != nil {
+		r.manager.StopAll()
+	}
 	r.roomID = ""
 	r.currentHostID = ""
-	r.mu.Unlock()
 
 	// Wait for receiveLoop to finish (stream is closed, so Read should return quickly)
 	waitCh := make(chan struct{})
@@ -231,6 +252,7 @@ func (r *PacketRouter) handleHostMigration(ctx context.Context, player wire.Play
 
 	if newHostID == selfID {
 		// I became a host!
+		r.StartHostPing()
 
 		payload := packet.NewHostSwitch(false, net.IPv4(127, 0, 0, 1))
 		if err := r.session.SendToGame(packet.HostMigration, payload); err != nil {
@@ -341,7 +363,8 @@ func (r *PacketRouter) handleHostMigration(ctx context.Context, player wire.Play
 }
 
 // Connect joins the relay infrastructure for the given room via the injected
-// PeerTransport and starts the receive loop.
+// PeerTransport, starts the receive loop, and begins periodic keep-alive pings
+// so the relay server does not time out this peer.
 func (r *PacketRouter) Connect(ctx context.Context, roomID string) error {
 	r.mu.Lock()
 	// Cancel any previously running receive loop before (re)joining, so a
@@ -363,43 +386,86 @@ func (r *PacketRouter) Connect(ctx context.Context, roomID string) error {
 
 	r.wg.Add(1)
 	go r.receiveLoop(loopCtx)
+	r.startKeepAlive()
 	return nil
 }
 
-// keepAliveHost periodically sends ping packets to the relay server to keep the connection alive.
-func (r *PacketRouter) keepAliveHost(ctx context.Context) { //nolint:unused // may be used in future
+// startKeepAlive sends periodic ping packets to the relay server so it does
+// not disconnect this peer due to liveness timeout. Every peer in the room
+// needs this, not just the host. The goroutine is stopped in Reset.
+func (r *PacketRouter) startKeepAlive() {
 	r.mu.Lock()
-	if r.pingTicker != nil {
-		r.pingTicker.Stop()
+	defer r.mu.Unlock()
+
+	r.stopKeepAliveLocked()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	r.keepAliveCancel = cancel
+	interval := r.hostPingInterval
+	if interval <= 0 {
+		interval = DefaultHostPingInterval
 	}
-	r.pingTicker = time.NewTicker(15 * time.Second)
-	r.mu.Unlock()
+	ticker := time.NewTicker(interval)
 
-	go func(ticker *time.Ticker) {
-		defer func() {
-			ticker.Stop()
-			r.logger.Debug("keep alive ping stopped")
-		}()
-
+	r.wg.Add(1)
+	go func() {
+		defer ticker.Stop()
+		defer r.wg.Done()
 		for {
 			select {
 			case <-ctx.Done():
 				return
-			case _, ok := <-ticker.C:
-				if !ok {
-					return
-				}
-
-				// Send a packet to the relay server to keep it announced, when
-				// playing alone
+			case <-ticker.C:
 				if err := r.SendPacket(RelayPacket{Type: "ping"}); err != nil {
-					r.logger.Error("failed to send ping packet", logging.Error(err))
-					r.Reset()
+					r.logger.Error("keep-alive ping failed", logging.Error(err))
 					return
 				}
 			}
 		}
-	}(r.pingTicker)
+	}()
+}
+
+// stopKeepAliveLocked stops the keep-alive goroutine. Must be called with r.mu held.
+func (r *PacketRouter) stopKeepAliveLocked() {
+	if r.keepAliveCancel != nil {
+		r.keepAliveCancel()
+		r.keepAliveCancel = nil
+	}
+}
+
+// StartHostPing begins sending periodic ping packets to the relay server while
+// this peer is the room host. It cancels any previous ping goroutine and creates
+// a new one. The goroutine is stopped when Reset is called.
+func (r *PacketRouter) StartHostPing() {
+	r.mu.Lock()
+	if r.hostPingCancel != nil {
+		r.hostPingCancel()
+	}
+	if r.pingTicker != nil {
+		r.pingTicker.Stop()
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	r.hostPingCancel = cancel
+	r.pingTicker = time.NewTicker(r.hostPingInterval)
+	ticker := r.pingTicker
+	r.mu.Unlock()
+
+	go func() {
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				r.logger.Debug("host ping stopped")
+				return
+			case <-ticker.C:
+				if err := r.SendPacket(RelayPacket{Type: "ping"}); err != nil {
+					r.logger.Error("failed to send ping packet", logging.Error(err))
+					return
+				}
+			}
+		}
+	}()
 }
 
 // Stop stops and cleans up the given fake host.
@@ -417,7 +483,7 @@ func (r *PacketRouter) SendPacket(pkt RelayPacket) error {
 	pkt.FromID = r.selfID
 	r.mu.Unlock()
 
-	kind := KindTCP
+	var kind PacketKind
 	switch pkt.Type {
 	case "udp":
 		kind = KindUDP

@@ -27,11 +27,11 @@ func startTestTCPServer(t *testing.T, handler func(conn net.Conn)) (addr string,
 			go handler(conn)
 		}
 	}()
-	return ln.Addr().String(), func() { ln.Close() }
+	return ln.Addr().String(), func() { _ = ln.Close() }
 }
 
 func TestDialTCP_SuccessAndClose(t *testing.T) {
-	addr, stop := startTestTCPServer(t, func(conn net.Conn) { conn.Close() })
+	addr, stop := startTestTCPServer(t, func(conn net.Conn) { _ = conn.Close() })
 	defer stop()
 
 	dialer, err := NewDialTCP("127.0.0.1", addr[strings.LastIndex(addr, ":")+1:], func(p []byte) error { return nil })
@@ -52,7 +52,7 @@ func TestWriteAndRead(t *testing.T) {
 		n, _ := conn.Read(buf)
 		_, _ = conn.Write([]byte("pong"))
 		require.Equal(t, "ping", string(buf[:n]))
-		conn.Close()
+		_ = conn.Close()
 	})
 	defer stop()
 
@@ -65,13 +65,13 @@ func TestWriteAndRead(t *testing.T) {
 	_, err = dialer.conn.Read(buf)
 	require.NoError(t, err)
 	require.Equal(t, "pong", string(buf))
-	dialer.Close()
+	_ = dialer.Close()
 }
 
 func TestRun_ContextCancel(t *testing.T) {
 	addr, stop := startTestTCPServer(t, func(conn net.Conn) {
 		time.Sleep(2 * time.Second)
-		conn.Close()
+		_ = conn.Close()
 	})
 	defer stop()
 
@@ -88,7 +88,7 @@ func TestRun_OnReceiveError(t *testing.T) {
 	addr, stop := startTestTCPServer(t, func(conn net.Conn) {
 		_, _ = conn.Write([]byte("data"))
 		time.Sleep(100 * time.Millisecond)
-		conn.Close()
+		_ = conn.Close()
 	})
 	defer stop()
 

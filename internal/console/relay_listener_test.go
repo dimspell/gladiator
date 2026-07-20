@@ -235,19 +235,14 @@ func TestRelayServer_LeaveCleansUpPeer(t *testing.T) {
 	require.NoError(t, writePacket(a, RelayPacket{Type: "join", RoomID: "R", FromID: "1"}))
 
 	require.Eventually(t, func() bool {
-		rs.mu.Lock()
-		defer rs.mu.Unlock()
-		room, ok := rs.rooms["R"]
-		return ok && len(room.Peers) == 1
+		room := rs.PeersInRoom("R")
+		return len(room) == 1
 	}, 2*time.Second, 10*time.Millisecond)
 
 	require.NoError(t, writePacket(a, RelayPacket{Type: "leave", RoomID: "R", FromID: "1"}))
 
 	require.Eventually(t, func() bool {
-		rs.mu.Lock()
-		defer rs.mu.Unlock()
-		_, ok := rs.peerToRoomIDs["1"]
-		return !ok
+		return !rs.HasPeer("1")
 	}, 2*time.Second, 10*time.Millisecond)
 
 	// A later joiner must not resurrect the departed peer.
@@ -257,13 +252,11 @@ func TestRelayServer_LeaveCleansUpPeer(t *testing.T) {
 	require.NoError(t, writePacket(b, RelayPacket{Type: "join", RoomID: "R", FromID: "2"}))
 
 	require.Eventually(t, func() bool {
-		rs.mu.Lock()
-		defer rs.mu.Unlock()
-		if _, exists := rs.peerToRoomIDs["1"]; exists {
+		if rs.HasPeer("1") {
 			return false
 		}
-		room, ok := rs.rooms["R"]
-		return ok && len(room.Peers) == 1
+		room := rs.PeersInRoom("R")
+		return len(room) == 1
 	}, 2*time.Second, 10*time.Millisecond)
 }
 

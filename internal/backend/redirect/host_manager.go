@@ -15,6 +15,12 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+// ErrNotHost is returned by StartGuest when the configured IsHost gate reports
+// that this backend is not the current room host. Only the host may open guest
+// dialers toward other peers, so a non-host StartGuest is refused rather than
+// creating noise and IP conflicts (the §8.1 pain point 5 bug class).
+var ErrNotHost = errors.New("redirect: StartGuest refused: this peer is not the current host")
+
 // ProxyKind and ProxyProtocol are type-safe enums for proxy creation.
 type ProxyKind string
 type ProxyProtocol string
@@ -64,6 +70,12 @@ type HostManager struct {
 
 	ProxyFactory ProxyFactory
 	Logger       *slog.Logger
+
+	// IsHost, when non-nil, gates StartGuest: a guest dialer is only created
+	// when IsHost() reports true. This encodes the "StartGuest only when host"
+	// rule inside the redirect layer so no caller can bypass it. Nil means no
+	// gate (backward compatible; every caller bears the responsibility).
+	IsHost func() bool
 }
 
 // NewManager creates a new HostManager with optional ProxyFactory, Logger, and Clock.
@@ -102,6 +114,15 @@ func WithDisabledLogger() func(*HostManager) {
 	return func(hm *HostManager) {
 		hm.Logger = logger.NewDiscardLogger()
 	}
+}
+
+// WithIsHost injects the predicate that decides whether this backend is the
+// current room host. When non-nil and it returns false, StartGuest becomes a
+// no-op that returns ErrNotHost, so only the host ever opens guest dialers
+// toward other peers. This is the redirect-layer encoding of the
+// "StartGuest only when host" rule.
+func WithIsHost(isHost func() bool) func(*HostManager) {
+	return func(hm *HostManager) { hm.IsHost = isHost }
 }
 
 // StopAll stops and removes all hosts.
@@ -150,6 +171,13 @@ func (hm *HostManager) StartGuest(
 	onReceiveTCP, onReceiveUDP func([]byte) error,
 	onHostDisconnect func(host *FakeHost, forced bool),
 ) (*FakeHost, error) {
+	// Only the current host may open guest dialers toward other peers. This is
+	// the authoritative guard: even if a caller forgets to check host status,
+	// StartGuest refuses to create dialers as a non-host peer.
+	if hm.IsHost != nil && !hm.IsHost() {
+		hm.Logger.Debug("StartGuest refused: only the current host may create guest dialers", logging.PeerID(peerID))
+		return nil, ErrNotHost
+	}
 	return hm.CreateFakeHost(
 		ctx,
 		"DIAL",
@@ -294,7 +322,7 @@ func (hm *HostManager) CreateFakeHost(
 		cancel()
 		hm.StopHost(host)
 		if onHostDisconnect != nil {
-			onHostDisconnect(host, errors.Is(err, io.EOF))
+			onHostDisconnect(host, err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, context.Canceled) && !errors.Is(err, net.ErrClosed))
 		}
 	}(host)
 

@@ -138,7 +138,7 @@ func TestListenerUDP_Acceptance(t *testing.T) {
 	// Simulate a client sending handshake and payload
 	conn, err := net.Dial("udp", addr)
 	require.NoError(t, err)
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	// Send handshake
 	_, err = conn.Write([]byte{26, 0, 2, 0})

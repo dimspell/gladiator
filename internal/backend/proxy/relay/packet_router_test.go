@@ -37,16 +37,16 @@ func startDummyTCPServer(t *testing.T, addr string) (stop func()) {
 					continue
 				}
 			}
-			go func(c net.Conn) {
-				defer c.Close()
-				// Optionally, read/write to c here if needed
-				_, _ = io.Copy(io.Discard, c)
-			}(conn)
-		}
-	}()
+		go func(c net.Conn) {
+			defer func() { _ = c.Close() }()
+			// Optionally, read/write to c here if needed
+			_, _ = io.Copy(io.Discard, c)
+		}(conn)
+	}
+}()
 	return func() {
 		close(done)
-		ln.Close()
+		_ = ln.Close()
 	}
 }
 

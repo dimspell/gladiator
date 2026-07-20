@@ -27,7 +27,7 @@ func BackendCommand() *cli.Command {
 			&cli.StringFlag{
 				Name:    "proxy",
 				Value:   defaultProxyType,
-				Usage:   fmt.Sprintf("Proxy type to use. Possible values are: %q, %q, %q", proxyTypeLAN, proxyTypeWebRTC, proxyTypeRelay),
+				Usage:   fmt.Sprintf("Proxy type to use. Possible values are: %q, %q", proxyTypeLAN, proxyTypeRelay),
 				Sources: cli.NewValueSourceChain(cli.EnvVar("PROXY")),
 			},
 			&cli.StringFlag{

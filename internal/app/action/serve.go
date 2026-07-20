@@ -40,7 +40,7 @@ func ServeCommand(version string) *cli.Command {
 			&cli.StringFlag{
 				Name:    "proxy",
 				Value:   defaultProxyType,
-				Usage:   fmt.Sprintf("Proxy type to use. Possible values are: %q, %q, %q", proxyTypeLAN, proxyTypeWebRTC, proxyTypeRelay),
+				Usage:   fmt.Sprintf("Proxy type to use. Possible values are: %q, %q", proxyTypeLAN, proxyTypeRelay),
 				Sources: cli.NewValueSourceChain(cli.EnvVar("PROXY")),
 			},
 			&cli.StringFlag{
@@ -64,7 +64,7 @@ func ServeCommand(version string) *cli.Command {
 			&cli.StringFlag{
 				Name:    "run-mode",
 				Value:   "",
-				Usage:   "Explicitly advertise the run mode (lan, relay-beta, webrtc-beta, single); overrides the relay-addr default",
+				Usage:   "Explicitly advertise the run mode (lan, relay-beta, single); overrides the relay-addr default",
 				Sources: cli.NewValueSourceChain(cli.EnvVar("RUN_MODE")),
 			},
 			&cli.StringFlag{

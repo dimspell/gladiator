@@ -188,6 +188,104 @@ func TestPacketRouter_SendPacket_DataRace(t *testing.T) {
 	}
 }
 
+// TestPacketRouter_DynamicJoin_NonHost_NoGuest proves the "StartGuest only when
+// host" rule end-to-end: when this peer is NOT the current host, a dynamic join
+// must not create a guest dialer (no fake host is registered). This defends
+// against the §8.1 pain point 5 noise/IP-conflict class of bug.
+func TestPacketRouter_DynamicJoin_NonHost_NoGuest(t *testing.T) {
+	cap := &CaptureRedirect{}
+	factory := &CaptureFactory{Shared: cap}
+
+	pr := &PacketRouter{
+		logger: slog.Default(),
+		roomID: "test-room",
+		manager: redirect.NewManager(
+			redirect.WithProxyFactory(factory),
+			redirect.WithDisabledLogger(),
+		),
+		transport: newMockTransport(),
+	}
+
+	// Act as a NON-host: selfID != currentHostID.
+	pr.mu.Lock()
+	pr.selfID = "100"
+	pr.currentHostID = "999"
+	pr.mu.Unlock()
+
+	pr.DynamicJoin(context.Background(), "test-room", "200")
+
+	if _, ok := pr.manager.GetPeerHost("200"); ok {
+		t.Fatal("non-host peer must not create a guest dialer for a dynamic join")
+	}
+}
+
+// TestPacketRouter_StartHostPing_SendsPings proves the host ping goroutine
+// sends KindPing packets when the router is the room host.
+func TestPacketRouter_StartHostPing_SendsPings(t *testing.T) {
+	mt := newMockTransport()
+	pr := &PacketRouter{
+		logger:           slog.Default(),
+		selfID:           "100",
+		transport:        mt,
+		hostPingInterval: 10 * time.Millisecond,
+	}
+
+	pr.StartHostPing()
+	defer pr.Reset()
+
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		mt.mu.Lock()
+		found := false
+		for _, pkt := range mt.sent {
+			if pkt.Kind == KindPing {
+				found = true
+			}
+		}
+		mt.mu.Unlock()
+		if found {
+			return
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	t.Fatal("expected at least one ping packet within 1s (interval=10ms)")
+}
+
+func TestPacketRouter_StartHostPing_StopsOnReset(t *testing.T) {
+	mt := newMockTransport()
+	pr := &PacketRouter{
+		logger:           slog.Default(),
+		selfID:           "100",
+		transport:        mt,
+		hostPingInterval: 10 * time.Millisecond,
+	}
+
+	pr.StartHostPing()
+
+	// Wait for a few pings to be sent
+	time.Sleep(50 * time.Millisecond)
+
+	pr.Reset()
+
+	// Give time for a stale goroutine to fire (it shouldn't)
+	time.Sleep(100 * time.Millisecond)
+
+	mt.mu.Lock()
+	// Count pings sent after the reset (we can't easily know when the last pre-reset
+	// ping fired, but we can check that the total is reasonable and not runaway)
+	sentAfter := 0
+	for _, pkt := range mt.sent {
+		if pkt.Kind == KindPing {
+			sentAfter++
+		}
+	}
+	mt.mu.Unlock()
+
+	if sentAfter > 5 {
+		t.Fatalf("expected no more than 5 pings (pre-reset), got %d (goroutine may have kept running)", sentAfter)
+	}
+}
+
 // TestPacketRouter_Connect_LoopSurvivesCallerCtxCancel proves the receive loop
 // is owned by the router and keeps running after the caller's context is
 // cancelled (e.g. an HTTP request scope), and that Reset cancels it promptly.

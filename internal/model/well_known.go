@@ -17,7 +17,9 @@ const (
 	RunModeSinglePlayer RunMode = "single"
 	RunModeLAN          RunMode = "lan"
 	RunModeRelay        RunMode = "relay-beta"
-	RunModeWebRTC       RunMode = "webrtc-beta"
+	// RunModeWebRTC is disabled. Source retained for reference.
+	// Selectable modes: single, lan, relay-beta.
+	RunModeWebRTC RunMode = "webrtc-beta"
 )
 
 func (m RunMode) String() string { return string(m) }

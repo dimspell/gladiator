@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
+	"github.com/dimspell/gladiator/internal/relayserver"
 	"github.com/dimspell/gladiator/internal/wire"
 	"github.com/stretchr/testify/require"
 )
@@ -306,7 +307,7 @@ func TestResetClearsSessionsAndRooms(t *testing.T) {
 
 func TestRegisterRelayHooks(t *testing.T) {
 	mp := NewRoomService()
-	relay := &RelayServer{}
+	relay := &RelayServer{RelayServer: &relayserver.RelayServer{}}
 	mp.RegisterRelayHooks(relay)
 	require.NotNil(t, relay.OnJoin)
 	require.NotNil(t, relay.OnLeave)

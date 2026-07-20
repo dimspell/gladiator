@@ -29,7 +29,6 @@ func (r *RelayService) Start(ctx context.Context) error {
 	}
 
 	ctx, r.cancel = context.WithCancel(ctx)
-	// go r.Server.cleanupPeers()
 
 	r.Server.Start(ctx)
 	return nil

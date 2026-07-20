@@ -41,9 +41,15 @@ func selectDatabaseType(c *cli.Command) (db *database.SQLite, err error) {
 }
 
 var (
-	proxyTypeLAN    = model.RunModeLAN.String()
-	proxyTypeWebRTC = model.RunModeWebRTC.String()
-	proxyTypeRelay  = model.RunModeRelay.String()
+	proxyTypeLAN   = model.RunModeLAN.String()
+	proxyTypeRelay = model.RunModeRelay.String()
+)
+
+// proxyTypeWebRTC and its implementation in selectProxy are disabled.
+// The p2p and webrtc imports are kept for reference via blank identifiers.
+var (
+	_ = p2p.ProxyP2P{}
+	_ = webrtc.ICEServer{}
 )
 
 func selectProxy(c *cli.Command) (p backend.ProxyFactory, err error) {
@@ -54,24 +60,22 @@ func selectProxy(c *cli.Command) (p backend.ProxyFactory, err error) {
 			return nil, fmt.Errorf("invalid lan-my-ip-addr: %q", myIPAddr)
 		}
 		return &direct.ProxyLAN{MyIPAddress: myIPAddr}, nil
-	case proxyTypeWebRTC:
-		return &p2p.ProxyP2P{
-			ICEServers: []webrtc.ICEServer{
-				{
-					URLs: []string{"stun:stun.l.google.com:19302"},
-				},
-				{
-					URLs:       []string{"turn:127.0.0.1:3478"},
-					Username:   "username2",
-					Credential: "password2",
-				},
-			},
-		}, nil
+	case model.RunModeWebRTC.String():
+		// WebRTC proxy is disabled. Source retained for reference.
+		// Previously returned &p2p.ProxyP2P{
+		//   ICEServers: []webrtc.ICEServer{
+		//     {URLs: []string{"stun:stun.l.google.com:19302"}},
+		//     {URLs: []string{"turn:127.0.0.1:3478"}, Username: "username2", Credential: "password2"},
+		//   },
+		// }
+		return nil, fmt.Errorf("proxy %q is disabled; use %q or %q",
+			model.RunModeWebRTC, proxyTypeLAN, proxyTypeRelay)
 	case proxyTypeRelay:
 		relayAddr := c.String("relay-addr")
 		return &relay.ProxyRelay{RelayServerAddr: relayAddr}, nil
 	default:
-		return nil, fmt.Errorf("unknown proxy: %q", c.String("proxy"))
+		return nil, fmt.Errorf("unknown proxy: %q (valid: %s, %s)",
+			c.String("proxy"), proxyTypeLAN, proxyTypeRelay)
 	}
 }
 
@@ -91,7 +95,7 @@ func selectConsoleOptions(c *cli.Command, version string) ([]console.Option, err
 
 	if runMode := c.String("run-mode"); runMode != "" {
 		if !isValidRunMode(runMode) {
-			return nil, fmt.Errorf("unknown run-mode: %q (valid: lan, relay-beta, webrtc-beta, single)", runMode)
+			return nil, fmt.Errorf("unknown run-mode: %q (valid: lan, relay-beta, single)", runMode)
 		}
 		options = append(options, console.WithRunMode(model.RunMode(runMode)))
 	}
@@ -99,11 +103,11 @@ func selectConsoleOptions(c *cli.Command, version string) ([]console.Option, err
 	return options, nil
 }
 
-// isValidRunMode reports whether s is one of the known model.RunMode values.
+// isValidRunMode reports whether s is one of the selectable model.RunMode values.
+// WebRTC and libp2p are disabled; the constants exist but their modes are rejected.
 func isValidRunMode(s string) bool {
 	switch model.RunMode(s) {
-	case model.RunModeSinglePlayer, model.RunModeLAN, model.RunModeRelay,
-		model.RunModeWebRTC:
+	case model.RunModeSinglePlayer, model.RunModeLAN, model.RunModeRelay:
 		return true
 	}
 	return false

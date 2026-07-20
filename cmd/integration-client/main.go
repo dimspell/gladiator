@@ -244,6 +244,10 @@ func run() error {
 		time.Sleep(500 * time.Millisecond)
 	}
 
+	// Clear the I/O deadline so the migration monitor can read opcode 71
+	// (HostMigration) after a long LEAVE_AFTER delay.
+	conn.SetDeadline(time.Time{})
+
 	// Controlled leave: keep the connection open for LEAVE_AFTER seconds,
 	// then return.  Closing the :6112 conn triggers a relay "leave" which
 	// the test harness observes.  Default 0 = exit immediately.

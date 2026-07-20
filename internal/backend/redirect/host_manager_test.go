@@ -379,3 +379,73 @@ func TestHostManager_ProxiesClosedOnRemove(t *testing.T) {
 		t.Errorf("expected proxies to be closed on RemoveByRemoteID")
 	}
 }
+
+// TestHostManager_StartGuest_RefusedWhenNotHost proves the redirect-layer guard:
+// when IsHost reports false, StartGuest refuses (returns ErrNotHost) and registers
+// NO fake host, so a non-host peer never opens guest dialers toward other peers.
+func TestHostManager_StartGuest_RefusedWhenNotHost(t *testing.T) {
+	tcp := &mockRedirect{}
+	udp := &mockRedirect{}
+	hm := NewManager(
+		WithProxyFactory(&mockProxyFactory{tcp, udp, false}),
+		WithIsHost(func() bool { return false }),
+	)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	ip, _ := hm.AssignIP("peer2")
+	host, err := hm.StartGuest(ctx, "peer2", ip, 1234, 5678, func([]byte) error { return nil }, func([]byte) error { return nil }, nil)
+	if !errors.Is(err, ErrNotHost) {
+		t.Fatalf("expected ErrNotHost, got %v", err)
+	}
+	if host != nil {
+		t.Fatalf("expected nil host when refused, got %+v", host)
+	}
+	if _, ok := hm.GetPeerHost("peer2"); ok {
+		t.Errorf("no fake host should be registered for a refused StartGuest")
+	}
+	if tcp.runCalled || udp.runCalled {
+		t.Errorf("no proxy should have been started for a refused StartGuest")
+	}
+}
+
+// TestHostManager_StartGuest_AllowedWhenHost proves that, with the gate reporting
+// true, StartGuest proceeds and registers the guest fake host normally.
+func TestHostManager_StartGuest_AllowedWhenHost(t *testing.T) {
+	tcp := &mockRedirect{}
+	udp := &mockRedirect{}
+	hm := NewManager(
+		WithProxyFactory(&mockProxyFactory{tcp, udp, false}),
+		WithIsHost(func() bool { return true }),
+	)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	ip, _ := hm.AssignIP("peer2")
+	host, err := hm.StartGuest(ctx, "peer2", ip, 1234, 5678, func([]byte) error { return nil }, func([]byte) error { return nil }, nil)
+	if err != nil {
+		t.Fatalf("expected StartGuest to succeed when host, got %v", err)
+	}
+	if host == nil || host.ProxyTCP == nil || host.ProxyUDP == nil {
+		t.Fatalf("expected a fully wired guest host, got %+v", host)
+	}
+	if _, ok := hm.GetPeerHost("peer2"); !ok {
+		t.Errorf("guest fake host should be registered when host")
+	}
+}
+
+// TestHostManager_StartGuest_GateNilBackwardCompatible proves that, when no
+// IsHost gate is configured, StartGuest behaves exactly as before (no guard).
+func TestHostManager_StartGuest_GateNilBackwardCompatible(t *testing.T) {
+	tcp := &mockRedirect{}
+	udp := &mockRedirect{}
+	hm := NewManager(WithProxyFactory(&mockProxyFactory{tcp, udp, false}))
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	ip, _ := hm.AssignIP("peer2")
+	host, err := hm.StartGuest(ctx, "peer2", ip, 1234, 5678, func([]byte) error { return nil }, func([]byte) error { return nil }, nil)
+	if err != nil {
+		t.Fatalf("expected StartGuest to succeed with nil gate, got %v", err)
+	}
+	if host == nil {
+		t.Fatalf("expected a guest host with nil gate")
+	}
+}

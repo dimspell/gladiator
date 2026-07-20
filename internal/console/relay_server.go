@@ -1,485 +1,69 @@
 package console
 
 import (
-	"context"
-	"encoding/json"
-	"errors"
-	"fmt"
-	"io"
-	"log"
-	"log/slog"
-	"net"
-	"strconv"
-	"sync"
-	"time"
-
-	"github.com/dimspell/gladiator/internal/app/logger/logging"
-	"github.com/dimspell/gladiator/internal/backend/proxy/relay/types"
-	"github.com/dimspell/gladiator/internal/metrics"
-	"github.com/quic-go/quic-go"
+	"github.com/dimspell/gladiator/internal/relayserver"
 )
 
-type RelayStream interface {
-	io.Reader
-	io.Writer
-	CancelRead(code quic.StreamErrorCode)
-	CancelWrite(code quic.StreamErrorCode)
-}
+type (
+	PeerConn          = relayserver.PeerConn
+	Room              = relayserver.Room
+	RelayStream       = relayserver.RelayStream
+	RelayConn         = relayserver.RelayConn
+	RelayPacket       = relayserver.RelayPacket
+	RelayServerOption = relayserver.RelayServerOption
+	RelayEventHook    = relayserver.RelayEventHook
+	RelayEvent        = relayserver.RelayEvent
+	RelayMetrics      = relayserver.RelayMetrics
+)
 
-type RelayConn interface {
-	AcceptStream(context.Context) (RelayStream, error)
-	CloseWithError(code quic.ApplicationErrorCode, msg string) error
-	RemoteAddr() net.Addr
-}
-
-// RelayPacket is the wire message exchanged with backend proxies.
-// It is defined in the shared relay/types package and aliased here so the
-// rest of this package can keep using the unqualified name.
-type RelayPacket = types.RelayPacket
-
-// UserSessionProvider is the minimal subset of the multiplayer service that
-// the relay server depends on. It decouples RelayServer from the concrete
-// *RoomService so the relay can be tested (and later run) in isolation.
+// UserSessionProvider is the console-specific session interface that the relay
+// server uses to authenticate peers during the handshake.
 type UserSessionProvider interface {
 	GetUserSession(id int64) (*UserSession, bool)
 }
 
-type PeerConn struct {
-	// ID is a peer identifier.
-	ID string
-
-	// RoomID is a game room identifier.
-	RoomID string
-
-	// Stream holds a reference to the QUIC R/W streams of the relay server.
-	Stream RelayStream
-
-	// Conn holds a reference to the QUIC connection to the relay server.
-	Conn RelayConn
-
-	// LastSeen is a timestamp, when the user has sent the packet for the last
-	// time.
-	LastSeen time.Time
-
-	Session *UserSession
-
-	writeMu sync.Mutex
+// sessionBridge adapts a UserSessionProvider to relayserver.SessionProvider.
+type sessionBridge struct {
+	p UserSessionProvider
 }
 
-type Room struct {
-	ID        string
-	Peers     map[string]*PeerConn
-	CreatedAt time.Time
+func (b *sessionBridge) SessionExists(id int64) bool {
+	if b == nil || b.p == nil {
+		return true
+	}
+	_, ok := b.p.GetUserSession(id)
+	return ok
 }
 
-// Metrics interface for testability
-// Only a subset shown for brevity
-
-type RelayMetrics interface {
-	IncConnectedPeers()
-	DecConnectedPeers()
-	IncPacketIn()
-	IncPacketOut()
-	SetPeersInRoom(roomID string, n int) // rs.metrics.SetPeersInRoom(roomID, len(room.Peers))
-	IncActiveRooms()
-	DecActiveRooms()
-	DeletePeersInRoom(roomID string)
-}
-
-// Default implementation using the global metrics
-
-type defaultRelayMetrics struct{} //nolint:unused // may be used in future
-
-func (defaultRelayMetrics) IncConnectedPeers() { metrics.ConnectedPeers.Inc() } //nolint:unused // may be used in future
-func (defaultRelayMetrics) DecConnectedPeers() { metrics.ConnectedPeers.Dec() } //nolint:unused // may be used in future
-func (defaultRelayMetrics) IncPacketIn()       { metrics.PacketIn.Inc() }       //nolint:unused // may be used in future
-func (defaultRelayMetrics) IncPacketOut()      { metrics.PacketOut.Inc() }      //nolint:unused // may be used in future
-func (defaultRelayMetrics) SetPeersInRoom(roomID string, n int) { //nolint:unused // may be used in future
-	metrics.PeersInRoom.WithLabelValues(roomID).Set(float64(n))
-}
-func (defaultRelayMetrics) IncActiveRooms() { metrics.ActiveRooms.Inc() } //nolint:unused // may be used in future
-func (defaultRelayMetrics) DecActiveRooms() { metrics.ActiveRooms.Dec() } //nolint:unused // may be used in future
-func (defaultRelayMetrics) DeletePeersInRoom(roomID string) { //nolint:unused // may be used in future
-	metrics.PeersInRoom.DeleteLabelValues(roomID)
-}
-
-// Event hooks
-
-type RelayEventHook func(eventType, peerID, roomID string)
-
-// Extend RelayServer struct
-
+// RelayServer wraps relayserver.RelayServer with console-specific session
+// integration. Existing callers (RelayService, RegisterRelayHooks, tests) work
+// through the promoted *relayserver.RelayServer fields and methods.
 type RelayServer struct {
-	listener      RelayListener
-	mu            sync.Mutex
-	rooms         map[string]*Room  // keyed by roomID
-	peerToRoomIDs map[string]string // key: peerID, value: roomID
-	logger        *slog.Logger
-
+	*relayserver.RelayServer
 	Multiplayer UserSessionProvider
-
-	verifyFunc func([]byte) ([]byte, bool) // Injected for testability
-
-	OnJoin   RelayEventHook
-	OnLeave  RelayEventHook
-	OnDelete RelayEventHook
 }
 
-type RelayEvent struct {
-	Type   string
-	PeerID string
-	RoomID string
-}
-
-type RelayServerOption func(*RelayServer)
-
-func WithLogger(l *slog.Logger) RelayServerOption {
-	return func(rs *RelayServer) { rs.logger = l }
+// NewQUICRelay creates a new RelayServer that delegates to the extracted relay
+// implementation in internal/relayserver.
+func NewQUICRelay(addr string, multiplayer UserSessionProvider, opts ...RelayServerOption) (*RelayServer, error) {
+	var bridge *sessionBridge
+	if multiplayer != nil {
+		bridge = &sessionBridge{p: multiplayer}
+	}
+	inner, err := relayserver.NewRelayServer(addr, bridge, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &RelayServer{
+		RelayServer: inner,
+		Multiplayer: multiplayer,
+	}, nil
 }
 
 func WithVerifyFunc(f func([]byte) ([]byte, bool)) RelayServerOption {
-	return func(rs *RelayServer) { rs.verifyFunc = f }
+	return relayserver.WithVerifyFunc(f)
 }
 
-func WithEventHooks(join, leave, delete RelayEventHook) RelayServerOption {
-	return func(rs *RelayServer) {
-		rs.OnJoin = join
-		rs.OnLeave = leave
-		rs.OnDelete = delete
-	}
-}
-
-func NewQUICRelay(addr string, multiplayer UserSessionProvider, opts ...RelayServerOption) (*RelayServer, error) {
-	rs := &RelayServer{
-		rooms:         make(map[string]*Room),
-		peerToRoomIDs: make(map[string]string),
-		logger:        slog.With(slog.String("component", "relay")),
-		Multiplayer:   multiplayer,
-		verifyFunc:    verifyRelayPacket,
-	}
-	for _, opt := range opts {
-		opt(rs)
-	}
-
-	if rs.listener == nil {
-		listener, err := newQUICListener(addr)
-		if err != nil {
-			return nil, err
-		}
-		rs.listener = listener
-	}
-
-	return rs, nil
-}
-
-func (rs *RelayServer) Start(ctx context.Context) {
-	rs.logger.Info("QUIC Relay Server listening", "addr", rs.listener.Addr())
-
-	for {
-		conn, err := rs.listener.Accept(ctx)
-		if err != nil {
-			if errors.Is(err, context.Canceled) {
-				return
-			}
-			rs.logger.Warn("Relay server failed to accept", logging.Error(err))
-			continue
-		}
-		go rs.handleConn(ctx, conn)
-	}
-}
-
-func (rs *RelayServer) handleConn(ctx context.Context, conn RelayConn) {
-	stream, err := conn.AcceptStream(ctx)
-	if err != nil {
-		rs.logger.Warn("Relay stream accept error", logging.Error(err))
-		_ = conn.CloseWithError(0x0, "done")
-		return
-	}
-
-	peerID, roomID, err := rs.handshake(stream)
-	if err != nil {
-		rs.logger.Warn("Relay handshake error", logging.Error(err))
-		rs.closeStream(conn, stream)
-		return
-	}
-
-	metrics.PacketIn.Inc()
-
-	peer := rs.joinRoom(roomID, peerID, conn, stream)
-
-	go rs.relayLoop(roomID, peerID, peer)
-}
-
-// closeStream closes the stream and connection abruptly
-func (rs *RelayServer) closeStream(conn RelayConn, stream RelayStream) {
-	// TODO: Name and handle various error codes
-	var errorCode quic.StreamErrorCode = 0xdead
-
-	stream.CancelWrite(errorCode)
-	stream.CancelRead(errorCode)
-	_ = conn.CloseWithError(0xdead, "done")
-
-	rs.logger.Info("Closed relay connection", "addr", conn.RemoteAddr())
-}
-
-func (rs *RelayServer) handshake(stream RelayStream) (string, string, error) {
-	data, err := types.ReadFramed(stream)
-	if err != nil {
-		return "", "", fmt.Errorf("error reading stream: %w", err)
-	}
-
-	payload, ok := rs.verifyFunc(data)
-	if !ok {
-		return "", "", fmt.Errorf("signature failed from client")
-	}
-
-	var pkt RelayPacket
-	if err := json.Unmarshal(payload, &pkt); err != nil {
-		return "", "", fmt.Errorf("error unmarshaling packet: %w", err)
-	}
-	if pkt.Type != "join" {
-		return "", "", fmt.Errorf("invalid join packet")
-	}
-
-	userID, _ := strconv.ParseInt(pkt.FromID, 10, 64)
-	if _, ok := rs.Multiplayer.GetUserSession(userID); !ok {
-		return "", "", fmt.Errorf("failed to get user session")
-	}
-
-	// TODO: Authenticate & authorize
-
-	return pkt.FromID, pkt.RoomID, nil
-}
-
-func (rs *RelayServer) joinRoom(roomID, peerID string, conn RelayConn, stream RelayStream) *PeerConn {
-	rs.mu.Lock()
-	defer rs.mu.Unlock()
-
-	room, ok := rs.rooms[roomID]
-	if !ok {
-		room = &Room{ID: roomID, Peers: make(map[string]*PeerConn), CreatedAt: time.Now().In(time.UTC)}
-		rs.rooms[roomID] = room
-		rs.logger.Info("new room created", logging.RoomID(roomID), logging.PeerID(peerID))
-		metrics.ActiveRooms.Inc()
-	}
-
-	pc := &PeerConn{
-		ID:       peerID,
-		RoomID:   roomID,
-		Stream:   stream,
-		Conn:     conn,
-		LastSeen: time.Now(),
-	}
-	room.Peers[peerID] = pc
-	rs.peerToRoomIDs[peerID] = roomID
-	rs.logger.Info("joined room", logging.RoomID(roomID), logging.PeerID(peerID))
-
-	// Notify about the new dynamic joiner
-	for _, peer := range room.Peers {
-		if peer.ID == peerID {
-			continue
-		}
-
-		rs.sendSigned(peer, RelayPacket{
-			Type:    "join",
-			RoomID:  roomID,
-			FromID:  peerID,
-			ToID:    peer.ID,
-			Payload: nil,
-		})
-	}
-
-	metrics.PeersInRoom.WithLabelValues(roomID).Set(float64(len(room.Peers)))
-
-	if rs.OnJoin != nil {
-		rs.OnJoin("join", peerID, roomID)
-	}
-
-	return pc
-}
-
-func (rs *RelayServer) relayLoop(roomID, peerID string, peer *PeerConn) {
-	metrics.ConnectedPeers.Inc()
-	defer metrics.ConnectedPeers.Dec()
-
-	for {
-		raw, err := types.ReadFramed(peer.Stream)
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			var se *quic.StreamError
-			if ok := errors.As(err, &se); ok && se.ErrorCode == 0xdead {
-				break
-			}
-			rs.logger.Warn("stream error when reading", logging.Error(err), logging.PeerID(peerID))
-			metrics.RelayErrors.WithLabelValues("stream_read").Inc()
-			break
-		}
-
-		metrics.BytesReceived.Add(float64(len(raw) + 4)) // +4 for length-prefix header
-
-		data, ok := rs.verifyFunc(raw)
-		if !ok {
-			rs.logger.Warn("signature check failed when reading", logging.PeerID(peerID))
-			metrics.PacketsDropped.Inc()
-			continue
-		}
-
-		peer.LastSeen = time.Now()
-
-		var pkt RelayPacket
-		if err := json.Unmarshal(data, &pkt); err != nil {
-			rs.logger.Warn("relay packet unmarshal error", logging.Error(err), logging.PeerID(peerID))
-			metrics.RelayErrors.WithLabelValues("unmarshal").Inc()
-			continue
-		}
-		metrics.PacketIn.Inc()
-		rs.logger.Debug("[RELAY]", "payload", pkt.Payload, "from", pkt.FromID, "to", pkt.ToID, "type", pkt.Type)
-		rs.handlePacket(pkt, peer)
-	}
-
-	rs.logger.Info("disconnected from relay", logging.PeerID(peerID))
-	rs.leaveRoom(peerID, roomID)
-	metrics.PeerDisconnects.WithLabelValues("relay_loop_exit").Inc()
-}
-
-func (rs *RelayServer) handlePacket(pkt RelayPacket, peer *PeerConn) {
-	switch pkt.Type {
-	case "udp", "tcp":
-		rs.sendTo(pkt.RoomID, pkt.ToID, pkt)
-
-	case "leave":
-		if pkt.FromID != peer.ID && pkt.RoomID != peer.RoomID {
-			return
-		}
-
-		rs.logger.Info("leave room", logging.PeerID(peer.ID))
-		rs.leaveRoom(peer.ID, peer.RoomID)
-		return
-	}
-}
-
-func (rs *RelayServer) leaveRoom(peerID, roomID string) {
-	rs.mu.Lock()
-	defer rs.mu.Unlock()
-
-	if _, ok := rs.peerToRoomIDs[peerID]; !ok {
-		return
-	}
-	delete(rs.peerToRoomIDs, peerID)
-
-	room, ok := rs.rooms[roomID]
-	if !ok {
-		return
-	}
-
-	leaver := room.Peers[peerID]
-	if leaver == nil {
-		return
-	}
-
-	rs.closeStream(leaver.Conn, leaver.Stream)
-	delete(room.Peers, peerID)
-
-	rs.logger.Info("peer left room", logging.RoomID(roomID), logging.PeerID(peerID))
-	metrics.PeerDisconnects.WithLabelValues("leave_room").Inc()
-
-	if rs.OnLeave != nil {
-		rs.OnLeave("leave", peerID, roomID)
-	}
-
-	if len(room.Peers) == 0 {
-		metrics.RelayRoomLifetime.Observe(time.Since(room.CreatedAt).Seconds())
-		delete(rs.rooms, roomID)
-		rs.logger.Info("room deleted (empty)", logging.RoomID(roomID))
-		if rs.OnDelete != nil {
-			rs.OnDelete("delete", peerID, roomID)
-		}
-
-		metrics.ActiveRooms.Dec()
-		metrics.PeersInRoom.DeleteLabelValues(roomID)
-		return
-	}
-
-	metrics.PeersInRoom.WithLabelValues(roomID).Set(float64(len(room.Peers)))
-}
-
-func (rs *RelayServer) cleanupPeers() { //nolint:unused // may be used in future
-	ticker := time.NewTicker(30 * time.Second)
-
-	for now := range ticker.C {
-		timeout := now.Add(-5 * time.Minute)
-		var toLeave []*PeerConn
-		rs.mu.Lock()
-		for roomID, room := range rs.rooms {
-			for peerID, peer := range room.Peers {
-				if timeout.After(peer.LastSeen) {
-					rs.logger.Info("peer timed out", logging.PeerID(peerID), logging.RoomID(roomID))
-					toLeave = append(toLeave, peer)
-				}
-			}
-		}
-		rs.mu.Unlock()
-
-		for _, peer := range toLeave {
-			rs.logger.Info("cleaning up users", logging.PeerID(peer.ID), logging.RoomID(peer.RoomID))
-			rs.leaveRoom(peer.ID, peer.RoomID)
-		}
-	}
-}
-
-func (rs *RelayServer) sendTo(roomID, peerID string, pkt RelayPacket) {
-	rs.mu.Lock()
-	defer rs.mu.Unlock()
-
-	room, ok := rs.rooms[roomID]
-	if !ok {
-		log.Printf("Room %s not found", roomID)
-		return
-	}
-
-	peer, ok := room.Peers[peerID]
-	if !ok {
-		log.Printf("Peer %s not in room %s", peerID, roomID)
-		return
-	}
-
-	rs.sendSigned(peer, pkt)
-}
-
-func (rs *RelayServer) broadcastFrom(roomID, fromID string, pkt RelayPacket) { //nolint:unused // may be used in future
-	rs.mu.Lock()
-	defer rs.mu.Unlock()
-
-	room, ok := rs.rooms[roomID]
-	if !ok {
-		return
-	}
-
-	for id, peer := range room.Peers {
-		if id == fromID {
-			continue
-		}
-		rs.sendSigned(peer, pkt)
-	}
-}
-
-func (rs *RelayServer) sendSigned(peer *PeerConn, pkt RelayPacket) {
-	peer.writeMu.Lock()
-	defer peer.writeMu.Unlock()
-
-	data, err := json.Marshal(pkt)
-	if err != nil {
-		rs.logger.Error("json marshal failed", logging.Error(err))
-		metrics.RelayErrors.WithLabelValues("marshal").Inc()
-		return
-	}
-	if err := types.WriteFramed(peer.Stream, data); err != nil {
-		rs.logger.Error("could not write the msg", logging.Error(err))
-		metrics.RelayErrors.WithLabelValues("write").Inc()
-		return
-	}
-	metrics.PacketOut.Inc()
-	metrics.BytesSent.Add(float64(len(data) + 4)) // +4 for length-prefix header
+func WithEventHooks(join, leave, del RelayEventHook) RelayServerOption {
+	return relayserver.WithEventHooks(join, leave, del)
 }

@@ -190,7 +190,7 @@ func startTestUDPServer(t *testing.T, handler func(conn *net.UDPConn, addr *net.
 			handler(conn, addr, buf[:n])
 		}
 	}()
-	return conn.LocalAddr().String(), func() { conn.Close(); <-done }
+	return conn.LocalAddr().String(), func() { _ = conn.Close(); <-done }
 }
 
 func TestDialUDP_SuccessAndClose(t *testing.T) {
@@ -210,5 +210,5 @@ func TestDialUDP_SuccessAndClose(t *testing.T) {
 	_, _, err = dialer.conn.ReadFromUDP(buf)
 	require.NoError(t, err)
 	require.Equal(t, "pong", string(buf))
-	dialer.Close()
+	_ = dialer.Close()
 }

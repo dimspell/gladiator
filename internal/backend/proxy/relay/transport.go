@@ -62,6 +62,15 @@ func NewRelayTransport(addr, selfID string) *RelayTransport {
 	}
 }
 
+// SetSelfID updates the peer identifier used in join/send/leave packets.
+// Must be called before Join if the initial value was constructed before the
+// UserID was known (the session manager creates transports before auth).
+func (t *RelayTransport) SetSelfID(id string) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.selfID = id
+}
+
 func (t *RelayTransport) Join(ctx context.Context, roomID string) error {
 	tlsConf := &tls.Config{
 		InsecureSkipVerify: true,
@@ -174,7 +183,8 @@ func (t *RelayTransport) write(rp transport.RelayPacket) error {
 	if err != nil {
 		return fmt.Errorf("marshal packet failed: %w", err)
 	}
-	if err := types.WriteFramed(t.stream, data); err != nil {
+	signed := types.SignHMAC(data, types.HMACKey())
+	if err := types.WriteFramed(t.stream, signed); err != nil {
 		return fmt.Errorf("write packet failed: %w", err)
 	}
 	return nil

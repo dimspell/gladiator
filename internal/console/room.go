@@ -687,7 +687,7 @@ func (mp *RoomService) SetPlayerDisconnected(session *UserSession) {
 	// Notify the relay server the user has disconnected
 	if mp.RelayService != nil {
 		slog.Info("Closing relay connection", "user", session.UserID)
-		mp.RelayService.Server.leaveRoom(fmt.Sprintf("%d", session.UserID), session.GameID)
+		mp.RelayService.Server.LeaveRoom(fmt.Sprintf("%d", session.UserID), session.GameID)
 	}
 
 	// Delete the session from the map

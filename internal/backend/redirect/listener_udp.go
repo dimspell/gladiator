@@ -60,7 +60,7 @@ func NewListenerUDP(ipv4 string, portNumber string, onReceive ReceiveFunc) (*Lis
 // Run starts the UDP listener loop, handling handshakes and forwarding packets.
 // It blocks until the context is cancelled or an error occurs.
 func (p *ListenerUDP) Run(ctx context.Context) error {
-	defer p.Close()
+	defer func() { _ = p.Close() }()
 
 	p.Lock()
 	conn := p.conn
