@@ -4,44 +4,81 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/coder/websocket"
 	"github.com/dimspell/gladiator/internal/app/logger/logging"
+	"github.com/dimspell/gladiator/internal/metrics"
 	"github.com/dimspell/gladiator/internal/wire"
 )
 
 type UserSession struct {
-	UserID    int64  `json:"userID,omitempty"`
-	GameID    string `json:"gameID,omitempty"`
-	Connected bool   `json:"connected,omitempty"`
+	UserID int64  `json:"userID,omitempty"`
+	GameID string `json:"gameID,omitempty"`
 
 	ConnectedAt time.Time `json:"connectedAt,omitempty"`
 	JoinedAt    time.Time `json:"joinedAt,omitempty"`
+	IPAddress   string    `json:"ip"`
 
-	// TODO: It is never provided
-	IPAddress string `json:"ip"`
-
-	wsConn ConnReadWriter
+	WebSocket ConnReadWriter
 
 	User      wire.User
 	Character wire.Character
+
+	// OnWriteError is invoked at most once when a websocket write fails, so the
+	// owner can tear down the dead session. It runs asynchronously to avoid
+	// re-entering locks held by the caller (e.g. forEachSession / LeaveRoom).
+	OnWriteError func()
+
+	// state is the explicit lifecycle state of the session. See session_state.go.
+	// StateConnecting (0) is the zero value, so no explicit init is required.
+	state atomic.Int32
+
+	// wsMu guards the WebSocket field, which is read by Send/ReadNext/pingLoop
+	// and written by closeWebSocket concurrently with disconnect teardown.
+	wsMu sync.RWMutex
+}
+
+// getWebSocket returns the current websocket connection (may be nil) under a
+// read lock.
+func (us *UserSession) getWebSocket() ConnReadWriter {
+	us.wsMu.RLock()
+	defer us.wsMu.RUnlock()
+	return us.WebSocket
+}
+
+// closeWebSocket closes and clears the websocket connection under lock. It does
+// not hold the lock while calling into RoomService, so it cannot deadlock with
+// the session map mutex (Send holds sessionMutex then wsMu; this releases wsMu
+// before any sessionMutex acquisition in the caller).
+func (us *UserSession) closeWebSocket() {
+	us.wsMu.Lock()
+	defer us.wsMu.Unlock()
+	if us.WebSocket == nil {
+		return
+	}
+	if err := us.WebSocket.CloseNow(); err != nil {
+		slog.Debug("Could not close the connection", "user", us.UserID, logging.Error(err))
+	}
+	us.WebSocket = nil
 }
 
 func NewUserSession(id int64, conn ConnReadWriter) *UserSession {
 	return &UserSession{
 		UserID:      id,
-		Connected:   true,
 		ConnectedAt: time.Now().In(time.UTC),
-		wsConn:      conn,
+		WebSocket:   conn,
 	}
 }
 
 func (us *UserSession) ReadNext(ctx context.Context) ([]byte, error) {
-	if !us.Connected {
+	conn := us.getWebSocket()
+	if conn == nil {
 		return nil, fmt.Errorf("not connected")
 	}
-	_, payload, err := us.wsConn.Read(ctx)
+	_, payload, err := conn.Read(ctx)
 	if err != nil {
 		// TODO: Make the log more clear that the user has disconnected
 		slog.Warn("Could not read the message", logging.Error(err), "closeError", websocket.CloseStatus(err))
@@ -51,19 +88,30 @@ func (us *UserSession) ReadNext(ctx context.Context) ([]byte, error) {
 }
 
 func (us *UserSession) Send(ctx context.Context, payload []byte) {
-	if len(payload) < 1 {
-		slog.Debug("payload is too short", "length", len(payload))
+	conn := us.getWebSocket()
+	if conn == nil {
+		slog.Debug("not connected", "userId", us.UserID)
+		metrics.FailedMessageSends.WithLabelValues(fmt.Sprintf("%d", us.UserID), "not_connected").Inc()
 		return
 	}
-	if !us.Connected {
-		slog.Debug("not connected", "userId", us.UserID)
+	if len(payload) < 1 {
+		slog.Debug("payload is too short", "length", len(payload))
+		metrics.FailedMessageSends.WithLabelValues(fmt.Sprintf("%d", us.UserID), "payload_too_short").Inc()
 		return
 	}
 
-	if err := wire.Write(ctx, us.wsConn, payload); err != nil {
+	if err := wire.Write(ctx, conn, payload); err != nil {
 		slog.Warn("Could not send a WS message", "to", us.UserID, logging.Error(err))
-		us.Connected = false
-		// TODO: There is no logic to disconnect and remove the failing session
+		metrics.FailedMessageSends.WithLabelValues(fmt.Sprintf("%d", us.UserID), "write_error").Inc()
+		// The socket is dead; tear down the session. Run asynchronously so we
+		// don't re-enter locks the caller may hold (forEachSession / LeaveRoom).
+		// Transition(StateDisconnecting) wins the CAS exactly once, so only one
+		// goroutine is spawned even under concurrent failed sends.
+		if us.Transition(StateDisconnecting) && us.OnWriteError != nil {
+			go us.OnWriteError()
+		}
+	} else {
+		metrics.MessagesSentPerPlayer.WithLabelValues(fmt.Sprintf("%d", us.UserID)).Inc()
 	}
 }
 
@@ -85,6 +133,8 @@ var _ ConnReadWriter = (*websocket.Conn)(nil)
 type ConnReadWriter interface {
 	Read(ctx context.Context) (websocket.MessageType, []byte, error)
 	Write(ctx context.Context, typ websocket.MessageType, p []byte) error
+	// Ping sends a WebSocket ping and blocks until a pong is received or the
+	// context expires. Used by the liveness ticker to detect dead sockets.
+	Ping(ctx context.Context) error
 	CloseNow() error
-	// TODO: Add Close function
 }

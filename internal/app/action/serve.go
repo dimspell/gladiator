@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/dimspell/gladiator/internal/app/logger"
 	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"github.com/dimspell/gladiator/internal/backend"
 	"github.com/dimspell/gladiator/internal/console"
@@ -63,6 +62,12 @@ func ServeCommand(version string) *cli.Command {
 				Sources: cli.NewValueSourceChain(cli.EnvVar("RELAY_PUBLIC_ADDR")),
 			},
 			&cli.StringFlag{
+				Name:    "run-mode",
+				Value:   "",
+				Usage:   "Explicitly advertise the run mode (lan, relay-beta, webrtc-beta, single); overrides the relay-addr default",
+				Sources: cli.NewValueSourceChain(cli.EnvVar("RUN_MODE")),
+			},
+			&cli.StringFlag{
 				Name:    "lobby-addr",
 				Value:   defaultLobbyAddr,
 				Sources: cli.NewValueSourceChain(cli.EnvVar("LOBBY_ADDR")),
@@ -96,11 +101,6 @@ func ServeCommand(version string) *cli.Command {
 				slog.Error("Failed to close database", logging.Error(err))
 			}
 		}()
-
-		// logger.PacketLogger = slog.New(packetlogger.New(os.Stderr, &packetlogger.Options{
-		//	Level: slog.LevelDebug,
-		// }))
-		logger.PacketLogger = slog.Default()
 
 		px, err := selectProxy(c)
 		if err != nil {

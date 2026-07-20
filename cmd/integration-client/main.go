@@ -1,0 +1,796 @@
+// Command integration-client is a minimal, deterministic game client used by the
+// multi-docker integration tests. It speaks the real backend wire protocol over
+// TCP :6112 (handshake + lobby/room phase) and then performs a real
+// game-packet exchange over UDP :6113 / TCP :6114 with its peer.
+//
+// For the LAN proxy the game traffic is direct peer-to-peer: the host listens on
+// its own MY_IP and the guest sends to PEER_IP. The host learns the guest's
+// address from the source of the incoming handshake packet and replies on it, so a
+// full bidirectional exchange is verified without any relay/p2p proxy in the path.
+//
+// Success is reported by printing GAME_PACKET_OK and exiting 0. Any failure
+// prints a diagnostic and exits 1 so the test harness can fail fast.
+package main
+
+import (
+	"bytes"
+	"encoding/binary"
+	"fmt"
+	"io"
+	"net"
+	"os"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+)
+
+const (
+	opHostAndUsername  = 30 // 0x1eff
+	opAuthHandshake    = 6  // 0x6ff
+	opClientAuth       = 41 // 0x29ff
+	opSelectCharacter  = 76 // 0x4cff
+	opGetCharInventory = 68 // 0x44ff
+	opCreateGame       = 28 // 0x1cff
+	opListGames        = 9  // 0x9ff
+	opSelectGame       = 69 // 0x45ff
+	opJoinGame         = 34 // 0x22ff
+
+	gamePortUDP = "6113"
+	gamePortTCP = "6114"
+
+	handshakeMagic = "\x1a\x00\x02\x00" // {26,0,2,0}
+)
+
+// migrationState holds shared state updated by the HostMigration monitor
+// goroutine and read by the exchange phase.
+type migrationState struct {
+	mu            sync.Mutex
+	currentPeerIP string // when HOST_MIGRATION_TO=<ip>, this field is set
+	iAmHost       bool   // when HOST_MIGRATION_SELF, this peer becomes host
+}
+
+func main() {
+	if err := run(); err != nil {
+		fmt.Fprintln(os.Stderr, "MOCKCLIENT_ERROR:", err)
+		os.Exit(1)
+	}
+	fmt.Println("GAME_PACKET_OK")
+}
+
+func env(key, def string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return def
+}
+
+// monitorMigrations replaces the old blind drain goroutine.  It continuously
+// reads backend frames from the :6112 connection and reacts to HostMigration
+// (opcode 0x47 / 71).  The exchange phase uses the same conn for handshake
+// only; game traffic flows over separate UDP/TCP sockets, so reading :6112
+// here does not interfere.
+func monitorMigrations(conn net.Conn, state *migrationState) {
+	hdr := make([]byte, 4)
+	for {
+		if _, err := io.ReadFull(conn, hdr); err != nil {
+			return
+		}
+		if hdr[0] != 255 {
+			return
+		}
+		total := int(binary.LittleEndian.Uint16(hdr[2:4]))
+		if total < 4 || total > 1<<20 {
+			return
+		}
+		payload := make([]byte, total-4)
+		if _, err := io.ReadFull(conn, payload); err != nil {
+			return
+		}
+		opcode := hdr[1]
+
+		if opcode == 71 { // packet.HostMigration
+			if len(payload) < 8 {
+				continue
+			}
+			state.mu.Lock()
+			if payload[0] == 0 {
+				// This peer is the new host.
+				state.iAmHost = true
+				fmt.Println("HOST_MIGRATION_SELF")
+			} else if payload[0] == 1 {
+				// Someone else became host.
+				newIP := net.IP(payload[4:8]).String()
+				state.currentPeerIP = newIP
+				fmt.Printf("HOST_MIGRATION_TO=%s\n", newIP)
+			}
+			state.mu.Unlock()
+		}
+		// All other opcodes are silently consumed (same as the old drain).
+	}
+}
+
+// stringInSlice returns true if s is present in the slice.
+func stringInSlice(s string, slice []string) bool {
+	for _, v := range slice {
+		if v == s {
+			return true
+		}
+	}
+	return false
+}
+
+func run() error {
+	backendAddr := env("BACKEND_ADDR", "127.0.0.1:6112")
+	role := env("ROLE", "guest") // "host" or "guest"
+	username := env("USERNAME", "tester")
+	room := env("ROOM", "room")
+	relayMode := env("RELAY_MODE", "") != ""
+	myIP := env("MY_IP", "127.0.0.1")
+	peerIP := env("PEER_IP", "")
+	timeout := 60 * time.Second
+	if v := env("TIMEOUT_SECONDS", ""); v != "" {
+		if sec, err := strconv.Atoi(v); err == nil {
+			timeout = time.Duration(sec) * time.Second
+		}
+	}
+	numPlayers := 2
+	if v := env("MOCK_NUM_PLAYERS", ""); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n >= 2 {
+			numPlayers = n
+		}
+	}
+
+	// Parse PEER_IPS (comma-separated) – overrides single PEER_IP for
+	// multi-peer exchange.
+	peerIPsStr := env("PEER_IPS", "")
+	var peerIPs []string
+	if peerIPsStr != "" {
+		for _, ip := range strings.Split(peerIPsStr, ",") {
+			ip = strings.TrimSpace(ip)
+			if ip != "" {
+				peerIPs = append(peerIPs, ip)
+			}
+		}
+	}
+
+	if relayMode {
+		if myIP == "127.0.0.1" && peerIP == "" && len(peerIPs) == 0 {
+			peerIP = "127.0.0.2"
+		}
+	}
+
+	// Number of guests for the host to accept.  If PEER_IPS is set it
+	// determines the count; otherwise derive from MOCK_NUM_PLAYERS.
+	numGuests := numPlayers - 1
+	if len(peerIPs) > 0 {
+		numGuests = len(peerIPs)
+	}
+
+	// Shared migration state (HostMigration opcode 71).
+	migState := &migrationState{currentPeerIP: peerIP}
+
+	conn, err := net.DialTimeout("tcp", backendAddr, 10*time.Second)
+	if err != nil {
+		return fmt.Errorf("dial backend %s: %w", backendAddr, err)
+	}
+	defer conn.Close()
+	conn.SetDeadline(time.Now().Add(timeout))
+
+	// Migration monitor – replaces the old blind drain goroutine.  It reads
+	// frames from :6112 and reacts to HostMigration (opcode 71).  The
+	// exchange phase uses separate UDP/TCP sockets, so reading :6112 here
+	// is safe.
+	go monitorMigrations(conn, migState)
+
+	if err := handshake(conn); err != nil {
+		return fmt.Errorf("handshake: %w", err)
+	}
+	if err := clientAuth(conn, username); err != nil {
+		return fmt.Errorf("auth: %w", err)
+	}
+	if err := selectCharacter(conn, username); err != nil {
+		return fmt.Errorf("select character: %w", err)
+	}
+	// Opcode 68 triggers InitObserver -> JoinLobby, which registers this
+	// user in the console lobby so CreateRoom/JoinRoom can find the session.
+	// The backend only replies if the (real) inventory is exactly 207 bytes,
+	// which our mock user has none of -- so we send it and do NOT wait
+	// for a response. The monitor goroutine consumes anything sent.
+	if err := triggerObserver(conn, username); err != nil {
+		return fmt.Errorf("trigger observer: %w", err)
+	}
+	// Let the console finish registering the lobby session before we
+	// create/join the room (the registration happens just after the
+	// JoinedLobby reply on the console side).
+	time.Sleep(500 * time.Millisecond)
+
+	switch role {
+	case "host":
+		if err := hostRoom(conn, room); err != nil {
+			return fmt.Errorf("host room: %w", err)
+		}
+	case "guest":
+		if peerIP == "" && len(peerIPs) == 0 {
+			return fmt.Errorf("guest requires PEER_IP or PEER_IPS (host game address)")
+		}
+		if err := guestRoom(conn, room); err != nil {
+			return fmt.Errorf("guest room: %w", err)
+		}
+	default:
+		return fmt.Errorf("unknown ROLE %q", role)
+	}
+
+	if relayMode && role == "guest" {
+		// The guest needs to wait for the backend to finish processing
+		// the join opcode and create the fake-host listener (StartHost)
+		// on 127.0.0.2:6113/6114 before dialing it. Without this delay
+		// the dial is refused. The host starts exchange immediately so
+		// its own TCP listener (for StartGuest) is up in time.
+		time.Sleep(3 * time.Second)
+	}
+
+	if err := exchange(myIP, peerIP, peerIPs, role, timeout, relayMode, numGuests, migState); err != nil {
+		return fmt.Errorf("game exchange: %w", err)
+	}
+
+	if relayMode && role == "host" {
+		// The host must stay alive briefly after exchange completes to
+		// allow the TCP reply to propagate through: DialTCP handleConnection
+		// reads the reply from the accepted conn asynchronously and sends
+		// it via the relay stream. If we exit immediately, the session TCP
+		// connection closes, the relay sends "leave" to the guest, and the
+		// guest's ListenerTCP is cleaned up before the reply arrives.
+		time.Sleep(500 * time.Millisecond)
+	}
+
+	// Controlled leave: keep the connection open for LEAVE_AFTER seconds,
+	// then return.  Closing the :6112 conn triggers a relay "leave" which
+	// the test harness observes.  Default 0 = exit immediately.
+	leaveAfter := 0
+	if v := env("LEAVE_AFTER", ""); v != "" {
+		if sec, err := strconv.Atoi(v); err == nil && sec > 0 {
+			leaveAfter = sec
+		}
+	}
+	if leaveAfter > 0 {
+		time.Sleep(time.Duration(leaveAfter) * time.Second)
+	}
+
+	return nil
+}
+
+// handshake performs the 3-step TCP handshake expected by backend.handleClient.
+// The backend reads 1 byte (ping), then a 64-byte frame, then a 24-byte
+// frame using non-looping conn.Read, so we send each frame as its own write
+// and pace them slightly. This lets the backend's reads consume each frame
+// completely before the next one is transmitted, avoiding a short-read race.
+func handshake(conn net.Conn) error {
+	// 1) ping byte
+	if _, err := conn.Write([]byte{1}); err != nil {
+		return err
+	}
+	time.Sleep(20 * time.Millisecond)
+	// 2) command 255-30: 64-byte frame, 60-byte payload (two null-terminated strings)
+	hostAndUser := encodePacket(opHostAndUsername, pad([]byte("host\x00user\x00"), 60))
+	if len(hostAndUser) != 64 {
+		return fmt.Errorf("host/username frame must be 64 bytes, got %d", len(hostAndUser))
+	}
+	if _, err := conn.Write(hostAndUser); err != nil {
+		return err
+	}
+	time.Sleep(20 * time.Millisecond)
+	// 3) command 255-6: 24-byte frame, 20-byte payload ("68XIPSID" + uint32(3) + pad)
+	authPayload := make([]byte, 20)
+	copy(authPayload, "68XIPSID")
+	binary.LittleEndian.PutUint32(authPayload[8:12], 3)
+	authFrame := encodePacket(opAuthHandshake, authPayload)
+	if len(authFrame) != 24 {
+		return fmt.Errorf("auth handshake frame must be 24 bytes, got %d", len(authFrame))
+	}
+	if _, err := conn.Write(authFrame); err != nil {
+		return err
+	}
+	return nil
+}
+
+func clientAuth(conn net.Conn, username string) error {
+	payload := append([]byte{2, 0, 0, 0, 't', 'e', 's', 't', 0}, []byte(username+"\x00")...)
+	return writeFrame(conn, opClientAuth, payload)
+}
+
+func selectCharacter(conn net.Conn, username string) error {
+	payload := []byte(username + "\x00" + username + "\x00")
+	return writeFrame(conn, opSelectCharacter, payload)
+}
+
+func hostRoom(conn net.Conn, room string) error {
+	// state 0 -> CreateRoom
+	if err := writeFrame(conn, opCreateGame, createGamePayload(0, room)); err != nil {
+		return err
+	}
+	// state 1 -> SetRoomReady (room becomes Ready, guest may join)
+	if err := writeFrame(conn, opCreateGame, createGamePayload(1, room)); err != nil {
+		return err
+	}
+	return nil
+}
+
+func guestRoom(conn net.Conn, room string) error {
+	if err := writeFrame(conn, opListGames, nil); err != nil {
+		return err
+	}
+	if err := writeFrame(conn, opSelectGame, []byte(room+"\x00")); err != nil {
+		return err
+	}
+	if err := writeFrame(conn, opJoinGame, []byte(room+"\x00")); err != nil {
+		return err
+	}
+	return nil
+}
+
+// triggerObserver sends opcode 68, which makes the backend call
+// InitObserver -> JoinLobby, registering this user in the console lobby so
+// that CreateRoom/JoinRoom can resolve the session. The backend only
+// replies if the (real) inventory is exactly 207 bytes, which our mock
+// user lacks, so we do NOT wait for a response -- the drain goroutine
+// consumes anything the backend happens to send.
+func triggerObserver(conn net.Conn, username string) error {
+	if err := writeFrame(conn, opGetCharInventory, []byte(username+"\x00"+username+"\x00")); err != nil {
+		return err
+	}
+	return nil
+}
+
+func createGamePayload(state uint32, room string) []byte {
+	p := make([]byte, 4)
+	binary.LittleEndian.PutUint32(p, state)
+	p = append(p, byte(1), 0, 0, 0) // map id = 1 (valid range 0-5)
+	p = append(p, []byte(room+"\x00")...)
+	p = append(p, 0) // password
+	return p
+}
+
+// exchange performs N-player UDP + TCP game-packet exchanges with peers.
+// For LAN proxy (relay=false): host listens on MY_IP and replies to all
+// incoming source addresses; guest sends to PEER_IP and reads the host's reply.
+// For relay/WebRTC proxy (relay=true): host accepts N-1 guest connections via
+// StartGuest dials; guest sends to PEER_IP and reads from its own listener.
+// When peerIPs is non-empty (PEER_IPS env var) the guest exchanges with every
+// listed IP concurrently, and the host accepts len(peerIPs) guests.
+// migState carries HostMigration updates observed on the :6112 connection.
+func exchange(myIP, peerIP string, peerIPs []string, role string, timeout time.Duration, relay bool, numGuests int, migState *migrationState) error {
+	type result struct {
+		proto string
+		err   error
+	}
+
+	// -----------------------------------------------------------------------
+	// Guest + relay: exchange with each peer in peerIPs (or the single peerIP
+	// if peerIPs is empty), then check for a HostMigration target and exchange
+	// one more round if the IP changed.
+	// -----------------------------------------------------------------------
+	if relay && role == "guest" {
+		var targets []string
+		if len(peerIPs) > 0 {
+			targets = peerIPs
+		} else if peerIP != "" {
+			targets = []string{peerIP}
+		}
+
+		// Step 1 — exchange against every listed target concurrently.
+		results := make(chan result, len(targets)*2)
+		for _, t := range targets {
+			target := t
+			go func() {
+				err := exchangeUDP(myIP, target, role, timeout, relay, 1)
+				results <- result{"udp", err}
+			}()
+			go func() {
+				err := exchangeTCP(myIP, target, role, timeout, relay, 1)
+				results <- result{"tcp", err}
+			}()
+		}
+
+		var firstErr error
+		for i := 0; i < len(targets)*2; i++ {
+			r := <-results
+			if r.err != nil {
+				if firstErr == nil {
+					firstErr = fmt.Errorf("%s: %w", r.proto, r.err)
+				}
+				fmt.Fprintf(os.Stderr, "MOCKCLIENT_WARN: %s exchange failed: %v\n", r.proto, r.err)
+			} else {
+				fmt.Printf("GAME_PACKET_EXCHANGED_%s\n", strings.ToUpper(r.proto))
+			}
+		}
+		if firstErr != nil {
+			return firstErr
+		}
+
+		// Step 2 — check for a HostMigration peer that is not in the
+		// original target list and exchange against it.
+		migState.mu.Lock()
+		migratedTarget := migState.currentPeerIP
+		migState.mu.Unlock()
+		if migratedTarget != "" && !stringInSlice(migratedTarget, targets) {
+			err := exchangeUDP(myIP, migratedTarget, role, timeout, relay, 1)
+			if err != nil {
+				return fmt.Errorf("udp: %w", err)
+			}
+			fmt.Printf("GAME_PACKET_EXCHANGED_UDP\n")
+			err = exchangeTCP(myIP, migratedTarget, role, timeout, relay, 1)
+			if err != nil {
+				return fmt.Errorf("tcp: %w", err)
+			}
+			fmt.Printf("GAME_PACKET_EXCHANGED_TCP\n")
+		}
+		return nil
+	}
+
+	// -----------------------------------------------------------------------
+	// Host (relay or LAN) and LAN guest — original single-peer concurrent
+	// UDP + TCP exchange.
+	// -----------------------------------------------------------------------
+	results := make(chan result, 2)
+
+	go func() {
+		err := exchangeUDP(myIP, peerIP, role, timeout, relay, numGuests)
+		results <- result{"udp", err}
+	}()
+	go func() {
+		err := exchangeTCP(myIP, peerIP, role, timeout, relay, numGuests)
+		results <- result{"tcp", err}
+	}()
+
+	var firstErr error
+	for i := 0; i < 2; i++ {
+		r := <-results
+		if r.err != nil {
+			if firstErr == nil {
+				firstErr = fmt.Errorf("%s: %w", r.proto, r.err)
+			}
+			fmt.Fprintf(os.Stderr, "MOCKCLIENT_WARN: %s exchange failed: %v\n", r.proto, r.err)
+		} else {
+			fmt.Printf("GAME_PACKET_EXCHANGED_%s\n", strings.ToUpper(r.proto))
+		}
+	}
+	return firstErr
+}
+
+func exchangeUDP(myIP, peerIP, role string, timeout time.Duration, relay bool, numGuests int) error {
+	payload := []byte("udp-game-packet-from-" + role)
+	deadline := time.Now().Add(timeout)
+	magic := []byte(handshakeMagic)
+
+	if relay && role == "guest" {
+		// Relay mode guest: bind to myIP:6113, send magic+payload to
+		// peerIP:6113 (the local backend's ListenerUDP), then read the
+		// host's reply from the same socket.
+		pc, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.ParseIP(myIP), Port: 6113})
+		if err != nil {
+			return fmt.Errorf("listen udp: %w", err)
+		}
+		defer pc.Close()
+		pc.SetReadDeadline(deadline)
+
+		msg := append(append([]byte{}, magic...), payload...)
+		peerAddr := &net.UDPAddr{IP: net.ParseIP(peerIP), Port: 6113}
+		if _, err := pc.WriteTo(msg, peerAddr); err != nil {
+			return fmt.Errorf("write: %w", err)
+		}
+
+		buf := make([]byte, 1024)
+		n, _, err := pc.ReadFromUDP(buf)
+		if err != nil {
+			return fmt.Errorf("read from listener: %w", err)
+		}
+		if string(buf[:n]) != "udp-reply-from-host" {
+			return fmt.Errorf("unexpected udp reply: %q", string(buf[:n]))
+		}
+		return nil
+	}
+
+	if relay && role == "host" {
+		// Relay mode host: bind to myIP:6113, read each guest's
+		// magic+payload (delivered via writeUDP -> StartGuest's DialUDP),
+		// reply to each source address.
+		pc, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.ParseIP(myIP), Port: 6113})
+		if err != nil {
+			return fmt.Errorf("listen udp: %w", err)
+		}
+		defer pc.Close()
+
+		for i := 0; i < numGuests; i++ {
+			pc.SetReadDeadline(deadline)
+			buf := make([]byte, 1024)
+			n, remote, err := pc.ReadFromUDP(buf)
+			if err != nil {
+				return fmt.Errorf("read from listener (guest %d): %w", i+1, err)
+			}
+			got := buf[:n]
+			if !bytes.HasPrefix(got, magic) {
+				return fmt.Errorf("guest %d: unexpected udp handshake: %q", i+1, string(got))
+			}
+			if len(got) <= len(magic) {
+				return fmt.Errorf("guest %d: empty udp payload: %q", i+1, string(got))
+			}
+			reply := []byte("udp-reply-from-host")
+			if _, err := pc.WriteToUDP(reply, remote); err != nil {
+				return fmt.Errorf("guest %d: write reply: %w", i+1, err)
+			}
+		}
+		return nil
+	}
+
+	if role == "host" {
+		pc, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.ParseIP(myIP), Port: 6113})
+		if err != nil {
+			return fmt.Errorf("listen udp: %w", err)
+		}
+		defer pc.Close()
+
+		for i := 0; i < numGuests; i++ {
+			pc.SetReadDeadline(deadline)
+			buf := make([]byte, 1024)
+			n, remote, err := pc.ReadFromUDP(buf)
+			if err != nil {
+				return fmt.Errorf("read (guest %d): %w", i+1, err)
+			}
+			got := buf[:n]
+			if !bytes.HasPrefix(got, magic) {
+				return fmt.Errorf("guest %d: unexpected udp handshake: %q", i+1, string(got))
+			}
+			if len(got) <= len(magic) {
+				return fmt.Errorf("guest %d: empty udp payload: %q", i+1, string(got))
+			}
+			reply := []byte("udp-reply-from-host")
+			if _, err := pc.WriteToUDP(reply, remote); err != nil {
+				return fmt.Errorf("guest %d: write reply: %w", i+1, err)
+			}
+		}
+		return nil
+	}
+
+	// guest (LAN)
+	remote, err := net.ResolveUDPAddr("udp", net.JoinHostPort(peerIP, gamePortUDP))
+	if err != nil {
+		return fmt.Errorf("resolve peer: %w", err)
+	}
+	pc, err := net.DialUDP("udp", nil, remote)
+	if err != nil {
+		return fmt.Errorf("dial peer: %w", err)
+	}
+	defer pc.Close()
+	pc.SetWriteDeadline(deadline)
+	// Send magic + payload as a single datagram.
+	msg := append(append([]byte{}, magic...), payload...)
+	if _, err := pc.Write(msg); err != nil {
+		return fmt.Errorf("write: %w", err)
+	}
+	pc.SetReadDeadline(deadline)
+	buf := make([]byte, 1024)
+	n, err := pc.Read(buf)
+	if err != nil {
+		return fmt.Errorf("read reply: %w", err)
+	}
+	if string(buf[:n]) != "udp-reply-from-host" {
+		return fmt.Errorf("unexpected udp reply: %q", string(buf[:n]))
+	}
+	return nil
+}
+
+func exchangeTCP(myIP, peerIP, role string, timeout time.Duration, relay bool, numGuests int) error {
+	payload := []byte("tcp-game-packet-from-" + role)
+	deadline := time.Now().Add(timeout)
+	magic := []byte(handshakeMagic)
+
+	if relay && role == "guest" {
+		// Relay mode guest: dial peerIP:6114 (the local backend's
+		// ListenerTCP). Send ##ident (required by handleHandshake), then
+		// magic+payload, then read the host's reply.
+		//
+		// Try to read the host's ##ident first (it was forwarded via relay
+		// when the host connected to its backend), but don't fail if it
+		// doesn't arrive (it may have been lost if the host connected
+		// before this side's ListenerTCP.conn was set).
+		c, err := net.DialTimeout("tcp", net.JoinHostPort(peerIP, gamePortTCP), 10*time.Second)
+		if err != nil {
+			return fmt.Errorf("dial backend: %w", err)
+		}
+		defer c.Close()
+		c.SetDeadline(deadline)
+
+		if _, err := c.Write([]byte("##guest\x00")); err != nil {
+			return fmt.Errorf("write ident: %w", err)
+		}
+
+		// Consume host's ##ident if it arrives quickly
+		c.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
+		identBuf := make([]byte, 64)
+		if n, err := c.Read(identBuf); err == nil && n > 0 && identBuf[0] == '#' {
+			// Consumed host's ident.
+		}
+		c.SetReadDeadline(deadline)
+
+		msg := append(append([]byte{}, magic...), payload...)
+		if _, err := c.Write(msg); err != nil {
+			return fmt.Errorf("write: %w", err)
+		}
+
+		buf := make([]byte, 1024)
+		n, err := c.Read(buf)
+		if err != nil {
+			return fmt.Errorf("read reply: %w", err)
+		}
+		if string(buf[:n]) != "tcp-reply-from-host" {
+			return fmt.Errorf("unexpected tcp reply: %q", string(buf[:n]))
+		}
+		return nil
+	}
+
+	if role == "host" {
+		ln, err := net.Listen("tcp", net.JoinHostPort(myIP, gamePortTCP))
+		if err != nil {
+			return fmt.Errorf("listen tcp: %w", err)
+		}
+		defer ln.Close()
+		ln.(*net.TCPListener).SetDeadline(deadline)
+
+		for i := 0; i < numGuests; i++ {
+			c, err := ln.Accept()
+			if err != nil {
+				return fmt.Errorf("accept (guest %d): %w", i+1, err)
+			}
+			c.SetReadDeadline(deadline)
+
+			if relay {
+				// Relay mode host: the accepted connection is from the
+				// backend's StartGuest (dial to 127.0.0.1:6114). The guest
+				// sends ##ident first as part of the game-client handshake
+				// (required by ListenerTCP.handleHandshake). This is
+				// forwarded through the relay and written to our accepted
+				// connection here.
+				//
+				// TCP coalescing: the relay proxy may write ident and
+				// magic+payload as two separate TCP writes, but the kernel
+				// can coalesce them into one TCP segment. Search for the
+				// magic bytes in the ident buffer; if found, process the
+				// payload inline.
+				identBuf := make([]byte, 64)
+				n, err := c.Read(identBuf)
+				if err != nil {
+					c.Close()
+					return fmt.Errorf("guest %d: read ident: %w", i+1, err)
+				}
+				c.SetReadDeadline(deadline)
+
+				if idx := bytes.Index(identBuf[:n], magic); idx >= 0 {
+					// Payload arrived coalesced with ident — process inline.
+					got := identBuf[idx:n]
+					if !bytes.HasPrefix(got, magic) {
+						c.Close()
+						return fmt.Errorf("guest %d: unexpected tcp handshake: %q", i+1, string(got))
+					}
+					if len(got) <= len(magic) {
+						c.Close()
+						return fmt.Errorf("guest %d: empty tcp payload: %q", i+1, string(got))
+					}
+					c.SetWriteDeadline(deadline)
+					if _, err := c.Write([]byte("tcp-reply-from-host")); err != nil {
+						c.Close()
+						return fmt.Errorf("guest %d: write reply: %w", i+1, err)
+					}
+					time.Sleep(200 * time.Millisecond)
+					c.Close()
+					continue
+				}
+				// Not coalesced — fall through to the outer payload read.
+			}
+
+			buf := make([]byte, 1024)
+			n, err := c.Read(buf)
+			if err != nil {
+				c.Close()
+				return fmt.Errorf("guest %d: read: %w", i+1, err)
+			}
+			got := buf[:n]
+			if !bytes.HasPrefix(got, magic) {
+				c.Close()
+				return fmt.Errorf("guest %d: unexpected tcp handshake: %q", i+1, string(got))
+			}
+			if len(got) <= len(magic) {
+				c.Close()
+				return fmt.Errorf("guest %d: empty tcp payload: %q", i+1, string(got))
+			}
+			c.SetWriteDeadline(deadline)
+			if _, err := c.Write([]byte("tcp-reply-from-host")); err != nil {
+				c.Close()
+				return fmt.Errorf("guest %d: write reply: %w", i+1, err)
+			}
+
+			if relay {
+				// Keep the accepted connection open briefly so DialTCP's
+				// handleConnection goroutine can read the reply (from our
+				// Write above) and send it through the relay stream before
+				// the session connection closes.
+				time.Sleep(200 * time.Millisecond)
+			}
+			c.Close()
+		}
+		return nil
+	}
+
+	if relay {
+		// Should not reach here: relay + guest is handled above, relay +
+		// host is handled above. This is the LAN-only guest path.
+	}
+
+	// guest (LAN)
+	c, err := net.DialTimeout("tcp", net.JoinHostPort(peerIP, gamePortTCP), 10*time.Second)
+	if err != nil {
+		return fmt.Errorf("dial peer: %w", err)
+	}
+	defer c.Close()
+	c.SetWriteDeadline(deadline)
+	// Send magic + payload as a single write (TCP may coalesce anyway).
+	msg := append(append([]byte{}, magic...), payload...)
+	if _, err := c.Write(msg); err != nil {
+		return fmt.Errorf("write: %w", err)
+	}
+	c.SetReadDeadline(deadline)
+	buf := make([]byte, 1024)
+	n, err := c.Read(buf)
+	if err != nil {
+		return fmt.Errorf("read reply: %w", err)
+	}
+	if string(buf[:n]) != "tcp-reply-from-host" {
+		return fmt.Errorf("unexpected tcp reply: %q", string(buf[:n]))
+	}
+	return nil
+}
+
+// encodePacket builds a backend wire frame: [255][code][len:2 LE][payload].
+func encodePacket(code byte, payload []byte) []byte {
+	buf := make([]byte, 4+len(payload))
+	buf[0] = 255
+	buf[1] = code
+	binary.LittleEndian.PutUint16(buf[2:4], uint16(len(buf)))
+	copy(buf[4:], payload)
+	return buf
+}
+
+func writeFrame(conn net.Conn, code byte, payload []byte) error {
+	_, err := conn.Write(encodePacket(code, payload))
+	return err
+}
+
+// readFrame reads one game packet: [255, code, 2-byte total-length, payload].
+// The 2-byte length is the TOTAL frame size (including the 4-byte header).
+func readFrame(conn net.Conn) ([]byte, error) {
+	hdr := make([]byte, 4)
+	if _, err := io.ReadFull(conn, hdr); err != nil {
+		return nil, fmt.Errorf("read frame header: %w", err)
+	}
+	if hdr[0] != 255 {
+		return nil, fmt.Errorf("unexpected frame marker 0x%02x", hdr[0])
+	}
+	total := int(binary.LittleEndian.Uint16(hdr[2:4]))
+	if total < 4 || total > 1<<20 {
+		return nil, fmt.Errorf("invalid frame length %d", total)
+	}
+	payload := make([]byte, total-4)
+	if _, err := io.ReadFull(conn, payload); err != nil {
+		return nil, fmt.Errorf("read frame payload: %w", err)
+	}
+	return payload, nil
+}
+
+func pad(b []byte, n int) []byte {
+	if len(b) >= n {
+		return b[:n]
+	}
+	out := make([]byte, n)
+	copy(out, b)
+	return out
+}

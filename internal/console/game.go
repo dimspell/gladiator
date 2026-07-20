@@ -11,15 +11,15 @@ import (
 	"github.com/dimspell/gladiator/internal/app/logger/logging"
 )
 
-var _ multiv1connect.GameServiceHandler = (*gameServiceServer)(nil)
+var _ multiv1connect.GameServiceHandler = (*GameService)(nil)
 
-type gameServiceServer struct {
-	Multiplayer *Multiplayer
+type GameService struct {
+	RoomService *RoomService
 }
 
 // ListGames returns a list of all open games.
-func (s *gameServiceServer) ListGames(_ context.Context, req *connect.Request[multiv1.ListGamesRequest]) (*connect.Response[multiv1.ListGamesResponse], error) {
-	rooms := s.Multiplayer.ListRooms()
+func (s *GameService) ListGames(_ context.Context, req *connect.Request[multiv1.ListGamesRequest]) (*connect.Response[multiv1.ListGamesResponse], error) {
+	rooms := s.RoomService.ListRooms()
 
 	games := make([]*multiv1.Game, 0, len(rooms))
 	for _, room := range rooms {
@@ -38,15 +38,16 @@ func (s *gameServiceServer) ListGames(_ context.Context, req *connect.Request[mu
 }
 
 // GetGame finds the game room by name.
-func (s *gameServiceServer) GetGame(_ context.Context, req *connect.Request[multiv1.GetGameRequest]) (*connect.Response[multiv1.GetGameResponse], error) {
-	room, found := s.Multiplayer.GetRoom(req.Msg.GetGameRoomId())
+func (s *GameService) GetGame(_ context.Context, req *connect.Request[multiv1.GetGameRequest]) (*connect.Response[multiv1.GetGameResponse], error) {
+	room, found := s.RoomService.GetRoom(req.Msg.GetGameRoomId())
 	if !found {
 		return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("game %s not found", req.Msg.GetGameRoomId()))
 	}
 
-	players := make([]*multiv1.Player, 0, len(room.Players))
-	for _, player := range room.Players {
-		players = append(players, &multiv1.Player{
+	sessions, _ := s.RoomService.GetRoomPlayers(req.Msg.GetGameRoomId())
+	playerList := make([]*multiv1.Player, 0, len(sessions))
+	for _, player := range sessions {
+		playerList = append(playerList, &multiv1.Player{
 			UserId:      player.UserID,
 			Username:    player.User.Username,
 			CharacterId: player.Character.CharacterID,
@@ -63,16 +64,16 @@ func (s *gameServiceServer) GetGame(_ context.Context, req *connect.Request[mult
 			HostUserId:    room.HostPlayer.UserID,
 			HostIpAddress: room.HostPlayer.IPAddress,
 		},
-		Players: players,
+		Players: playerList,
 	})
 	return resp, nil
 }
 
 // CreateGame creates a new game.
-func (s *gameServiceServer) CreateGame(_ context.Context, req *connect.Request[multiv1.CreateGameRequest]) (*connect.Response[multiv1.CreateGameResponse], error) {
+func (s *GameService) CreateGame(_ context.Context, req *connect.Request[multiv1.CreateGameRequest]) (*connect.Response[multiv1.CreateGameResponse], error) {
 	gameId := req.Msg.GetGameName()
 
-	room, err := s.Multiplayer.CreateRoom(
+	room, err := s.RoomService.CreateRoom(
 		req.Msg.HostUserId,
 		req.Msg.GameName,
 		req.Msg.Password,
@@ -100,22 +101,22 @@ func (s *gameServiceServer) CreateGame(_ context.Context, req *connect.Request[m
 }
 
 // JoinGame tries to get the player to join a game.
-func (s *gameServiceServer) JoinGame(_ context.Context, req *connect.Request[multiv1.JoinGameRequest]) (*connect.Response[multiv1.JoinGameResponse], error) {
-	room, err := s.Multiplayer.JoinRoom(
+func (s *GameService) JoinGame(_ context.Context, req *connect.Request[multiv1.JoinGameRequest]) (*connect.Response[multiv1.JoinGameResponse], error) {
+	if _, err := s.RoomService.JoinRoom(
 		req.Msg.GameRoomId,
 		req.Msg.UserId,
 		req.Msg.IpAddress,
-	)
-	if err != nil {
+	); err != nil {
 		slog.Error("failed to join room", "gameId", req.Msg.GameRoomId, logging.Error(err))
 		return nil, connect.NewError(connect.CodeAborted, err)
 	}
 
-	s.Multiplayer.AnnounceJoin(room, req.Msg.UserId)
+	s.RoomService.AnnounceJoin(req.Msg.GameRoomId, req.Msg.UserId)
 
-	players := make([]*multiv1.Player, 0, len(room.Players))
-	for _, player := range room.Players {
-		players = append(players, &multiv1.Player{
+	sessions, _ := s.RoomService.GetRoomPlayers(req.Msg.GameRoomId)
+	playerList := make([]*multiv1.Player, 0, len(sessions))
+	for _, player := range sessions {
+		playerList = append(playerList, &multiv1.Player{
 			UserId:      player.UserID,
 			Username:    player.User.Username,
 			CharacterId: player.Character.CharacterID,
@@ -124,6 +125,6 @@ func (s *gameServiceServer) JoinGame(_ context.Context, req *connect.Request[mul
 		})
 	}
 
-	resp := connect.NewResponse(&multiv1.JoinGameResponse{Players: players})
+	resp := connect.NewResponse(&multiv1.JoinGameResponse{Players: playerList})
 	return resp, nil
 }

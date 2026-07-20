@@ -1,6 +1,7 @@
 package backend
 
 import (
+	"context"
 	"encoding/binary"
 	"fmt"
 	"time"
@@ -9,7 +10,7 @@ import (
 	"github.com/dimspell/gladiator/internal/backend/packet"
 )
 
-func (b *Backend) HandlePing(session *bsession.Session, req PingRequest) error {
+func (b *Backend) HandlePing(ctx context.Context, session *bsession.Session, req PingRequest) error {
 	return session.SendToGame(packet.PingClockTime, []byte{1, 0, 0, 0})
 }
 

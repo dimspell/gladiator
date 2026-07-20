@@ -10,13 +10,34 @@ join_id ?= 2
 build:
 	go build -race -v -o /dev/null ./
 
+docker-build:
+	docker compose build
+
+deploy:
+	./scripts/deploy.sh
+
 serve:
 	 go run -v ./ serve --backend-addr=127.0.0.1:6112 --console-addr=127.0.0.1:2137
 	#go run ./ serve --backend-addr=0.0.0.0:6112 --console-addr=0.0.0.0:2137
 	#(go build -v); (.\gladiator.exe serve --backend-addr=0.0.0.0:6112 --console-addr=0.0.0.0:2137)
 
 test:
-	go test -v --race ./...
+	go test -v --race -timeout 600s ./...
+
+test-e2e:
+	go test -v -tags=e2e -timeout 1200s ./internal/acceptance/...
+
+test-integration-lan:
+	go test -tags=integration -run 'TestSpike|TestLANGameExchange' -v -timeout 300s -count=1 ./internal/integration/...
+
+test-integration-relay:
+	go test -tags integration -run TestRelayGameExchange -v -timeout 300s -count=1 ./internal/integration/...
+
+test-integration-lifecycle:
+	go test -tags integration -run 'TestRelayFullLifecycleWithMigration' -v -timeout 600s -count=1 ./internal/integration/...
+
+lint:
+	go tool golangci-lint run ./...
 
 console: clear
 	go run -v ./ console --console-addr=127.0.0.1:2137

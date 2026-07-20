@@ -44,14 +44,14 @@ func (c *Console) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			"channelName", channelName)
 		return
 	}
-	defer conn.CloseNow()
+	defer func() { _ = conn.CloseNow() }()
 
 	if conn.Subprotocol() != wire.SupportedRealm {
 		_ = conn.Close(websocket.StatusPolicyViolation, "client must speak the right subprotocol")
 		return
 	}
 
-	if err := c.Multiplayer.HandleSession(r.Context(), NewUserSession(userID, conn)); err != nil {
+	if err := c.RoomService.HandleSession(r.Context(), NewUserSession(userID, conn)); err != nil {
 		return
 	}
 }

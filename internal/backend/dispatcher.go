@@ -3,9 +3,11 @@ package backend
 import (
 	"context"
 	"fmt"
+	"io"
+	"log/slog"
 	"net"
+	"time"
 
-	"github.com/dimspell/gladiator/internal/app/logger"
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/packet"
 )
@@ -14,8 +16,7 @@ func (b *Backend) handshake(conn net.Conn) (*bsession.Session, error) {
 	// Ping (single byte - [0x01])
 	{
 		buf := make([]byte, 1)
-		_, err := conn.Read(buf)
-		if err != nil {
+		if _, err := io.ReadFull(conn, buf); err != nil {
 			return nil, fmt.Errorf("error reading: %s", err)
 		}
 
@@ -24,18 +25,17 @@ func (b *Backend) handshake(conn net.Conn) (*bsession.Session, error) {
 		}
 	}
 
-	session := b.AddSession(conn)
+	session := b.SessionManager.Add(conn)
 
 	// Command 255 30 aka 0x1eff
 	{
 		buf := make([]byte, 64)
-		n, err := conn.Read(buf)
-		if err != nil {
+		if _, err := io.ReadFull(conn, buf); err != nil {
 			return nil, fmt.Errorf("error reading: %s", err)
 		}
 
 		// Reply with 255 30 aka 0x1eff
-		if err := b.HandleClientHostAndUsername(session, buf[4:n]); err != nil {
+		if err := b.HandleClientHostAndUsername(session, buf[4:]); err != nil {
 			return nil, err
 		}
 	}
@@ -43,11 +43,10 @@ func (b *Backend) handshake(conn net.Conn) (*bsession.Session, error) {
 	// Command 255 6 aka 0x06ff
 	{
 		buf := make([]byte, 24)
-		n, err := conn.Read(buf)
-		if err != nil {
+		if _, err := io.ReadFull(conn, buf); err != nil {
 			return nil, fmt.Errorf("error reading: %s", err)
 		}
-		if err := b.HandleAuthorizationHandshake(session, buf[4:n]); err != nil {
+		if err := b.HandleAuthorizationHandshake(session, buf[4:]); err != nil {
 			return nil, err
 		}
 	}
@@ -56,6 +55,12 @@ func (b *Backend) handshake(conn net.Conn) (*bsession.Session, error) {
 }
 
 func (b *Backend) handleCommands(ctx context.Context, session *bsession.Session) error {
+	// Refresh the read deadline each loop so an idle (dead) connection is
+	// detected. 90s covers ~3 missed client ping intervals before we give up.
+	if tcpConn, ok := session.Conn.(*net.TCPConn); ok {
+		_ = tcpConn.SetReadDeadline(time.Now().Add(90 * time.Second))
+	}
+
 	buf := make([]byte, 1024)
 	n, err := session.Conn.Read(buf)
 	if err != nil {
@@ -72,13 +77,7 @@ func (b *Backend) handleCommands(ctx context.Context, session *bsession.Session)
 		}
 
 		code := packet.Code(data[1])
-		if logger.PacketLogger != nil {
-			logger.PacketLogger.Debug("Recv",
-				"code", code,
-				"bytes", data,
-				"session_id", session.ID,
-			)
-		}
+		slog.Debug("Recv", "code", code, "bytes", data, "session_id", session.ID)
 
 		switch code {
 		case packet.CreateNewAccount:
@@ -155,6 +154,10 @@ func (b *Backend) handleCommands(ctx context.Context, session *bsession.Session)
 			}
 		case packet.UpdateCharacterStats:
 			if err := b.HandleUpdateCharacterStats(ctx, session, data[4:]); err != nil {
+				return err
+			}
+		case packet.PingClockTime:
+			if err := b.HandlePing(ctx, session, data[4:]); err != nil {
 				return err
 			}
 		}

@@ -1,9 +1,7 @@
 package console
 
 import (
-	"bytes"
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -16,6 +14,7 @@ import (
 	"time"
 
 	"github.com/dimspell/gladiator/internal/app/logger/logging"
+	"github.com/dimspell/gladiator/internal/backend/proxy/relay/types"
 	"github.com/dimspell/gladiator/internal/metrics"
 	"github.com/quic-go/quic-go"
 )
@@ -28,17 +27,21 @@ type RelayStream interface {
 }
 
 type RelayConn interface {
-	AcceptStream(context.Context) (*quic.Stream, error)
+	AcceptStream(context.Context) (RelayStream, error)
 	CloseWithError(code quic.ApplicationErrorCode, msg string) error
 	RemoteAddr() net.Addr
 }
 
-type RelayPacket struct {
-	Type    string `json:"type"` // "join", "leave", ...
-	RoomID  string `json:"room"`
-	FromID  string `json:"from"`
-	ToID    string `json:"to,omitempty"`
-	Payload []byte `json:"payload"`
+// RelayPacket is the wire message exchanged with backend proxies.
+// It is defined in the shared relay/types package and aliased here so the
+// rest of this package can keep using the unqualified name.
+type RelayPacket = types.RelayPacket
+
+// UserSessionProvider is the minimal subset of the multiplayer service that
+// the relay server depends on. It decouples RelayServer from the concrete
+// *RoomService so the relay can be tested (and later run) in isolation.
+type UserSessionProvider interface {
+	GetUserSession(id int64) (*UserSession, bool)
 }
 
 type PeerConn struct {
@@ -59,23 +62,67 @@ type PeerConn struct {
 	LastSeen time.Time
 
 	Session *UserSession
+
+	writeMu sync.Mutex
 }
 
 type Room struct {
-	ID    string
-	Peers map[string]*PeerConn
+	ID        string
+	Peers     map[string]*PeerConn
+	CreatedAt time.Time
 }
 
+// Metrics interface for testability
+// Only a subset shown for brevity
+
+type RelayMetrics interface {
+	IncConnectedPeers()
+	DecConnectedPeers()
+	IncPacketIn()
+	IncPacketOut()
+	SetPeersInRoom(roomID string, n int) // rs.metrics.SetPeersInRoom(roomID, len(room.Peers))
+	IncActiveRooms()
+	DecActiveRooms()
+	DeletePeersInRoom(roomID string)
+}
+
+// Default implementation using the global metrics
+
+type defaultRelayMetrics struct{} //nolint:unused // may be used in future
+
+func (defaultRelayMetrics) IncConnectedPeers() { metrics.ConnectedPeers.Inc() } //nolint:unused // may be used in future
+func (defaultRelayMetrics) DecConnectedPeers() { metrics.ConnectedPeers.Dec() } //nolint:unused // may be used in future
+func (defaultRelayMetrics) IncPacketIn()       { metrics.PacketIn.Inc() }       //nolint:unused // may be used in future
+func (defaultRelayMetrics) IncPacketOut()      { metrics.PacketOut.Inc() }      //nolint:unused // may be used in future
+func (defaultRelayMetrics) SetPeersInRoom(roomID string, n int) { //nolint:unused // may be used in future
+	metrics.PeersInRoom.WithLabelValues(roomID).Set(float64(n))
+}
+func (defaultRelayMetrics) IncActiveRooms() { metrics.ActiveRooms.Inc() } //nolint:unused // may be used in future
+func (defaultRelayMetrics) DecActiveRooms() { metrics.ActiveRooms.Dec() } //nolint:unused // may be used in future
+func (defaultRelayMetrics) DeletePeersInRoom(roomID string) { //nolint:unused // may be used in future
+	metrics.PeersInRoom.DeleteLabelValues(roomID)
+}
+
+// Event hooks
+
+type RelayEventHook func(eventType, peerID, roomID string)
+
+// Extend RelayServer struct
+
 type RelayServer struct {
-	listener      *quic.Listener
+	listener      RelayListener
 	mu            sync.Mutex
 	rooms         map[string]*Room  // keyed by roomID
 	peerToRoomIDs map[string]string // key: peerID, value: roomID
 	logger        *slog.Logger
 
-	Multiplayer *Multiplayer
+	Multiplayer UserSessionProvider
 
-	Events chan RelayEvent
+	verifyFunc func([]byte) ([]byte, bool) // Injected for testability
+
+	OnJoin   RelayEventHook
+	OnLeave  RelayEventHook
+	OnDelete RelayEventHook
 }
 
 type RelayEvent struct {
@@ -84,41 +131,57 @@ type RelayEvent struct {
 	RoomID string
 }
 
-func NewQUICRelay(addr string, multiplayer *Multiplayer) (*RelayServer, error) {
-	tlsConf := &tls.Config{
-		InsecureSkipVerify: true,
-		NextProtos:         []string{"game-relay"},
-		Certificates:       []tls.Certificate{generateSelfSigned()},
-	}
+type RelayServerOption func(*RelayServer)
 
-	listener, err := quic.ListenAddr(addr, tlsConf, &quic.Config{
-		MaxIdleTimeout:  30 * time.Second,
-		KeepAlivePeriod: 15 * time.Second,
-	})
-	if err != nil {
-		return nil, err
-	}
+func WithLogger(l *slog.Logger) RelayServerOption {
+	return func(rs *RelayServer) { rs.logger = l }
+}
 
-	return &RelayServer{
-		listener:      listener,
+func WithVerifyFunc(f func([]byte) ([]byte, bool)) RelayServerOption {
+	return func(rs *RelayServer) { rs.verifyFunc = f }
+}
+
+func WithEventHooks(join, leave, delete RelayEventHook) RelayServerOption {
+	return func(rs *RelayServer) {
+		rs.OnJoin = join
+		rs.OnLeave = leave
+		rs.OnDelete = delete
+	}
+}
+
+func NewQUICRelay(addr string, multiplayer UserSessionProvider, opts ...RelayServerOption) (*RelayServer, error) {
+	rs := &RelayServer{
 		rooms:         make(map[string]*Room),
 		peerToRoomIDs: make(map[string]string),
 		logger:        slog.With(slog.String("component", "relay")),
 		Multiplayer:   multiplayer,
-		Events:        make(chan RelayEvent),
-	}, nil
+		verifyFunc:    verifyRelayPacket,
+	}
+	for _, opt := range opts {
+		opt(rs)
+	}
+
+	if rs.listener == nil {
+		listener, err := newQUICListener(addr)
+		if err != nil {
+			return nil, err
+		}
+		rs.listener = listener
+	}
+
+	return rs, nil
 }
 
-func (rs *RelayServer) Start(ctx context.Context) error {
-	slog.Info("QUIC Relay Server listening", "addr", rs.listener.Addr())
+func (rs *RelayServer) Start(ctx context.Context) {
+	rs.logger.Info("QUIC Relay Server listening", "addr", rs.listener.Addr())
 
 	for {
 		conn, err := rs.listener.Accept(ctx)
 		if err != nil {
 			if errors.Is(err, context.Canceled) {
-				return nil
+				return
 			}
-			slog.Warn("Relay server failed to accept", logging.Error(err))
+			rs.logger.Warn("Relay server failed to accept", logging.Error(err))
 			continue
 		}
 		go rs.handleConn(ctx, conn)
@@ -156,24 +219,22 @@ func (rs *RelayServer) closeStream(conn RelayConn, stream RelayStream) {
 	stream.CancelRead(errorCode)
 	_ = conn.CloseWithError(0xdead, "done")
 
-	slog.Info("Closed relay connection", "addr", conn.RemoteAddr())
+	rs.logger.Info("Closed relay connection", "addr", conn.RemoteAddr())
 }
 
 func (rs *RelayServer) handshake(stream RelayStream) (string, string, error) {
-	// Initial handshake: receive signed join a packet
-	buf := make([]byte, 128)
-	n, err := stream.Read(buf)
+	data, err := types.ReadFramed(stream)
 	if err != nil {
 		return "", "", fmt.Errorf("error reading stream: %w", err)
 	}
 
-	data, ok := verify(buf[:n])
+	payload, ok := rs.verifyFunc(data)
 	if !ok {
 		return "", "", fmt.Errorf("signature failed from client")
 	}
 
 	var pkt RelayPacket
-	if err := json.Unmarshal(data, &pkt); err != nil {
+	if err := json.Unmarshal(payload, &pkt); err != nil {
 		return "", "", fmt.Errorf("error unmarshaling packet: %w", err)
 	}
 	if pkt.Type != "join" {
@@ -196,7 +257,7 @@ func (rs *RelayServer) joinRoom(roomID, peerID string, conn RelayConn, stream Re
 
 	room, ok := rs.rooms[roomID]
 	if !ok {
-		room = &Room{ID: roomID, Peers: make(map[string]*PeerConn)}
+		room = &Room{ID: roomID, Peers: make(map[string]*PeerConn), CreatedAt: time.Now().In(time.UTC)}
 		rs.rooms[roomID] = room
 		rs.logger.Info("new room created", logging.RoomID(roomID), logging.PeerID(peerID))
 		metrics.ActiveRooms.Inc()
@@ -219,7 +280,7 @@ func (rs *RelayServer) joinRoom(roomID, peerID string, conn RelayConn, stream Re
 			continue
 		}
 
-		rs.sendSigned(peer.Stream, RelayPacket{
+		rs.sendSigned(peer, RelayPacket{
 			Type:    "join",
 			RoomID:  roomID,
 			FromID:  peerID,
@@ -228,12 +289,11 @@ func (rs *RelayServer) joinRoom(roomID, peerID string, conn RelayConn, stream Re
 		})
 	}
 
-	rs.Events <- RelayEvent{
-		Type:   "join",
-		PeerID: peerID,
-		RoomID: roomID,
-	}
 	metrics.PeersInRoom.WithLabelValues(roomID).Set(float64(len(room.Peers)))
+
+	if rs.OnJoin != nil {
+		rs.OnJoin("join", peerID, roomID)
+	}
 
 	return pc
 }
@@ -242,10 +302,8 @@ func (rs *RelayServer) relayLoop(roomID, peerID string, peer *PeerConn) {
 	metrics.ConnectedPeers.Inc()
 	defer metrics.ConnectedPeers.Dec()
 
-	buf := make([]byte, 4096)
-
 	for {
-		n, err := peer.Stream.Read(buf)
+		raw, err := types.ReadFramed(peer.Stream)
 		if err == io.EOF {
 			break
 		}
@@ -255,55 +313,51 @@ func (rs *RelayServer) relayLoop(roomID, peerID string, peer *PeerConn) {
 				break
 			}
 			rs.logger.Warn("stream error when reading", logging.Error(err), logging.PeerID(peerID))
+			metrics.RelayErrors.WithLabelValues("stream_read").Inc()
 			break
 		}
 
-		data, ok := verify(buf[:n])
+		metrics.BytesReceived.Add(float64(len(raw) + 4)) // +4 for length-prefix header
+
+		data, ok := rs.verifyFunc(raw)
 		if !ok {
 			rs.logger.Warn("signature check failed when reading", logging.PeerID(peerID))
+			metrics.PacketsDropped.Inc()
 			continue
 		}
 
 		peer.LastSeen = time.Now()
 
-		d := json.NewDecoder(bytes.NewReader(data))
-		for {
-			var pkt RelayPacket
-			if err := d.Decode(&pkt); err != nil {
-				if err == io.EOF {
-					// TODO: Maybe clear(buf) is needed?
-					break
-				}
-				rs.logger.Warn("relay packet unmarshal error", logging.Error(err), logging.PeerID(peerID))
-				break
-			}
-			metrics.PacketIn.Inc()
-
-			// if pkt.Type != "ping" {
-			rs.logger.Debug("[RELAY]", "payload", pkt.Payload, "from", pkt.FromID, "to", pkt.ToID, "type", pkt.Type)
-			// }
-
-			switch pkt.Type {
-			case "udp", "tcp":
-				rs.sendTo(pkt.RoomID, pkt.ToID, pkt)
-
-			case "broadcast":
-				rs.broadcastFrom(pkt.RoomID, pkt.FromID, pkt)
-
-			case "leave":
-				if pkt.FromID != peerID && pkt.RoomID != roomID {
-					continue
-				}
-
-				slog.Info("leave room", logging.PeerID(peerID))
-				rs.leaveRoom(peerID, roomID)
-				return
-			}
+		var pkt RelayPacket
+		if err := json.Unmarshal(data, &pkt); err != nil {
+			rs.logger.Warn("relay packet unmarshal error", logging.Error(err), logging.PeerID(peerID))
+			metrics.RelayErrors.WithLabelValues("unmarshal").Inc()
+			continue
 		}
+		metrics.PacketIn.Inc()
+		rs.logger.Debug("[RELAY]", "payload", pkt.Payload, "from", pkt.FromID, "to", pkt.ToID, "type", pkt.Type)
+		rs.handlePacket(pkt, peer)
 	}
 
 	rs.logger.Info("disconnected from relay", logging.PeerID(peerID))
 	rs.leaveRoom(peerID, roomID)
+	metrics.PeerDisconnects.WithLabelValues("relay_loop_exit").Inc()
+}
+
+func (rs *RelayServer) handlePacket(pkt RelayPacket, peer *PeerConn) {
+	switch pkt.Type {
+	case "udp", "tcp":
+		rs.sendTo(pkt.RoomID, pkt.ToID, pkt)
+
+	case "leave":
+		if pkt.FromID != peer.ID && pkt.RoomID != peer.RoomID {
+			return
+		}
+
+		rs.logger.Info("leave room", logging.PeerID(peer.ID))
+		rs.leaveRoom(peer.ID, peer.RoomID)
+		return
+	}
 }
 
 func (rs *RelayServer) leaveRoom(peerID, roomID string) {
@@ -320,7 +374,7 @@ func (rs *RelayServer) leaveRoom(peerID, roomID string) {
 		return
 	}
 
-	leaver, _ := room.Peers[peerID]
+	leaver := room.Peers[peerID]
 	if leaver == nil {
 		return
 	}
@@ -328,20 +382,19 @@ func (rs *RelayServer) leaveRoom(peerID, roomID string) {
 	rs.closeStream(leaver.Conn, leaver.Stream)
 	delete(room.Peers, peerID)
 
-	rs.Events <- RelayEvent{
-		Type:   "leave",
-		PeerID: peerID,
-		RoomID: roomID,
-	}
 	rs.logger.Info("peer left room", logging.RoomID(roomID), logging.PeerID(peerID))
+	metrics.PeerDisconnects.WithLabelValues("leave_room").Inc()
+
+	if rs.OnLeave != nil {
+		rs.OnLeave("leave", peerID, roomID)
+	}
 
 	if len(room.Peers) == 0 {
+		metrics.RelayRoomLifetime.Observe(time.Since(room.CreatedAt).Seconds())
 		delete(rs.rooms, roomID)
 		rs.logger.Info("room deleted (empty)", logging.RoomID(roomID))
-		rs.Events <- RelayEvent{
-			Type:   "delete",
-			PeerID: peerID,
-			RoomID: roomID,
+		if rs.OnDelete != nil {
+			rs.OnDelete("delete", peerID, roomID)
 		}
 
 		metrics.ActiveRooms.Dec()
@@ -352,7 +405,7 @@ func (rs *RelayServer) leaveRoom(peerID, roomID string) {
 	metrics.PeersInRoom.WithLabelValues(roomID).Set(float64(len(room.Peers)))
 }
 
-func (rs *RelayServer) cleanupPeers() {
+func (rs *RelayServer) cleanupPeers() { //nolint:unused // may be used in future
 	ticker := time.NewTicker(30 * time.Second)
 
 	for now := range ticker.C {
@@ -370,7 +423,7 @@ func (rs *RelayServer) cleanupPeers() {
 		rs.mu.Unlock()
 
 		for _, peer := range toLeave {
-			slog.Info("cleaning up users", logging.PeerID(peer.ID), logging.RoomID(peer.RoomID))
+			rs.logger.Info("cleaning up users", logging.PeerID(peer.ID), logging.RoomID(peer.RoomID))
 			rs.leaveRoom(peer.ID, peer.RoomID)
 		}
 	}
@@ -392,10 +445,10 @@ func (rs *RelayServer) sendTo(roomID, peerID string, pkt RelayPacket) {
 		return
 	}
 
-	rs.sendSigned(peer.Stream, pkt)
+	rs.sendSigned(peer, pkt)
 }
 
-func (rs *RelayServer) broadcastFrom(roomID, fromID string, pkt RelayPacket) {
+func (rs *RelayServer) broadcastFrom(roomID, fromID string, pkt RelayPacket) { //nolint:unused // may be used in future
 	rs.mu.Lock()
 	defer rs.mu.Unlock()
 
@@ -408,20 +461,25 @@ func (rs *RelayServer) broadcastFrom(roomID, fromID string, pkt RelayPacket) {
 		if id == fromID {
 			continue
 		}
-		rs.sendSigned(peer.Stream, pkt)
+		rs.sendSigned(peer, pkt)
 	}
 }
 
-func (rs *RelayServer) sendSigned(stream RelayStream, pkt RelayPacket) {
+func (rs *RelayServer) sendSigned(peer *PeerConn, pkt RelayPacket) {
+	peer.writeMu.Lock()
+	defer peer.writeMu.Unlock()
+
 	data, err := json.Marshal(pkt)
 	if err != nil {
-		slog.Error("json marshal failed", logging.Error(err))
+		rs.logger.Error("json marshal failed", logging.Error(err))
+		metrics.RelayErrors.WithLabelValues("marshal").Inc()
+		return
 	}
-	// packet := sign(data)
-	data = append(data, '\n')
-	if _, err := stream.Write(data); err != nil {
-		slog.Error("could not write the msg", logging.Error(err))
+	if err := types.WriteFramed(peer.Stream, data); err != nil {
+		rs.logger.Error("could not write the msg", logging.Error(err))
+		metrics.RelayErrors.WithLabelValues("write").Inc()
 		return
 	}
 	metrics.PacketOut.Inc()
+	metrics.BytesSent.Add(float64(len(data) + 4)) // +4 for length-prefix header
 }

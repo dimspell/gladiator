@@ -46,14 +46,14 @@ var (
 	proxyTypeRelay  = model.RunModeRelay.String()
 )
 
-func selectProxy(c *cli.Command) (p backend.Proxy, err error) {
+func selectProxy(c *cli.Command) (p backend.ProxyFactory, err error) {
 	switch c.String("proxy") {
 	case proxyTypeLAN:
 		myIPAddr := c.String("lan-my-ip-addr")
 		if ip := net.ParseIP(myIPAddr); ip == nil {
 			return nil, fmt.Errorf("invalid lan-my-ip-addr: %q", myIPAddr)
 		}
-		return &direct.ProxyLAN{myIPAddr}, nil
+		return &direct.ProxyLAN{MyIPAddress: myIPAddr}, nil
 	case proxyTypeWebRTC:
 		return &p2p.ProxyP2P{
 			ICEServers: []webrtc.ICEServer{
@@ -89,7 +89,24 @@ func selectConsoleOptions(c *cli.Command, version string) ([]console.Option, err
 		options = append(options, console.WithRelayAddr(relayBindAddr, relayPublicAddr))
 	}
 
+	if runMode := c.String("run-mode"); runMode != "" {
+		if !isValidRunMode(runMode) {
+			return nil, fmt.Errorf("unknown run-mode: %q (valid: lan, relay-beta, webrtc-beta, single)", runMode)
+		}
+		options = append(options, console.WithRunMode(model.RunMode(runMode)))
+	}
+
 	return options, nil
+}
+
+// isValidRunMode reports whether s is one of the known model.RunMode values.
+func isValidRunMode(s string) bool {
+	switch model.RunMode(s) {
+	case model.RunModeSinglePlayer, model.RunModeLAN, model.RunModeRelay,
+		model.RunModeWebRTC:
+		return true
+	}
+	return false
 }
 
 func fallbackString(value string, fallback string) string {

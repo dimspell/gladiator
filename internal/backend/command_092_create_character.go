@@ -44,7 +44,7 @@ func (b *Backend) HandleCreateCharacter(ctx context.Context, session *bsession.S
 
 // TODO: check if there is any additional not recognised byte at the end like slot number
 type CreateCharacterRequest []byte
-  
+
 type CreateCharacterRequestData struct {
 	Info          []byte
 	ParsedInfo    model.CharacterInfo

@@ -105,8 +105,8 @@ func TestConsole_Handlers(t *testing.T) {
 			}
 
 			// Assert
-			assert.Equal(t, c.Config.ConsoleBindAddr, "127.0.0.1:2137")
-			assert.Equal(t, c.Config.RelayBindAddr, "0.0.0.0:9999")
+			assert.Equal(t, c.ConsoleBindAddr, "127.0.0.1:2137")
+			assert.Equal(t, c.RelayBindAddr, "0.0.0.0:9999")
 
 			assert.Equal(t, wellKnown.Version, "v2.13.7-dev1")
 			assert.Equal(t, wellKnown.Addr, "https://console.example.com")
@@ -143,7 +143,7 @@ func TestConsole_Handlers(t *testing.T) {
 			}
 
 			// Assert
-			assert.Equal(t, c.Config.ConsoleBindAddr, "127.0.0.1:2137")
+			assert.Equal(t, c.ConsoleBindAddr, "127.0.0.1:2137")
 
 			assert.Equal(t, wellKnown.Version, "v2.13.7-dev1")
 			assert.Equal(t, wellKnown.Addr, "https://console.example.com")
@@ -151,10 +151,46 @@ func TestConsole_Handlers(t *testing.T) {
 			assert.Equal(t, wellKnown.RelayServerAddr, "")
 			assert.Equal(t, wellKnown.CallerIP, "127.0.0.1")
 		})
+
+		t.Run("RunMode override (webrtc-beta)", func(t *testing.T) {
+			// Arrange
+			options := []Option{
+				WithVersion("v2.13.7-dev1"),
+				WithConsoleAddr("127.0.0.1:2137", "https://console.example.com"),
+				WithRelayAddr("0.0.0.0:9999", "relay.example.com:9123"),
+				WithRunMode(model.RunModeWebRTC),
+			}
+
+			c := NewConsole(nil, options...)
+			ts := httptest.NewServer(c.HttpRouter())
+			defer ts.Close()
+
+			ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+			defer cancel()
+
+			// Act
+			http.DefaultClient.Timeout = time.Second
+			body, err := helperGetJSON(ctx, ts.URL+"/.well-known/console.json")
+			if err != nil {
+				t.Error(err)
+				return
+			}
+			var wellKnown model.WellKnown
+			if err := json.Unmarshal(body, &wellKnown); err != nil {
+				t.Error(err)
+				return
+			}
+
+			// Assert: WithRunMode overrides the run mode to webrtc-beta. The
+			// relay address is only advertised in relay mode, so it stays empty
+			// here even though WithRelayAddr was also applied.
+			assert.Equal(t, wellKnown.RunMode, model.RunModeWebRTC)
+			assert.Equal(t, wellKnown.RelayServerAddr, "")
+		})
 	})
 
 	t.Run("Connect to websocket", func(t *testing.T) {
-		c := &Console{Config: DefaultConfig()}
+		c := NewConsole(nil)
 		ts := httptest.NewServer(c.HttpRouter())
 		defer ts.Close()
 

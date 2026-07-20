@@ -33,6 +33,7 @@ func TestUserServiceHandler(t *testing.T) {
 		res3, err := service.GetUser(t.Context(), connect.NewRequest(&multiv1.GetUserRequest{
 			UserId: 1,
 		}))
+		assert.NoError(t, err)
 
 		assert.Equal(t, int64(1), res.Msg.User.UserId)
 		assert.Equal(t, "testuser", res.Msg.User.Username)

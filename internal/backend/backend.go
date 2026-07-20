@@ -9,15 +9,25 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
-	"sync"
 	"time"
 
 	"github.com/dimspell/gladiator/gen/multi/v1/multiv1connect"
 	"github.com/dimspell/gladiator/internal/app/logger/logging"
-	"github.com/dimspell/gladiator/internal/backend/bsession"
-	"github.com/dimspell/gladiator/internal/backend/packet"
 	"github.com/dimspell/gladiator/internal/model"
 )
+
+var SharedHttpClient = &http.Client{
+	Timeout: 30 * time.Second,
+	Transport: &http.Transport{
+		Proxy:                 http.DefaultTransport.(*http.Transport).Proxy,
+		DialContext:           http.DefaultTransport.(*http.Transport).DialContext,
+		ForceAttemptHTTP2:     true,
+		MaxIdleConns:          100,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+	},
+}
 
 type Backend struct {
 	Addr            string
@@ -25,48 +35,59 @@ type Backend struct {
 
 	listener net.Listener
 
-	ConnectedSessions sync.Map
+	SessionManager *SessionManager
 
-	CreateProxy Proxy
+	httpClient *http.Client
 
 	characterClient multiv1connect.CharacterServiceClient
-	gameClient      multiv1connect.GameServiceClient
 	userClient      multiv1connect.UserServiceClient
 	rankingClient   multiv1connect.RankingServiceClient
 }
 
-func NewBackend(backendAddr, consolePublicAddr string, createProxy Proxy) *Backend {
-	characterClient, gameClient, userClient, rankingClient := createServiceClients(consolePublicAddr)
+// Option configures a Backend during construction.
+type Option func(*Backend) error
 
-	return &Backend{
-		Addr:        backendAddr,
-		CreateProxy: createProxy,
-
-		characterClient: characterClient,
-		gameClient:      gameClient,
-		userClient:      userClient,
-		rankingClient:   rankingClient,
+// WithHTTPClient overrides the HTTP client used for console service calls.
+// By default SharedHttpClient is used.
+func WithHTTPClient(client *http.Client) Option {
+	return func(b *Backend) error {
+		if client == nil {
+			return errors.New("backend: WithHTTPClient requires a non-nil *http.Client")
+		}
+		b.httpClient = client
+		return nil
 	}
 }
 
-func createServiceClients(consoleAddr string) (
+func NewBackend(backendAddr, consolePublicAddr string, proxyFactory ProxyFactory, opts ...Option) *Backend {
+	b := &Backend{
+		Addr:       backendAddr,
+		httpClient: SharedHttpClient,
+	}
+
+	for _, fn := range opts {
+		if err := fn(b); err != nil {
+			panic("backend: failed to apply option: " + err.Error())
+		}
+	}
+
+	characterClient, gameClient, userClient, rankingClient := createServiceClients(consolePublicAddr, b.httpClient)
+
+	b.SessionManager = NewSessionManager(proxyFactory, gameClient)
+	b.characterClient = characterClient
+	b.userClient = userClient
+	b.rankingClient = rankingClient
+
+	return b
+}
+
+func createServiceClients(consoleAddr string, httpClient *http.Client) (
 	multiv1connect.CharacterServiceClient,
 	multiv1connect.GameServiceClient,
 	multiv1connect.UserServiceClient,
 	multiv1connect.RankingServiceClient,
 ) {
-	httpClient := &http.Client{
-		Timeout: 5 * time.Second,
-		Transport: &http.Transport{
-			Proxy:                 http.DefaultTransport.(*http.Transport).Proxy,
-			DialContext:           http.DefaultTransport.(*http.Transport).DialContext,
-			ForceAttemptHTTP2:     true,
-			MaxIdleConns:          100,
-			IdleConnTimeout:       90 * time.Second,
-			TLSHandshakeTimeout:   10 * time.Second,
-			ExpectContinueTimeout: 1 * time.Second,
-		},
-	}
+	// req.Header().Set("Authorization", "Bearer "+token)
 
 	consoleUri := fmt.Sprintf("%s/grpc", consoleAddr)
 
@@ -90,32 +111,12 @@ func (b *Backend) Start() error {
 	}
 	b.listener = listener
 
-	slog.Info("Backend listening", "addr", b.listener.Addr(), "mode", b.CreateProxy.Mode())
+	slog.Info("Backend listening", "addr", b.listener.Addr(), "mode", b.SessionManager.ProxyFactory.Mode())
 	return nil
 }
 
 func (b *Backend) Shutdown() {
 	slog.Info("Shutting down the backend...")
-
-	// Close all open connections
-	b.ConnectedSessions.Range(func(k, v any) bool {
-		session := v.(*bsession.Session)
-
-		// TODO: Send a system message "(system) The server is going to close in less than 30 seconds"
-		_ = session.SendToGame(
-			packet.ReceiveMessage,
-			NewGlobalMessage("system-info", "The server is going to shut down..."))
-
-		// TODO: Send a packet to trigger stats saving
-		// TODO: Send a system message "(system): Your stats were saving, your game client might close in the next 10 seconds"
-
-		// TODO: Send a packet to close the connection (malformed 255-21?)
-		if err := session.Conn.Close(); err != nil {
-			slog.Error("Could not close session", logging.Error(err), "session", session.ID)
-		}
-
-		return true
-	})
 
 	if b.listener != nil {
 		if err := b.listener.Close(); err != nil {
@@ -162,6 +163,14 @@ func (b *Backend) handleClient(conn net.Conn) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	// Enable TCP keepalive so silently-dead game clients (e.g. crashed host,
+	// dropped network without a FIN) are detected at the OS level. The read
+	// deadline in handleCommands provides the application-level timeout.
+	if tcpConn, ok := conn.(*net.TCPConn); ok {
+		_ = tcpConn.SetKeepAlive(true)
+		_ = tcpConn.SetKeepAlivePeriod(30 * time.Second)
+	}
+
 	session, err := b.handshake(conn)
 	if err != nil {
 		if err2 := conn.Close(); err2 != nil {
@@ -174,11 +183,7 @@ func (b *Backend) handleClient(conn net.Conn) error {
 		slog.Warn("Handshake failed", logging.Error(err))
 		return err
 	}
-	defer func() {
-		if err := b.CloseSession(session); err != nil {
-			slog.Warn("Close session failed", logging.Error(err))
-		}
-	}()
+	defer b.SessionManager.Remove(session)
 
 	for {
 		if err := b.handleCommands(ctx, session); err != nil {
@@ -188,12 +193,9 @@ func (b *Backend) handleClient(conn net.Conn) error {
 	}
 }
 
-// type ConfigOption func(backend *Backend) error
-// []ConfigOption,
-
 func GetMetadata(ctx context.Context, consoleAddr string) (*model.WellKnown, error) {
 	httpClient := &http.Client{Timeout: 3 * time.Second}
-	
+
 	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("%s/.well-known/console.json", consoleAddr), nil)
 	if err != nil {
 		return nil, err

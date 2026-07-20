@@ -24,7 +24,7 @@ type Probe struct {
 	Health       int32
 	SignalChange chan int32
 
-	mtx    sync.Mutex
+	mtx    sync.Mutex //nolint:unused // reserved for future use
 	cancel chan struct{}
 }
 

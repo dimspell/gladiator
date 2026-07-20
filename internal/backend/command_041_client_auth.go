@@ -34,7 +34,7 @@ func (b *Backend) HandleClientAuthentication(ctx context.Context, session *bsess
 	}
 
 	// Connect to the lobby server.
-	if err = b.ConnectToLobby(ctx, user.Msg.User, session); err != nil {
+	if err = session.ConnectOverWebsocket(ctx, user.Msg.User, b.SignalServerURL); err != nil {
 		slog.Debug("packet-41: could not connect to lobby", logging.Error(err))
 		return session.SendToGame(packet.ClientAuthentication, []byte{0, 0, 0, 0})
 	}

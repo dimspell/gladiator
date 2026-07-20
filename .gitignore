@@ -36,3 +36,7 @@ go.work
 
 # Releases
 *.zip
+
+# deepwork state (git-local)
+.slim/deepwork/
+.dwp/

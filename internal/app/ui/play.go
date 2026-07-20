@@ -79,7 +79,7 @@ func (c *Controller) playView(w fyne.Window, consoleAddr string, metadata *model
 		loadingDialog := dialog.NewCustomWithoutButtons("Starting backend...", widget.NewProgressBarInfinite(), w)
 		loadingDialog.Show()
 
-		var proxyCreator backend.Proxy
+		var proxyCreator backend.ProxyFactory
 		switch metadata.RunMode {
 		case model.RunModeRelay:
 			proxyCreator = &relay.ProxyRelay{RelayServerAddr: metadata.RelayServerAddr}
@@ -101,12 +101,12 @@ func (c *Controller) playView(w fyne.Window, consoleAddr string, metadata *model
 		if _, isRunning := c.backendProbe.Status(); isRunning {
 			backendStart.Disable()
 			backendStop.Enable()
-			backendRunningLabel.Set("Backend: Running")
+			_ = backendRunningLabel.Set("Backend: Running")
 			backendRunningCheck.TextStyle = fyne.TextStyle{Bold: true}
 		} else {
 			backendStart.Enable()
 			backendStop.Disable()
-			backendRunningLabel.Set("Backend: Not Running")
+			_ = backendRunningLabel.Set("Backend: Not Running")
 			backendRunningCheck.TextStyle = fyne.TextStyle{Bold: false}
 		}
 	}))

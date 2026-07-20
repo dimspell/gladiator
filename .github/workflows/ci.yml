@@ -22,14 +22,34 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.24"
+          go-version: "1.26"
           cache: 'true'
 
       - name: Compile binary
         run: go build -v ./
 
       - name: Run Tests
-        run: go test -v -cover -race ./...
+        run: go test -v -timeout 600s -cover -race ./...
+
+      - name: Run E2E Tests
+        run: go test -v -tags=e2e -timeout 1200s ./internal/acceptance/...
+
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs:
+      - test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+
+      - name: Run multi-docker integration tests
+        # Docker is pre-installed on GitHub-hosted runners.
+        run: go test -tags=integration -run 'TestSpike|TestLANGameExchange' -v -timeout 300s -count=1 ./internal/integration/...
 
   build:
     runs-on: ubuntu-latest
@@ -44,7 +64,7 @@ jobs:
         id: setup-go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.24"
+          go-version: "1.26"
 
       - name: Get build data
         run: |
@@ -74,7 +94,7 @@ jobs:
             -ldflags="main.version=${BUILD_VERSION}" \
             -ldflags="main.commit=${BUILD_REVISION}" \
             -ldflags="main.date=${BUILD_TIME}" \
-            -env="GOTOOLCHAIN=go1.24.4" \
+            -env="GOTOOLCHAIN=go1.26" \
             -tags=gui
 
       - name: Extract packaged app
@@ -89,7 +109,7 @@ jobs:
         with:
           name: windows-build
           path: |
-            dist/Gladiator.exe 
+            dist/Gladiator.exe
 
       - name: Release
         uses: softprops/action-gh-release@v2
@@ -115,7 +135,7 @@ jobs:
         id: setup-go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.24"
+          go-version: "1.26"
 
       - name: Get build data
         run: |

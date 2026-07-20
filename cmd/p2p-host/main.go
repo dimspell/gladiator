@@ -8,7 +8,6 @@ import (
 	"os"
 	"time"
 
-	"connectrpc.com/connect"
 	multiv1 "github.com/dimspell/gladiator/gen/multi/v1"
 	"github.com/dimspell/gladiator/gen/multi/v1/multiv1connect"
 	"github.com/dimspell/gladiator/internal/app/logger"
@@ -16,7 +15,6 @@ import (
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/proxy"
 	"github.com/dimspell/gladiator/internal/backend/proxy/p2p"
-	"github.com/dimspell/gladiator/internal/backend/redirect"
 	"github.com/dimspell/gladiator/internal/model"
 )
 
@@ -50,9 +48,9 @@ func main() {
 		Username: meName,
 	}
 	p2pProxy := p2p.ProxyP2P{}
-	px := p2pProxy.Create(session).(*p2p.PeerToPeer)
-	px.NewUDPRedirect = redirect.NewNoop
-	px.NewTCPRedirect = redirect.NewLineReader
+	px := p2pProxy.Create(session, gm).(*p2p.PeerToPeer)
+	// px.NewUDPRedirect = redirect.NewNoop
+	// px.NewTCPRedirect = redirect.NewLineReader
 
 	if err := session.ConnectOverWebsocket(ctx, user1, fmt.Sprintf("ws://%s/lobby", consoleUri)); err != nil {
 		slog.Error("failed to connect over websocket", logging.Error(err))
@@ -80,26 +78,15 @@ func main() {
 		}
 	}()
 
-	game, err := gm.CreateGame(ctx, connect.NewRequest(&multiv1.CreateGameRequest{
-		GameName:      roomId,
-		Password:      "",
-		MapId:         multiv1.GameMap_AbandonedRealm,
-		HostUserId:    meUserId,
-		HostIpAddress: "127.0.1.2", // Not used for P2P traffic
-	}))
-	if err != nil {
-		slog.Error("failed to create game over console", logging.Error(err))
-		return
-	}
-	slog.Info("created game over console")
+	params := proxy.CreateParams{GameID: roomId, Password: "", MapId: multiv1.GameMap_AbandonedRealm}
 
-	if _, err := px.CreateRoom(proxy.CreateParams{GameID: game.Msg.Game.GameId}); err != nil {
+	if err := px.CreateRoom(ctx, params); err != nil {
 		slog.Error("failed to create room over proxy", logging.Error(err))
 		return
 	}
 	slog.Info("created room over proxy")
 
-	if err := px.HostRoom(ctx, proxy.HostParams{GameID: game.Msg.Game.GameId}); err != nil {
+	if err := px.SetRoomReady(ctx, params); err != nil {
 		slog.Error("failed to host room over proxy", logging.Error(err))
 		return
 	}

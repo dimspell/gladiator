@@ -1,0 +1,94 @@
+# Cursor rules for this Go project
+
+These rules define how code should be written, reviewed, and changed in this repository.
+
+## Go toolchain + formatting (non-negotiable)
+
+- **Always run `gofmt`** on changed Go files.
+- **Use `goimports`** (or `gofmt` + manual imports) so imports are grouped and unused imports removed.
+- **Prefer standard library** over new dependencies unless there’s a clear reason.
+- **Keep `go.mod` tidy**: don’t add deps casually; when you do, keep versions minimal and coherent.
+
+## Code style + structure
+
+- **Small, focused diffs**: change the minimum surface area necessary.
+- **Package boundaries**: prefer adding code to an existing relevant package over creating new packages.
+- **Avoid cyclic dependencies**; keep `internal/...` layering clean.
+- **Public API discipline**:
+  - Export only what must be used outside the package.
+  - Keep exported types/functions well-documented (GoDoc comment starting with the symbol name).
+- **Naming**:
+  - Use Go conventions (short receiver names, no `GetX()` unless needed).
+  - Prefer clear domain names over generic ones (e.g., `RoomService` not `Service`).
+
+## Error handling (industry patterns)
+
+- **Return errors, don’t panic** in normal control flow.
+- **Wrap errors with context** using `%w`:
+  - `return fmt.Errorf("doing X: %w", err)`
+- **Use sentinel errors sparingly**; prefer typed errors only when callers must branch on type.
+- **Don’t log and return the same error** unless you have a strong reason (avoid double logging).
+- **Use `errors.Is` / `errors.As`** for comparisons.
+
+## Context, cancellation, timeouts
+
+- **Plumb `context.Context`** through call chains for IO, network, and long-running operations.
+- **Never store `context.Context`** inside structs.
+- **Always set timeouts** for network calls unless the caller explicitly controls it.
+- **Select on `ctx.Done()`** in loops that can block or run indefinitely.
+
+## Concurrency hygiene
+
+- **Avoid goroutine leaks**:
+  - Always ensure goroutines can exit (ctx cancellation, closed channels, done signals).
+  - Prefer `errgroup.Group` for fan-out work with cancellation.
+- **Prefer channels for ownership transfer**, not for shared mutable state.
+- **Protect shared state** with `sync.Mutex`/`sync.RWMutex` or confine it to one goroutine.
+- **Avoid data races**: design for correctness first; use `-race` when running tests.
+
+## Logging & observability
+
+- Use the project’s logging conventions (currently `slog`).
+- Log **actionable** fields:
+  - request/connection identifiers where available
+  - addresses, user IDs, session IDs (avoid PII where possible)
+- **Don’t log secrets** (passwords, tokens, private keys).
+- Metrics:
+  - Prefer incrementing existing Prometheus metrics where appropriate instead of inventing new ones.
+
+## Networking & protocol code
+
+- Be strict on input validation at boundaries (HTTP params, websocket payloads, TCP packets).
+- For protocol evolution:
+  - Add backwards-compatible fields where possible.
+  - Keep parsing resilient; fail fast with clear errors on malformed inputs.
+- Avoid allocating in tight loops; reuse buffers when it materially improves hot paths.
+
+## Tests (expected behavior)
+
+- For new behavior, add or update tests close to the code:
+  - `*_test.go` in the same package unless black-box testing is required.
+- Prefer table-driven tests for multiple cases.
+- Verify error cases explicitly (invalid inputs, timeouts, empty states).
+- Keep tests deterministic; avoid sleeps when possible.
+
+## Security expectations
+
+- Treat all external input as untrusted (HTTP, WS, TCP, DB).
+- Never commit real credentials; use env vars/config where secrets are needed.
+- Prefer constant-time comparisons for secrets if relevant.
+- Validate/normalize user-controlled network addresses to avoid SSRF-like patterns.
+
+## Documentation when changing behavior
+
+- If you modify user-facing behavior (CLI flags, endpoints, defaults), update docs in `docs/`.
+- Keep “incomplete/WIP” notes accurate—don’t over-promise.
+
+## How to work in this repository (practical)
+
+- Before large refactors, look for existing patterns in `internal/...` and follow them.
+- When you touch the backend protocol handlers (`internal/backend/command_*.go`), prioritize:
+  - correctness
+  - compatibility with existing clients
+  - clear logging around handshake/session boundaries
+
