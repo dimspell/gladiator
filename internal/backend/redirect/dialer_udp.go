@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"sync"
@@ -98,6 +99,11 @@ func (p *DialerUDP) Run(ctx context.Context) error {
 				if errors.As(err, &ne) && ne.Timeout() {
 					p.lastActive = time.Now()
 					continue
+				}
+				// A closed connection or cancelled context is a normal
+				// teardown; don't warn about it, just return the error.
+				if errors.Is(err, net.ErrClosed) || errors.Is(err, io.EOF) || ctx.Err() != nil {
+					return err
 				}
 				p.logger.Warn("UDP read error", logging.Error(err))
 				return fmt.Errorf("dial-udp: failed to read UDP message: %w", err)

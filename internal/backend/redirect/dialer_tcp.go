@@ -79,6 +79,11 @@ func (p *DialerTCP) Run(ctx context.Context) error {
 				if errors.As(err, &ne) && ne.Timeout() {
 					continue
 				}
+				// A closed connection or cancelled context is a normal
+				// teardown; don't error-log about it, just return the error.
+				if errors.Is(err, net.ErrClosed) || ctx.Err() != nil {
+					return err
+				}
 
 				p.logger.Error("TCP read error", logging.Error(err))
 				return err

@@ -104,6 +104,11 @@ func (p *ListenerTCP) Run(ctx context.Context) error {
 
 		// Recognise who is trying to connect by handling the initial data.
 		if err := p.handleHandshake(conn, p.OnReceive); err != nil {
+			// A closed connection or cancelled context means we are shutting
+			// down; don't spam warnings or busy-loop on a dead socket.
+			if errors.Is(err, net.ErrClosed) || errors.Is(err, io.EOF) || ctx.Err() != nil {
+				return ctx.Err()
+			}
 			p.logger.Warn("Failed to handle a handshake", logging.Error(err))
 			continue
 		}
