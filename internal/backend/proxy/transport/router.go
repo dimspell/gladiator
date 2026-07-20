@@ -32,6 +32,10 @@ type PacketRouter struct {
 	currentHostID string
 	pingTicker    *time.Ticker
 	wg            sync.WaitGroup
+
+	// loopCancel cancels the receive loop's context. The loop is owned by the
+	// router (not the caller's context) so it survives request-scoped contexts.
+	loopCancel context.CancelFunc
 }
 
 // NewPacketRouter constructs a PacketRouter. The manager and transport are
@@ -153,6 +157,12 @@ func (r *PacketRouter) Disconnect() {
 // disconnectLocked closes the current transport without acquiring the lock.
 // Caller must hold r.mu.
 func (r *PacketRouter) disconnectLocked() {
+	// Cancel the receive loop first so it unblocks even if the transport's Recv
+	// does not return promptly on Close.
+	if r.loopCancel != nil {
+		r.loopCancel()
+		r.loopCancel = nil
+	}
 	if r.transport != nil {
 		_ = r.transport.Close()
 	}
@@ -333,12 +343,26 @@ func (r *PacketRouter) handleHostMigration(ctx context.Context, player wire.Play
 // Connect joins the relay infrastructure for the given room via the injected
 // PeerTransport and starts the receive loop.
 func (r *PacketRouter) Connect(ctx context.Context, roomID string) error {
+	r.mu.Lock()
+	// Cancel any previously running receive loop before (re)joining, so a
+	// reconnect cannot leave a stale loop reading from the old transport.
+	if r.loopCancel != nil {
+		r.loopCancel()
+		r.loopCancel = nil
+	}
 	if err := r.transport.Join(ctx, roomID); err != nil {
+		r.mu.Unlock()
 		return fmt.Errorf("failed to join relay: %w", err)
 	}
+	// The receive loop must outlive the caller's context (e.g. an HTTP request
+	// scope). It is owned by the router and torn down via loopCancel on
+	// disconnect/reset.
+	loopCtx, cancel := context.WithCancel(context.Background())
+	r.loopCancel = cancel
+	r.mu.Unlock()
 
 	r.wg.Add(1)
-	go r.receiveLoop(ctx)
+	go r.receiveLoop(loopCtx)
 	return nil
 }
 

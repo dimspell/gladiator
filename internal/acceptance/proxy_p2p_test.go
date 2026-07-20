@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"net/http"
 	"net/http/httptest"
 	"os"
 	"testing"
@@ -448,7 +449,12 @@ func setupP2PEnv(t *testing.T) *p2pTestEnv {
 
 // createPlayer creates and authenticates a player.
 func (env *p2pTestEnv) createPlayer(username, characterName string) *p2pPlayer {
-	bd := backend.NewBackend("", env.testServer.URL, env.proxy)
+	// Under -race the in-process auth server is slow enough to exceed the
+	// default 5s SharedHttpClient timeout; use a generous client for the test.
+	bd := backend.NewBackend("", env.testServer.URL, env.proxy, backend.WithHTTPClient(&http.Client{
+		Timeout:   30 * time.Second,
+		Transport: backend.SharedHttpClient.Transport,
+	}))
 	bd.SignalServerURL = "ws://" + env.consoleHostPort + "/lobby"
 
 	conn := &mockConn{}
@@ -546,9 +552,9 @@ func TestE2E_P2P_HostMigration(t *testing.T) {
 	// Host creates room
 	env.createRoom(host, "testroom", v1.GameMap_FrozenLabyrinth)
 
-	room, ok := env.console.RoomService.Rooms["testroom"]
-	require.True(t, ok, "room not found")
-	require.Equal(t, host.session.UserID, room.HostPlayer.UserID, "host should be archer")
+	snap := env.console.RoomService.GetRoomSnapshot("testroom")
+	require.True(t, snap.Exists, "room not found")
+	require.Equal(t, host.session.UserID, snap.HostUserID, "host should be archer")
 
 	// Guest joins
 	env.joinRoom(guest, "testroom")
@@ -557,8 +563,8 @@ func TestE2E_P2P_HostMigration(t *testing.T) {
 	env.processMessages(3 * time.Second)
 
 	// Verify both players are in room
-	room = env.console.RoomService.Rooms["testroom"]
-	require.Equal(t, 2, len(room.Players), "should have 2 players")
+	snap = env.console.RoomService.GetRoomSnapshot("testroom")
+	require.Equal(t, 2, len(snap.PlayerIDs), "should have 2 players")
 
 	// Get the host's user session for LeaveRoom
 	hostSession, ok := env.console.RoomService.GetUserSession(host.session.UserID)
@@ -571,10 +577,10 @@ func TestE2E_P2P_HostMigration(t *testing.T) {
 	env.processMessages(1 * time.Second)
 
 	// Verify guest is now host
-	room, ok = env.console.RoomService.Rooms["testroom"]
-	require.True(t, ok, "room should still exist")
-	require.Equal(t, 1, len(room.Players), "should have 1 player after host left")
-	require.Equal(t, guest.session.UserID, room.HostPlayer.UserID, "mage should now be host")
+	snap = env.console.RoomService.GetRoomSnapshot("testroom")
+	require.True(t, snap.Exists, "room should still exist")
+	require.Equal(t, 1, len(snap.PlayerIDs), "should have 1 player after host left")
+	require.Equal(t, guest.session.UserID, snap.HostUserID, "mage should now be host")
 
 	t.Log("Host migration successful: mage is now host")
 }
@@ -597,8 +603,8 @@ func TestE2E_P2P_ThirdPlayerJoins(t *testing.T) {
 	// Process WebRTC signaling for first guest
 	env.processMessages(2 * time.Second)
 
-	room := env.console.RoomService.Rooms["bigroom"]
-	require.Equal(t, 2, len(room.Players), "should have 2 players after first guest joins")
+	snap := env.console.RoomService.GetRoomSnapshot("bigroom")
+	require.Equal(t, 2, len(snap.PlayerIDs), "should have 2 players after first guest joins")
 
 	// Second guest joins
 	env.joinRoom(guest2, "bigroom")
@@ -607,15 +613,15 @@ func TestE2E_P2P_ThirdPlayerJoins(t *testing.T) {
 	env.processMessages(3 * time.Second)
 
 	// Verify all 3 players are in room
-	room, ok := env.console.RoomService.Rooms["bigroom"]
-	require.True(t, ok, "room not found")
-	require.Equal(t, 3, len(room.Players), "should have 3 players")
-	require.Equal(t, host.session.UserID, room.HostPlayer.UserID, "host should still be archer")
+	snap = env.console.RoomService.GetRoomSnapshot("bigroom")
+	require.True(t, snap.Exists, "room not found")
+	require.Equal(t, 3, len(snap.PlayerIDs), "should have 3 players")
+	require.Equal(t, host.session.UserID, snap.HostUserID, "host should still be archer")
 
 	// Verify each player is present
-	_, hasHost := room.Players[host.session.UserID]
-	_, hasGuest1 := room.Players[guest1.session.UserID]
-	_, hasGuest2 := room.Players[guest2.session.UserID]
+	hasHost := containsUserID(snap.PlayerIDs, host.session.UserID)
+	hasGuest1 := containsUserID(snap.PlayerIDs, guest1.session.UserID)
+	hasGuest2 := containsUserID(snap.PlayerIDs, guest2.session.UserID)
 	require.True(t, hasHost, "archer should be in room")
 	require.True(t, hasGuest1, "mage should be in room")
 	require.True(t, hasGuest2, "warrior should be in room")
@@ -647,9 +653,9 @@ func TestE2E_P2P_FourPlayersOneLeaves(t *testing.T) {
 	env.processMessages(3 * time.Second)
 
 	// Verify 4 players in room
-	room, ok := env.console.RoomService.Rooms["fullroom"]
-	require.True(t, ok, "room not found")
-	require.Equal(t, 4, len(room.Players), "should have 4 players")
+	snap := env.console.RoomService.GetRoomSnapshot("fullroom")
+	require.True(t, snap.Exists, "room not found")
+	require.Equal(t, 4, len(snap.PlayerIDs), "should have 4 players")
 
 	t.Log("4-player room setup complete")
 
@@ -662,16 +668,16 @@ func TestE2E_P2P_FourPlayersOneLeaves(t *testing.T) {
 	env.processMessages(1 * time.Second)
 
 	// Verify cleanup
-	room, ok = env.console.RoomService.Rooms["fullroom"]
-	require.True(t, ok, "room should still exist")
-	require.Equal(t, 3, len(room.Players), "should have 3 players after one left")
-	require.Equal(t, host.session.UserID, room.HostPlayer.UserID, "host should still be archer")
+	snap = env.console.RoomService.GetRoomSnapshot("fullroom")
+	require.True(t, snap.Exists, "room should still exist")
+	require.Equal(t, 3, len(snap.PlayerIDs), "should have 3 players after one left")
+	require.Equal(t, host.session.UserID, snap.HostUserID, "host should still be archer")
 
 	// Verify warrior is gone but others remain
-	_, hasHost := room.Players[host.session.UserID]
-	_, hasGuest1 := room.Players[guest1.session.UserID]
-	_, hasGuest2 := room.Players[guest2.session.UserID]
-	_, hasGuest3 := room.Players[guest3.session.UserID]
+	hasHost := containsUserID(snap.PlayerIDs, host.session.UserID)
+	hasGuest1 := containsUserID(snap.PlayerIDs, guest1.session.UserID)
+	hasGuest2 := containsUserID(snap.PlayerIDs, guest2.session.UserID)
+	hasGuest3 := containsUserID(snap.PlayerIDs, guest3.session.UserID)
 	require.True(t, hasHost, "archer should be in room")
 	require.True(t, hasGuest1, "mage should be in room")
 	require.False(t, hasGuest2, "warrior should NOT be in room")
@@ -700,9 +706,9 @@ func TestE2E_P2P_HostLeavesWithMultiplePlayers(t *testing.T) {
 	env.processMessages(3 * time.Second)
 
 	// Verify 3 players
-	room := env.console.RoomService.Rooms["migroom"]
-	require.Equal(t, 3, len(room.Players), "should have 3 players")
-	require.Equal(t, host.session.UserID, room.HostPlayer.UserID)
+	snap := env.console.RoomService.GetRoomSnapshot("migroom")
+	require.Equal(t, 3, len(snap.PlayerIDs), "should have 3 players")
+	require.Equal(t, host.session.UserID, snap.HostUserID)
 
 	// Record which guest joined first (for host selection)
 	guest1Session, _ := env.console.RoomService.GetUserSession(guest1.session.UserID)
@@ -720,12 +726,12 @@ func TestE2E_P2P_HostLeavesWithMultiplePlayers(t *testing.T) {
 	env.processMessages(1 * time.Second)
 
 	// Verify new host is the earlier guest
-	room, ok := env.console.RoomService.Rooms["migroom"]
-	require.True(t, ok, "room should exist")
-	require.Equal(t, 2, len(room.Players), "should have 2 players")
-	require.Equal(t, earlierGuest.UserID, room.HostPlayer.UserID, "earlier guest should be new host")
+	snap = env.console.RoomService.GetRoomSnapshot("migroom")
+	require.True(t, snap.Exists, "room should exist")
+	require.Equal(t, 2, len(snap.PlayerIDs), "should have 2 players")
+	require.Equal(t, earlierGuest.UserID, snap.HostUserID, "earlier guest should be new host")
 
-	t.Logf("Host migration with 3 players: new host is user %d", room.HostPlayer.UserID)
+	t.Logf("Host migration with 3 players: new host is user %d", snap.HostUserID)
 }
 
 // TestE2E_P2P_AllGuestsLeave tests that room is cleaned up when all guests leave.
@@ -748,8 +754,8 @@ func TestE2E_P2P_AllGuestsLeave(t *testing.T) {
 	env.processMessages(2 * time.Second)
 
 	// Verify 3 players
-	room := env.console.RoomService.Rooms["emptyroom"]
-	require.Equal(t, 3, len(room.Players))
+	snap := env.console.RoomService.GetRoomSnapshot("emptyroom")
+	require.Equal(t, 3, len(snap.PlayerIDs))
 
 	// Both guests leave
 	guest1Session, _ := env.console.RoomService.GetUserSession(guest1.session.UserID)
@@ -762,10 +768,20 @@ func TestE2E_P2P_AllGuestsLeave(t *testing.T) {
 	env.processMessages(1 * time.Second)
 
 	// Verify only host remains
-	room, ok := env.console.RoomService.Rooms["emptyroom"]
-	require.True(t, ok, "room should exist")
-	require.Equal(t, 1, len(room.Players), "only host should remain")
-	require.Equal(t, host.session.UserID, room.HostPlayer.UserID)
+	snap = env.console.RoomService.GetRoomSnapshot("emptyroom")
+	require.True(t, snap.Exists, "room should exist")
+	require.Equal(t, 1, len(snap.PlayerIDs), "only host should remain")
+	require.Equal(t, host.session.UserID, snap.HostUserID)
 
 	t.Log("All guests left, host remains alone")
+}
+
+// containsUserID reports whether ids contains id.
+func containsUserID(ids []int64, id int64) bool {
+	for _, u := range ids {
+		if u == id {
+			return true
+		}
+	}
+	return false
 }

@@ -112,7 +112,16 @@ func (p *ListenerTCP) Run(ctx context.Context) error {
 		break
 	}
 
-	if err := p.handleConnection(ctx, p.conn, p.OnReceive); err != nil {
+	// Snapshot the active connection under lock; handleConnection uses the
+	// local copy so Close can nil/close p.conn without a race.
+	p.mu.RLock()
+	conn := p.conn
+	p.mu.RUnlock()
+	if conn == nil {
+		return fmt.Errorf("listen-tcp: no active connection")
+	}
+
+	if err := p.handleConnection(ctx, conn, p.OnReceive); err != nil {
 		p.logger.Error("Failed to handle connection", "error", err)
 		return err
 	}
@@ -165,7 +174,7 @@ func (p *ListenerTCP) handleConnection(ctx context.Context, conn TCPConn, onRece
 			}
 
 			// Mark when the last activity has happened
-			p.lastActive = time.Now()
+			p.setLastActive()
 
 			if len(msg) == 0 {
 				continue
@@ -209,22 +218,33 @@ func readNext(conn TCPConn, buf []byte) ([]byte, error) {
 // Write sends data to the active TCP connection (game client).
 // Returns the number of bytes written or an error if the connection is closed or unavailable.
 func (p *ListenerTCP) Write(msg []byte) (int, error) {
+	// Snapshot the connection under a read lock; the actual write happens
+	// without the lock held so it cannot block Close or handleConnection.
 	p.mu.RLock()
-	defer p.mu.RUnlock()
+	conn := p.conn
+	p.mu.RUnlock()
 
-	if p.conn == nil {
+	if conn == nil {
 		return 0, fmt.Errorf("listen-tcp: no active connection")
 	}
 
-	n, err := p.conn.Write(msg)
+	n, err := conn.Write(msg)
 	if err != nil {
 		p.logger.Error("Failed to send data", logging.Error(err))
 		return n, fmt.Errorf("listen-tcp: write failed: %w", err)
 	}
 
-	p.lastActive = time.Now()
+	p.setLastActive()
 	// p.logger.Debug("Sent to the game client", "size", n, "data", msg[:n])
 	return n, nil
+}
+
+// setLastActive records the last activity time under the mutex so concurrent
+// writers (handleConnection, Write) and readers (Alive) cannot race.
+func (p *ListenerTCP) setLastActive() {
+	p.mu.Lock()
+	p.lastActive = time.Now()
+	p.mu.Unlock()
 }
 
 // Close shuts down the listener and any active connection.

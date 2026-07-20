@@ -86,7 +86,7 @@ func TestListenerUDP_handleConnection_Valid(t *testing.T) {
 	}
 	listener := &ListenerUDP{remoteAddr: mockConn.remote, logger: logger.NewDiscardLogger()}
 	var received []string
-	err := listener.handleConnection(context.Background(), mockConn, func(p []byte) error {
+	err := listener.handleConnection(context.Background(), mockConn, listener.remoteAddr, func(p []byte) error {
 		received = append(received, string(p))
 		return nil
 	})
@@ -101,7 +101,7 @@ func TestListenerUDP_handleConnection_UnknownSource(t *testing.T) {
 	}
 	listener := &ListenerUDP{remoteAddr: &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 1234}, logger: logger.NewDiscardLogger()}
 	var received []string
-	err := listener.handleConnection(context.Background(), mockConn, func(p []byte) error {
+	err := listener.handleConnection(context.Background(), mockConn, listener.remoteAddr, func(p []byte) error {
 		received = append(received, string(p))
 		return nil
 	})

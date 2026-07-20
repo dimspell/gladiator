@@ -187,3 +187,75 @@ func TestPacketRouter_SendPacket_DataRace(t *testing.T) {
 		t.Errorf("expected 100 sent packets, got %d", sent)
 	}
 }
+
+// TestPacketRouter_Connect_LoopSurvivesCallerCtxCancel proves the receive loop
+// is owned by the router and keeps running after the caller's context is
+// cancelled (e.g. an HTTP request scope), and that Reset cancels it promptly.
+func TestPacketRouter_Connect_LoopSurvivesCallerCtxCancel(t *testing.T) {
+	callerCtx, callerCancel := context.WithCancel(context.Background())
+
+	cap := &CaptureRedirect{}
+	factory := &CaptureFactory{Shared: cap}
+
+	pr := &PacketRouter{
+		logger: slog.Default(),
+		roomID: "test-room",
+		manager: redirect.NewManager(
+			redirect.WithProxyFactory(factory),
+			redirect.WithDisabledLogger(),
+		),
+		transport: newMockTransport(),
+	}
+
+	// Act as the host so dynamicJoin provisions a guest host for peer 200.
+	pr.mu.Lock()
+	pr.selfID = "100"
+	pr.currentHostID = "100"
+	pr.mu.Unlock()
+
+	pr.DynamicJoin(context.Background(), "test-room", "200")
+	if _, ok := pr.manager.GetPeerHost("200"); !ok {
+		t.Fatal("peer 200 not registered after dynamicJoin")
+	}
+
+	// Connect with the caller's context, then cancel it. The loop must keep
+	// running because the router derives its own loopCtx from Background.
+	if err := pr.Connect(callerCtx, "test-room"); err != nil {
+		t.Fatalf("Connect failed: %v", err)
+	}
+	callerCancel()
+
+	// Give the loop a moment; it should still be alive despite callerCtx cancel.
+	time.Sleep(20 * time.Millisecond)
+
+	// Push a TCP packet into the mock transport; the loop must still dispatch it.
+	pr.transport.(*mockTransport).recvCh <- TransportPacket{
+		FromID: "200",
+		RoomID: "test-room",
+		Kind:   KindTCP,
+		Data:   []byte("survived"),
+	}
+
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		if string(cap.Bytes()) == "survived" {
+			break
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	if got := string(cap.Bytes()); got != "survived" {
+		t.Fatalf("loop died after caller ctx cancel; got %q", got)
+	}
+
+	// Reset must cancel the loop promptly (not block waiting on transport close).
+	done := make(chan struct{})
+	go func() {
+		pr.Reset()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("Reset did not exit loop promptly after caller ctx cancel")
+	}
+}

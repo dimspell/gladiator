@@ -37,25 +37,51 @@ type Backend struct {
 
 	SessionManager *SessionManager
 
+	httpClient *http.Client
+
 	characterClient multiv1connect.CharacterServiceClient
 	userClient      multiv1connect.UserServiceClient
 	rankingClient   multiv1connect.RankingServiceClient
 }
 
-func NewBackend(backendAddr, consolePublicAddr string, proxyFactory ProxyFactory) *Backend {
-	characterClient, gameClient, userClient, rankingClient := createServiceClients(consolePublicAddr)
+// Option configures a Backend during construction.
+type Option func(*Backend) error
 
-	return &Backend{
-		Addr:           backendAddr,
-		SessionManager: NewSessionManager(proxyFactory, gameClient),
-
-		characterClient: characterClient,
-		userClient:      userClient,
-		rankingClient:   rankingClient,
+// WithHTTPClient overrides the HTTP client used for console service calls.
+// By default SharedHttpClient is used.
+func WithHTTPClient(client *http.Client) Option {
+	return func(b *Backend) error {
+		if client == nil {
+			return errors.New("backend: WithHTTPClient requires a non-nil *http.Client")
+		}
+		b.httpClient = client
+		return nil
 	}
 }
 
-func createServiceClients(consoleAddr string) (
+func NewBackend(backendAddr, consolePublicAddr string, proxyFactory ProxyFactory, opts ...Option) *Backend {
+	b := &Backend{
+		Addr:       backendAddr,
+		httpClient: SharedHttpClient,
+	}
+
+	for _, fn := range opts {
+		if err := fn(b); err != nil {
+			panic("backend: failed to apply option: " + err.Error())
+		}
+	}
+
+	characterClient, gameClient, userClient, rankingClient := createServiceClients(consolePublicAddr, b.httpClient)
+
+	b.SessionManager = NewSessionManager(proxyFactory, gameClient)
+	b.characterClient = characterClient
+	b.userClient = userClient
+	b.rankingClient = rankingClient
+
+	return b
+}
+
+func createServiceClients(consoleAddr string, httpClient *http.Client) (
 	multiv1connect.CharacterServiceClient,
 	multiv1connect.GameServiceClient,
 	multiv1connect.UserServiceClient,
@@ -65,10 +91,10 @@ func createServiceClients(consoleAddr string) (
 
 	consoleUri := fmt.Sprintf("%s/grpc", consoleAddr)
 
-	characterClient := multiv1connect.NewCharacterServiceClient(SharedHttpClient, consoleUri)
-	gameClient := multiv1connect.NewGameServiceClient(SharedHttpClient, consoleUri)
-	userClient := multiv1connect.NewUserServiceClient(SharedHttpClient, consoleUri)
-	rankingClient := multiv1connect.NewRankingServiceClient(SharedHttpClient, consoleUri)
+	characterClient := multiv1connect.NewCharacterServiceClient(httpClient, consoleUri)
+	gameClient := multiv1connect.NewGameServiceClient(httpClient, consoleUri)
+	userClient := multiv1connect.NewUserServiceClient(httpClient, consoleUri)
+	rankingClient := multiv1connect.NewRankingServiceClient(httpClient, consoleUri)
 
 	return characterClient, gameClient, userClient, rankingClient
 }

@@ -5,6 +5,7 @@ import (
 	"io"
 	"log/slog"
 	"sync"
+	"sync/atomic"
 
 	"github.com/dimspell/gladiator/internal/backend/proxy/transport"
 )
@@ -34,6 +35,10 @@ type webrtcTransport struct {
 	// (re)created on Join and closed on Close so reconnection is leak-free.
 	recvCh chan transport.TransportPacket
 	closed bool
+
+	// dropped counts inbound packets dropped because recvCh was full or had no
+	// draining receiver. Surfaced at Close so packet loss is observable.
+	dropped uint64
 }
 
 var _ transport.PeerTransport = (*webrtcTransport)(nil)
@@ -118,6 +123,9 @@ func (t *webrtcTransport) Close() error {
 		close(t.recvCh)
 		t.recvCh = nil
 	}
+	if dropped := atomic.LoadUint64(&t.dropped); dropped > 0 {
+		t.logger.Warn("webrtc transport: inbound packets dropped during session", "count", dropped)
+	}
 	return nil
 }
 
@@ -136,8 +144,10 @@ func (t *webrtcTransport) deliver(fromID string, kind transport.PacketKind, data
 	select {
 	case ch <- transport.TransportPacket{FromID: fromID, Kind: kind, Data: data}:
 	default:
-		// No receiver draining (e.g. before Connect started the loop). Drop rather
-		// than block the pion callback goroutine.
+		// No receiver draining (e.g. before Connect started the loop) or the
+		// channel is full under burst. Drop rather than block the pion callback
+		// goroutine, but count it so we can surface the loss at teardown.
+		atomic.AddUint64(&t.dropped, 1)
 		t.logger.Warn("webrtc transport: dropping inbound packet; recv channel full", "from", fromID)
 	}
 }

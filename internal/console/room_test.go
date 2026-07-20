@@ -249,7 +249,7 @@ func TestAnnounceJoin(t *testing.T) {
 	room, _ := mp.CreateRoom(1, "room1", "", 0, "127.0.0.1")
 	room.Players[2] = mp.sessions[2]
 	room.Players[3] = mp.sessions[3]
-	mp.AnnounceJoin(*room, 2)
+	mp.AnnounceJoin("room1", 2)
 	// Should send to 1 and 3, not 2
 	require.ElementsMatch(t, []int64{1, 3}, sentTo)
 }

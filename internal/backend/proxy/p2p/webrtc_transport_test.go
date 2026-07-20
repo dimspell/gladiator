@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"log/slog"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -258,4 +259,28 @@ func TestWebRTCTransport_EndToEnd(t *testing.T) {
 	assert.Equal(t, "B", pkt.FromID)
 	assert.Equal(t, transport.KindUDP, pkt.Kind)
 	assert.Equal(t, []byte("pong"), pkt.Data)
+}
+
+// TestWebRTCTransport_DeliverDropsCounter verifies that when recvCh is full,
+// deliver drops non-blocking and increments the dropped counter, which is then
+// surfaced at Close.
+func TestWebRTCTransport_DeliverDropsCounter(t *testing.T) {
+	tr := &webrtcTransport{
+		logger: slog.Default(),
+		lookup: func(peerID string) (*Peer, bool) { return nil, false },
+		recvCh: make(chan transport.TransportPacket, 2),
+	}
+
+	// Fill the buffer.
+	tr.deliver("100", transport.KindTCP, []byte("a"))
+	tr.deliver("100", transport.KindTCP, []byte("b"))
+
+	// Further delivers must drop and count.
+	tr.deliver("100", transport.KindTCP, []byte("c"))
+	tr.deliver("100", transport.KindTCP, []byte("d"))
+
+	assert.Equal(t, uint64(2), atomic.LoadUint64(&tr.dropped))
+
+	// Close must not panic and should surface the drop count (logged).
+	tr.Close()
 }

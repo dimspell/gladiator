@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -34,6 +35,34 @@ type UserSession struct {
 	// state is the explicit lifecycle state of the session. See session_state.go.
 	// StateConnecting (0) is the zero value, so no explicit init is required.
 	state atomic.Int32
+
+	// wsMu guards the WebSocket field, which is read by Send/ReadNext/pingLoop
+	// and written by closeWebSocket concurrently with disconnect teardown.
+	wsMu sync.RWMutex
+}
+
+// getWebSocket returns the current websocket connection (may be nil) under a
+// read lock.
+func (us *UserSession) getWebSocket() ConnReadWriter {
+	us.wsMu.RLock()
+	defer us.wsMu.RUnlock()
+	return us.WebSocket
+}
+
+// closeWebSocket closes and clears the websocket connection under lock. It does
+// not hold the lock while calling into RoomService, so it cannot deadlock with
+// the session map mutex (Send holds sessionMutex then wsMu; this releases wsMu
+// before any sessionMutex acquisition in the caller).
+func (us *UserSession) closeWebSocket() {
+	us.wsMu.Lock()
+	defer us.wsMu.Unlock()
+	if us.WebSocket == nil {
+		return
+	}
+	if err := us.WebSocket.CloseNow(); err != nil {
+		slog.Debug("Could not close the connection", "user", us.UserID, logging.Error(err))
+	}
+	us.WebSocket = nil
 }
 
 func NewUserSession(id int64, conn ConnReadWriter) *UserSession {
@@ -45,7 +74,7 @@ func NewUserSession(id int64, conn ConnReadWriter) *UserSession {
 }
 
 func (us *UserSession) ReadNext(ctx context.Context) ([]byte, error) {
-	conn := us.WebSocket
+	conn := us.getWebSocket()
 	if conn == nil {
 		return nil, fmt.Errorf("not connected")
 	}
@@ -59,7 +88,7 @@ func (us *UserSession) ReadNext(ctx context.Context) ([]byte, error) {
 }
 
 func (us *UserSession) Send(ctx context.Context, payload []byte) {
-	conn := us.WebSocket
+	conn := us.getWebSocket()
 	if conn == nil {
 		slog.Debug("not connected", "userId", us.UserID)
 		metrics.FailedMessageSends.WithLabelValues(fmt.Sprintf("%d", us.UserID), "not_connected").Inc()

@@ -62,11 +62,15 @@ func NewListenerUDP(ipv4 string, portNumber string, onReceive ReceiveFunc) (*Lis
 func (p *ListenerUDP) Run(ctx context.Context) error {
 	defer p.Close()
 
+	p.Lock()
+	conn := p.conn
+	p.Unlock()
+	if conn == nil {
+		return fmt.Errorf("conn is nil")
+	}
+
 	for {
-		if p.conn == nil {
-			return fmt.Errorf("conn is nil")
-		}
-		if err := p.handleHandshake(p.conn, p.OnReceive); err != nil {
+		if err := p.handleHandshake(conn, p.OnReceive); err != nil {
 			p.logger.Warn("Failed to handle handshake", logging.Error(err))
 			continue
 		}
@@ -75,7 +79,14 @@ func (p *ListenerUDP) Run(ctx context.Context) error {
 		break
 	}
 
-	if err := p.handleConnection(ctx, p.conn, p.OnReceive); err != nil {
+	// The peer address is immutable after the handshake, so snapshot it once
+	// and use the local copy in the connection loop. This avoids locking on the
+	// hot path and any race with Write/Close.
+	p.Lock()
+	peerAddr := p.remoteAddr
+	p.Unlock()
+
+	if err := p.handleConnection(ctx, conn, peerAddr, p.OnReceive); err != nil {
 		p.logger.Error("Failed to handle connection", "error", err)
 		return err
 	}
@@ -127,7 +138,7 @@ func (p *ListenerUDP) handleHandshake(conn UDPConn, onReceive ReceiveFunc) error
 
 // handleConnection processes incoming UDP packets from the connected client.
 // It calls the provided onReceive callback for each valid packet.
-func (p *ListenerUDP) handleConnection(ctx context.Context, conn UDPConn, onReceive ReceiveFunc) error {
+func (p *ListenerUDP) handleConnection(ctx context.Context, conn UDPConn, peerAddr *net.UDPAddr, onReceive ReceiveFunc) error {
 	buf := make([]byte, 1024)
 
 	for {
@@ -145,7 +156,7 @@ func (p *ListenerUDP) handleConnection(ctx context.Context, conn UDPConn, onRece
 			if err != nil {
 				var ne net.Error
 				if errors.As(err, &ne) && ne.Timeout() {
-					p.lastActive = time.Now()
+					p.setLastActive()
 					continue
 				}
 				if errors.Is(err, io.EOF) {
@@ -161,12 +172,12 @@ func (p *ListenerUDP) handleConnection(ctx context.Context, conn UDPConn, onRece
 
 			// Drop packets from a source other than the handshake-recorded peer.
 			// This prevents local processes from spoofing packets into the game stream.
-			if p.remoteAddr == nil || !remoteAddr.IP.Equal(p.remoteAddr.IP) || remoteAddr.Port != p.remoteAddr.Port {
+			if peerAddr == nil || !remoteAddr.IP.Equal(peerAddr.IP) || remoteAddr.Port != peerAddr.Port {
 				p.logger.Warn("Received packet from an unknown source", "data", buf[:n], "remoteAddr", remoteAddr, "length", n)
 				continue
 			}
 
-			p.lastActive = time.Now()
+			p.setLastActive()
 
 			// Forward the packet to the game server
 			if err := onReceive(buf[:n]); err != nil {
@@ -175,6 +186,14 @@ func (p *ListenerUDP) handleConnection(ctx context.Context, conn UDPConn, onRece
 			}
 		}
 	}
+}
+
+// setLastActive records the last activity time under the mutex so concurrent
+// writers (handleConnection, Write) and readers (Alive) cannot race.
+func (p *ListenerUDP) setLastActive() {
+	p.Lock()
+	p.lastActive = time.Now()
+	p.Unlock()
 }
 
 // Write sends data to the last received remote address (the game client).

@@ -55,12 +55,19 @@ func (mp *RoomService) Stop() { mp.done() }
 func (mp *RoomService) Reset() {
 	mp.shutdown.Store(true)
 
-	mp.forEachSession(func(userSession *UserSession) bool {
-		if userSession.WebSocket != nil {
-			_ = userSession.WebSocket.CloseNow()
-		}
-		return true
-	})
+	// Collect sessions under the read lock, then close their websockets
+	// outside the lock. This avoids holding sessionMutex while closeWebSocket
+	// runs, which would invert the required lock order (sessionMutex -> wsMu).
+	mp.sessionMutex.RLock()
+	sessions := make([]*UserSession, 0, len(mp.sessions))
+	for _, s := range mp.sessions {
+		sessions = append(sessions, s)
+	}
+	mp.sessionMutex.RUnlock()
+
+	for _, s := range sessions {
+		s.closeWebSocket()
+	}
 
 	mp.sessionMutex.Lock()
 	clear(mp.sessions)
@@ -211,7 +218,7 @@ func (mp *RoomService) pingLoop(ctx context.Context, session *UserSession) {
 			if ctx.Err() != nil {
 				return
 			}
-			conn := session.WebSocket
+			conn := session.getWebSocket()
 			if conn == nil {
 				return
 			}
@@ -266,12 +273,23 @@ type GameRoom struct {
 	CreatedAt time.Time // For room lifetime metrics
 }
 
-// ListRooms returns list of all created game rooms.
-func (mp *RoomService) ListRooms() map[string]*GameRoom {
+// ListRooms returns a snapshot of all created game rooms. Each room is a deep
+// copy (including its Players map), so callers may read or iterate the result
+// without racing with LeaveRoom/JoinRoom mutations of the live Rooms map.
+func (mp *RoomService) ListRooms() map[string]GameRoom {
 	mp.roomsMutex.RLock()
 	defer mp.roomsMutex.RUnlock()
 
-	return mp.Rooms
+	rooms := make(map[string]GameRoom, len(mp.Rooms))
+	for id, room := range mp.Rooms {
+		cp := *room
+		cp.Players = make(map[int64]*UserSession, len(room.Players))
+		for uid, sess := range room.Players {
+			cp.Players[uid] = sess
+		}
+		rooms[id] = cp
+	}
+	return rooms
 }
 
 func (mp *RoomService) GetRoom(roomId string) (GameRoom, bool) {
@@ -283,6 +301,54 @@ func (mp *RoomService) GetRoom(roomId string) (GameRoom, bool) {
 		return GameRoom{}, false
 	}
 	return *room, found
+}
+
+// RoomSnapshot is a thread-safe copy of a GameRoom's observable state. It holds
+// no shared mutable references, so it is safe to read after the call returns
+// (unlike GetRoom, whose Players map aliases the live room).
+type RoomSnapshot struct {
+	PlayerIDs  []int64
+	HostUserID int64
+	Exists     bool
+}
+
+// GetRoomSnapshot returns a snapshot of a room's player set and host under
+// roomsMutex, so callers (including tests) can inspect room state without
+// racing with LeaveRoom/JoinRoom mutations of the live Players map.
+func (mp *RoomService) GetRoomSnapshot(roomID string) RoomSnapshot {
+	mp.roomsMutex.RLock()
+	defer mp.roomsMutex.RUnlock()
+	room, ok := mp.Rooms[roomID]
+	if !ok {
+		return RoomSnapshot{Exists: false}
+	}
+	ids := make([]int64, 0, len(room.Players))
+	for uid := range room.Players {
+		ids = append(ids, uid)
+	}
+	var hostUserID int64
+	if room.HostPlayer != nil {
+		hostUserID = room.HostPlayer.UserID
+	}
+	return RoomSnapshot{PlayerIDs: ids, HostUserID: hostUserID, Exists: true}
+}
+
+// GetRoomPlayers returns a snapshot of the sessions in a room under roomsMutex.
+// The returned pointers are stable; callers may read effectively-immutable
+// session fields (User, Character) after the lock is released. IPAddress may be
+// mutated by JoinRoom/CreateRoom, so do not rely on it across the lock release.
+func (mp *RoomService) GetRoomPlayers(roomID string) ([]*UserSession, bool) {
+	mp.roomsMutex.RLock()
+	defer mp.roomsMutex.RUnlock()
+	room, ok := mp.Rooms[roomID]
+	if !ok {
+		return nil, false
+	}
+	players := make([]*UserSession, 0, len(room.Players))
+	for _, session := range room.Players {
+		players = append(players, session)
+	}
+	return players, true
 }
 
 // CreateRoom creates new game room.
@@ -466,26 +532,37 @@ func (mp *RoomService) GetNextHost(room *GameRoom) *UserSession {
 	return earliest
 }
 
-func (mp *RoomService) AnnounceJoin(room GameRoom, userId int64) {
-	mp.sessionMutex.Lock()
-
-	// Finding the user session of the player who joins
-	joinedPlayer, found := mp.sessions[userId]
-	if !found {
-		mp.sessionMutex.Unlock()
+// AnnounceJoin notifies the other players in a game room that a new peer has
+// joined, so their game clients start exchanging packets. The player list is
+// snapshotted under roomsMutex so we never iterate the live Players map while
+// LeaveRoom/JoinRoom may be mutating it concurrently.
+func (mp *RoomService) AnnounceJoin(roomID string, userId int64) {
+	mp.roomsMutex.RLock()
+	room, ok := mp.Rooms[roomID]
+	if !ok {
+		mp.roomsMutex.RUnlock()
 		return
 	}
-	mp.sessionMutex.Unlock()
+	players := make([]*UserSession, 0, len(room.Players))
+	for _, session := range room.Players {
+		players = append(players, session)
+	}
+	mp.roomsMutex.RUnlock()
+
+	joinedPlayer, ok := mp.GetUserSession(userId)
+	if !ok {
+		return
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 
-	for id, session := range room.Players {
-		if id == userId {
+	for _, session := range players {
+		if session.UserID == userId {
 			continue
 		}
 		session.Send(ctx, wire.Compose(wire.JoinRoom, wire.Message{
-			To:   strconv.Itoa(int(id)),
+			To:   strconv.Itoa(int(session.UserID)),
 			From: strconv.Itoa(int(userId)),
 			Type: wire.JoinRoom,
 			Content: wire.Player{
@@ -602,10 +679,7 @@ func (mp *RoomService) SetPlayerDisconnected(session *UserSession) {
 	slog.Info("Closing player connection", "user", session.UserID)
 
 	// Close the websocket connection
-	if err := session.WebSocket.CloseNow(); err != nil {
-		slog.Debug("Could not close the connection", "user", session.UserID, logging.Error(err))
-	}
-	session.WebSocket = nil
+	session.closeWebSocket()
 
 	// Kick the user from the game room (if any)
 	mp.LeaveRoom(context.Background(), session)
@@ -710,12 +784,11 @@ func (mp *RoomService) HandleRelayJoin(eventType, peerID, roomID string) {
 	if err != nil {
 		return
 	}
-	room, found := mp.GetRoom(roomID)
-	if !found {
+	if !mp.GetRoomSnapshot(roomID).Exists {
 		slog.Debug("HandleRelayJoin: room not found", logging.RoomID(roomID), logging.PeerID(peerID))
 		return
 	}
-	mp.AnnounceJoin(room, userID)
+	mp.AnnounceJoin(roomID, userID)
 }
 
 func (mp *RoomService) HandleRelayLeave(eventType, peerID, roomID string) {
