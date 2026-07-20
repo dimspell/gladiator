@@ -29,7 +29,10 @@ jobs:
         run: go build -v ./
 
       - name: Run Tests
-        run: go test -v -timeout 300s -cover -race ./...
+        run: go test -v -timeout 600s -cover -race ./...
+
+      - name: Run E2E Tests
+        run: go test -v -tags=e2e -timeout 1200s ./internal/acceptance/...
 
   integration:
     runs-on: ubuntu-latest

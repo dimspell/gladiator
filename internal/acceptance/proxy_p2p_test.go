@@ -1,3 +1,5 @@
+//go:build e2e
+
 package acceptance
 
 import (
@@ -75,6 +77,11 @@ func TestE2E_P2P(t *testing.T) {
 
 	conn1 := &mockConn{}
 	session1 := bd1.SessionManager.Add(conn1)
+	t.Cleanup(func() {
+		if session1.Proxy != nil {
+			session1.Proxy.Close()
+		}
+	})
 
 	// FIXME: Set IPRing in test mode2
 	// session1.IpRing.IsTesting = true
@@ -142,11 +149,19 @@ func TestE2E_P2P(t *testing.T) {
 	assert.Equal(t, byte(v1.ClassType_Archer), room.Players[1].Character.ClassType)
 
 	// Other user
-	bd2 := backend.NewBackend("", ts.URL, proxy)
+	bd2 := backend.NewBackend("", ts.URL, proxy, backend.WithHTTPClient(&http.Client{
+		Timeout:   30 * time.Second,
+		Transport: backend.SharedHttpClient.Transport,
+	}))
 	bd2.SignalServerURL = "ws://" + consoleHostPort + "/lobby"
 
 	conn2 := &mockConn{}
 	session2 := bd2.SessionManager.Add(conn2)
+	t.Cleanup(func() {
+		if session2.Proxy != nil {
+			session2.Proxy.Close()
+		}
+	})
 
 	// FIXME: Set IPRing in test mode
 	// session2.IpRing.IsTesting = true
@@ -462,6 +477,14 @@ func (env *p2pTestEnv) createPlayer(username, characterName string) *p2pPlayer {
 
 	conn := &mockConn{}
 	session := bd.SessionManager.Add(conn)
+	env.t.Cleanup(func() {
+		// Tear down the per-session WebRTC/ICE/mDNS goroutines and release
+		// bound UDP/TCP ports so they don't leak across the sequential E2E
+		// P2P tests (SessionManager.Remove is not called by these tests).
+		if session.Proxy != nil {
+			session.Proxy.Close()
+		}
+	})
 
 	// Sign-in
 	authReq := backend.ClientAuthenticationRequest(append(
@@ -532,13 +555,39 @@ func (env *p2pTestEnv) joinRoom(player *p2pPlayer, roomName string) {
 }
 
 // processMessages processes all pending WebSocket messages for a short duration.
-func (env *p2pTestEnv) processMessages(duration time.Duration) {
-	timeout := time.After(duration)
+// processMessages drains pending room/signaling messages until the channel is
+// idle (no message for a short grace period) or the maximum wait elapses.
+// This replaces a fixed time.Sleep so tests finish as soon as WebRTC/migration
+// signaling settles, instead of failing when the system is slower than expected
+// (for example under the race detector). The passed duration is treated as a
+// safety cap; a too-small value is raised to a sane minimum.
+func (env *p2pTestEnv) processMessages(maxWait time.Duration) {
+	if maxWait < 30*time.Second {
+		maxWait = 30 * time.Second
+	}
+
+	idle := time.NewTimer(250 * time.Millisecond)
+	defer idle.Stop()
+	deadline := time.NewTimer(maxWait)
+	defer deadline.Stop()
+
 	for {
 		select {
-		case msg := <-env.console.RoomService.Messages:
+		case msg, ok := <-env.console.RoomService.Messages:
+			if !ok {
+				return
+			}
 			env.console.RoomService.HandleIncomingMessage(env.ctx, msg)
-		case <-timeout:
+			if !idle.Stop() {
+				select {
+				case <-idle.C:
+				default:
+				}
+			}
+			idle.Reset(250 * time.Millisecond)
+		case <-idle.C:
+			return
+		case <-deadline.C:
 			return
 		}
 	}

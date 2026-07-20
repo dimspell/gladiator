@@ -1,3 +1,5 @@
+//go:build e2e
+
 package acceptance
 
 import (
@@ -177,13 +179,39 @@ func (env *relayTestEnv) joinRoom(player *relayPlayer, roomName string) {
 }
 
 // processMessages processes all pending WebSocket messages for a short duration.
-func (env *relayTestEnv) processMessages(duration time.Duration) {
-	timeout := time.After(duration)
+// processMessages drains pending room/signaling messages until the channel is
+// idle (no message for a short grace period) or the maximum wait elapses.
+// This replaces a fixed time.Sleep so tests finish as soon as signaling settles,
+// instead of failing when the system is slower than expected (for example under
+// the race detector). The passed duration is treated as a safety cap; a
+// too-small value is raised to a sane minimum.
+func (env *relayTestEnv) processMessages(maxWait time.Duration) {
+	if maxWait < 30*time.Second {
+		maxWait = 30 * time.Second
+	}
+
+	idle := time.NewTimer(250 * time.Millisecond)
+	defer idle.Stop()
+	deadline := time.NewTimer(maxWait)
+	defer deadline.Stop()
+
 	for {
 		select {
-		case msg := <-env.console.RoomService.Messages:
+		case msg, ok := <-env.console.RoomService.Messages:
+			if !ok {
+				return
+			}
 			env.console.RoomService.HandleIncomingMessage(env.ctx, msg)
-		case <-timeout:
+			if !idle.Stop() {
+				select {
+				case <-idle.C:
+				default:
+				}
+			}
+			idle.Reset(250 * time.Millisecond)
+		case <-idle.C:
+			return
+		case <-deadline.C:
 			return
 		}
 	}

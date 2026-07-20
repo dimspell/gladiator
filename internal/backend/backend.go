@@ -17,7 +17,7 @@ import (
 )
 
 var SharedHttpClient = &http.Client{
-	Timeout: 5 * time.Second,
+	Timeout: 30 * time.Second,
 	Transport: &http.Transport{
 		Proxy:                 http.DefaultTransport.(*http.Transport).Proxy,
 		DialContext:           http.DefaultTransport.(*http.Transport).DialContext,

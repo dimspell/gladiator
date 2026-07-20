@@ -57,21 +57,21 @@ func TestRelayGameExchange(t *testing.T) {
 
 	hostEnv := map[string]string{
 		"ROLE":         "host",
-		"USERNAME":    "archer",
+		"USERNAME":     "archer",
 		"ROOM":         "room",
 		"MY_IP":        "127.0.0.1",
 		"PEER_IP":      "127.0.0.2",
 		"RELAY_MODE":   "1",
-		"BACKEND_ADDR":  "127.0.0.1:" + backendPort,
+		"BACKEND_ADDR": "127.0.0.1:" + backendPort,
 	}
 	guestEnv := map[string]string{
 		"ROLE":         "guest",
-		"USERNAME":    "mage",
+		"USERNAME":     "mage",
 		"ROOM":         "room",
 		"MY_IP":        "127.0.0.1",
 		"PEER_IP":      "127.0.0.2",
 		"RELAY_MODE":   "1",
-		"BACKEND_ADDR":  "127.0.0.1:" + backendPort,
+		"BACKEND_ADDR": "127.0.0.1:" + backendPort,
 	}
 
 	// Host runs in the background: creates the room, then listens and
@@ -130,18 +130,18 @@ func TestRelay4PlayerGameExchange(t *testing.T) {
 	_ = consoleC
 
 	backendHost := startBackend(t, ctx, net, fd, consoleName, "relay-beta", hostIP, true)
-	backendG1   := startBackend(t, ctx, net, fd, consoleName, "relay-beta", guestIP, true)
-	backendG2   := startBackend(t, ctx, net, fd, consoleName, "relay-beta", guest2IP, true)
-	backendG3   := startBackend(t, ctx, net, fd, consoleName, "relay-beta", guest3IP, true)
+	backendG1 := startBackend(t, ctx, net, fd, consoleName, "relay-beta", guestIP, true)
+	backendG2 := startBackend(t, ctx, net, fd, consoleName, "relay-beta", guest2IP, true)
+	backendG3 := startBackend(t, ctx, net, fd, consoleName, "relay-beta", guest3IP, true)
 
 	hostEnv := map[string]string{
-		"ROLE":            "host",
-		"USERNAME":        "archer",
-		"ROOM":            "room",
-		"MY_IP":           "127.0.0.1",
-		"PEER_IP":         "127.0.0.2",
-		"RELAY_MODE":      "1",
-		"BACKEND_ADDR":    "127.0.0.1:" + backendPort,
+		"ROLE":             "host",
+		"USERNAME":         "archer",
+		"ROOM":             "room",
+		"MY_IP":            "127.0.0.1",
+		"PEER_IP":          "127.0.0.2",
+		"RELAY_MODE":       "1",
+		"BACKEND_ADDR":     "127.0.0.1:" + backendPort,
 		"MOCK_NUM_PLAYERS": "4",
 	}
 	guestEnv := func(name string) map[string]string {
@@ -167,8 +167,8 @@ func TestRelay4PlayerGameExchange(t *testing.T) {
 	time.Sleep(5 * time.Second)
 
 	guests := []struct {
-		name     string
-		backend  testcontainers.Container
+		name    string
+		backend testcontainers.Container
 	}{
 		{"mage", backendG1},
 		{"warrior", backendG2},
@@ -262,31 +262,31 @@ func TestRelayFullLifecycleWithMigration(t *testing.T) {
 
 	// Phase 4: Guests B, C, D join concurrently.
 	guestBEnv := map[string]string{
-		"ROLE":        "guest",
-		"USERNAME":    "mage",
-		"ROOM":        "room",
-		"MY_IP":       "127.0.0.1",
-		"PEER_IPS":    "127.0.0.2",
-		"RELAY_MODE":  "1",
+		"ROLE":         "guest",
+		"USERNAME":     "mage",
+		"ROOM":         "room",
+		"MY_IP":        "127.0.0.1",
+		"PEER_IPS":     "127.0.0.2",
+		"RELAY_MODE":   "1",
 		"BACKEND_ADDR": "127.0.0.1:" + backendPort,
-		"LEAVE_AFTER": "40",
+		"LEAVE_AFTER":  "40",
 	}
 	guestCEnv := map[string]string{
-		"ROLE":        "guest",
-		"USERNAME":    "warrior",
-		"ROOM":        "room",
-		"MY_IP":       "127.0.0.1",
-		"PEER_IPS":    "127.0.0.2",
-		"RELAY_MODE":  "1",
+		"ROLE":         "guest",
+		"USERNAME":     "warrior",
+		"ROOM":         "room",
+		"MY_IP":        "127.0.0.1",
+		"PEER_IPS":     "127.0.0.2",
+		"RELAY_MODE":   "1",
 		"BACKEND_ADDR": "127.0.0.1:" + backendPort,
 	}
 	guestDEnv := map[string]string{
-		"ROLE":        "guest",
-		"USERNAME":    "necro",
-		"ROOM":        "room",
-		"MY_IP":       "127.0.0.1",
-		"PEER_IPS":    "127.0.0.2",
-		"RELAY_MODE":  "1",
+		"ROLE":         "guest",
+		"USERNAME":     "necro",
+		"ROOM":         "room",
+		"MY_IP":        "127.0.0.1",
+		"PEER_IPS":     "127.0.0.2",
+		"RELAY_MODE":   "1",
 		"BACKEND_ADDR": "127.0.0.1:" + backendPort,
 	}
 
