@@ -92,8 +92,8 @@ type defaultRelayMetrics struct{} //nolint:unused // may be used in future
 
 func (defaultRelayMetrics) IncConnectedPeers() { metrics.ConnectedPeers.Inc() } //nolint:unused // may be used in future
 func (defaultRelayMetrics) DecConnectedPeers() { metrics.ConnectedPeers.Dec() } //nolint:unused // may be used in future
-func (defaultRelayMetrics) IncPacketIn() { metrics.PacketIn.Inc() } //nolint:unused // may be used in future
-func (defaultRelayMetrics) IncPacketOut() { metrics.PacketOut.Inc() } //nolint:unused // may be used in future
+func (defaultRelayMetrics) IncPacketIn()       { metrics.PacketIn.Inc() }       //nolint:unused // may be used in future
+func (defaultRelayMetrics) IncPacketOut()      { metrics.PacketOut.Inc() }      //nolint:unused // may be used in future
 func (defaultRelayMetrics) SetPeersInRoom(roomID string, n int) { //nolint:unused // may be used in future
 	metrics.PeersInRoom.WithLabelValues(roomID).Set(float64(n))
 }

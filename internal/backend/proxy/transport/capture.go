@@ -23,8 +23,8 @@ type CaptureRedirect struct {
 	closed bool
 }
 
-func (c *CaptureRedirect) Run(ctx context.Context) error { select {} }
-func (c *CaptureRedirect) Alive(time.Time, time.Duration) bool              { return true }
+func (c *CaptureRedirect) Run(ctx context.Context) error       { select {} }
+func (c *CaptureRedirect) Alive(time.Time, time.Duration) bool { return true }
 func (c *CaptureRedirect) Write(p []byte) (int, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()

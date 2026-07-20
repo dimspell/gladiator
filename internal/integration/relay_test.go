@@ -207,3 +207,194 @@ func TestRelay4PlayerGameExchange(t *testing.T) {
 	require.Equal(t, 0, hostCode, "host mock client failed (code=%d):\n%s", hostCode, hostOut)
 	require.Contains(t, hostOut, "GAME_PACKET_OK")
 }
+
+// TestRelayFullLifecycleWithMigration proves a full relay-proxy lifecycle
+// with host migration. Topology: 1 console (relay-beta) + 4 backends
+// (relay-beta). Host A (archer) creates the room, guests B (mage), C (warrior),
+// and D (necro) join. B leaves mid-game, then A leaves, triggering host
+// migration to C. Survivors (C, D) re-exchange after migration.
+func TestRelayFullLifecycleWithMigration(t *testing.T) {
+	if os.Getenv("SKIP_DOCKER") != "" {
+		t.Skip("SKIP_DOCKER set")
+	}
+	ctx := context.Background()
+	repoRoot := findRepoRoot(t)
+	fd := testcontainers.FromDockerfile{
+		Context:    repoRoot,
+		Dockerfile: "Dockerfile.integration",
+		KeepImage:  true,
+	}
+
+	netName := "gladiator-lifecycle-" + strings.ToLower(t.Name())
+	net := newNetwork(t, ctx, netName)
+
+	// Phase 1: Console + 4 backends (relay-beta, all with relay enabled)
+	consoleC, consoleName := startConsole(t, ctx, net, fd, "relay-beta", true)
+	_ = consoleC
+
+	backendA := startBackend(t, ctx, net, fd, consoleName, "relay-beta", hostIP, true)
+	backendB := startBackend(t, ctx, net, fd, consoleName, "relay-beta", guestIP, true)
+	backendC := startBackend(t, ctx, net, fd, consoleName, "relay-beta", guest2IP, true)
+	backendD := startBackend(t, ctx, net, fd, consoleName, "relay-beta", guest3IP, true)
+
+	// Phase 2: Host A (archer) — background goroutine, stays ~90s then leaves.
+	hostEnv := map[string]string{
+		"ROLE":             "host",
+		"USERNAME":         "archer",
+		"ROOM":             "room",
+		"MY_IP":            "127.0.0.1",
+		"RELAY_MODE":       "1",
+		"BACKEND_ADDR":     "127.0.0.1:" + backendPort,
+		"MOCK_NUM_PLAYERS": "4",
+		"LEAVE_AFTER":      "90",
+	}
+	var wg sync.WaitGroup
+	var hostOut string
+	var hostCode int
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		hostOut, hostCode = runMockClient(t, ctx, backendA, hostEnv, 180*time.Second)
+	}()
+
+	// Phase 3: Wait for room ready on the console.
+	time.Sleep(5 * time.Second)
+
+	// Phase 4: Guests B, C, D join concurrently.
+	guestBEnv := map[string]string{
+		"ROLE":        "guest",
+		"USERNAME":    "mage",
+		"ROOM":        "room",
+		"MY_IP":       "127.0.0.1",
+		"PEER_IPS":    "127.0.0.2",
+		"RELAY_MODE":  "1",
+		"BACKEND_ADDR": "127.0.0.1:" + backendPort,
+		"LEAVE_AFTER": "40",
+	}
+	guestCEnv := map[string]string{
+		"ROLE":        "guest",
+		"USERNAME":    "warrior",
+		"ROOM":        "room",
+		"MY_IP":       "127.0.0.1",
+		"PEER_IPS":    "127.0.0.2",
+		"RELAY_MODE":  "1",
+		"BACKEND_ADDR": "127.0.0.1:" + backendPort,
+	}
+	guestDEnv := map[string]string{
+		"ROLE":        "guest",
+		"USERNAME":    "necro",
+		"ROOM":        "room",
+		"MY_IP":       "127.0.0.1",
+		"PEER_IPS":    "127.0.0.2",
+		"RELAY_MODE":  "1",
+		"BACKEND_ADDR": "127.0.0.1:" + backendPort,
+	}
+
+	var (
+		guestBOut  string
+		guestBCode int
+		guestCOut  string
+		guestCCode int
+		guestDOut  string
+		guestDCode int
+	)
+
+	// B uses its own WaitGroup so we can wait for LEAVE_AFTER=40 to fire.
+	var bWg sync.WaitGroup
+	bWg.Add(1)
+	go func() {
+		defer bWg.Done()
+		guestBOut, guestBCode = runMockClient(t, ctx, backendB, guestBEnv, 60*time.Second)
+	}()
+
+	// C and D run until their 180s timeout (survivors).
+	var guestWg sync.WaitGroup
+	guestWg.Add(1)
+	go func() {
+		defer guestWg.Done()
+		guestCOut, guestCCode = runMockClient(t, ctx, backendC, guestCEnv, 180*time.Second)
+	}()
+	guestWg.Add(1)
+	go func() {
+		defer guestWg.Done()
+		guestDOut, guestDCode = runMockClient(t, ctx, backendD, guestDEnv, 180*time.Second)
+	}()
+
+	// Phase 5: B leaves after ~40s (LEAVE_AFTER=40).
+	bWg.Wait()
+	if guestBCode != 0 || !strings.Contains(guestBOut, "GAME_PACKET_OK") {
+		dumpLogs(t, ctx, backendB, "guest-mage")
+		dumpLogs(t, ctx, consoleC, "console-relay")
+		dumpLogs(t, ctx, backendA, "host-archer")
+		t.Fatalf("guest B (mage) failed (code=%d):\n%s", guestBCode, guestBOut)
+	}
+	require.Contains(t, guestBOut, "GAME_PACKET_EXCHANGED_UDP", "B exchanged UDP before leaving")
+	require.Contains(t, guestBOut, "GAME_PACKET_EXCHANGED_TCP", "B exchanged TCP before leaving")
+
+	// Let the leave propagate through the relay.
+	time.Sleep(5 * time.Second)
+
+	// Phase 6: Survivors (C, D) keep exchanging with A — no explicit check yet.
+
+	// Phase 7: A leaves after ~90s → the console migrates host to C.
+	wg.Wait()
+	require.Equal(t, 0, hostCode, "host A (archer) failed:\n%s", hostOut)
+	require.Contains(t, hostOut, "GAME_PACKET_OK", "host A should have exchanged before leaving")
+
+	// Sleep for migration to propagate to survivors.
+	time.Sleep(5 * time.Second)
+
+	// Dump C and D container logs for migration-event visibility.
+	dumpLogs(t, ctx, backendC, "guest-warrior")
+	dumpLogs(t, ctx, backendD, "guest-necro")
+
+	// Wait for C and D to finish (180s timeout from Phase 4).
+	guestWg.Wait()
+
+	// Phase 8: Assertions on all outputs.
+	var failures []string
+
+	// Survivors must have exited 0 and exchanged successfully.
+	if guestCCode != 0 || !strings.Contains(guestCOut, "GAME_PACKET_OK") {
+		failures = append(failures, fmt.Sprintf("guest C (warrior) code=%d:\n%s", guestCCode, guestCOut))
+	}
+	if guestDCode != 0 || !strings.Contains(guestDOut, "GAME_PACKET_OK") {
+		failures = append(failures, fmt.Sprintf("guest D (necro) code=%d:\n%s", guestDCode, guestDOut))
+	}
+
+	// Survivors must have exchanged UDP and TCP (initial round or after migration).
+	if !strings.Contains(guestCOut, "GAME_PACKET_EXCHANGED_UDP") {
+		failures = append(failures, "C did not exchange UDP")
+	}
+	if !strings.Contains(guestCOut, "GAME_PACKET_EXCHANGED_TCP") {
+		failures = append(failures, "C did not exchange TCP")
+	}
+	if !strings.Contains(guestDOut, "GAME_PACKET_EXCHANGED_UDP") {
+		failures = append(failures, "D did not exchange UDP")
+	}
+	if !strings.Contains(guestDOut, "GAME_PACKET_EXCHANGED_TCP") {
+		failures = append(failures, "D did not exchange TCP")
+	}
+
+	// Host migration must be reported by at least one survivor.
+	cMig := strings.Contains(guestCOut, "HOST_MIGRATION_TO") ||
+		strings.Contains(guestCOut, "HOST_MIGRATION_SELF")
+	dMig := strings.Contains(guestDOut, "HOST_MIGRATION_TO") ||
+		strings.Contains(guestDOut, "HOST_MIGRATION_SELF")
+	if !cMig && !dMig {
+		failures = append(failures,
+			"neither C nor D reported host migration (HOST_MIGRATION_TO or HOST_MIGRATION_SELF)")
+	}
+
+	if len(failures) > 0 {
+		dumpLogs(t, ctx, consoleC, "console-relay")
+		dumpLogs(t, ctx, backendA, "host-archer")
+		dumpLogs(t, ctx, backendB, "guest-mage")
+		dumpLogs(t, ctx, backendC, "guest-warrior")
+		dumpLogs(t, ctx, backendD, "guest-necro")
+		for _, f := range failures {
+			t.Logf("FAIL: %s", f)
+		}
+		t.Fatal("survivor check failed; see FAIL lines above")
+	}
+}

@@ -74,7 +74,7 @@ func NewRelay(config *ProxyRelay, client multiv1connect.GameServiceClient, sessi
 
 	router := tport.NewPacketRouter(
 		slog.With(slog.String("proxy", "relay"), slog.String("sessionId", session.ID)),
-			remoteID(session.UserID),
+		remoteID(session.UserID),
 		session,
 		redirect.NewManager(append([]func(*redirect.HostManager){redirect.WithIPPrefix(ipPrefix.To4())}, config.ManagerOptions...)...),
 		transport,
@@ -129,19 +129,6 @@ func (r *Relay) SetRoomReady(ctx context.Context, params proxy.CreateParams) err
 		return fmt.Errorf("could not send set room ready: %w", err)
 	}
 
-	// A scheduled interval to keep connection to the relay server
-	// Note: In case of players playing alone
-	// r.router.keepAliveHost(ctx)
-
-	// Probe to check if the game server is still running
-	// onDisconnect := func() {
-	//	slog.Warn("Game server went offline")
-	//	r.router.Reset()
-	//	r.router.disconnect()
-	// }
-	// if err := probe.StartProbeTCP(ctx, net.JoinHostPort("127.0.0.1", "6114"), onDisconnect); err != nil {
-	//	return fmt.Errorf("failed start the game server probe: %w", err)
-	// }
 	return nil
 }
 

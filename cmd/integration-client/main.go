@@ -21,25 +21,34 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
 const (
-	opHostAndUsername = 30 // 0x1eff
-	opAuthHandshake   = 6  // 0x6ff
-	opClientAuth      = 41 // 0x29ff
-	opSelectCharacter = 76 // 0x4cff
+	opHostAndUsername  = 30 // 0x1eff
+	opAuthHandshake    = 6  // 0x6ff
+	opClientAuth       = 41 // 0x29ff
+	opSelectCharacter  = 76 // 0x4cff
 	opGetCharInventory = 68 // 0x44ff
-	opCreateGame      = 28 // 0x1cff
-	opListGames       = 9  // 0x9ff
-	opSelectGame      = 69 // 0x45ff
-	opJoinGame        = 34 // 0x22ff
+	opCreateGame       = 28 // 0x1cff
+	opListGames        = 9  // 0x9ff
+	opSelectGame       = 69 // 0x45ff
+	opJoinGame         = 34 // 0x22ff
 
 	gamePortUDP = "6113"
 	gamePortTCP = "6114"
 
 	handshakeMagic = "\x1a\x00\x02\x00" // {26,0,2,0}
 )
+
+// migrationState holds shared state updated by the HostMigration monitor
+// goroutine and read by the exchange phase.
+type migrationState struct {
+	mu            sync.Mutex
+	currentPeerIP string // when HOST_MIGRATION_TO=<ip>, this field is set
+	iAmHost       bool   // when HOST_MIGRATION_SELF, this peer becomes host
+}
 
 func main() {
 	if err := run(); err != nil {
@@ -54,6 +63,61 @@ func env(key, def string) string {
 		return v
 	}
 	return def
+}
+
+// monitorMigrations replaces the old blind drain goroutine.  It continuously
+// reads backend frames from the :6112 connection and reacts to HostMigration
+// (opcode 0x47 / 71).  The exchange phase uses the same conn for handshake
+// only; game traffic flows over separate UDP/TCP sockets, so reading :6112
+// here does not interfere.
+func monitorMigrations(conn net.Conn, state *migrationState) {
+	hdr := make([]byte, 4)
+	for {
+		if _, err := io.ReadFull(conn, hdr); err != nil {
+			return
+		}
+		if hdr[0] != 255 {
+			return
+		}
+		total := int(binary.LittleEndian.Uint16(hdr[2:4]))
+		if total < 4 || total > 1<<20 {
+			return
+		}
+		payload := make([]byte, total-4)
+		if _, err := io.ReadFull(conn, payload); err != nil {
+			return
+		}
+		opcode := hdr[1]
+
+		if opcode == 71 { // packet.HostMigration
+			if len(payload) < 8 {
+				continue
+			}
+			state.mu.Lock()
+			if payload[0] == 0 {
+				// This peer is the new host.
+				state.iAmHost = true
+				fmt.Println("HOST_MIGRATION_SELF")
+			} else if payload[0] == 1 {
+				// Someone else became host.
+				newIP := net.IP(payload[4:8]).String()
+				state.currentPeerIP = newIP
+				fmt.Printf("HOST_MIGRATION_TO=%s\n", newIP)
+			}
+			state.mu.Unlock()
+		}
+		// All other opcodes are silently consumed (same as the old drain).
+	}
+}
+
+// stringInSlice returns true if s is present in the slice.
+func stringInSlice(s string, slice []string) bool {
+	for _, v := range slice {
+		if v == s {
+			return true
+		}
+	}
+	return false
 }
 
 func run() error {
@@ -77,11 +141,34 @@ func run() error {
 		}
 	}
 
+	// Parse PEER_IPS (comma-separated) – overrides single PEER_IP for
+	// multi-peer exchange.
+	peerIPsStr := env("PEER_IPS", "")
+	var peerIPs []string
+	if peerIPsStr != "" {
+		for _, ip := range strings.Split(peerIPsStr, ",") {
+			ip = strings.TrimSpace(ip)
+			if ip != "" {
+				peerIPs = append(peerIPs, ip)
+			}
+		}
+	}
+
 	if relayMode {
-		if myIP == "127.0.0.1" && peerIP == "" {
+		if myIP == "127.0.0.1" && peerIP == "" && len(peerIPs) == 0 {
 			peerIP = "127.0.0.2"
 		}
 	}
+
+	// Number of guests for the host to accept.  If PEER_IPS is set it
+	// determines the count; otherwise derive from MOCK_NUM_PLAYERS.
+	numGuests := numPlayers - 1
+	if len(peerIPs) > 0 {
+		numGuests = len(peerIPs)
+	}
+
+	// Shared migration state (HostMigration opcode 71).
+	migState := &migrationState{currentPeerIP: peerIP}
 
 	conn, err := net.DialTimeout("tcp", backendAddr, 10*time.Second)
 	if err != nil {
@@ -90,15 +177,11 @@ func run() error {
 	defer conn.Close()
 	conn.SetDeadline(time.Now().Add(timeout))
 
-	// Drain backend responses so its write buffer never blocks.
-	go func() {
-		buf := make([]byte, 4096)
-		for {
-			if _, err := conn.Read(buf); err != nil {
-				return
-			}
-		}
-	}()
+	// Migration monitor – replaces the old blind drain goroutine.  It reads
+	// frames from :6112 and reacts to HostMigration (opcode 71).  The
+	// exchange phase uses separate UDP/TCP sockets, so reading :6112 here
+	// is safe.
+	go monitorMigrations(conn, migState)
 
 	if err := handshake(conn); err != nil {
 		return fmt.Errorf("handshake: %w", err)
@@ -113,7 +196,7 @@ func run() error {
 	// user in the console lobby so CreateRoom/JoinRoom can find the session.
 	// The backend only replies if the (real) inventory is exactly 207 bytes,
 	// which our mock user has none of -- so we send it and do NOT wait
-	// for a response. The drain goroutine consumes anything sent.
+	// for a response. The monitor goroutine consumes anything sent.
 	if err := triggerObserver(conn, username); err != nil {
 		return fmt.Errorf("trigger observer: %w", err)
 	}
@@ -128,8 +211,8 @@ func run() error {
 			return fmt.Errorf("host room: %w", err)
 		}
 	case "guest":
-		if peerIP == "" {
-			return fmt.Errorf("guest requires PEER_IP (host game address)")
+		if peerIP == "" && len(peerIPs) == 0 {
+			return fmt.Errorf("guest requires PEER_IP or PEER_IPS (host game address)")
 		}
 		if err := guestRoom(conn, room); err != nil {
 			return fmt.Errorf("guest room: %w", err)
@@ -147,7 +230,7 @@ func run() error {
 		time.Sleep(3 * time.Second)
 	}
 
-	if err := exchange(myIP, peerIP, role, timeout, relayMode, numPlayers); err != nil {
+	if err := exchange(myIP, peerIP, peerIPs, role, timeout, relayMode, numGuests, migState); err != nil {
 		return fmt.Errorf("game exchange: %w", err)
 	}
 
@@ -159,6 +242,19 @@ func run() error {
 		// connection closes, the relay sends "leave" to the guest, and the
 		// guest's ListenerTCP is cleaned up before the reply arrives.
 		time.Sleep(500 * time.Millisecond)
+	}
+
+	// Controlled leave: keep the connection open for LEAVE_AFTER seconds,
+	// then return.  Closing the :6112 conn triggers a relay "leave" which
+	// the test harness observes.  Default 0 = exit immediately.
+	leaveAfter := 0
+	if v := env("LEAVE_AFTER", ""); v != "" {
+		if sec, err := strconv.Atoi(v); err == nil && sec > 0 {
+			leaveAfter = sec
+		}
+	}
+	if leaveAfter > 0 {
+		time.Sleep(time.Duration(leaveAfter) * time.Second)
 	}
 
 	return nil
@@ -260,25 +356,90 @@ func createGamePayload(state uint32, room string) []byte {
 // incoming source addresses; guest sends to PEER_IP and reads the host's reply.
 // For relay/WebRTC proxy (relay=true): host accepts N-1 guest connections via
 // StartGuest dials; guest sends to PEER_IP and reads from its own listener.
-func exchange(myIP, peerIP, role string, timeout time.Duration, relay bool, numPlayers int) error {
+// When peerIPs is non-empty (PEER_IPS env var) the guest exchanges with every
+// listed IP concurrently, and the host accepts len(peerIPs) guests.
+// migState carries HostMigration updates observed on the :6112 connection.
+func exchange(myIP, peerIP string, peerIPs []string, role string, timeout time.Duration, relay bool, numGuests int, migState *migrationState) error {
 	type result struct {
 		proto string
 		err   error
 	}
-	numGuests := numPlayers - 1
-	if role != "host" {
-		numGuests = 1
-	}
-	results := make(chan result, numGuests*2)
 
-	// UDP
+	// -----------------------------------------------------------------------
+	// Guest + relay: exchange with each peer in peerIPs (or the single peerIP
+	// if peerIPs is empty), then check for a HostMigration target and exchange
+	// one more round if the IP changed.
+	// -----------------------------------------------------------------------
+	if relay && role == "guest" {
+		var targets []string
+		if len(peerIPs) > 0 {
+			targets = peerIPs
+		} else if peerIP != "" {
+			targets = []string{peerIP}
+		}
+
+		// Step 1 — exchange against every listed target concurrently.
+		results := make(chan result, len(targets)*2)
+		for _, t := range targets {
+			target := t
+			go func() {
+				err := exchangeUDP(myIP, target, role, timeout, relay, 1)
+				results <- result{"udp", err}
+			}()
+			go func() {
+				err := exchangeTCP(myIP, target, role, timeout, relay, 1)
+				results <- result{"tcp", err}
+			}()
+		}
+
+		var firstErr error
+		for i := 0; i < len(targets)*2; i++ {
+			r := <-results
+			if r.err != nil {
+				if firstErr == nil {
+					firstErr = fmt.Errorf("%s: %w", r.proto, r.err)
+				}
+				fmt.Fprintf(os.Stderr, "MOCKCLIENT_WARN: %s exchange failed: %v\n", r.proto, r.err)
+			} else {
+				fmt.Printf("GAME_PACKET_EXCHANGED_%s\n", strings.ToUpper(r.proto))
+			}
+		}
+		if firstErr != nil {
+			return firstErr
+		}
+
+		// Step 2 — check for a HostMigration peer that is not in the
+		// original target list and exchange against it.
+		migState.mu.Lock()
+		migratedTarget := migState.currentPeerIP
+		migState.mu.Unlock()
+		if migratedTarget != "" && !stringInSlice(migratedTarget, targets) {
+			err := exchangeUDP(myIP, migratedTarget, role, timeout, relay, 1)
+			if err != nil {
+				return fmt.Errorf("udp: %w", err)
+			}
+			fmt.Printf("GAME_PACKET_EXCHANGED_UDP\n")
+			err = exchangeTCP(myIP, migratedTarget, role, timeout, relay, 1)
+			if err != nil {
+				return fmt.Errorf("tcp: %w", err)
+			}
+			fmt.Printf("GAME_PACKET_EXCHANGED_TCP\n")
+		}
+		return nil
+	}
+
+	// -----------------------------------------------------------------------
+	// Host (relay or LAN) and LAN guest — original single-peer concurrent
+	// UDP + TCP exchange.
+	// -----------------------------------------------------------------------
+	results := make(chan result, 2)
+
 	go func() {
-		err := exchangeUDP(myIP, peerIP, role, timeout, relay, numPlayers)
+		err := exchangeUDP(myIP, peerIP, role, timeout, relay, numGuests)
 		results <- result{"udp", err}
 	}()
-	// TCP
 	go func() {
-		err := exchangeTCP(myIP, peerIP, role, timeout, relay, numPlayers)
+		err := exchangeTCP(myIP, peerIP, role, timeout, relay, numGuests)
 		results <- result{"tcp", err}
 	}()
 
@@ -297,7 +458,7 @@ func exchange(myIP, peerIP, role string, timeout time.Duration, relay bool, numP
 	return firstErr
 }
 
-func exchangeUDP(myIP, peerIP, role string, timeout time.Duration, relay bool, numPlayers int) error {
+func exchangeUDP(myIP, peerIP, role string, timeout time.Duration, relay bool, numGuests int) error {
 	payload := []byte("udp-game-packet-from-" + role)
 	deadline := time.Now().Add(timeout)
 	magic := []byte(handshakeMagic)
@@ -340,7 +501,7 @@ func exchangeUDP(myIP, peerIP, role string, timeout time.Duration, relay bool, n
 		}
 		defer pc.Close()
 
-		for i := 0; i < numPlayers-1; i++ {
+		for i := 0; i < numGuests; i++ {
 			pc.SetReadDeadline(deadline)
 			buf := make([]byte, 1024)
 			n, remote, err := pc.ReadFromUDP(buf)
@@ -369,7 +530,7 @@ func exchangeUDP(myIP, peerIP, role string, timeout time.Duration, relay bool, n
 		}
 		defer pc.Close()
 
-		for i := 0; i < numPlayers-1; i++ {
+		for i := 0; i < numGuests; i++ {
 			pc.SetReadDeadline(deadline)
 			buf := make([]byte, 1024)
 			n, remote, err := pc.ReadFromUDP(buf)
@@ -419,7 +580,7 @@ func exchangeUDP(myIP, peerIP, role string, timeout time.Duration, relay bool, n
 	return nil
 }
 
-func exchangeTCP(myIP, peerIP, role string, timeout time.Duration, relay bool, numPlayers int) error {
+func exchangeTCP(myIP, peerIP, role string, timeout time.Duration, relay bool, numGuests int) error {
 	payload := []byte("tcp-game-packet-from-" + role)
 	deadline := time.Now().Add(timeout)
 	magic := []byte(handshakeMagic)
@@ -476,7 +637,7 @@ func exchangeTCP(myIP, peerIP, role string, timeout time.Duration, relay bool, n
 		defer ln.Close()
 		ln.(*net.TCPListener).SetDeadline(deadline)
 
-		for i := 0; i < numPlayers-1; i++ {
+		for i := 0; i < numGuests; i++ {
 			c, err := ln.Accept()
 			if err != nil {
 				return fmt.Errorf("accept (guest %d): %w", i+1, err)

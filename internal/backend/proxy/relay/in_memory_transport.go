@@ -103,7 +103,7 @@ func (t *InMemoryTransport) Recv(ctx context.Context) (transport.TransportPacket
 		return transport.TransportPacket{}, io.EOF
 	case pkt, ok := <-recvCh:
 		if !ok {
-		return transport.TransportPacket{}, io.EOF
+			return transport.TransportPacket{}, io.EOF
 		}
 		return pkt, nil
 	}

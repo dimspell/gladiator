@@ -27,9 +27,9 @@ const integrationRelayAddr = "127.0.0.1:9911"
 // proxy client, and (optionally) a capture sink for everything the player's
 // fake hosts receive.
 type clusterPlayer struct {
-	session    *bsession.Session
+	session     *bsession.Session
 	userSession *console.UserSession
-	relay      *Relay
+	relay       *Relay
 	cap         *transport.CaptureRedirect
 }
 
@@ -89,8 +89,9 @@ func waitFor(t *testing.T, msg string, cond func() bool) {
 
 // TestCluster drives the full multi-user relay flow end-to-end against a real
 // RelayServer (loopback QUIC, no game binary, no external services):
-//   host creates room -> 3 guests join -> message exchange ->
-//   one guest leaves (cleanup) -> host leaves (host migration).
+//
+//	host creates room -> 3 guests join -> message exchange ->
+//	one guest leaves (cleanup) -> host leaves (host migration).
 func TestCluster(t *testing.T) {
 	logger.SetPlainTextLogger(os.Stderr, slog.LevelWarn)
 

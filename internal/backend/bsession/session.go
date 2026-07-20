@@ -284,4 +284,3 @@ func (s *Session) SendRTCAnswer(ctx context.Context, answer webrtc.SessionDescri
 		Offer:       answer,
 	}, recipientId)
 }
-

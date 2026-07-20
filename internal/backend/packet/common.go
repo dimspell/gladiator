@@ -40,7 +40,7 @@ const (
 
 	opSetChannelName byte = 7
 
-	opUnknown1  byte = 1 //nolint:unused // reserved for future use
+	opUnknown1  byte = 1  //nolint:unused // reserved for future use
 	opUnknown17 byte = 18 //nolint:unused // reserved for future use (0x11? 0x12?)
 )
 

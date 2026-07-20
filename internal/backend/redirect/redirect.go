@@ -101,7 +101,7 @@ func NewUDPRedirect(joinType Mode, addr *Addressing) (Redirect, error) {
 }
 
 func NewTCPRedirect(joinType Mode, addr *Addressing) (Redirect, error) {
-		logger := slog.With(
+	logger := slog.With(
 		slog.String("redirect", "NewTCPRedirect"),
 		slog.String("joinType", joinType.String()),
 		slog.String("ip", addr.IP.String()),

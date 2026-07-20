@@ -67,7 +67,10 @@ func TestE2E_P2P(t *testing.T) {
 	cs.ConsoleBindAddr = consoleHostPort
 
 	// proxy1.NewRedirect = redirectFunc
-	bd1 := backend.NewBackend("", ts.URL, proxy)
+	bd1 := backend.NewBackend("", ts.URL, proxy, backend.WithHTTPClient(&http.Client{
+		Timeout:   30 * time.Second,
+		Transport: backend.SharedHttpClient.Transport,
+	}))
 	bd1.SignalServerURL = "ws://" + consoleHostPort + "/lobby"
 
 	conn1 := &mockConn{}
