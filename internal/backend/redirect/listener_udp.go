@@ -71,6 +71,11 @@ func (p *ListenerUDP) Run(ctx context.Context) error {
 
 	for {
 		if err := p.handleHandshake(conn, p.OnReceive); err != nil {
+			// A closed connection or cancelled context means we are shutting
+			// down; don't spam warnings or busy-loop on a dead socket.
+			if errors.Is(err, net.ErrClosed) || errors.Is(err, io.EOF) || ctx.Err() != nil {
+				return nil
+			}
 			p.logger.Warn("Failed to handle handshake", logging.Error(err))
 			continue
 		}
