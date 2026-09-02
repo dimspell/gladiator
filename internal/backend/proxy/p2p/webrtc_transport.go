@@ -17,7 +17,7 @@ import (
 //
 // Outbound: Send looks up the destination peer by pkt.ToID and writes the payload
 // onto its data channel, prefixing it with 'T'/'U' so the receiver can route it to
-// the right fake socket (mirroring the legacy p2p wire framing).
+// the right fake socket.
 //
 // Inbound: setupDataChannel registers dc.OnMessage handlers that push a
 // transport.TransportPacket (tagged with the sender's peer ID) into recvCh. The

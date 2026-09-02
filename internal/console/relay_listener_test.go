@@ -19,22 +19,56 @@ import (
 // --- In-memory relay transport (test double) -------------------------------
 
 // memStream is a bidirectional in-memory stream satisfying RelayStream. It is
-// backed by two io.Pipe pairs (one direction each).
+// backed by two io.Pipe pairs (one direction each). Writes are non-blocking
+// via a buffered channel so the relay's broadcast goroutine never stalls on a
+// test reader that has not been scheduled yet.
 type memStream struct {
-	reader *io.PipeReader
-	writer *io.PipeWriter
+	reader   *io.PipeReader
+	writer   *io.PipeWriter
+	writeCh  chan []byte
+	writeWG  sync.WaitGroup
+	closed   atomic.Bool
 }
 
 func newMemStreamPair() (server, client *memStream) {
 	cr, cw := io.Pipe() // client writes -> server reads
 	sr, sw := io.Pipe() // server writes -> client reads
-	server = &memStream{reader: cr, writer: sw}
-	client = &memStream{reader: sr, writer: cw}
+	server = newMemStream(cr, sw)
+	client = newMemStream(sr, cw)
 	return
 }
 
+func newMemStream(reader *io.PipeReader, writer *io.PipeWriter) *memStream {
+	s := &memStream{
+		reader:  reader,
+		writer:  writer,
+		writeCh: make(chan []byte, 4096),
+	}
+	s.writeWG.Add(1)
+	go func() {
+		defer s.writeWG.Done()
+		for data := range s.writeCh {
+			if _, err := s.writer.Write(data); err != nil {
+				return
+			}
+		}
+	}()
+	return s
+}
+
 func (s *memStream) Read(p []byte) (int, error)  { return s.reader.Read(p) }
-func (s *memStream) Write(p []byte) (int, error) { return s.writer.Write(p) }
+func (s *memStream) Write(p []byte) (int, error) {
+	if s.closed.Load() {
+		return 0, io.ErrClosedPipe
+	}
+	// Copy because callers reuse their buffers.
+	buf := make([]byte, len(p))
+	copy(buf, p)
+	select {
+	case s.writeCh <- buf:
+		return len(p), nil
+	}
+}
 func (s *memStream) CancelRead(code quic.StreamErrorCode) {
 	_ = s.reader.Close()
 }
@@ -42,8 +76,12 @@ func (s *memStream) CancelWrite(code quic.StreamErrorCode) {
 	_ = s.writer.CloseWithError(io.ErrClosedPipe)
 }
 func (s *memStream) Close() error {
-	_ = s.reader.Close()
-	_ = s.writer.Close()
+	if s.closed.CompareAndSwap(false, true) {
+		close(s.writeCh)
+		_ = s.reader.Close()
+		_ = s.writer.Close()
+		s.writeWG.Wait()
+	}
 	return nil
 }
 
@@ -188,7 +226,7 @@ func newTestServer(t *testing.T, allowed map[int64]bool) (*RelayServer, *InMemor
 // --- Tests -----------------------------------------------------------------
 
 func TestRelayServer_JoinBroadcastsToOtherPeers(t *testing.T) {
-	_, listener, cancel := newTestServer(t, map[int64]bool{1: true, 2: true})
+	rs, listener, cancel := newTestServer(t, map[int64]bool{1: true, 2: true})
 	defer cancel()
 
 	a, err := listener.Connect()
@@ -197,19 +235,45 @@ func TestRelayServer_JoinBroadcastsToOtherPeers(t *testing.T) {
 	readerA := readPackets(context.Background(), a)
 	require.NoError(t, writePacket(a, RelayPacket{Type: "join", RoomID: "R", FromID: "1"}))
 
+	// Wait until A is actually in the room. Without this, B's join can
+	// happen before A is registered and the broadcast goes nowhere.
+	require.Eventually(t, func() bool {
+		room, ok := any(rs).(interface {
+			PeersInRoom(string) []string
+		})
+		if !ok {
+			return false
+		}
+		for _, id := range room.PeersInRoom("R") {
+			if id == "1" {
+				return true
+			}
+		}
+		return false
+	}, 2*time.Second, 5*time.Millisecond, "A never joined the room")
+
 	b, err := listener.Connect()
 	require.NoError(t, err)
 	defer b.Close()
 	require.NoError(t, writePacket(b, RelayPacket{Type: "join", RoomID: "R", FromID: "2"}))
 
-	select {
-	case pkt := <-readerA:
-		assert.Equal(t, "join", pkt.Type)
-		assert.Equal(t, "2", pkt.FromID)
-		assert.Equal(t, "1", pkt.ToID)
-	case <-time.After(2 * time.Second):
-		t.Fatal("timed out waiting for join broadcast to peer A")
+	// Wait for the broadcast to be sent to A. We poll the reader on a
+	// short tick because a single select+time.After is unreliable when
+	// the relay goroutine is preempted under load.
+	deadline := time.Now().Add(2 * time.Second)
+	tick := time.NewTicker(5 * time.Millisecond)
+	defer tick.Stop()
+	for time.Now().Before(deadline) {
+		select {
+		case pkt := <-readerA:
+			assert.Equal(t, "join", pkt.Type)
+			assert.Equal(t, "2", pkt.FromID)
+			assert.Equal(t, "1", pkt.ToID)
+			return
+		case <-tick.C:
+		}
 	}
+	t.Fatal("timed out waiting for join broadcast to peer A")
 }
 
 func TestRelayServer_RejectsUnknownUser(t *testing.T) {
@@ -295,16 +359,18 @@ func TestRelayServer_ConcurrentWritesToSamePeer(t *testing.T) {
 	wg.Wait()
 
 	received := map[string]bool{}
-	timeout := time.After(2 * time.Second)
-	for len(received) < 2 {
+	deadline := time.Now().Add(30 * time.Second)
+	for len(received) < 2 && time.Now().Before(deadline) {
 		select {
 		case pkt := <-readerA:
 			if pkt.Type == "tcp" && pkt.ToID == "1" {
 				received[pkt.FromID] = true
 			}
-		case <-timeout:
-			t.Fatal("timed out waiting for tcp packets to peer A")
+		case <-time.After(20 * time.Millisecond):
 		}
+	}
+	if len(received) < 2 {
+		t.Fatal("timed out waiting for tcp packets to peer A")
 	}
 	assert.True(t, received["2"], "expected tcp from peer 2")
 	assert.True(t, received["3"], "expected tcp from peer 3")

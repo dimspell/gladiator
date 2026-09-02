@@ -127,7 +127,7 @@ func (c *Controller) StopConsole() error {
 		slog.Warn("Console has been already shut down")
 		return nil
 	}
-	if err := c.consoleStop(context.TODO()); err != nil {
+	if err := c.consoleStop(context.Background()); err != nil {
 		return err
 	}
 

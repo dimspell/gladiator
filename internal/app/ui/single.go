@@ -201,9 +201,9 @@ func (c *Controller) SinglePlayerScreen(w fyne.Window, initial *SinglePlayerScre
 }
 
 func renderRegistryNotes() *widget.RichText {
-	registryUpdatedText := widget.NewRichTextFromMarkdown("**1. Update the registry (e.g. with regedit)**\n\n" +
-		"Make sure the value of `HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\AbalonStudio\\Dispel\\Multi\\Server` key is set to `localhost`. " +
-		"If not, then please change it.")
+	registryUpdatedText := widget.NewRichTextFromMarkdown("**1. Point the installed game at this server (optional, reversible)**\n\n" +
+		"This sets the game's server to `localhost` and its version to `1.30`. " +
+		"The old values are saved first, so Restore puts them back.")
 	registryUpdatedText.Wrapping = fyne.TextWrapWord
 
 	return registryUpdatedText
@@ -211,52 +211,65 @@ func renderRegistryNotes() *widget.RichText {
 
 func renderRegistryPatchContainer(w fyne.Window) fyne.CanvasObject {
 	registryValueBinding := binding.NewString()
-	changeRegistryValue := func(registryValue string) {
-		if registryValue == "" {
-			registryValue = "<unknown>"
-		}
-		_ = registryValueBinding.Set(fmt.Sprintf("Value: %q", registryValue))
-	}
-
-	registryValue, _ := registrypatch.ReadServer()
-	changeRegistryValue(registryValue)
-
-	checkButton := widget.NewButton("Check registry", func() {
+	refresh := func() {
 		s, err := registrypatch.ReadServer()
 		if err != nil {
 			dialog.ShowError(err, w)
 			return
 		}
-		changeRegistryValue(s)
-		dialog.ShowInformation("Registry value", fmt.Sprintf("Current value: %q", s), w)
+		if s == "" {
+			s = "<unknown>"
+		}
+		_ = registryValueBinding.Set(fmt.Sprintf("Value: %q", s))
+	}
+
+	s, _ := registrypatch.ReadServer()
+	if s == "" {
+		s = "<unknown>"
+	}
+	_ = registryValueBinding.Set(fmt.Sprintf("Value: %q", s))
+
+	checkButton := widget.NewButton("Check", func() {
+		refresh()
 	})
 
-	patchButton := widget.NewButton("Patch registry", func() {
+	patchButton := widget.NewButton("Use localhost", func() {
 		before, _ := registrypatch.ReadServer()
+		dialog.ShowConfirm("Point the game at this server?",
+			fmt.Sprintf("Set the game's server from %q to %q and its version to %q? The old values are saved and can be restored.", before, "localhost", "1.30"),
+			func(confirmed bool) {
+				if !confirmed {
+					return
+				}
+				if !registrypatch.PatchRegistry() {
+					dialog.ShowError(fmt.Errorf("cannot change the setting (was the elevation prompt cancelled?)"), w)
+					return
+				}
 
-		if !registrypatch.PatchRegistry() {
-			dialog.ShowError(fmt.Errorf("cannot change registry key"), w)
+				time.Sleep(1 * time.Second)
+				refresh()
+			}, w)
+	})
+
+	restoreButton := widget.NewButton("Restore", func() {
+		if !registrypatch.RestoreRegistry() {
+			dialog.ShowError(fmt.Errorf("nothing to restore (is there a saved value?)"), w)
 			return
 		}
-
 		time.Sleep(1 * time.Second)
-
-		after, err := registrypatch.ReadServer()
-		if err != nil {
-			dialog.ShowError(err, w)
-			return
-		}
-		changeRegistryValue(after)
-		dialog.ShowInformation("Changed Windows Registry", fmt.Sprintf("From %q to %q", before, after), w)
+		refresh()
 	})
 
 	statusLabel := widget.NewLabelWithData(registryValueBinding)
 	statusLabel.Alignment = fyne.TextAlignCenter
 
-	return container.NewGridWithColumns(3,
+	return container.NewVBox(
 		statusLabel,
-		checkButton,
-		patchButton,
+		container.NewGridWithColumns(3,
+			checkButton,
+			patchButton,
+			restoreButton,
+		),
 	)
 }
 
@@ -280,7 +293,7 @@ func renderCreateUserNotes() *widget.RichText {
 
 func renderStartGameNotes() *widget.RichText {
 	startGameText := widget.NewRichTextFromMarkdown("**4. Start game**\n\n" +
-		"Start the Dispel Multi game from the shortcut on your desktop or the Menu Start.")
+		"Start the game from the shortcut on your desktop or the Menu Start.")
 	startGameText.Wrapping = fyne.TextWrapWord
 
 	return startGameText

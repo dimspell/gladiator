@@ -19,7 +19,7 @@ const (
 
 	// All players, who connect to the server are guests (joiners).
 	// We are connecting (dialing) to ourselves on the loopback interface,
-	// to the local instance served by the DispelMulti.exe.
+	// to our own game instance.
 	CurrentUserIsHost
 
 	// The person who is connecting is a host (game creator).
@@ -29,7 +29,7 @@ const (
 
 	// The person who is connecting is a guest, who has already joined.
 	// We are connecting (dialing) to the host (game creator) on the loopback interface,
-	// to the local instance served by the DispelMulti.exe.
+	// to the host's game instance.
 	OtherUserHasJoined
 
 	// The person who is connecting is a guest, who has not joined yet.

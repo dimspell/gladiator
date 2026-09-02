@@ -59,6 +59,7 @@ type PeerConn struct {
 	Conn     RelayConn
 	LastSeen time.Time
 	writeMu  sync.Mutex
+	writeCh  chan []byte
 }
 
 type Room struct {
@@ -187,6 +188,11 @@ func (rs *RelayServer) Start(ctx context.Context) {
 
 	go rs.livenessChecker(ctx)
 
+	// When ctx is cancelled, remove every remaining peer so the per-peer
+	// writer goroutines exit. Without this the relay leaks goroutines on
+	// shutdown and goleak-based tests fail.
+	defer rs.shutdownAll()
+
 	for {
 		conn, err := rs.listener.Accept(ctx)
 		if err != nil {
@@ -197,6 +203,21 @@ func (rs *RelayServer) Start(ctx context.Context) {
 			continue
 		}
 		go rs.handleConn(ctx, conn)
+	}
+}
+
+// shutdownAll tears down every active peer and room. Used by Start when
+// its context is cancelled.
+func (rs *RelayServer) shutdownAll() {
+	rs.mu.Lock()
+	peers := make([]string, 0, len(rs.peerToRoomIDs))
+	for peerID, roomID := range rs.peerToRoomIDs {
+		peers = append(peers, peerID)
+		_ = roomID
+	}
+	rs.mu.Unlock()
+	for _, peerID := range peers {
+		rs.LeaveRoom(peerID, "")
 	}
 }
 
@@ -297,10 +318,13 @@ func (rs *RelayServer) joinRoom(roomID, peerID string, conn RelayConn, stream Re
 		Stream:   stream,
 		Conn:     conn,
 		LastSeen: time.Now(),
+		writeCh:  make(chan []byte, 64),
 	}
 	room.Peers[peerID] = pc
 	rs.peerToRoomIDs[peerID] = roomID
 	rs.logger.Info("joined room", logging.RoomID(roomID), logging.PeerID(peerID))
+
+	go rs.peerWriter(pc)
 
 	for _, peer := range room.Peers {
 		if peer.ID == peerID {
@@ -408,6 +432,10 @@ func (rs *RelayServer) LeaveRoom(peerID, roomID string) {
 
 	rs.closeStream(leaver.Conn, leaver.Stream)
 	delete(room.Peers, peerID)
+	// Stop the peerWriter goroutine. Use sync.Once to make the close
+	// idempotent: a peer can be removed by a clean leave and then again by
+	// a stream error.
+	closePeerWriter(leaver)
 
 	rs.logger.Info("peer left room", logging.RoomID(roomID), logging.PeerID(peerID))
 	metrics.PeerDisconnects.WithLabelValues("leave_room").Inc()
@@ -500,22 +528,59 @@ func (rs *RelayServer) broadcastFrom(roomID, fromID string, pkt RelayPacket) {
 }
 
 func (rs *RelayServer) sendSigned(peer *PeerConn, pkt RelayPacket) {
-	peer.writeMu.Lock()
-	defer peer.writeMu.Unlock()
-
 	data, err := json.Marshal(pkt)
 	if err != nil {
 		rs.logger.Error("json marshal failed", logging.Error(err))
 		metrics.RelayErrors.WithLabelValues("marshal").Inc()
 		return
 	}
-	if err := types.WriteFramed(peer.Stream, data); err != nil {
-		rs.logger.Error("could not write the msg", logging.Error(err))
-		metrics.RelayErrors.WithLabelValues("write").Inc()
+	log.Println("sendSigned", peer.ID)
+	// Serialize writes per peer (the stream is not safe for concurrent
+	// use) but never block the caller: a slow reader must not stall the
+	// room's other peers or the join handshake.
+	select {
+	case peer.writeCh <- data:
+	default:
+		metrics.PacketsDropped.Inc()
+		rs.logger.Warn("peer write channel full, dropping packet", logging.PeerID(peer.ID))
+	}
+	log.Println("sendSigned done", peer.ID)
+}
+
+// peerWriter drains peer.writeCh into the underlying stream. One per peer.
+// Started by joinRoom and stopped when the peer is removed.
+func (rs *RelayServer) peerWriter(peer *PeerConn) {
+	log.Println("peerWriter start", peer.ID)
+	for data := range peer.writeCh {
+		log.Println("peerWriter write", peer.ID, len(data))
+		peer.writeMu.Lock()
+		err := types.WriteFramed(peer.Stream, data)
+		peer.writeMu.Unlock()
+		if err != nil {
+			log.Println("peerWriter exit error", peer.ID, err)
+			rs.logger.Error("could not write the msg", logging.Error(err))
+			metrics.RelayErrors.WithLabelValues("write").Inc()
+			return
+		}
+		metrics.PacketOut.Inc()
+		metrics.BytesSent.Add(float64(len(data) + 4))
+	}
+	log.Println("peerWriter exit range done", peer.ID)
+}
+
+// closePeerWriter is the idempotent shutdown for a peer's write goroutine.
+// Multiple leave paths (explicit leave, stream error, server shutdown) may
+// call it; only the first close takes effect.
+var peerWriterClose sync.Map // *PeerConn -> struct{}
+
+func closePeerWriter(peer *PeerConn) {
+	log.Println("closePeerWriter", peer.ID)
+	if _, loaded := peerWriterClose.LoadOrStore(peer, struct{}{}); loaded {
+		log.Println("closePeerWriter already loaded", peer.ID)
 		return
 	}
-	metrics.PacketOut.Inc()
-	metrics.BytesSent.Add(float64(len(data) + 4))
+	close(peer.writeCh)
+	log.Println("closePeerWriter closed", peer.ID)
 }
 
 // PeersInRoom returns the peer IDs currently in a room. Only used in tests.

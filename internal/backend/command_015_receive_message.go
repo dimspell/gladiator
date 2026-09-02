@@ -29,3 +29,13 @@ func NewLobbyMessage(user, text string) []byte {
 func SetChannelName(channelName string) []byte {
 	return packet.SetChannelName(channelName)
 }
+
+// Deprecated: Use packet.NewAdminNotice.
+func NewAdminNotice(user, text string) []byte {
+	return packet.NewAdminNotice(user, text)
+}
+
+// Deprecated: Use packet.NewNumericProbe.
+func NewNumericProbe(s1, s2, s3 string) []byte {
+	return packet.NewNumericProbe(s1, s2, s3)
+}

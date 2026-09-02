@@ -23,6 +23,18 @@ func Split(buf []byte) [][]byte {
 			break
 		}
 
+		// 4-byte lobby tokens
+		if offset+4 <= len(buf) && buf[offset+1] == 0x0B && buf[offset+2] == 0x40 && buf[offset+3] == 0xBF {
+			packets = append(packets, buf[offset:offset+4])
+			offset += 4
+			continue
+		}
+		if offset+4 <= len(buf) && buf[offset+1] == 0x09 && buf[offset+2] == 0x40 && buf[offset+3] == 0xBF {
+			packets = append(packets, buf[offset:offset+4])
+			offset += 4
+			continue
+		}
+
 		length := int(binary.LittleEndian.Uint16(buf[offset+2 : offset+4]))
 
 		// Ignore oversize packets

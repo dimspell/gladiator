@@ -479,9 +479,16 @@ func (mp *RoomService) LeaveRoom(ctx context.Context, session *UserSession) {
 	}
 
 	if playerWasHost {
-		// Find the user who will become the new host
+		// Find the next host. Observed host-election behavior for local
+		// interop: pick the next valid host and broadcast its IP.
+		// Cases handled: self (client becomes host), known peer (client
+		// connects to host:6114), unknown (no valid IP yet), null-IP
+		// (0.0.0.0 refresh), and already-host.
 		room.HostPlayer = mp.GetNextHost(room)
 		metrics.HostMigrations.Inc()
+		if room.HostPlayer != nil {
+			slog.Info("host election: new host chosen", "room", room.ID, "oldHost", session.UserID, "newHost", room.HostPlayer.UserID, "newHostIP", room.HostPlayer.IPAddress)
+		}
 	}
 
 	for id, player := range room.Players {
@@ -499,6 +506,14 @@ func (mp *RoomService) LeaveRoom(ctx context.Context, session *UserSession) {
 		}))
 
 		if playerWasHost && room.HostPlayer != nil {
+			// Null-IP refresh — observed behavior: refresh the slot without
+			// full migration.
+			// If the elected host has no IP yet, skip HostMigration and let
+			// clients wait for re-election.
+			if room.HostPlayer.IPAddress == "" || room.HostPlayer.IPAddress == "0.0.0.0" {
+				slog.Info("host election: null-IP refresh, skipping migration", "room", room.ID, "newHost", room.HostPlayer.UserID)
+				continue
+			}
 			player.Send(ctx, wire.Compose(wire.HostMigration, wire.Message{
 				To:   strconv.Itoa(int(id)),
 				From: strconv.Itoa(int(room.HostPlayer.UserID)),
@@ -519,17 +534,34 @@ func (mp *RoomService) LeaveRoom(ctx context.Context, session *UserSession) {
 }
 
 // GetNextHost returns the next host of the game room.
+// The server picks the new host and sends its IP to the room; each
+// remaining client then either becomes the host itself, connects to the
+// new host, keeps waiting for an address, or refreshes its slot. Prefer
+// the earliest joined player with a valid IP, falling back to the earliest
+// joined player when nobody has an address yet, so the election stays
+// deterministic.
 func (mp *RoomService) GetNextHost(room *GameRoom) *UserSession {
-	var earliest *UserSession
+	var earliestValid *UserSession
+	var earliestAny *UserSession
 
-	// Find the player who joined the room earliest
 	for _, player := range room.Players {
-		if earliest == nil || player.JoinedAt.Before(earliest.JoinedAt) {
-			earliest = player
+		if earliestAny == nil || player.JoinedAt.Before(earliestAny.JoinedAt) {
+			earliestAny = player
+		}
+		if player.IPAddress != "" && player.IPAddress != "0.0.0.0" {
+			if earliestValid == nil || player.JoinedAt.Before(earliestValid.JoinedAt) {
+				earliestValid = player
+			}
 		}
 	}
 
-	return earliest
+	if earliestValid != nil {
+		return earliestValid
+	}
+	// No player has a valid IP yet (e.g. all pending) — return earliest.
+	// Callers must handle null-IP refresh (slot refresh without full
+	// migration).
+	return earliestAny
 }
 
 // AnnounceJoin notifies the other players in a game room that a new peer has
@@ -646,7 +678,7 @@ func (mp *RoomService) SetPlayerConnected(session *UserSession) {
 	mp.AddUserSession(session.UserID, session)
 	session.Transition(StateInLobby)
 
-	ctx, cancel := context.WithTimeout(context.TODO(), time.Second*3)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
 	defer cancel()
 
 	// Include in response also the player who has just joined

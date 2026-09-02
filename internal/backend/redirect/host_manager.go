@@ -328,6 +328,7 @@ func (hm *HostManager) CreateFakeHost(
 
 	hm.Hosts[assignedIP] = host
 	hm.PeerHosts[peerID] = host
+	hm.Logger.Debug("TRACE CreateFakeHost added to PeerHosts", "peerID", peerID, "assignedIP", assignedIP, "peerHostsCount", len(hm.PeerHosts))
 
 	return host, nil
 }
@@ -382,6 +383,7 @@ func (hm *HostManager) RemoveByIP(ipAddr string) {
 func (hm *HostManager) RemoveByRemoteID(remoteID string) bool {
 	hm.mu.Lock()
 	defer hm.mu.Unlock()
+	hm.Logger.Debug("TRACE RemoveByRemoteID", "peerID", remoteID, "peerHostsBefore", len(hm.PeerHosts), "peerHostsKeys", fmt.Sprintf("%v", func() []string { var keys []string; for k := range hm.PeerHosts { keys = append(keys, k) }; return keys }()))
 	host, exists := hm.PeerHosts[remoteID]
 	if !exists {
 		hm.Logger.Debug("Cleaning up guest host - not exist", logging.PeerID(remoteID))
@@ -422,6 +424,7 @@ func (hm *HostManager) stopHostLocked(host *FakeHost) {
 		delete(hm.IPToPeerID, host.AssignedIP)
 		delete(hm.PeerIPs, remoteID)
 		delete(hm.PeerHosts, remoteID)
+		hm.Logger.Debug("TRACE stopHostLocked removed from PeerHosts", "peerID", remoteID, "assignedIP", host.AssignedIP, "peerHostsCount", len(hm.PeerHosts))
 	})
 }
 
@@ -454,6 +457,7 @@ func (hm *HostManager) GetPeerIP(remoteID string) (string, bool) {
 func (hm *HostManager) ForEachPeerHost(fn func(peerID string, host *FakeHost) bool) {
 	hm.mu.Lock()
 	defer hm.mu.Unlock()
+	hm.Logger.Debug("TRACE ForEachPeerHost", "peerHostsCount", len(hm.PeerHosts), "keys", fmt.Sprintf("%v", func() []string { var keys []string; for k := range hm.PeerHosts { keys = append(keys, k) }; return keys }()))
 	for id, host := range hm.PeerHosts {
 		if !fn(id, host) {
 			break

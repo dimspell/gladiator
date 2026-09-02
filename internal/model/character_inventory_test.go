@@ -16,26 +16,26 @@ func TestCharacterInventory_ToBytes(t *testing.T) {
 			inv: CharacterInventory{
 				Backpack: [63]InventoryItem{
 					{
-						TypeId:  1,
-						ItemId:  2,
-						Unknown: 3,
+						TypeId:    1,
+						ItemId:    2,
+						PackedPos: 3,
 					},
 					{
-						TypeId:  4,
-						ItemId:  5,
-						Unknown: 6,
+						TypeId:    4,
+						ItemId:    5,
+						PackedPos: 6,
 					},
 				},
 				Belt: [6]InventoryItem{
 					{
-						TypeId:  7,
-						ItemId:  8,
-						Unknown: 9,
+						TypeId:    7,
+						ItemId:    8,
+						PackedPos: 9,
 					},
 					{
-						TypeId:  10,
-						ItemId:  11,
-						Unknown: 12,
+						TypeId:    10,
+						ItemId:    11,
+						PackedPos: 12,
 					},
 				},
 			},

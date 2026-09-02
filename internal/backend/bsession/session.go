@@ -108,7 +108,7 @@ func (s *Session) ToPlayer(ipAddr net.IP) wire.Player {
 func (s *Session) InitObserver(registerNewObserver func(context.Context) error) error {
 	var err error
 	s.OnceSelectedCharacter.Do(func() {
-		ctx := context.TODO()
+		ctx := context.Background()
 
 		err = s.JoinLobby(ctx)
 		if err != nil {

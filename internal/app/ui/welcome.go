@@ -46,7 +46,7 @@ func (c *Controller) WelcomeScreen(w fyne.Window) fyne.CanvasObject {
 		nil,
 		container.NewPadded(
 			container.NewVBox(
-				widget.NewRichTextFromMarkdown("# Gladiator Dispel Multi"),
+				widget.NewRichTextFromMarkdown("# Gladiator"),
 
 				container.NewVBox(
 					header1Label,

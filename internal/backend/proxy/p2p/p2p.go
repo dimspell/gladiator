@@ -13,6 +13,7 @@ import (
 	"github.com/dimspell/gladiator/gen/multi/v1/multiv1connect"
 	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"github.com/dimspell/gladiator/internal/backend/bsession"
+	"github.com/dimspell/gladiator/internal/backend/packet"
 	"github.com/dimspell/gladiator/internal/backend/proxy"
 	"github.com/dimspell/gladiator/internal/backend/proxy/transport"
 	"github.com/dimspell/gladiator/internal/backend/redirect"
@@ -418,14 +419,56 @@ func (p *PeerToPeer) handleLeaveRoom(ctx context.Context, player wire.Player) er
 
 func (p *PeerToPeer) handleHostMigration(ctx context.Context, newHost wire.Player) error {
 	newHostID := peerID(newHost.UserID)
+	newHostIPStr := newHost.IPAddress
 
 	p.mu.Lock()
+	prevHostID := p.currentHostID
 	p.currentHostID = newHostID
+	selfID := p.selfID
 	p.mu.Unlock()
 
 	p.router.SetCurrentHostID(newHostID)
 
-	p.logger.Info("Host migration", "newHost", newHostID)
+	// Host migration arrives in 5 cases, handled the same way as the
+	// router's HostMigration.
+
+	// Case 4 — Null-IP refresh: no migration packet, just log.
+	if newHostIPStr == "" || newHostIPStr == "0.0.0.0" {
+		p.logger.Info("host migration: null-IP refresh (p2p), no action", "newHostID", newHostID)
+		return nil
+	}
+
+	ip := net.ParseIP(newHostIPStr)
+	if ip == nil {
+		p.logger.Warn("host migration: invalid IP, waiting for re-election", "newHostID", newHostID, "ip", newHostIPStr)
+		_ = p.session.SendToGame(packet.ReceiveMessage, packet.NewAdminNotice("system", "Host election: unknown host, please wait"))
+		return nil
+	}
+
+	// Case 1 — Self becomes host. Check already-host for idempotency.
+	if newHostID == selfID {
+		if prevHostID == selfID {
+			p.logger.Info("host migration: already host (p2p), refreshing", "selfID", selfID)
+			return nil
+		}
+		p.logger.Info("host migration: I became host (p2p)", "selfID", selfID, "ip", newHostIPStr)
+		// Flag 0 tells the game it is the host, so it starts listening on 6114.
+		payload := packet.NewHostSwitch(false, net.IPv4(127, 0, 0, 1))
+		if err := p.session.SendToGame(packet.HostMigration, payload); err != nil {
+			p.logger.Error("failed to send host migration (self p2p)", logging.Error(err))
+		}
+		return nil
+	}
+
+	// Case 2 — Known peer becomes host: send flag 1 + IP so the game
+	// connects to host:6114. P2P still creates the WebRTC peer connection
+	// separately in createPeerConnection, but the in-game packet is needed
+	// for the game's host-migration handler.
+	p.logger.Info("host migration: peer host (p2p)", "newHostID", newHostID, "ip", newHostIPStr)
+	payload := packet.NewHostSwitch(true, ip)
+	if err := p.session.SendToGame(packet.HostMigration, payload); err != nil {
+		p.logger.Error("failed to send host migration (peer p2p)", logging.Error(err))
+	}
 	return nil
 }
 

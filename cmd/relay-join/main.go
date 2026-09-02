@@ -134,7 +134,7 @@ func main() {
 	session.Proxy = proxyClient
 	session.Conn = &mockConn{}
 
-	ctx := context.TODO()
+	ctx := context.Background()
 
 	if err := session.ConnectOverWebsocket(ctx, &multiv1.User{
 		UserId:   session.UserID,

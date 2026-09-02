@@ -31,11 +31,11 @@ type PacketRouter struct {
 	selfID    string
 	transport PeerTransport
 
-	roomID            string
-	currentHostID     string
-	pingTicker        *time.Ticker
-	hostPingInterval  time.Duration
-	wg                sync.WaitGroup
+	roomID           string
+	currentHostID    string
+	pingTicker       *time.Ticker
+	hostPingInterval time.Duration
+	wg               sync.WaitGroup
 
 	// loopCancel cancels the receive loop's context. The loop is owned by the
 	// router (not the caller's context) so it survives request-scoped contexts.
@@ -243,49 +243,56 @@ func (r *PacketRouter) handleLeaveRoom(ctx context.Context, player wire.Player) 
 
 func (r *PacketRouter) handleHostMigration(ctx context.Context, player wire.Player) error {
 	newHostID := strconv.Itoa(int(player.UserID))
+	newHostIP := player.IPAddress
 
 	r.mu.Lock()
+	prevHostID := r.currentHostID
 	r.currentHostID = newHostID
 	roomID := r.roomID
 	selfID := r.selfID
 	r.mu.Unlock()
 
+	// Null IP means refresh only, not a migration.
+	if newHostIP == "" || newHostIP == "0.0.0.0" {
+		r.logger.Info("host migration: refresh", "host", newHostID)
+		if host, ok := r.manager.GetPeerHost(newHostID); ok {
+			r.manager.StopHost(host)
+		}
+		return nil
+	}
+
 	if newHostID == selfID {
-		// I became a host!
+		if prevHostID == selfID {
+			r.logger.Info("already host, refresh ping", "room", roomID)
+			r.StartHostPing()
+			return nil
+		}
+		r.logger.Info("became host", "room", roomID)
 		r.StartHostPing()
 
 		payload := packet.NewHostSwitch(false, net.IPv4(127, 0, 0, 1))
 		if err := r.session.SendToGame(packet.HostMigration, payload); err != nil {
-			r.logger.Error("failed to send host migration packet", logging.Error(err))
-			return fmt.Errorf("failed to send host migration packet: %w", err)
+			r.logger.Error("failed to send host migration", logging.Error(err))
+			return fmt.Errorf("failed to send host migration: %w", err)
 		}
 
-		// Shutdown the previous proxies and save {[peerID: IPv4]} parameters to
-		// reuse them.
+		// Tear down the old listener and rebind surviving peer guests:
+		// stop old FakeHosts and recreate as UDP-only guests (TCP relay via
+		// relay path).
 		rebindHosts := make(map[string]string)
 		r.manager.ForEachPeerHost(func(peerID string, host *redirect.FakeHost) bool {
 			rebindHosts[peerID] = host.AssignedIP
 			r.manager.StopHost(host)
 			return true
 		})
+		r.logger.Info("host migration: rebind surviving peers as guests", "count", len(rebindHosts), "peers", rebindHosts)
 
-		// Recreate the proxies to the new host
 		for peerID, ip := range rebindHosts {
 			onUDPMessage := func(p []byte) error {
-				return r.SendPacket(RelayPacket{
-					Type:    "udp",
-					RoomID:  roomID,
-					ToID:    peerID,
-					Payload: p,
-				})
+				return r.SendPacket(RelayPacket{Type: "udp", RoomID: roomID, ToID: peerID, Payload: p})
 			}
 			onTCPMessage := func(p []byte) error {
-				return r.SendPacket(RelayPacket{
-					Type:    "tcp",
-					RoomID:  roomID,
-					ToID:    peerID,
-					Payload: p,
-				})
+				return r.SendPacket(RelayPacket{Type: "tcp", RoomID: roomID, ToID: peerID, Payload: p})
 			}
 			onHostDisconnected := func(host *redirect.FakeHost, forced bool) {
 				slog.Warn("Host went offline", logging.PeerID(peerID), "ip", host.AssignedIP, "forced", forced)
@@ -295,48 +302,46 @@ func (r *PacketRouter) handleHostMigration(ctx context.Context, player wire.Play
 					r.Reset()
 				}
 			}
-			host, err := r.manager.StartGuest(ctx, peerID, ip, 6114, 6113, onTCPMessage, onUDPMessage, onHostDisconnected)
+			// TCP port 0: no TCP listener for non-host peers after migration;
+			// the new host's game client is not yet listening.
+			host, err := r.manager.StartGuest(ctx, peerID, ip, 0, 6113, onTCPMessage, onUDPMessage, onHostDisconnected)
 			if err != nil {
-				r.logger.Warn("failed to start dial host", logging.Error(err), logging.PeerID(peerID))
-				return nil
+				r.logger.Warn("failed to start dial host for rebind", logging.Error(err), logging.PeerID(peerID))
+				continue
 			}
-			r.logger.Info("dial host started", logging.PeerID(peerID), "ip", host.AssignedIP)
+			r.logger.Info("dial host re-bound", logging.PeerID(peerID), "ip", host.AssignedIP)
 		}
-
-		// TODO: Send notice about the completion
 
 		return nil
 	}
 
-	// Non-self host migration: defer the delayed work to avoid blocking the event loop
+	// Peer host migration (deferred to avoid blocking).
 	go func() {
 		select {
 		case <-time.After(3 * time.Second):
-			// Someone else became a host
-			host, ok := r.manager.GetPeerHost(newHostID)
-			if !ok {
-				r.logger.Warn("peer not found, nothing to migrate", logging.PeerID(newHostID))
+			r.mu.Lock()
+			current := r.currentHostID
+			r.mu.Unlock()
+			if current != newHostID {
+				r.logger.Info("host migration superseded", "expected", newHostID, "current", current)
 				return
 			}
+
+			host, ok := r.manager.GetPeerHost(newHostID)
+			if !ok {
+				r.logger.Warn("unknown host, waiting", logging.PeerID(newHostID))
+				_ = r.session.SendToGame(packet.ReceiveMessage, packet.NewAdminNotice("system", "Host election: unknown host, please wait"))
+				return
+			}
+
 			r.manager.StopHost(host)
 
 			onTCPMessage := func(p []byte) error {
-				return r.SendPacket(RelayPacket{
-					Type:    "tcp",
-					RoomID:  roomID,
-					ToID:    newHostID,
-					Payload: p,
-				})
+				return r.SendPacket(RelayPacket{Type: "tcp", RoomID: roomID, ToID: newHostID, Payload: p})
 			}
 			onUDPMessage := func(p []byte) error {
-				return r.SendPacket(RelayPacket{
-					Type:    "udp",
-					RoomID:  roomID,
-					ToID:    newHostID,
-					Payload: p,
-				})
+				return r.SendPacket(RelayPacket{Type: "udp", RoomID: roomID, ToID: newHostID, Payload: p})
 			}
-
 			onHostDisconnected := func(host *redirect.FakeHost, forced bool) {
 				slog.Warn("Host went offline", logging.PeerID(newHostID), "ip", host.AssignedIP, "forced", forced)
 				r.Stop(host)
@@ -345,15 +350,19 @@ func (r *PacketRouter) handleHostMigration(ctx context.Context, player wire.Play
 					r.Reset()
 				}
 			}
-			host, err := r.manager.StartHost(context.Background(), newHostID, host.AssignedIP, 6114, 6113, onTCPMessage, onUDPMessage, onHostDisconnected)
+			newHost, err := r.manager.StartHost(context.Background(), newHostID, host.AssignedIP, 6114, 6113, onTCPMessage, onUDPMessage, onHostDisconnected)
 			if err != nil {
-				r.logger.Warn("failed to start host", logging.Error(err), logging.PeerID(newHostID))
+				r.logger.Warn("failed to start host for peer", logging.Error(err), logging.PeerID(newHostID))
 				return
 			}
 
-			payload := packet.NewHostSwitch(true, net.ParseIP(host.AssignedIP))
+			// Send HostMigration to the local game client so its 0x47FF handler
+			// takes the peer branch (connect to host:6114).
+			payload := packet.NewHostSwitch(true, net.ParseIP(newHost.AssignedIP))
 			if err := r.session.SendToGame(packet.HostMigration, payload); err != nil {
-				r.logger.Error("failed to send host migration packet", logging.Error(err))
+				r.logger.Error("failed to send host migration packet (peer)", logging.Error(err))
+			} else {
+				r.logger.Info("host migration: peer host established", "newHostID", newHostID, "ip", newHost.AssignedIP)
 			}
 		case <-ctx.Done():
 		}
@@ -603,6 +612,10 @@ func (r *PacketRouter) writeTCP(peerID string, payload []byte) {
 	host, ok := r.manager.GetPeerHost(peerID)
 	if !ok {
 		r.logger.Warn("peer not found, nothing to write", logging.PeerID(peerID))
+		return
+	}
+	if host.ProxyTCP == nil {
+		r.logger.Warn("tcp proxy not available for peer", logging.PeerID(peerID))
 		return
 	}
 	if _, err := host.ProxyTCP.Write(payload); err != nil {

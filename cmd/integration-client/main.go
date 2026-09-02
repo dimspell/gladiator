@@ -261,6 +261,41 @@ func run() error {
 		time.Sleep(time.Duration(leaveAfter) * time.Second)
 	}
 
+	// Post-migration exchange: after LEAVE_AFTER, host migration (if any)
+	// has already been processed by monitorMigrations. Survivors exchange
+	// UDP and TCP with the new host to verify connectivity after migration.
+	migState.mu.Lock()
+	iAmHost := migState.iAmHost
+	migratedIP := migState.currentPeerIP
+	migState.mu.Unlock()
+
+	if relayMode && role == "guest" {
+		if iAmHost {
+			// This survivor became the new host — accept incoming connections
+			// from the remaining survivor(s) with a 30s timeout.
+			postTimeout := 30 * time.Second
+			if err := exchangeUDP(myIP, "", "host", postTimeout, relayMode, 1); err != nil {
+				return fmt.Errorf("post-migration udp: %w", err)
+			}
+			fmt.Println("GAME_PACKET_EXCHANGED_UDP")
+			if err := exchangeTCP(myIP, "", "host", postTimeout, relayMode, 1); err != nil {
+				return fmt.Errorf("post-migration tcp: %w", err)
+			}
+			fmt.Println("GAME_PACKET_EXCHANGED_TCP")
+		} else if migratedIP != "" && migratedIP != peerIP && !stringInSlice(migratedIP, peerIPs) {
+			// This survivor is not the new host — dial the new host's IP.
+			postTimeout := 30 * time.Second
+			if err := exchangeUDP(myIP, migratedIP, "guest", postTimeout, relayMode, 1); err != nil {
+				return fmt.Errorf("post-migration udp: %w", err)
+			}
+			fmt.Println("GAME_PACKET_EXCHANGED_UDP")
+			if err := exchangeTCP(myIP, migratedIP, "guest", postTimeout, relayMode, 1); err != nil {
+				return fmt.Errorf("post-migration tcp: %w", err)
+			}
+			fmt.Println("GAME_PACKET_EXCHANGED_TCP")
+		}
+	}
+
 	return nil
 }
 
@@ -412,23 +447,6 @@ func exchange(myIP, peerIP string, peerIPs []string, role string, timeout time.D
 			return firstErr
 		}
 
-		// Step 2 — check for a HostMigration peer that is not in the
-		// original target list and exchange against it.
-		migState.mu.Lock()
-		migratedTarget := migState.currentPeerIP
-		migState.mu.Unlock()
-		if migratedTarget != "" && !stringInSlice(migratedTarget, targets) {
-			err := exchangeUDP(myIP, migratedTarget, role, timeout, relay, 1)
-			if err != nil {
-				return fmt.Errorf("udp: %w", err)
-			}
-			fmt.Printf("GAME_PACKET_EXCHANGED_UDP\n")
-			err = exchangeTCP(myIP, migratedTarget, role, timeout, relay, 1)
-			if err != nil {
-				return fmt.Errorf("tcp: %w", err)
-			}
-			fmt.Printf("GAME_PACKET_EXCHANGED_TCP\n")
-		}
 		return nil
 	}
 

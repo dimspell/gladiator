@@ -214,17 +214,48 @@ func (p *LAN) Handle(ctx context.Context, payload []byte) error {
 			return nil
 		}
 
-		ip := net.ParseIP(msg.Content.IPAddress)
-		if ip == nil {
-			slog.Error("Failed to parse IP address", "ip", msg.Content.IPAddress)
+		newHostID := msg.Content.UserID
+		newHostIPStr := msg.Content.IPAddress
+
+		// Case 4 — Null-IP refresh (0.0.0.0): just log, no migration packet.
+		// Observed behavior: refresh the slot without migration.
+		if newHostIPStr == "" || newHostIPStr == "0.0.0.0" {
+			slog.Info("host migration: null-IP refresh, no action", "newHostID", newHostID, "ip", newHostIPStr)
 			return nil
 		}
 
-		response := packet.NewHostSwitch(true, ip)
-		if err := p.Session.SendToGame(packet.HostMigration, response); err != nil {
-			slog.Error("Failed to send host migration response", logging.Error(err))
+		ip := net.ParseIP(newHostIPStr)
+		if ip == nil {
+			slog.Error("Failed to parse IP address", "ip", newHostIPStr)
 			return nil
 		}
+
+		// Case 1 — Self becomes host (local address match). Observed
+		// behavior: start listening on 6114 for peer connections.
+		if newHostID == p.Session.UserID {
+			slog.Info("host migration: I became host (LAN)", "selfID", p.Session.UserID, "ip", newHostIPStr)
+			response := packet.NewHostSwitch(false, net.IPv4(127, 0, 0, 1))
+			if err := p.Session.SendToGame(packet.HostMigration, response); err != nil {
+				slog.Error("Failed to send host migration response (self)", logging.Error(err))
+				return nil
+			}
+			return nil
+		}
+
+		// Case 2 — Known peer becomes host. For LAN we always treat it as
+		// known peer if the IP parses, and send the migration to the game
+		// client so its host-migration handler connects.
+		response := packet.NewHostSwitch(true, ip)
+		if err := p.Session.SendToGame(packet.HostMigration, response); err != nil {
+			slog.Error("Failed to send host migration response (peer)", logging.Error(err))
+			return nil
+		}
+		slog.Info("host migration: peer host established (LAN)", "newHostID", newHostID, "ip", newHostIPStr)
+
+		// Case 3 — Unknown host would be handled by the console's GetNextHost
+		// fallback; here we have the IP, so we proceed. No separate unknown
+		// branch needed for LAN because the IP is always provided.
+
 	default:
 		//	Ignore
 	}

@@ -11,7 +11,7 @@ Build = 3
 GenericName = "Gladiator"
 Categories = ["Games"]
 # Comment = "View sites on the Internet"
-Keywords = ["dispel", "gladiator"]
+Keywords = ["gladiator"]
 ExecParams = "gui"
 
 [Migrations]

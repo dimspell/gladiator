@@ -1,6 +1,13 @@
 # Gladiator
 
-This repository is a monorepo that contains multiple projects that helps to play a Dispel Multiplayer game.
+> Unofficial preservation research. Not affiliated with, endorsed by, or
+> connected to the original game publisher or studio.
+> Requires a lawfully obtained copy of the game. No game files
+> are distributed. Local loopback interop only.
+
+This repository is a monorepo with local servers that preserve multiplayer
+capabilities for the game after the original online service
+was discontinued.
 
 * **console** - A main server handling the state preservation and communication with the clients.
 * **backend** - A backend server that handles the commands send by the `DispelMulti.exe`. It exchanges the data with the **console**.

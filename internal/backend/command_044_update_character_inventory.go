@@ -14,11 +14,11 @@ import (
 
 func (b *Backend) HandleUpdateCharacterInventory(ctx context.Context, session *bsession.Session, req UpdateCharacterInventoryRequest) error {
 	if session.UserID == 0 {
-		return fmt.Errorf("packet-44: user is not logged in")
+		return fmt.Errorf("packet-44: not logged in")
 	}
 	data, err := req.Parse()
 	if err != nil {
-		slog.Warn("Invalid packet", logging.Error(err))
+		slog.Warn("invalid packet", logging.Error(err))
 		return nil
 	}
 
@@ -29,9 +29,10 @@ func (b *Backend) HandleUpdateCharacterInventory(ctx context.Context, session *b
 			Inventory:     data.Inventory,
 		}))
 	if err != nil {
-		return err
+		// The game sends roomname as second string; treat as ack
+		slog.Debug("no character, ack as room inventory", "char", data.CharacterName)
+		return session.SendToGame(packet.UpdateCharacterInventory, []byte{1, 0, 0, 0})
 	}
-
 	return session.SendToGame(packet.UpdateCharacterInventory, []byte{1, 0, 0, 0})
 }
 
@@ -45,19 +46,17 @@ type UpdateCharacterInventoryRequestData struct {
 
 func (r UpdateCharacterInventoryRequest) Parse() (data UpdateCharacterInventoryRequestData, err error) {
 	rd := packet.NewReader(r)
-
 	data.Username, err = rd.ReadString()
 	if err != nil {
-		return data, fmt.Errorf("packet-44: malformed username: %w", err)
+		return data, fmt.Errorf("packet-44: bad username: %w", err)
 	}
 	data.CharacterName, err = rd.ReadString()
 	if err != nil {
-		return data, fmt.Errorf("packet-44: malformed character name: %w", err)
+		return data, fmt.Errorf("packet-44: bad character name: %w", err)
 	}
 	data.Inventory, err = rd.ReadNBytes(207)
 	if err != nil {
-		return data, fmt.Errorf("packet-44: malformed inventory: %w", err)
+		return data, fmt.Errorf("packet-44: bad inventory: %w", err)
 	}
-
 	return data, rd.Close()
 }

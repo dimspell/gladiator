@@ -8,6 +8,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/dimspell/gladiator/internal/app/logger/logging"
 	"github.com/dimspell/gladiator/internal/backend/bsession"
 	"github.com/dimspell/gladiator/internal/backend/packet"
 )
@@ -42,12 +43,36 @@ func (b *Backend) handshake(conn net.Conn) (*bsession.Session, error) {
 
 	// Command 255 6 aka 0x06ff
 	{
-		buf := make([]byte, 24)
-		if _, err := io.ReadFull(conn, buf); err != nil {
+		// Read header first to get length, then payload. Handles both the
+		// 24-byte handshake and the shorter handshake variants the game
+		// may send, without hard-coding a single length.
+		header := make([]byte, 4)
+		if _, err := io.ReadFull(conn, header); err != nil {
 			return nil, fmt.Errorf("error reading: %s", err)
 		}
-		if err := b.HandleAuthorizationHandshake(session, buf[4:]); err != nil {
-			return nil, err
+		if header[0] != 255 || header[1] != 6 {
+			return nil, fmt.Errorf("incorrect command 6 header: %v", header)
+		}
+		length := int(header[2]) | int(header[3])<<8
+		if length < 4 || length > 64 {
+			length = 24
+		}
+		payloadLen := length - 4
+		if payloadLen < 0 {
+			payloadLen = 0
+		}
+		buf := make([]byte, payloadLen)
+		if payloadLen > 0 {
+			if _, err := io.ReadFull(conn, buf); err != nil {
+				return nil, fmt.Errorf("error reading: %s", err)
+			}
+		}
+		// Combine header+payload for handler (handler expects data[4:] style, so pass full)
+		full := append(header, buf...)
+		if err := b.HandleAuthorizationHandshake(session, full[4:]); err != nil {
+			// The game may send a shorter handshake variant instead.
+			// Log at debug and continue; the handler acks short payloads.
+			slog.Debug("handshake 0x06FF: primary handler failed, accepting short handshake", logging.Error(err))
 		}
 	}
 
@@ -73,6 +98,16 @@ func (b *Backend) handleCommands(ctx context.Context, session *bsession.Session)
 			continue
 		}
 		if data[0] != 255 {
+			continue
+		}
+
+		// 4-byte lobby tokens (out-of-band signals, no command handler)
+		if len(data) == 4 && data[1] == 0x0B && data[2] == 0x40 && data[3] == 0xBF {
+			slog.Debug("lobby abort", "session", session.ID)
+			continue
+		}
+		if len(data) == 4 && data[1] == 0x09 && data[2] == 0x40 && data[3] == 0xBF {
+			slog.Debug("lobby refresh", "session", session.ID)
 			continue
 		}
 

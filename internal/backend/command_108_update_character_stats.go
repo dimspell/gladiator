@@ -28,14 +28,15 @@ func (b *Backend) HandleUpdateCharacterStats(ctx context.Context, session *bsess
 		return err
 	}
 
-	_, err = b.characterClient.PutStats(context.TODO(),
+	_, err = b.characterClient.PutStats(ctx,
 		connect.NewRequest(&multiv1.PutStatsRequest{
 			UserId:        session.UserID,
 			CharacterName: data.Character,
 			Stats:         data.Info,
 		}))
 	if err != nil {
-		return err
+		slog.Warn("invalid packet", logging.Error(err))
+		return nil
 	}
 
 	return session.SendToGame(packet.UpdateCharacterStats, []byte{})

@@ -23,6 +23,26 @@ func (h *LobbyEventHandler) Handle(ctx context.Context, payload []byte) error {
 	eventType := wire.ParseEventType(payload)
 
 	switch eventType {
+	case wire.SystemNotice:
+		_, msg, err := wire.DecodeTyped[wire.SystemNoticePayload](payload)
+		if err != nil {
+			slog.Warn("Could not decode system notice", "session", h.Session.ID, logging.Error(err), "event", eventType.String(), "payload", payload)
+			return nil
+		}
+		if err := h.Session.SendToGame(packet.ReceiveMessage, packet.NewAdminNotice(msg.Content.User, msg.Content.Text)); err != nil {
+			slog.Error("Error writing system notice", "session", h.Session.ID, logging.Error(err))
+			return nil
+		}
+	case wire.NumericProbe:
+		_, msg, err := wire.DecodeTyped[wire.NumericProbePayload](payload)
+		if err != nil {
+			slog.Warn("Could not decode numeric probe", "session", h.Session.ID, logging.Error(err), "event", eventType.String(), "payload", payload)
+			return nil
+		}
+		if err := h.Session.SendToGame(packet.ReceiveMessage, packet.NewNumericProbe(msg.Content.S1, msg.Content.S2, msg.Content.S3)); err != nil {
+			slog.Error("Error writing numeric probe", "session", h.Session.ID, logging.Error(err))
+			return nil
+		}
 	case wire.Chat:
 		_, msg, err := wire.DecodeTyped[wire.ChatMessage](payload)
 		if err != nil {

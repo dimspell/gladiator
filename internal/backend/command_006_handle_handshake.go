@@ -9,22 +9,30 @@ import (
 	"github.com/dimspell/gladiator/internal/backend/packet"
 )
 
-// HandleAuthorizationHandshake handles 0x6ff (255-6) command.
+// HandleAuthorizationHandshake handles 0x6ff (255-6), sent by the game
+// during the initial handshake after it asked to play and the server
+// answered on 255-30.
 //
-// This command is called from the game client during initial handshake, after
-// player clicked on the "Play" button and the game server previously responded
-// on command 255-30.
-//
-// It expects to receive an authorization key "68XIPSID" (note: not a null
-// terminated string) from the game client. If the key matches, then the game
-// server is going to respond with "ENET" (also a null-terminated string).
-//
-// When the game client will receive the response on the 255-6 command, it is
-// going to display a login screen, asking user to create a new account or sign
-// in using with already existing credentials.
+// The game sends an 8-byte authorization key followed by a version number.
+// If the key matches, the server replies with a short ack and the game
+// moves on to the login screen.
 func (b *Backend) HandleAuthorizationHandshake(session *bsession.Session, req AuthorizationHandshakeRequest) error {
+	// The game may send a shorter handshake (4 or 16 bytes) instead of the
+	// default 24-byte form; ack those too so it can proceed.
+	if len(req) == 4 && string(req) == "ENET" {
+		return session.SendToGame(packet.AuthorizationHandshake, []byte("ENET\x00"))
+	}
+	if len(req) == 16 && len(req) >= 8 && string(req[0:4]) == "IX86" {
+		return session.SendToGame(packet.AuthorizationHandshake, []byte("ENET\x00"))
+	}
+
 	data, err := req.Parse()
 	if err != nil {
+		// Short handshake variants (e.g. 4 B): ack so the game can proceed.
+		if len(req) <= 16 {
+			slog.Debug("packet-6: short handshake, acking", "len", len(req))
+			return session.SendToGame(packet.AuthorizationHandshake, []byte("ENET\x00"))
+		}
 		slog.Warn("Invalid packet", logging.Error(err))
 		return nil
 	}
@@ -33,8 +41,6 @@ func (b *Backend) HandleAuthorizationHandshake(session *bsession.Session, req Au
 		if err := session.SendToGame(packet.AuthorizationHandshake, []byte{0, 0, 0, 0}); err != nil {
 			return err
 		}
-
-		// Returned only for any fake clients
 		return fmt.Errorf("packet-6: wrong auth key: %q", data.AuthKey)
 	}
 
@@ -42,7 +48,6 @@ func (b *Backend) HandleAuthorizationHandshake(session *bsession.Session, req Au
 		if err := session.SendToGame(packet.AuthorizationHandshake, []byte{0, 0, 0, 0}); err != nil {
 			return err
 		}
-
 		return fmt.Errorf("packet-6: invalid version number: %d", data.VersionNumber)
 	}
 
@@ -52,10 +57,10 @@ func (b *Backend) HandleAuthorizationHandshake(session *bsession.Session, req Au
 type AuthorizationHandshakeRequest []byte
 
 type AuthorizationHandshakeRequestData struct {
-	// Authorization key. Normally it should be equal to "68XIPSID".
+	// Authorization key sent by the game.
 	AuthKey []byte
 
-	// It seems to be always equal to 3.
+	// Version number sent by the game; always 3.
 	VersionNumber uint32
 }
 

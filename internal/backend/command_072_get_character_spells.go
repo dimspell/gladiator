@@ -14,27 +14,28 @@ import (
 
 func (b *Backend) HandleGetCharacterSpells(ctx context.Context, session *bsession.Session, req GetCharacterSpellsRequest) error {
 	if session.UserID == 0 {
-		return fmt.Errorf("packet-72: user is not logged in")
+		return fmt.Errorf("packet-72: not logged in")
 	}
-
 	data, err := req.Parse()
 	if err != nil {
-		slog.Warn("Invalid packet", logging.Error(err))
+		slog.Warn("invalid packet", logging.Error(err))
 		return nil
 	}
-
 	respChar, err := b.characterClient.GetCharacter(ctx, connect.NewRequest(&multiv1.GetCharacterRequest{
 		UserId:        session.UserID,
 		CharacterName: data.CharacterName,
 	}))
 	if err != nil {
-		return err
+		slog.Debug("no character, send default 41", "char", data.CharacterName)
+		def := make([]byte, 41)
+		for i := range def {
+			def[i] = 1
+		}
+		return session.SendToGame(packet.GetCharacterSpells, def)
 	}
-
 	character := respChar.Msg.Character
-
 	if len(character.Spells) != 43 {
-		slog.Warn("packet-72: spells array should be 43-chars long", "spells", character.Spells, logging.Error(err))
+		slog.Warn("packet-72: bad spells length", "len", len(character.Spells))
 		return nil
 	}
 	for i := 0; i < 41; i++ {
@@ -42,7 +43,6 @@ func (b *Backend) HandleGetCharacterSpells(ctx context.Context, session *bsessio
 			character.Spells[i] = 1
 		}
 	}
-
 	return session.SendToGame(packet.GetCharacterSpells, character.Spells)
 }
 

@@ -80,7 +80,7 @@ func TestParseCharacterInfo(t *testing.T) {
 	assert.Equal(t, EquipmentSlot(100), info.SecondaryWeapon)
 	assert.Equal(t, EquipmentSlot(42), info.PrimaryWeapon)
 	assert.Equal(t, EquipmentSlot(100), info.Shield)
-	assert.Equal(t, EquipmentSlot(100), info.UnknownEquipmentSlot)
+	assert.Equal(t, EquipmentSlot(100), info.ExtraSlot)
 	assert.Equal(t, GenderMale, info.Gender)
 	assert.Equal(t, byte(1), info.Level)
 	assert.Equal(t, uint16(1), info.EdgedWeapons)
@@ -119,7 +119,7 @@ func BenchmarkCharacterInfo_ToBytes(b *testing.B) {
 		SecondaryWeapon:      100,
 		PrimaryWeapon:        42,
 		Shield:               100,
-		UnknownEquipmentSlot: 100,
+		ExtraSlot: 100,
 		Gender:               GenderMale,
 		Level:                1,
 		EdgedWeapons:         2,

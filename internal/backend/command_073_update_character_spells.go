@@ -14,15 +14,13 @@ import (
 
 func (b *Backend) HandleUpdateCharacterSpells(ctx context.Context, session *bsession.Session, req UpdateCharacterSpellsRequest) error {
 	if session.UserID == 0 {
-		return fmt.Errorf("packet-73: user has been already logged in")
+		return fmt.Errorf("packet-73: not logged in")
 	}
-
 	data, err := req.Parse()
 	if err != nil {
-		slog.Warn("Invalid packet", logging.Error(err))
+		slog.Warn("invalid packet", logging.Error(err))
 		return nil
 	}
-
 	_, err = b.characterClient.PutSpells(ctx,
 		connect.NewRequest(&multiv1.PutSpellsRequest{
 			UserId:        session.UserID,
@@ -30,9 +28,9 @@ func (b *Backend) HandleUpdateCharacterSpells(ctx context.Context, session *bses
 			Spells:        data.Spells,
 		}))
 	if err != nil {
-		return fmt.Errorf("packet-73: could not update character spells: %s", err)
+		slog.Debug("no character, ack anyway", "char", data.CharacterName)
+		return session.SendToGame(packet.UpdateCharacterSpells, []byte{1, 0, 0, 0})
 	}
-
 	return session.SendToGame(packet.UpdateCharacterSpells, []byte{1, 0, 0, 0})
 }
 

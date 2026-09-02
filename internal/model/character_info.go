@@ -27,7 +27,7 @@ type CharacterInfo struct {
 	SecondaryWeapon      EquipmentSlot // Buggy
 	PrimaryWeapon        EquipmentSlot
 	Shield               EquipmentSlot
-	UnknownEquipmentSlot EquipmentSlot // Unknown
+	ExtraSlot            EquipmentSlot // buf[37] — 11th equipment slot, purpose unknown (100 = empty)
 	Gender               Gender
 	Level                byte
 	EdgedWeapons         uint16 // First byte is stat, the next one is number of kills
@@ -64,7 +64,7 @@ func ParseCharacterInfo(buf []byte) CharacterInfo {
 		SecondaryWeapon:      EquipmentSlot(buf[34]),
 		PrimaryWeapon:        EquipmentSlot(buf[35]),
 		Shield:               EquipmentSlot(buf[36]),
-		UnknownEquipmentSlot: EquipmentSlot(buf[37]),
+		ExtraSlot:            EquipmentSlot(buf[37]),
 		Gender:               Gender(buf[38]),
 		Level:                buf[39],
 		EdgedWeapons:         binary.LittleEndian.Uint16(buf[40:42]),
@@ -105,7 +105,7 @@ func (c *CharacterInfo) ToBytes() []byte {
 	buf[34] = byte(c.SecondaryWeapon)
 	buf[35] = byte(c.PrimaryWeapon)
 	buf[36] = byte(c.Shield)
-	buf[37] = byte(c.UnknownEquipmentSlot)
+	buf[37] = byte(c.ExtraSlot)
 
 	buf[38] = byte(c.Gender)
 	buf[39] = c.Level

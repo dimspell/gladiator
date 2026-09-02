@@ -39,7 +39,7 @@ func main() {
 	proxyClient := px.Create(session, gameClient).(*relay.Relay)
 	session.Proxy = proxyClient
 
-	ctx := context.TODO()
+	ctx := context.Background()
 
 	if err := session.ConnectOverWebsocket(ctx, &multiv1.User{
 		UserId:   session.UserID,

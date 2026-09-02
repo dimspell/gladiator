@@ -65,6 +65,17 @@ func (p *Player) ID() string {
 }
 
 type ChatMessage struct {
-	User string
-	Text string
+	User string `json:"user"`
+	Text string `json:"text"`
+}
+
+type SystemNoticePayload struct {
+	User string `json:"user"`
+	Text string `json:"text"`
+}
+
+type NumericProbePayload struct {
+	S1 string `json:"s1"`
+	S2 string `json:"s2"`
+	S3 string `json:"s3"`
 }

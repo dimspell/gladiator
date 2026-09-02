@@ -19,6 +19,9 @@ const (
 	RTCOffer
 	RTCAnswer
 	RTCICECandidate
+
+	SystemNotice
+	NumericProbe
 )
 
 func (e EventType) String() string {
@@ -53,6 +56,10 @@ func (e EventType) String() string {
 		return "RTCAnswer"
 	case RTCICECandidate:
 		return "RTCICECandidate"
+	case SystemNotice:
+		return "SystemNotice"
+	case NumericProbe:
+		return "NumericProbe"
 	default:
 		return "Unknown"
 	}
